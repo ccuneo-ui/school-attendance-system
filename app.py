@@ -1,0 +1,242 @@
+"""
+School Attendance System - Backend Server
+This Flask app connects the HTML attendance form to your SQLite database
+"""
+
+from flask import Flask, request, jsonify, send_from_directory
+from flask_cors import CORS
+import sqlite3
+from datetime import datetime
+import os
+
+app = Flask(__name__)
+CORS(app)  # Allow the HTML form to communicate with this server
+
+# Database file location - UPDATE THIS PATH to match where you saved your database
+DATABASE = 'school.db'
+
+def get_db_connection():
+    """Create a connection to the SQLite database"""
+    conn = sqlite3.connect(DATABASE)
+    conn.row_factory = sqlite3.Row  # Return rows as dictionaries
+    return conn
+
+# ============================================
+# API ENDPOINTS
+# ============================================
+
+@app.route('/')
+def index():
+    """Serve the attendance form"""
+    return send_from_directory('.', 'attendance_form.html')
+
+@app.route('/api/programs', methods=['GET'])
+def get_programs():
+    """Get all active programs"""
+    conn = get_db_connection()
+    programs = conn.execute('''
+        SELECT program_id, program_name, billing_rate, billing_type
+        FROM programs
+        WHERE status = 'active'
+        ORDER BY program_name
+    ''').fetchall()
+    conn.close()
+    
+    return jsonify([dict(p) for p in programs])
+
+@app.route('/api/staff', methods=['GET'])
+def get_staff():
+    """Get all staff members who can record attendance"""
+    conn = get_db_connection()
+    staff = conn.execute('''
+        SELECT staff_id, first_name || ' ' || last_name as name, role
+        FROM staff
+        WHERE status = 'active' AND can_record_attendance = 1
+        ORDER BY last_name, first_name
+    ''').fetchall()
+    conn.close()
+    
+    return jsonify([dict(s) for s in staff])
+
+@app.route('/api/enrollments/<int:program_id>', methods=['GET'])
+def get_enrollments(program_id):
+    """Get all students enrolled in a specific program"""
+    conn = get_db_connection()
+    enrollments = conn.execute('''
+        SELECT 
+            e.enrollment_id,
+            e.student_id,
+            s.first_name || ' ' || s.last_name as student_name,
+            s.first_name,
+            s.last_name,
+            e.program_id,
+            p.program_name
+        FROM enrollments e
+        JOIN students s ON e.student_id = s.student_id
+        JOIN programs p ON e.program_id = p.program_id
+        WHERE e.program_id = ? 
+            AND e.status = 'active'
+            AND s.status = 'active'
+        ORDER BY s.last_name, s.first_name
+    ''', (program_id,)).fetchall()
+    conn.close()
+    
+    return jsonify([dict(e) for e in enrollments])
+
+@app.route('/api/attendance', methods=['POST'])
+def save_attendance():
+    """Save attendance records"""
+    data = request.json
+    
+    program_id = data.get('program_id')
+    date = data.get('date')
+    staff_id = data.get('staff_id')
+    attendance = data.get('attendance', {})
+    
+    if not all([program_id, date, staff_id, attendance]):
+        return jsonify({'error': 'Missing required fields'}), 400
+    
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    saved_count = 0
+    errors = []
+    
+    for student_id, record in attendance.items():
+        try:
+            # Get enrollment_id
+            enrollment = cursor.execute('''
+                SELECT enrollment_id 
+                FROM enrollments 
+                WHERE student_id = ? AND program_id = ? AND status = 'active'
+            ''', (student_id, program_id)).fetchone()
+            
+            if not enrollment:
+                errors.append(f"No active enrollment found for student {student_id}")
+                continue
+            
+            enrollment_id = enrollment['enrollment_id']
+            
+            # Check if attendance already exists for this date
+            existing = cursor.execute('''
+                SELECT attendance_id 
+                FROM attendance_records 
+                WHERE enrollment_id = ? AND attendance_date = ?
+            ''', (enrollment_id, date)).fetchone()
+            
+            if existing:
+                # Update existing record
+                cursor.execute('''
+                    UPDATE attendance_records
+                    SET status = ?, 
+                        notes = ?,
+                        recorded_by = ?,
+                        recorded_at = CURRENT_TIMESTAMP
+                    WHERE attendance_id = ?
+                ''', (record['status'], record.get('note', ''), staff_id, existing['attendance_id']))
+            else:
+                # Insert new record
+                cursor.execute('''
+                    INSERT INTO attendance_records 
+                    (enrollment_id, attendance_date, status, recorded_by, notes)
+                    VALUES (?, ?, ?, ?, ?)
+                ''', (enrollment_id, date, record['status'], staff_id, record.get('note', '')))
+            
+            saved_count += 1
+            
+        except Exception as e:
+            errors.append(f"Error saving attendance for student {student_id}: {str(e)}")
+    
+    conn.commit()
+    conn.close()
+    
+    return jsonify({
+        'success': True,
+        'saved_count': saved_count,
+        'errors': errors
+    })
+
+@app.route('/api/attendance/<int:program_id>/<date>', methods=['GET'])
+def get_attendance(program_id, date):
+    """Get attendance records for a specific program and date"""
+    conn = get_db_connection()
+    records = conn.execute('''
+        SELECT 
+            a.attendance_id,
+            a.enrollment_id,
+            e.student_id,
+            s.first_name || ' ' || s.last_name as student_name,
+            a.status,
+            a.notes,
+            a.recorded_at,
+            st.first_name || ' ' || st.last_name as recorded_by_name
+        FROM attendance_records a
+        JOIN enrollments e ON a.enrollment_id = e.enrollment_id
+        JOIN students s ON e.student_id = s.student_id
+        JOIN staff st ON a.recorded_by = st.staff_id
+        WHERE e.program_id = ? AND a.attendance_date = ?
+        ORDER BY s.last_name, s.first_name
+    ''', (program_id, date)).fetchall()
+    conn.close()
+    
+    return jsonify([dict(r) for r in records])
+
+@app.route('/api/summary/<int:program_id>/<start_date>/<end_date>', methods=['GET'])
+def get_summary(program_id, start_date, end_date):
+    """Get attendance summary for a program over a date range"""
+    conn = get_db_connection()
+    summary = conn.execute('''
+        SELECT 
+            s.student_id,
+            s.first_name || ' ' || s.last_name as student_name,
+            COUNT(*) as total_days,
+            SUM(CASE WHEN a.status = 'present' THEN 1 ELSE 0 END) as present_count,
+            SUM(CASE WHEN a.status = 'absent' THEN 1 ELSE 0 END) as absent_count,
+            SUM(CASE WHEN a.status = 'excused' THEN 1 ELSE 0 END) as excused_count
+        FROM attendance_records a
+        JOIN enrollments e ON a.enrollment_id = e.enrollment_id
+        JOIN students s ON e.student_id = s.student_id
+        WHERE e.program_id = ?
+            AND a.attendance_date BETWEEN ? AND ?
+        GROUP BY s.student_id, s.first_name, s.last_name
+        ORDER BY s.last_name, s.first_name
+    ''', (program_id, start_date, end_date)).fetchall()
+    conn.close()
+    
+    return jsonify([dict(r) for r in summary])
+
+@app.route('/api/test', methods=['GET'])
+def test():
+    """Test endpoint to verify server is running"""
+    return jsonify({
+        'status': 'ok',
+        'message': 'Server is running!',
+        'database': DATABASE,
+        'database_exists': os.path.exists(DATABASE)
+    })
+
+# ============================================
+# RUN SERVER
+# ============================================
+
+if __name__ == '__main__':
+    # Check if database exists
+    if not os.path.exists(DATABASE):
+        print(f"WARNING: Database file '{DATABASE}' not found!")
+        print("Please make sure your school.db file is in the same folder as this script.")
+        print("Or update the DATABASE variable at the top of this file with the correct path.")
+    else:
+        print(f"✓ Database found: {DATABASE}")
+    
+    print("\n" + "="*50)
+    print("🚀 School Attendance System Server Starting...")
+    print("="*50)
+    print("\nServer will be available at: http://localhost:5000")
+    print("\nTo use the attendance form:")
+    print("1. Open your web browser")
+    print("2. Go to: http://localhost:5000")
+    print("\nPress Ctrl+C to stop the server")
+    print("="*50 + "\n")
+    
+    port = int(os.environ.get('PORT', 5000))
+    app.run(debug=False, host='0.0.0.0', port=port)
