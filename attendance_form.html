@@ -371,9 +371,23 @@
 
             // Event listeners
             document.getElementById('programSelect').addEventListener('change', loadStudents);
-            document.getElementById('dateInput').addEventListener('change', () => {
+            document.getElementById('dateInput').addEventListener('change', async () => {
                 updateDateDisplay();
-                loadStudents(); // Reload students AND existing attendance when date changes
+                const programId = parseInt(document.getElementById('programSelect').value);
+                if (programId) {
+                    // If students already loaded, just reload attendance for new date
+                    const date = document.getElementById('dateInput').value;
+                    attendanceData = {};
+                    // Clear all button highlights
+                    document.querySelectorAll('.status-btn').forEach(btn => {
+                        btn.classList.remove('active', 'present', 'absent', 'excused');
+                    });
+                    // Hide all notes
+                    document.querySelectorAll('.notes-input').forEach(n => n.classList.remove('show'));
+                    // Load existing records for new date
+                    await loadExistingAttendance(programId, date);
+                    updateSummary();
+                }
             });
         }
 
