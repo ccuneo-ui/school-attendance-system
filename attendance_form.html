@@ -330,6 +330,14 @@
                     </select>
                 </div>
             </div>
+            <div class="control-group" style="margin-top: 15px;">
+                <div class="form-group">
+                    <label for="gradeFilter">Filter by Grade (optional)</label>
+                    <select id="gradeFilter">
+                        <option value="">All Grades</option>
+                    </select>
+                </div>
+            </div>
         </div>
 
         <div class="attendance-grid">
@@ -383,6 +391,7 @@
 
             // Event listeners
             document.getElementById('programSelect').addEventListener('change', loadStudents);
+            document.getElementById('gradeFilter').addEventListener('change', filterStudentsByGrade);
             document.getElementById('dateInput').addEventListener('change', async () => {
                 updateDateDisplay();
                 const programId = parseInt(document.getElementById('programSelect').value);
@@ -446,6 +455,43 @@
             }
         }
 
+
+        function populateGradeFilter(students) {
+            const gradeFilter = document.getElementById('gradeFilter');
+            // Clear existing options except "All Grades"
+            gradeFilter.innerHTML = '<option value="">All Grades</option>';
+            
+            // Get unique grades from students
+            const grades = [...new Set(students.map(s => s.grade || 'Unknown'))].sort();
+            
+            grades.forEach(grade => {
+                const option = document.createElement('option');
+                option.value = grade;
+                option.textContent = `Grade ${grade}`;
+                gradeFilter.appendChild(option);
+            });
+        }
+
+        function filterStudentsByGrade() {
+            const selectedGrade = document.getElementById('gradeFilter').value;
+            const allRows = document.querySelectorAll('.student-row');
+            
+            allRows.forEach(row => {
+                if (!selectedGrade) {
+                    row.style.display = '';  // Show all
+                } else {
+                    const studentGrade = row.getAttribute('data-grade');
+                    if (studentGrade === selectedGrade) {
+                        row.style.display = '';
+                    } else {
+                        row.style.display = 'none';
+                    }
+                }
+            });
+            
+            updateSummary();
+        }
+
         function updateDateDisplay() {
             const dateInput = document.getElementById('dateInput');
             const date = new Date(dateInput.value + 'T00:00:00');
@@ -490,11 +536,17 @@
                 }
 
                 attendanceData = {};
+                // Store students globally for filtering
+                window.currentStudents = students;
+                
+                // Populate grade filter
+                populateGradeFilter(students);
+                
                 studentList.innerHTML = students.map(student => `
-                    <div class="student-row" id="student-${student.student_id}">
+                    <div class="student-row" id="student-${student.student_id}" data-grade="${student.grade || 'Unknown'}">
                         <div>
                             <div class="student-name">${student.student_name}</div>
-                            <div class="student-info">Student ID: ${student.student_id}</div>
+                            <div class="student-info">Student ID: ${student.student_id} | Grade: ${student.grade || 'Unknown'}</div>
                         </div>
                         <div class="status-buttons">
                             <button class="status-btn" onclick="setStatus(${student.student_id}, 'present')" data-status="present">
