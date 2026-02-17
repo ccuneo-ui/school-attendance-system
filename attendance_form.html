@@ -371,7 +371,10 @@
 
             // Event listeners
             document.getElementById('programSelect').addEventListener('change', loadStudents);
-            document.getElementById('dateInput').addEventListener('change', updateDateDisplay);
+            document.getElementById('dateInput').addEventListener('change', () => {
+                updateDateDisplay();
+                loadStudents(); // Reload students AND existing attendance when date changes
+            });
         }
 
         async function loadPrograms() {
@@ -479,6 +482,11 @@
 
                 document.getElementById('summary').style.display = 'flex';
                 document.getElementById('actionButtons').style.display = 'flex';
+                
+                // Load existing attendance records for this date
+                const date = document.getElementById('dateInput').value;
+                await loadExistingAttendance(programId, date);
+                
                 updateSummary();
                 
             } catch (error) {
@@ -489,6 +497,50 @@
                         <p>Please make sure the backend server is running</p>
                     </div>
                 `;
+            }
+        }
+
+        async function loadExistingAttendance(programId, date) {
+            try {
+                const response = await fetch(`${API_URL}/attendance/${programId}/${date}`);
+                const records = await response.json();
+                
+                if (records.length === 0) return; // No existing records, nothing to pre-fill
+                
+                records.forEach(record => {
+                    const studentId = record.student_id;
+                    
+                    // Pre-fill attendance data
+                    attendanceData[studentId] = {
+                        status: record.status,
+                        note: record.notes || ''
+                    };
+                    
+                    // Highlight the correct button
+                    const row = document.getElementById(`student-${studentId}`);
+                    if (row) {
+                        const buttons = row.querySelectorAll('.status-btn');
+                        buttons.forEach(btn => {
+                            btn.classList.remove('active', 'present', 'absent', 'excused');
+                        });
+                        const activeBtn = row.querySelector(`[data-status="${record.status}"]`);
+                        if (activeBtn) {
+                            activeBtn.classList.add('active', record.status);
+                        }
+                        
+                        // Pre-fill notes if any
+                        if (record.notes) {
+                            const notesInput = document.getElementById(`notes-${studentId}`);
+                            if (notesInput) {
+                                notesInput.classList.add('show');
+                                notesInput.querySelector('input').value = record.notes;
+                            }
+                        }
+                    }
+                });
+                
+            } catch (error) {
+                console.error('Error loading existing attendance:', error);
             }
         }
 
