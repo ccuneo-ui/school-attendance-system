@@ -401,8 +401,16 @@
                     const option = document.createElement('option');
                     option.value = program.program_id;
                     option.textContent = program.program_name;
+                    // Auto-select General Attendance
+                    if (program.program_name === 'General Attendance') {
+                        option.selected = true;
+                    }
                     programSelect.appendChild(option);
                 });
+                
+                // Auto-load students for General Attendance
+                await loadStudents();
+                
             } catch (error) {
                 console.error('Error loading programs:', error);
                 alert('Error connecting to server. Make sure the Python backend is running.');
