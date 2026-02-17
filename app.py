@@ -12,8 +12,27 @@ import os
 app = Flask(__name__)
 CORS(app)  # Allow the HTML form to communicate with this server
 
-# Database file location - UPDATE THIS PATH to match where you saved your database
-DATABASE = 'school.db'
+# Database file location - Uses persistent disk on Render, falls back to local for development
+PERSISTENT_DB = '/var/data/school.db'  # Persistent disk path on Render
+LOCAL_DB = 'school.db'                 # Local path for development
+
+def get_database_path():
+    """Use persistent disk if available, otherwise use local file"""
+    import os
+    # If persistent disk exists, use it
+    if os.path.exists('/var/data'):
+        # If database doesn't exist on persistent disk yet, copy it from local
+        if not os.path.exists(PERSISTENT_DB):
+            import shutil
+            if os.path.exists(LOCAL_DB):
+                shutil.copy2(LOCAL_DB, PERSISTENT_DB)
+                print(f"✓ Copied database to persistent disk: {PERSISTENT_DB}")
+            else:
+                print(f"WARNING: No local database found to copy!")
+        return PERSISTENT_DB
+    return LOCAL_DB
+
+DATABASE = get_database_path()
 
 def get_db_connection():
     """Create a connection to the SQLite database"""
@@ -238,5 +257,4 @@ if __name__ == '__main__':
     print("\nPress Ctrl+C to stop the server")
     print("="*50 + "\n")
     
-    port = int(os.environ.get('PORT', 5000))
-    app.run(debug=False, host='0.0.0.0', port=port)
+    app.run(debug=True, host='0.0.0.0', port=5000)
