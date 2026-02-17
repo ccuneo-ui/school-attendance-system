@@ -176,8 +176,20 @@
         .action-buttons {
             display: flex;
             gap: 15px;
-            margin-top: 20px;
             justify-content: flex-end;
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: white;
+            padding: 15px 30px;
+            box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.1);
+            z-index: 100;
+        }
+
+        /* Add padding so content isn't hidden behind sticky bar */
+        .attendance-grid {
+            padding-bottom: 80px;
         }
 
         .btn {
