@@ -235,6 +235,37 @@ def test():
     })
 
 # ============================================
+# BACKUP ENDPOINT
+# ============================================
+
+BACKUP_PASSWORD = 'school2026'  # Change this to something only you know!
+
+@app.route('/backup/download', methods=['GET'])
+def download_backup():
+    """Download the live database file - password protected"""
+    password = request.args.get('key', '')
+    
+    if password != BACKUP_PASSWORD:
+        return jsonify({'error': 'Unauthorized - invalid key'}), 401
+    
+    if not os.path.exists(DATABASE):
+        return jsonify({'error': 'Database not found'}), 404
+    
+    directory = os.path.dirname(os.path.abspath(DATABASE))
+    filename = os.path.basename(DATABASE)
+    
+    from flask import send_file
+    from datetime import datetime
+    backup_name = f"school_backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}.db"
+    
+    return send_file(
+        DATABASE,
+        as_attachment=True,
+        download_name=backup_name,
+        mimetype='application/octet-stream'
+    )
+
+# ============================================
 # RUN SERVER
 # ============================================
 
