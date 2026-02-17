@@ -88,6 +88,7 @@ def get_enrollments(program_id):
             s.first_name || ' ' || s.last_name as student_name,
             s.first_name,
             s.last_name,
+            s.grade,
             e.program_id,
             p.program_name
         FROM enrollments e
