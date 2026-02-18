@@ -236,6 +236,75 @@ def test():
     })
 
 # ============================================
+# M CARD ROUTES
+# ============================================
+
+def init_mcard_table():
+    """Create mcard_charges table if it doesn't exist"""
+    conn = get_db_connection()
+    conn.execute('''
+        CREATE TABLE IF NOT EXISTS mcard_charges (
+            charge_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            student_name TEXT NOT NULL,
+            charge_date TEXT NOT NULL,
+            recorded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+    conn.commit()
+    conn.close()
+
+@app.route('/mcard')
+def mcard():
+    """Serve the M Card charge tracker"""
+    return send_from_directory('.', 'mcard_tracker.html')
+
+@app.route('/api/mcard/charges', methods=['GET'])
+def get_mcard_charges():
+    """Get all M Card charges"""
+    init_mcard_table()
+    conn = get_db_connection()
+    charges = conn.execute('''
+        SELECT charge_id, student_name, charge_date, recorded_at
+        FROM mcard_charges
+        ORDER BY charge_date DESC, recorded_at DESC
+    ''').fetchall()
+    conn.close()
+    return jsonify([dict(c) for c in charges])
+
+@app.route('/api/mcard/charges', methods=['POST'])
+def add_mcard_charge():
+    """Add a new M Card charge"""
+    init_mcard_table()
+    data = request.json
+    student_name = data.get('student_name', '').strip()
+    charge_date = data.get('charge_date', '')
+
+    if not student_name or not charge_date:
+        return jsonify({'error': 'Missing student_name or charge_date'}), 400
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute('''
+        INSERT INTO mcard_charges (student_name, charge_date)
+        VALUES (?, ?)
+    ''', (student_name, charge_date))
+    charge_id = cursor.lastrowid
+    conn.commit()
+    conn.close()
+
+    return jsonify({'success': True, 'charge_id': charge_id})
+
+@app.route('/api/mcard/charges/<int:charge_id>', methods=['DELETE'])
+def delete_mcard_charge(charge_id):
+    """Delete an M Card charge"""
+    init_mcard_table()
+    conn = get_db_connection()
+    conn.execute('DELETE FROM mcard_charges WHERE charge_id = ?', (charge_id,))
+    conn.commit()
+    conn.close()
+    return jsonify({'success': True})
+
+# ============================================
 # BACKUP ENDPOINT
 # ============================================
 
