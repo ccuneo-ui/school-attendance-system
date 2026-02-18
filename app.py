@@ -519,15 +519,40 @@ def get_dismissal_today():
 
     conn.close()
 
+    # ── Elective schedule rules ──────────────────────────────────────────────
+    # Lower school  (grades 1-4): elective every Tuesday
+    # Middle school (grades 5-8): advisory/elective every Thursday
+    # JPK, SPK, K:  always end in homeroom
+    from datetime import date as dt_date
+    d_obj    = dt_date.fromisoformat(date_param)
+    day_name = d_obj.strftime('%A')   # e.g. 'Tuesday'
+
+    LOWER_SCHOOL  = {'1', '2', '3', '4'}
+    MIDDLE_SCHOOL = {'5', '6', '7', '8'}
+
+    def calc_ends_in(grade):
+        g = str(grade or '').strip()
+        if g in LOWER_SCHOOL and day_name == 'Tuesday':
+            return 'elective', 'Elective'
+        if g in MIDDLE_SCHOOL and day_name == 'Tuesday':
+            return 'elective', 'Advisory'
+        if g in MIDDLE_SCHOOL and day_name == 'Thursday':
+            return 'elective', 'Elective'
+        return 'homeroom', None
+
     students = []
     for r in rows:
         row = dict(r)
         row['name'] = f"{row['firstName']} {row['lastName']}"
+        ends_in, elective = calc_ends_in(row.get('grade'))
+        row['endsIn']   = ends_in
+        row['elective'] = elective
         students.append(row)
 
     return jsonify({
         'date':     date_param,
         'source':   source,
+        'day':      day_name,
         'students': students
     })
 
