@@ -80,7 +80,7 @@
 
   .form-grid {
     display: grid;
-    grid-template-columns: 2fr 1fr auto;
+    grid-template-columns: 2fr 1fr auto auto;
     gap: 14px;
     align-items: end;
   }
@@ -168,11 +168,9 @@
 
   input[type="date"]:focus { border-color: var(--gold-dark); background: #fff; }
 
-  .btn-add {
-    background: var(--gold);
-    color: var(--navy);
+  .btn-add, .btn-add-2 {
     border: none;
-    padding: 12px 28px;
+    padding: 12px 22px;
     border-radius: 12px;
     font-size: 15px;
     font-weight: 700;
@@ -183,9 +181,14 @@
     height: 48px;
   }
 
+  .btn-add { background: var(--gold); color: var(--navy); }
   .btn-add:hover { background: var(--gold-dark); }
-  .btn-add:active { transform: scale(0.97); }
-  .btn-add:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  .btn-add-2 { background: var(--navy); color: var(--gold); }
+  .btn-add-2:hover { background: #0f1a33; }
+
+  .btn-add:active, .btn-add-2:active { transform: scale(0.97); }
+  .btn-add:disabled, .btn-add-2:disabled { opacity: 0.5; cursor: not-allowed; }
 
   .summary-strip { display: flex; gap: 14px; margin-bottom: 28px; flex-wrap: wrap; }
 
@@ -368,7 +371,10 @@
         <input type="date" id="chargeDate">
       </div>
       <div>
-        <button class="btn-add" id="addBtn" onclick="addCharge()">+ Add Charge</button>
+        <button class="btn-add" id="addBtn1" onclick="addCharge(1)">+ 1 Snack</button>
+      </div>
+      <div>
+        <button class="btn-add-2" id="addBtn2" onclick="addCharge(2)">+ 2 Snacks</button>
       </div>
     </div>
   </div>
@@ -487,7 +493,7 @@
     }
   }
 
-  async function addCharge() {
+  async function addCharge(quantity) {
     if (!selectedStudentId) {
       searchInput.focus();
       searchInput.style.borderColor = 'var(--red)';
@@ -498,9 +504,10 @@
     const date = document.getElementById('chargeDate').value;
     if (!date) { document.getElementById('chargeDate').focus(); return; }
 
-    const btn = document.getElementById('addBtn');
-    btn.disabled = true;
-    btn.textContent = 'Saving...';
+    const btn1 = document.getElementById('addBtn1');
+    const btn2 = document.getElementById('addBtn2');
+    btn1.disabled = true; btn2.disabled = true;
+    btn1.textContent = 'Saving...'; btn2.textContent = 'Saving...';
 
     const nameForFlash = selectedStudentName;
 
@@ -508,7 +515,7 @@
       const res = await fetch(`${API_BASE}/api/mcard/charges`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ student_id: selectedStudentId, charge_date: date })
+        body: JSON.stringify({ student_id: selectedStudentId, charge_date: date, quantity: quantity })
       });
 
       if (!res.ok) throw new Error();
@@ -520,7 +527,8 @@
         student_id: selectedStudentId,
         student_name: selectedStudentName,
         grade: student ? student.grade : '',
-        charge_date: date
+        charge_date: date,
+        quantity: quantity
       });
 
       searchInput.value = '';
@@ -528,13 +536,13 @@
       selectedStudentName = '';
       searchInput.focus();
       renderTable();
-      showFlash('Charge added for ' + nameForFlash + '!', false);
+      showFlash('+' + quantity + ' snack' + (quantity > 1 ? 's' : '') + ' added for ' + nameForFlash + '!', false);
     } catch(e) {
       showFlash('Error saving charge. Try again.', true);
     }
 
-    btn.disabled = false;
-    btn.textContent = '+ Add Charge';
+    btn1.disabled = false; btn2.disabled = false;
+    btn1.textContent = '+ 1 Snack'; btn2.textContent = '+ 2 Snacks';
   }
 
   async function removeCharge(id) {
@@ -554,8 +562,8 @@
     const filtered = charges.filter(c => c.student_name.toLowerCase().includes(search));
 
     const uniqueStudents = new Set(charges.map(c => c.student_id)).size;
-    const todayCount = charges.filter(c => c.charge_date === today).length;
-    document.getElementById('statTotal').textContent = charges.length;
+    const todayCount = charges.filter(c => c.charge_date === today).reduce((s,c) => s + (c.quantity || 1), 0);
+    document.getElementById('statTotal').textContent = charges.reduce((s,c) => s + (c.quantity || 1), 0);
     document.getElementById('statStudents').textContent = uniqueStudents;
     document.getElementById('statToday').textContent = todayCount;
 
@@ -577,7 +585,7 @@
         <td style="font-weight:600">${esc(c.student_name)}</td>
         <td><span class="grade-pill">${esc(c.grade || '?')}</span></td>
         <td style="color:var(--muted)">${dateStr}</td>
-        <td><span class="charge-badge">+1</span></td>
+        <td><span class="charge-badge">+${c.quantity || 1}</span></td>
         <td><button class="btn-remove" onclick="removeCharge(${c.charge_id})">Remove</button></td>
       </tr>`;
     });
