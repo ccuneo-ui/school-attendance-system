@@ -240,7 +240,7 @@ def test():
 # ============================================
 
 def init_mcard_table():
-    """Create mcard_charges table if it doesn't exist"""
+    """Create mcard_charges table if it doesn't exist, and add quantity column if missing"""
     conn = get_db_connection()
     conn.execute('''
         CREATE TABLE IF NOT EXISTS mcard_charges (
@@ -252,6 +252,11 @@ def init_mcard_table():
             FOREIGN KEY (student_id) REFERENCES students(student_id)
         )
     ''')
+    # Add quantity column if it doesn't exist (for tables created before this column was added)
+    try:
+        conn.execute('ALTER TABLE mcard_charges ADD COLUMN quantity INTEGER NOT NULL DEFAULT 1')
+    except Exception:
+        pass  # Column already exists, fine
     conn.commit()
     conn.close()
 
