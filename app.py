@@ -245,9 +245,10 @@ def init_mcard_table():
     conn.execute('''
         CREATE TABLE IF NOT EXISTS mcard_charges (
             charge_id INTEGER PRIMARY KEY AUTOINCREMENT,
-            student_name TEXT NOT NULL,
+            student_id INTEGER NOT NULL,
             charge_date TEXT NOT NULL,
-            recorded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            recorded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (student_id) REFERENCES students(student_id)
         )
     ''')
     conn.commit()
@@ -258,36 +259,66 @@ def mcard():
     """Serve the M Card charge tracker"""
     return send_from_directory('.', 'mcard_tracker.html')
 
+@app.route('/api/mcard/students', methods=['GET'])
+def get_mcard_students():
+    """Get all active students for the M Card dropdown"""
+    conn = get_db_connection()
+    students = conn.execute('''
+        SELECT student_id, first_name, last_name, grade
+        FROM students
+        WHERE status = 'active'
+        ORDER BY last_name, first_name
+    ''').fetchall()
+    conn.close()
+    return jsonify([dict(s) for s in students])
+
 @app.route('/api/mcard/charges', methods=['GET'])
 def get_mcard_charges():
-    """Get all M Card charges"""
+    """Get all M Card charges joined with student info"""
     init_mcard_table()
     conn = get_db_connection()
     charges = conn.execute('''
-        SELECT charge_id, student_name, charge_date, recorded_at
-        FROM mcard_charges
-        ORDER BY charge_date DESC, recorded_at DESC
+        SELECT 
+            m.charge_id,
+            m.student_id,
+            s.first_name || ' ' || s.last_name AS student_name,
+            s.grade,
+            m.charge_date,
+            m.recorded_at
+        FROM mcard_charges m
+        JOIN students s ON m.student_id = s.student_id
+        ORDER BY m.charge_date DESC, m.recorded_at DESC
     ''').fetchall()
     conn.close()
     return jsonify([dict(c) for c in charges])
 
 @app.route('/api/mcard/charges', methods=['POST'])
 def add_mcard_charge():
-    """Add a new M Card charge"""
+    """Add a new M Card charge linked to a student record"""
     init_mcard_table()
     data = request.json
-    student_name = data.get('student_name', '').strip()
+    student_id = data.get('student_id')
     charge_date = data.get('charge_date', '')
 
-    if not student_name or not charge_date:
-        return jsonify({'error': 'Missing student_name or charge_date'}), 400
+    if not student_id or not charge_date:
+        return jsonify({'error': 'Missing student_id or charge_date'}), 400
 
     conn = get_db_connection()
+    # Verify the student exists and is active
+    student = conn.execute(
+        'SELECT student_id FROM students WHERE student_id = ? AND status = ?',
+        (student_id, 'active')
+    ).fetchone()
+
+    if not student:
+        conn.close()
+        return jsonify({'error': 'Student not found or inactive'}), 404
+
     cursor = conn.cursor()
     cursor.execute('''
-        INSERT INTO mcard_charges (student_name, charge_date)
+        INSERT INTO mcard_charges (student_id, charge_date)
         VALUES (?, ?)
-    ''', (student_name, charge_date))
+    ''', (student_id, charge_date))
     charge_id = cursor.lastrowid
     conn.commit()
     conn.close()

@@ -43,23 +43,13 @@
     font-family: 'Fraunces', serif;
     font-weight: 900;
     font-size: 22px;
-    width: 48px;
-    height: 48px;
+    width: 48px; height: 48px;
     border-radius: 12px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    display: flex; align-items: center; justify-content: center;
     flex-shrink: 0;
   }
 
-  header h1 {
-    font-family: 'Fraunces', serif;
-    font-weight: 700;
-    font-size: 22px;
-    color: #fff;
-    line-height: 1.2;
-  }
-
+  header h1 { font-family: 'Fraunces', serif; font-weight: 700; font-size: 22px; color: #fff; line-height: 1.2; }
   header p { color: #a0aec0; font-size: 13px; margin-top: 2px; }
 
   .nav-link {
@@ -75,7 +65,7 @@
   }
   .nav-link:hover { background: var(--gold); color: var(--navy); }
 
-  .container { max-width: 900px; margin: 0 auto; padding: 32px 20px; }
+  .container { max-width: 960px; margin: 0 auto; padding: 32px 20px; }
 
   .form-card {
     background: var(--card-bg);
@@ -86,21 +76,16 @@
     margin-bottom: 28px;
   }
 
-  .form-card h2 {
-    font-family: 'Fraunces', serif;
-    font-size: 18px;
-    margin-bottom: 20px;
-    color: var(--navy);
-  }
+  .form-card h2 { font-family: 'Fraunces', serif; font-size: 18px; margin-bottom: 20px; color: var(--navy); }
 
   .form-grid {
     display: grid;
-    grid-template-columns: 1fr 1fr auto;
+    grid-template-columns: 2fr 1fr auto;
     gap: 14px;
     align-items: end;
   }
 
-  @media (max-width: 600px) { .form-grid { grid-template-columns: 1fr; } }
+  @media (max-width: 640px) { .form-grid { grid-template-columns: 1fr; } }
 
   label {
     font-size: 12px;
@@ -112,7 +97,9 @@
     margin-bottom: 6px;
   }
 
-  input[type="text"], input[type="date"] {
+  .student-select-wrap { position: relative; }
+
+  #studentSearch {
     width: 100%;
     padding: 12px 14px;
     border: 2px solid var(--border);
@@ -121,11 +108,65 @@
     font-family: 'DM Sans', sans-serif;
     background: var(--cream);
     color: var(--text);
-    transition: border-color 0.2s;
     outline: none;
+    transition: border-color 0.2s;
   }
 
-  input:focus { border-color: var(--gold-dark); background: #fff; }
+  #studentSearch:focus { border-color: var(--gold-dark); background: #fff; }
+
+  .dropdown-list {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0; right: 0;
+    background: #fff;
+    border: 2px solid var(--gold-dark);
+    border-radius: 12px;
+    max-height: 240px;
+    overflow-y: auto;
+    z-index: 100;
+    display: none;
+    box-shadow: 0 8px 24px rgba(26,39,68,0.12);
+  }
+
+  .dropdown-list.open { display: block; }
+
+  .dropdown-item {
+    padding: 10px 14px;
+    cursor: pointer;
+    font-size: 14px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    transition: background 0.1s;
+  }
+
+  .dropdown-item:hover { background: #faf6ec; }
+
+  .dropdown-item .grade-tag {
+    font-size: 11px;
+    background: var(--navy);
+    color: #fff;
+    border-radius: 6px;
+    padding: 2px 8px;
+    font-weight: 600;
+  }
+
+  .dropdown-empty { padding: 14px; color: var(--muted); font-size: 14px; text-align: center; }
+
+  input[type="date"] {
+    width: 100%;
+    padding: 12px 14px;
+    border: 2px solid var(--border);
+    border-radius: 12px;
+    font-size: 15px;
+    font-family: 'DM Sans', sans-serif;
+    background: var(--cream);
+    color: var(--text);
+    outline: none;
+    transition: border-color 0.2s;
+  }
+
+  input[type="date"]:focus { border-color: var(--gold-dark); background: #fff; }
 
   .btn-add {
     background: var(--gold);
@@ -153,27 +194,11 @@
     border: 2px solid var(--border);
     border-radius: 16px;
     padding: 16px 22px;
-    flex: 1;
-    min-width: 130px;
-    text-align: center;
+    flex: 1; min-width: 130px; text-align: center;
   }
 
-  .stat-box .val {
-    font-family: 'Fraunces', serif;
-    font-size: 32px;
-    font-weight: 900;
-    color: var(--navy);
-    line-height: 1;
-  }
-
-  .stat-box .lbl {
-    font-size: 12px;
-    color: var(--muted);
-    margin-top: 4px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.07em;
-  }
+  .stat-box .val { font-family: 'Fraunces', serif; font-size: 32px; font-weight: 900; color: var(--navy); line-height: 1; }
+  .stat-box .lbl { font-size: 12px; color: var(--muted); margin-top: 4px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.07em; }
 
   .table-card {
     background: var(--card-bg);
@@ -240,7 +265,7 @@
   tbody tr:last-child { border-bottom: none; }
   tbody tr:hover { background: #faf6ec; }
 
-  td { padding: 14px 20px; font-size: 14px; vertical-align: middle; }
+  td { padding: 13px 20px; font-size: 14px; vertical-align: middle; }
 
   .charge-badge {
     background: var(--gold);
@@ -249,6 +274,16 @@
     border-radius: 8px;
     padding: 3px 12px;
     font-size: 14px;
+    display: inline-block;
+  }
+
+  .grade-pill {
+    background: var(--navy);
+    color: #fff;
+    font-size: 11px;
+    font-weight: 600;
+    border-radius: 6px;
+    padding: 2px 8px;
     display: inline-block;
   }
 
@@ -284,8 +319,7 @@
 
   .flash {
     position: fixed;
-    bottom: 24px;
-    right: 24px;
+    bottom: 24px; right: 24px;
     background: var(--green);
     color: #fff;
     padding: 12px 22px;
@@ -323,8 +357,11 @@
     <h2>🛒 Add Snack Charge</h2>
     <div class="form-grid">
       <div>
-        <label for="studentName">Student Name</label>
-        <input type="text" id="studentName" placeholder="First Last" autocomplete="off">
+        <label>Student</label>
+        <div class="student-select-wrap">
+          <input type="text" id="studentSearch" placeholder="Type to search students..." autocomplete="off">
+          <div class="dropdown-list" id="dropdownList"></div>
+        </div>
       </div>
       <div>
         <label for="chargeDate">Date</label>
@@ -355,36 +392,95 @@
     <div class="table-header">
       <h2>Charge Log</h2>
       <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
-        <input class="search-input" id="searchInput" placeholder="Search student..." oninput="renderTable()">
+        <input class="search-input" id="searchInput" placeholder="Filter log..." oninput="renderTable()">
         <button class="btn-export" onclick="exportCSV()">⬇ Export CSV</button>
       </div>
     </div>
     <div id="tableWrap">
-      <div class="empty-state"><span>⏳</span>Loading charges...</div>
+      <div class="empty-state"><span>⏳</span>Loading...</div>
     </div>
   </div>
 
 </div>
 
-<div class="flash" id="flash">Charge added!</div>
+<div class="flash" id="flash"></div>
 
 <script>
-  // Auto-detect the API base URL
   const API_BASE = window.location.origin;
-
   const today = new Date().toISOString().split('T')[0];
   document.getElementById('chargeDate').value = today;
 
+  let allStudents = [];
   let charges = [];
+  let selectedStudentId = null;
+  let selectedStudentName = '';
 
+  // ── Student search dropdown ──────────────────────────
+  async function loadStudents() {
+    try {
+      const res = await fetch(`${API_BASE}/api/mcard/students`);
+      allStudents = await res.json();
+    } catch(e) {
+      document.getElementById('errorBanner').style.display = 'block';
+    }
+  }
+
+  const searchInput = document.getElementById('studentSearch');
+  const dropdown = document.getElementById('dropdownList');
+
+  searchInput.addEventListener('input', () => {
+    selectedStudentId = null;
+    selectedStudentName = '';
+    const q = searchInput.value.trim().toLowerCase();
+    if (!q) { closeDropdown(); return; }
+
+    const matches = allStudents.filter(s =>
+      (s.first_name + ' ' + s.last_name).toLowerCase().includes(q)
+    ).slice(0, 20);
+
+    if (matches.length === 0) {
+      dropdown.innerHTML = '<div class="dropdown-empty">No students found</div>';
+    } else {
+      dropdown.innerHTML = matches.map(s => `
+        <div class="dropdown-item" data-id="${s.student_id}" data-name="${esc(s.first_name + ' ' + s.last_name)}">
+          <span>${esc(s.first_name)} ${esc(s.last_name)}</span>
+          <span class="grade-tag">Grade ${esc(s.grade || '?')}</span>
+        </div>
+      `).join('');
+
+      dropdown.querySelectorAll('.dropdown-item').forEach(el => {
+        el.addEventListener('mousedown', (e) => {
+          e.preventDefault();
+          selectedStudentId = parseInt(el.dataset.id);
+          selectedStudentName = el.dataset.name;
+          searchInput.value = selectedStudentName;
+          closeDropdown();
+        });
+      });
+    }
+
+    dropdown.classList.add('open');
+  });
+
+  searchInput.addEventListener('focus', () => {
+    if (searchInput.value.trim()) searchInput.dispatchEvent(new Event('input'));
+  });
+
+  document.addEventListener('click', e => {
+    if (!e.target.closest('.student-select-wrap')) closeDropdown();
+  });
+
+  function closeDropdown() { dropdown.classList.remove('open'); }
+
+  // ── Charges ──────────────────────────────────────────
   async function loadCharges() {
     try {
       const res = await fetch(`${API_BASE}/api/mcard/charges`);
-      if (!res.ok) throw new Error('Server error');
+      if (!res.ok) throw new Error();
       charges = await res.json();
       document.getElementById('errorBanner').style.display = 'none';
       renderTable();
-    } catch (e) {
+    } catch(e) {
       document.getElementById('errorBanner').style.display = 'block';
       document.getElementById('tableWrap').innerHTML =
         '<div class="empty-state"><span>⚠️</span>Unable to load charges from server.</div>';
@@ -392,31 +488,48 @@
   }
 
   async function addCharge() {
-    const name = document.getElementById('studentName').value.trim();
+    if (!selectedStudentId) {
+      searchInput.focus();
+      searchInput.style.borderColor = 'var(--red)';
+      setTimeout(() => searchInput.style.borderColor = '', 1500);
+      showFlash('Please select a student from the list.', true);
+      return;
+    }
     const date = document.getElementById('chargeDate').value;
-    if (!name) { document.getElementById('studentName').focus(); return; }
     if (!date) { document.getElementById('chargeDate').focus(); return; }
 
     const btn = document.getElementById('addBtn');
     btn.disabled = true;
     btn.textContent = 'Saving...';
 
+    const nameForFlash = selectedStudentName;
+
     try {
       const res = await fetch(`${API_BASE}/api/mcard/charges`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ student_name: name, charge_date: date })
+        body: JSON.stringify({ student_id: selectedStudentId, charge_date: date })
       });
 
-      if (!res.ok) throw new Error('Server error');
+      if (!res.ok) throw new Error();
       const result = await res.json();
 
-      charges.unshift({ charge_id: result.charge_id, student_name: name, charge_date: date });
-      document.getElementById('studentName').value = '';
-      document.getElementById('studentName').focus();
+      const student = allStudents.find(s => s.student_id === selectedStudentId);
+      charges.unshift({
+        charge_id: result.charge_id,
+        student_id: selectedStudentId,
+        student_name: selectedStudentName,
+        grade: student ? student.grade : '',
+        charge_date: date
+      });
+
+      searchInput.value = '';
+      selectedStudentId = null;
+      selectedStudentName = '';
+      searchInput.focus();
       renderTable();
-      showFlash('Charge added for ' + name + '!', false);
-    } catch (e) {
+      showFlash('Charge added for ' + nameForFlash + '!', false);
+    } catch(e) {
       showFlash('Error saving charge. Try again.', true);
     }
 
@@ -431,24 +544,16 @@
       charges = charges.filter(c => c.charge_id !== id);
       renderTable();
       showFlash('Charge removed.', false);
-    } catch (e) {
+    } catch(e) {
       showFlash('Error removing charge.', true);
     }
-  }
-
-  function showFlash(msg, isError) {
-    const f = document.getElementById('flash');
-    f.textContent = msg;
-    f.classList.toggle('error', isError);
-    f.classList.add('show');
-    setTimeout(() => f.classList.remove('show'), 2200);
   }
 
   function renderTable() {
     const search = document.getElementById('searchInput').value.toLowerCase();
     const filtered = charges.filter(c => c.student_name.toLowerCase().includes(search));
 
-    const uniqueStudents = new Set(charges.map(c => c.student_name.toLowerCase())).size;
+    const uniqueStudents = new Set(charges.map(c => c.student_id)).size;
     const todayCount = charges.filter(c => c.charge_date === today).length;
     document.getElementById('statTotal').textContent = charges.length;
     document.getElementById('statStudents').textContent = uniqueStudents;
@@ -461,7 +566,7 @@
     }
 
     let html = `<table><thead><tr>
-      <th>#</th><th>Student Name</th><th>Date</th><th>Charge</th><th></th>
+      <th>#</th><th>Student</th><th>Grade</th><th>Date</th><th>Charge</th><th></th>
     </tr></thead><tbody>`;
 
     filtered.forEach((c, i) => {
@@ -470,6 +575,7 @@
       html += `<tr>
         <td style="color:var(--muted);font-size:13px">${filtered.length - i}</td>
         <td style="font-weight:600">${esc(c.student_name)}</td>
+        <td><span class="grade-pill">${esc(c.grade || '?')}</span></td>
         <td style="color:var(--muted)">${dateStr}</td>
         <td><span class="charge-badge">+1</span></td>
         <td><button class="btn-remove" onclick="removeCharge(${c.charge_id})">Remove</button></td>
@@ -480,22 +586,33 @@
     wrap.innerHTML = html;
   }
 
+  function showFlash(msg, isError) {
+    const f = document.getElementById('flash');
+    f.textContent = msg;
+    f.classList.toggle('error', isError);
+    f.classList.add('show');
+    setTimeout(() => f.classList.remove('show'), 2200);
+  }
+
   function esc(str) {
-    return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
   }
 
   function exportCSV() {
     if (charges.length === 0) { alert('No charges to export.'); return; }
-    let csv = 'Student Name,Date\n';
+    let csv = 'Student ID,Student Name,Grade,Date\n';
     [...charges].sort((a,b) => b.charge_date.localeCompare(a.charge_date)).forEach(c => {
-      csv += `"${c.student_name}","${c.charge_date}"\n`;
+      csv += `${c.student_id},"${c.student_name}","${c.grade}","${c.charge_date}"\n`;
     });
 
     const grouped = {};
-    charges.forEach(c => { grouped[c.student_name] = (grouped[c.student_name] || 0) + 1; });
-    csv += '\nStudent Summary\nName,Total Charges\n';
-    Object.entries(grouped).sort((a,b)=>b[1]-a[1]).forEach(([name, count]) => {
-      csv += `"${name}",${count}\n`;
+    charges.forEach(c => {
+      if (!grouped[c.student_id]) grouped[c.student_id] = { name: c.student_name, grade: c.grade, count: 0 };
+      grouped[c.student_id].count++;
+    });
+    csv += '\nStudent Summary\nStudent ID,Name,Grade,Total Charges\n';
+    Object.entries(grouped).sort((a,b)=>b[1].count-a[1].count).forEach(([id, d]) => {
+      csv += `${id},"${d.name}","${d.grade}",${d.count}\n`;
     });
 
     const blob = new Blob([csv], { type: 'text/csv' });
@@ -505,11 +622,7 @@
     a.click();
   }
 
-  document.getElementById('studentName').addEventListener('keydown', e => {
-    if (e.key === 'Enter') addCharge();
-  });
-
-  loadCharges();
+  Promise.all([loadStudents(), loadCharges()]);
 </script>
 </body>
 </html>
