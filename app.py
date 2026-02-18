@@ -367,6 +367,147 @@ def download_backup():
     )
 
 # ============================================
+# DISMISSAL PLANNER ROUTES
+# ============================================
+
+@app.route('/dismissal')
+def dismissal():
+    """Serve the dismissal planner page"""
+    return send_from_directory('.', 'dismissal_planner.html')
+
+@app.route('/api/dismissal/students', methods=['GET'])
+def get_dismissal_students():
+    """Get all active students with their dismissal defaults"""
+    conn = get_db_connection()
+    students = conn.execute('''
+        SELECT student_id, first_name, last_name, grade,
+               dismissal_mon, dismissal_tue, dismissal_wed,
+               dismissal_thu, dismissal_fri, before_care
+        FROM students
+        WHERE status = 'active'
+        ORDER BY last_name, first_name
+    ''').fetchall()
+    conn.close()
+    return jsonify([dict(s) for s in students])
+
+@app.route('/api/dismissal/plan/<date>', methods=['GET'])
+def get_dismissal_plan(date):
+    """Get the daily dismissal plan for a specific date"""
+    conn = get_db_connection()
+    plan = conn.execute('''
+        SELECT d.dismissal_id, d.student_id, d.dismissal_type,
+               d.destination, d.notes, d.is_override, d.recorded_at
+        FROM daily_dismissal d
+        WHERE d.dismissal_date = ?
+        ORDER BY d.recorded_at
+    ''', (date,)).fetchall()
+    conn.close()
+    return jsonify([dict(p) for p in plan])
+
+@app.route('/api/dismissal/plan', methods=['POST'])
+def save_dismissal_plan():
+    """Save or update a single student's dismissal for a date"""
+    data = request.json
+    student_id    = data.get('student_id')
+    date          = data.get('dismissal_date')
+    d_type        = data.get('dismissal_type')
+    destination   = data.get('destination', '')
+    notes         = data.get('notes', '')
+    is_override   = data.get('is_override', 0)
+
+    if not all([student_id, date, d_type]):
+        return jsonify({'error': 'Missing required fields'}), 400
+
+    conn = get_db_connection()
+    conn.execute('''
+        INSERT INTO daily_dismissal
+            (student_id, dismissal_date, dismissal_type, destination, notes, is_override)
+        VALUES (?, ?, ?, ?, ?, ?)
+        ON CONFLICT(student_id, dismissal_date)
+        DO UPDATE SET
+            dismissal_type = excluded.dismissal_type,
+            destination    = excluded.destination,
+            notes          = excluded.notes,
+            is_override    = excluded.is_override,
+            recorded_at    = CURRENT_TIMESTAMP
+    ''', (student_id, date, d_type, destination, notes, is_override))
+    conn.commit()
+    conn.close()
+    return jsonify({'success': True})
+
+@app.route('/api/dismissal/plan/bulk', methods=['POST'])
+def save_dismissal_bulk():
+    """Bulk assign a destination to multiple students"""
+    data = request.json
+    student_ids = data.get('student_ids', [])
+    date        = data.get('dismissal_date')
+    d_type      = data.get('dismissal_type')
+    destination = data.get('destination', '')
+
+    if not all([student_ids, date, d_type]):
+        return jsonify({'error': 'Missing required fields'}), 400
+
+    conn = get_db_connection()
+    for sid in student_ids:
+        conn.execute('''
+            INSERT INTO daily_dismissal
+                (student_id, dismissal_date, dismissal_type, destination, notes, is_override)
+            VALUES (?, ?, ?, ?, '', 0)
+            ON CONFLICT(student_id, dismissal_date)
+            DO UPDATE SET
+                dismissal_type = excluded.dismissal_type,
+                destination    = excluded.destination,
+                recorded_at    = CURRENT_TIMESTAMP
+        ''', (sid, date, d_type, destination))
+    conn.commit()
+    conn.close()
+    return jsonify({'success': True, 'updated': len(student_ids)})
+
+@app.route('/api/dismissal/load-defaults', methods=['POST'])
+def load_dismissal_defaults():
+    """Auto-populate today's dismissal plan from each student's weekly defaults.
+       Only sets students who don't already have a record for this date."""
+    data = request.json
+    date    = data.get('date')
+    day_key = data.get('day_key')  # 'mon', 'tue', etc.
+
+    if not date or not day_key:
+        return jsonify({'error': 'Missing date or day_key'}), 400
+
+    valid_days = ['mon','tue','wed','thu','fri']
+    if day_key not in valid_days:
+        return jsonify({'error': 'Invalid day'}), 400
+
+    col = f'dismissal_{day_key}'
+    conn = get_db_connection()
+
+    # Get students who don't already have a plan today
+    existing = set(row[0] for row in conn.execute(
+        'SELECT student_id FROM daily_dismissal WHERE dismissal_date = ?', (date,)
+    ).fetchall())
+
+    students = conn.execute(f'''
+        SELECT student_id, {col} as default_type
+        FROM students
+        WHERE status = 'active' AND {col} IS NOT NULL AND {col} != ''
+    ''').fetchall()
+
+    inserted = 0
+    for s in students:
+        if s['student_id'] not in existing:
+            dest = 'Aftercare' if s['default_type'] == 'activity' else ''
+            conn.execute('''
+                INSERT OR IGNORE INTO daily_dismissal
+                    (student_id, dismissal_date, dismissal_type, destination, notes, is_override)
+                VALUES (?, ?, ?, ?, '', 0)
+            ''', (s['student_id'], date, s['default_type'], dest))
+            inserted += 1
+
+    conn.commit()
+    conn.close()
+    return jsonify({'success': True, 'inserted': inserted})
+
+# ============================================
 # RUN SERVER
 # ============================================
 
