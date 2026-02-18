@@ -347,6 +347,282 @@ def delete_mcard_charge(charge_id):
     return jsonify({'success': True})
 
 # ============================================
+# DISMISSAL ROUTES
+# ============================================
+
+def init_dismissal_tables():
+    """
+    Create dismissal-related tables if they don't exist.
+
+    dismissal_today  — one row per student per date, holds today's actual
+                       bus/pickup/activity assignment plus where they end the day.
+    electives        — lookup table of elective class names (Art, Music, PE, etc.)
+    """
+    conn = get_db_connection()
+
+    # Today's working dismissal plan (reset each day by admin)
+    conn.execute('''
+        CREATE TABLE IF NOT EXISTS dismissal_today (
+            dismissal_id   INTEGER PRIMARY KEY AUTOINCREMENT,
+            student_id     INTEGER NOT NULL,
+            plan_date      TEXT NOT NULL,           -- YYYY-MM-DD
+            bus_route      TEXT,                    -- e.g. "POK", "Arlington", "Pick Up"
+            activity       TEXT,                    -- e.g. "Aftercare", "JV Soccer"
+            ends_in        TEXT DEFAULT 'homeroom', -- 'homeroom' | 'elective'
+            elective_name  TEXT,                    -- e.g. "Art", "PE" (if ends_in = 'elective')
+            notes          TEXT,                    -- one-off override notes
+            updated_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (student_id) REFERENCES students(student_id),
+            UNIQUE(student_id, plan_date)           -- one record per student per day
+        )
+    ''')
+
+    # Electives lookup (so the dropdown stays consistent)
+    conn.execute('''
+        CREATE TABLE IF NOT EXISTS electives (
+            elective_id   INTEGER PRIMARY KEY AUTOINCREMENT,
+            name          TEXT NOT NULL UNIQUE,
+            active        INTEGER DEFAULT 1
+        )
+    ''')
+
+    # Seed electives if table is empty
+    existing = conn.execute('SELECT COUNT(*) as c FROM electives').fetchone()['c']
+    if existing == 0:
+        default_electives = [
+            'Art', 'Music', 'PE', 'Library', 'Technology',
+            'Drama', 'Spanish', 'French', 'Mandarin', 'STEM'
+        ]
+        for name in default_electives:
+            conn.execute('INSERT OR IGNORE INTO electives (name) VALUES (?)', (name,))
+
+    conn.commit()
+    conn.close()
+
+
+@app.route('/dismissal-staff')
+def dismissal_staff():
+    """Serve the read-only staff dismissal dashboard"""
+    return send_from_directory('.', 'dismissal_staff_view.html')
+
+
+@app.route('/api/electives', methods=['GET'])
+def get_electives():
+    """Return list of elective names for dropdowns"""
+    init_dismissal_tables()
+    conn = get_db_connection()
+    rows = conn.execute(
+        'SELECT elective_id, name FROM electives WHERE active = 1 ORDER BY name'
+    ).fetchall()
+    conn.close()
+    return jsonify([dict(r) for r in rows])
+
+
+@app.route('/api/dismissal/today', methods=['GET'])
+def get_dismissal_today():
+    """
+    Return today's dismissal list for the staff dashboard.
+
+    Query params:
+      date  — YYYY-MM-DD (defaults to server's today)
+      grade — filter to one grade (optional)
+
+    Response shape:
+      {
+        "date":     "2026-02-18",
+        "source":   "today" | "default",
+        "students": [ { id, name, firstName, lastName, grade,
+                        dismissal, activity, endsIn, elective, notes } ]
+      }
+
+    If no dismissal_today rows exist for the requested date we fall back to
+    each student's per-day default from the students table
+    (dismissal_mon … dismissal_fri columns).
+    """
+    init_dismissal_tables()
+
+    date_param = request.args.get('date', datetime.now().strftime('%Y-%m-%d'))
+    grade_filter = request.args.get('grade', None)
+
+    conn = get_db_connection()
+
+    # Check whether today's plan has been filled in at all
+    filled = conn.execute(
+        'SELECT COUNT(*) as c FROM dismissal_today WHERE plan_date = ?',
+        (date_param,)
+    ).fetchone()['c']
+
+    source = 'today' if filled > 0 else 'default'
+
+    if source == 'today':
+        # Pull from dismissal_today joined with students
+        grade_clause = 'AND s.grade = ?' if grade_filter else ''
+        params = [date_param]
+        if grade_filter:
+            params.append(grade_filter)
+
+        rows = conn.execute(f'''
+            SELECT
+                s.student_id            AS id,
+                s.first_name            AS firstName,
+                s.last_name             AS lastName,
+                s.grade,
+                d.bus_route             AS dismissal,
+                d.activity,
+                COALESCE(d.ends_in, 'homeroom') AS endsIn,
+                d.elective_name         AS elective,
+                d.notes
+            FROM students s
+            LEFT JOIN dismissal_today d
+                   ON d.student_id = s.student_id AND d.plan_date = ?
+            WHERE s.status = 'active'
+            {grade_clause}
+            ORDER BY s.last_name, s.first_name
+        ''', params).fetchall()
+
+    else:
+        # Fall back to per-day defaults stored on the students table
+        day_col_map = {
+            'Monday':    'dismissal_mon',
+            'Tuesday':   'dismissal_tue',
+            'Wednesday': 'dismissal_wed',
+            'Thursday':  'dismissal_thu',
+            'Friday':    'dismissal_fri',
+        }
+        # Figure out day name from date_param
+        from datetime import date as dt_date
+        d_obj = dt_date.fromisoformat(date_param)
+        day_name = d_obj.strftime('%A')          # e.g. "Tuesday"
+        col = day_col_map.get(day_name, 'dismissal_mon')
+
+        grade_clause = 'AND grade = ?' if grade_filter else ''
+        params = []
+        if grade_filter:
+            params.append(grade_filter)
+
+        rows = conn.execute(f'''
+            SELECT
+                student_id   AS id,
+                first_name   AS firstName,
+                last_name    AS lastName,
+                grade,
+                {col}        AS dismissal,
+                NULL         AS activity,
+                'homeroom'   AS endsIn,
+                NULL         AS elective,
+                NULL         AS notes
+            FROM students
+            WHERE status = 'active'
+            {grade_clause}
+            ORDER BY last_name, first_name
+        ''', params).fetchall()
+
+    conn.close()
+
+    students = []
+    for r in rows:
+        row = dict(r)
+        row['name'] = f"{row['firstName']} {row['lastName']}"
+        students.append(row)
+
+    return jsonify({
+        'date':     date_param,
+        'source':   source,
+        'students': students
+    })
+
+
+@app.route('/api/dismissal/today', methods=['POST'])
+def save_dismissal_today():
+    """
+    Admin endpoint — upsert one or more students' dismissal assignments for a date.
+
+    Body (JSON):
+      {
+        "date": "2026-02-18",
+        "records": [
+          {
+            "student_id":    42,
+            "bus_route":     "POK",
+            "activity":      null,
+            "ends_in":       "elective",
+            "elective_name": "Art",
+            "notes":         ""
+          },
+          ...
+        ]
+      }
+    """
+    init_dismissal_tables()
+    data = request.json
+    plan_date = data.get('date', datetime.now().strftime('%Y-%m-%d'))
+    records   = data.get('records', [])
+
+    if not records:
+        return jsonify({'error': 'No records provided'}), 400
+
+    conn = get_db_connection()
+    saved = 0
+    errors = []
+
+    for rec in records:
+        sid = rec.get('student_id')
+        if not sid:
+            errors.append('Missing student_id in record')
+            continue
+        try:
+            conn.execute('''
+                INSERT INTO dismissal_today
+                    (student_id, plan_date, bus_route, activity, ends_in, elective_name, notes, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                ON CONFLICT(student_id, plan_date) DO UPDATE SET
+                    bus_route      = excluded.bus_route,
+                    activity       = excluded.activity,
+                    ends_in        = excluded.ends_in,
+                    elective_name  = excluded.elective_name,
+                    notes          = excluded.notes,
+                    updated_at     = CURRENT_TIMESTAMP
+            ''', (
+                sid,
+                plan_date,
+                rec.get('bus_route'),
+                rec.get('activity'),
+                rec.get('ends_in', 'homeroom'),
+                rec.get('elective_name'),
+                rec.get('notes', '')
+            ))
+            saved += 1
+        except Exception as e:
+            errors.append(f"Student {sid}: {str(e)}")
+
+    conn.commit()
+    conn.close()
+
+    return jsonify({'success': True, 'saved': saved, 'errors': errors})
+
+
+@app.route('/api/dismissal/today', methods=['DELETE'])
+def clear_dismissal_today():
+    """
+    Admin endpoint — clear all dismissal assignments for a given date
+    (e.g. called at end of day to reset for tomorrow).
+
+    Query param:  date=YYYY-MM-DD   (required)
+    """
+    init_dismissal_tables()
+    plan_date = request.args.get('date')
+    if not plan_date:
+        return jsonify({'error': 'date param required'}), 400
+
+    conn = get_db_connection()
+    conn.execute('DELETE FROM dismissal_today WHERE plan_date = ?', (plan_date,))
+    conn.commit()
+    conn.close()
+
+    return jsonify({'success': True, 'cleared_date': plan_date})
+
+
+# ============================================
 # BACKUP ENDPOINT
 # ============================================
 
@@ -382,6 +658,9 @@ def download_backup():
 # ============================================
 
 if __name__ == '__main__':
+    # Initialize dismissal tables on startup
+    init_dismissal_tables()
+
     # Check if database exists
     if not os.path.exists(DATABASE):
         print(f"WARNING: Database file '{DATABASE}' not found!")

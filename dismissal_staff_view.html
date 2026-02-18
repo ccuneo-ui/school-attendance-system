@@ -1,0 +1,980 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dismissal Board – Staff View</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=Epilogue:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --navy:    #0f1f3d;
+    --navy2:   #162847;
+    --accent:  #e8a020;
+    --accent2: #f5c842;
+    --teal:    #1a8a7a;
+    --teal-lt: #e8f7f5;
+    --red:     #c0392b;
+    --red-lt:  #fdf0ef;
+    --blue:    #1a5fa8;
+    --blue-lt: #edf4ff;
+    --purple:  #6b3fa0;
+    --purple-lt:#f3eeff;
+    --gold-lt: #fff8e8;
+    --bg:      #f0f2f5;
+    --card:    #ffffff;
+    --border:  #dde2ec;
+    --text:    #1a2744;
+    --muted:   #6b7a99;
+    --pill-r:  6px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Epilogue', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+  }
+
+  /* ── HEADER ───────────────────────────────────── */
+  header {
+    background: var(--navy);
+    padding: 0 28px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 64px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    box-shadow: 0 2px 16px rgba(0,0,0,.35);
+  }
+
+  .header-left {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+
+  .logo {
+    background: var(--accent);
+    color: var(--navy);
+    font-family: 'Syne', sans-serif;
+    font-weight: 800;
+    font-size: 18px;
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  header h1 {
+    font-family: 'Syne', sans-serif;
+    font-weight: 700;
+    font-size: 17px;
+    color: #fff;
+    letter-spacing: .01em;
+  }
+
+  .header-badge {
+    background: rgba(255,255,255,.12);
+    color: rgba(255,255,255,.7);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    padding: 4px 10px;
+    border-radius: 20px;
+    border: 1px solid rgba(255,255,255,.15);
+  }
+
+  .header-right {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+  }
+
+  #liveDate {
+    font-size: 13px;
+    color: rgba(255,255,255,.65);
+    font-weight: 500;
+  }
+
+  #liveTime {
+    font-family: 'Syne', sans-serif;
+    font-size: 20px;
+    color: var(--accent2);
+    font-weight: 700;
+    letter-spacing: .04em;
+  }
+
+  /* ── FILTER BAR ────────────────────────────────── */
+  .filter-bar {
+    background: var(--card);
+    border-bottom: 2px solid var(--border);
+    padding: 14px 28px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+    box-shadow: 0 2px 8px rgba(0,0,0,.06);
+  }
+
+  .filter-label {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-right: 4px;
+    white-space: nowrap;
+  }
+
+  .filter-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .filter-pills {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+
+  .pill {
+    padding: 5px 14px;
+    border-radius: 20px;
+    border: 1.5px solid var(--border);
+    background: var(--bg);
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--muted);
+    cursor: pointer;
+    transition: all .15s ease;
+    white-space: nowrap;
+    user-select: none;
+  }
+
+  .pill:hover {
+    border-color: var(--navy);
+    color: var(--navy);
+    background: #fff;
+  }
+
+  .pill.active {
+    background: var(--navy);
+    border-color: var(--navy);
+    color: #fff;
+  }
+
+  .divider-v {
+    width: 1px;
+    height: 28px;
+    background: var(--border);
+    flex-shrink: 0;
+  }
+
+  .view-toggle {
+    display: flex;
+    background: var(--bg);
+    border-radius: 8px;
+    border: 1.5px solid var(--border);
+    overflow: hidden;
+  }
+
+  .view-btn {
+    padding: 5px 12px;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: .04em;
+    border: none;
+    background: transparent;
+    color: var(--muted);
+    cursor: pointer;
+    transition: all .15s;
+  }
+
+  .view-btn.active {
+    background: var(--navy);
+    color: #fff;
+  }
+
+  .search-wrap {
+    position: relative;
+    margin-left: auto;
+  }
+
+  .search-wrap svg {
+    position: absolute;
+    left: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--muted);
+    pointer-events: none;
+  }
+
+  #searchInput {
+    border: 1.5px solid var(--border);
+    border-radius: 8px;
+    padding: 6px 12px 6px 34px;
+    font-size: 13px;
+    font-family: 'Epilogue', sans-serif;
+    color: var(--text);
+    background: var(--bg);
+    width: 200px;
+    outline: none;
+    transition: border-color .15s, background .15s;
+  }
+
+  #searchInput:focus {
+    border-color: var(--navy);
+    background: #fff;
+  }
+
+  /* ── SUMMARY STRIP ─────────────────────────────── */
+  .summary-strip {
+    padding: 12px 28px;
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+
+  .stat-chip {
+    background: var(--card);
+    border: 1.5px solid var(--border);
+    border-radius: 8px;
+    padding: 7px 14px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--muted);
+    display: flex;
+    align-items: center;
+    gap: 7px;
+  }
+
+  .stat-chip .count {
+    font-family: 'Syne', sans-serif;
+    font-size: 16px;
+    font-weight: 800;
+    color: var(--navy);
+  }
+
+  .stat-chip .dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  /* ── MAIN CONTENT ──────────────────────────────── */
+  .content {
+    padding: 0 28px 40px;
+  }
+
+  /* ── TABLE VIEW ────────────────────────────────── */
+  .table-wrapper {
+    background: var(--card);
+    border-radius: 14px;
+    border: 1.5px solid var(--border);
+    overflow: hidden;
+    box-shadow: 0 2px 12px rgba(0,0,0,.06);
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+
+  thead {
+    background: var(--navy);
+  }
+
+  thead th {
+    padding: 13px 16px;
+    font-family: 'Syne', sans-serif;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: rgba(255,255,255,.65);
+    text-align: left;
+    white-space: nowrap;
+  }
+
+  thead th:first-child { padding-left: 22px; }
+
+  tbody tr {
+    border-bottom: 1px solid var(--border);
+    transition: background .12s;
+  }
+
+  tbody tr:last-child { border-bottom: none; }
+
+  tbody tr:hover { background: #f7f9fc; }
+
+  tbody td {
+    padding: 12px 16px;
+    font-size: 13.5px;
+  }
+
+  tbody td:first-child { padding-left: 22px; }
+
+  .student-name {
+    font-weight: 600;
+    color: var(--text);
+  }
+
+  .grade-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 5px;
+    font-size: 11px;
+    font-weight: 700;
+    font-family: 'Syne', sans-serif;
+    background: var(--navy2);
+    color: rgba(255,255,255,.85);
+    letter-spacing: .03em;
+  }
+
+  .dismissal-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 600;
+  }
+
+  .tag-bus    { background: var(--blue-lt);   color: var(--blue);   }
+  .tag-pickup { background: var(--gold-lt);   color: #8a6000;       }
+  .tag-aftercare { background: var(--teal-lt); color: var(--teal);  }
+  .tag-activity  { background: var(--purple-lt); color: var(--purple); }
+  .tag-none   { background: #f2f2f2;          color: var(--muted);  }
+
+  .location-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 3px 9px;
+    border-radius: 5px;
+    font-size: 11px;
+    font-weight: 600;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--muted);
+  }
+
+  /* ── GROUPED VIEW ──────────────────────────────── */
+  .groups-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 16px;
+  }
+
+  .group-card {
+    background: var(--card);
+    border-radius: 14px;
+    border: 1.5px solid var(--border);
+    overflow: hidden;
+    box-shadow: 0 2px 12px rgba(0,0,0,.05);
+    animation: fadeUp .3s ease both;
+  }
+
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(12px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .group-header {
+    padding: 14px 18px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1.5px solid var(--border);
+  }
+
+  .group-header h3 {
+    font-family: 'Syne', sans-serif;
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--text);
+    display: flex;
+    align-items: center;
+    gap: 9px;
+  }
+
+  .group-count {
+    font-family: 'Syne', sans-serif;
+    font-size: 13px;
+    font-weight: 800;
+    color: var(--muted);
+    background: var(--bg);
+    padding: 2px 9px;
+    border-radius: 20px;
+    border: 1px solid var(--border);
+  }
+
+  .group-students {
+    padding: 6px 0;
+  }
+
+  .group-student-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 18px;
+    border-bottom: 1px solid #f0f2f5;
+    transition: background .1s;
+  }
+
+  .group-student-row:last-child { border-bottom: none; }
+  .group-student-row:hover { background: #f7f9fc; }
+
+  .gsrow-name {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text);
+  }
+
+  .gsrow-meta {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+  }
+
+  /* ── EMPTY STATE ────────────────────────────────── */
+  .empty-state {
+    text-align: center;
+    padding: 60px 20px;
+    color: var(--muted);
+  }
+
+  .empty-state svg { opacity: .3; margin-bottom: 14px; }
+  .empty-state h3 { font-family: 'Syne', sans-serif; font-size: 18px; color: var(--text); margin-bottom: 6px; }
+  .empty-state p { font-size: 13px; }
+
+  /* ── STATUS BAR ─────────────────────────────────── */
+  .status-bar {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: var(--navy);
+    padding: 8px 28px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 11px;
+    color: rgba(255,255,255,.5);
+    letter-spacing: .04em;
+  }
+
+  .status-bar .pulse {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    color: rgba(255,255,255,.7);
+  }
+
+  .pulse-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: #2ecc71;
+    animation: pulse 2s infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50%       { opacity: .6; transform: scale(.8); }
+  }
+
+  /* ── NOT FILLED banner ──────────────────────────── */
+  .not-filled-banner {
+    background: #fff8e0;
+    border: 1.5px solid #f5c842;
+    border-radius: 10px;
+    padding: 14px 20px;
+    margin-bottom: 20px;
+    font-size: 13px;
+    color: #7a5800;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .not-filled-banner svg { flex-shrink: 0; }
+
+  /* ── RESPONSIVE ─────────────────────────────────── */
+  @media (max-width: 640px) {
+    header { padding: 0 16px; }
+    .filter-bar { padding: 12px 16px; }
+    .summary-strip { padding: 10px 16px; }
+    .content { padding: 0 16px 60px; }
+    .search-wrap { margin-left: 0; width: 100%; }
+    #searchInput { width: 100%; }
+    #liveDate { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header>
+  <div class="header-left">
+    <div class="logo">S</div>
+    <div>
+      <h1>Dismissal Board</h1>
+    </div>
+    <span class="header-badge">Staff View · Read Only</span>
+  </div>
+  <div class="header-right">
+    <span id="liveDate"></span>
+    <span id="liveTime"></span>
+  </div>
+</header>
+
+<!-- FILTER BAR -->
+<div class="filter-bar">
+  <div class="filter-group">
+    <span class="filter-label">Grade</span>
+    <div class="filter-pills" id="gradePills">
+      <div class="pill active" data-grade="all" onclick="setGrade(this)">All</div>
+    </div>
+  </div>
+
+  <div class="divider-v"></div>
+
+  <div class="filter-group">
+    <span class="filter-label">Ends In</span>
+    <div class="filter-pills" id="locationPills">
+      <div class="pill active" data-loc="all" onclick="setLocation(this)">All</div>
+      <div class="pill" data-loc="homeroom" onclick="setLocation(this)">Homeroom</div>
+      <div class="pill" data-loc="elective" onclick="setLocation(this)">Elective</div>
+    </div>
+  </div>
+
+  <div class="divider-v"></div>
+
+  <div class="filter-group">
+    <span class="filter-label">View</span>
+    <div class="view-toggle">
+      <button class="view-btn active" onclick="setView('table', this)">Table</button>
+      <button class="view-btn" onclick="setView('grouped', this)">Grouped</button>
+    </div>
+  </div>
+
+  <div class="search-wrap">
+    <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+      <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+    </svg>
+    <input type="text" id="searchInput" placeholder="Search student…" oninput="applyFilters()">
+  </div>
+</div>
+
+<!-- SUMMARY STRIP -->
+<div class="summary-strip" id="summaryStrip"></div>
+
+<!-- MAIN CONTENT -->
+<div class="content">
+  <div id="notFilledBanner" class="not-filled-banner" style="display:none">
+    <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+      <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+    </svg>
+    Today's dismissal plan has not been filled in yet by the office. Showing default dismissal based on day of week.
+  </div>
+  <div id="mainView"></div>
+</div>
+
+<!-- STATUS BAR -->
+<div class="status-bar">
+  <div class="pulse">
+    <div class="pulse-dot"></div>
+    <span>Live · auto-refreshes every 60 seconds</span>
+  </div>
+  <span id="lastRefresh"></span>
+</div>
+
+<script>
+// ── CONFIG ────────────────────────────────────────────────────────────────────
+const API_URL = 'https://school-attendance-system-0ax5.onrender.com/api';
+
+// Bus routes, activities, etc.
+const BUS_ROUTES  = ['Arlington','Brewster','Carmel','Dover','HOPE','Minivan','Pawling','POK','Wappingers'];
+const ACTIVITIES  = ['Aftercare','Piano Lessons','LS HW Club','LS MiST','MS HW Club','MS MiST','JV Soccer','V Soccer','Basketball','Other','Tutoring','KABARET','Book Club'];
+const ELECTIVE_SUBJECTS = ['Art','Music','PE','Library','Technology','Drama','Spanish','French','Mandarin'];
+
+// ── STATE ─────────────────────────────────────────────────────────────────────
+let allStudents = [];
+let filteredStudents = [];
+let currentGrade    = 'all';
+let currentLocation = 'all';
+let currentView     = 'table';
+let groupBy         = 'grade'; // used in grouped view
+let dataSource      = 'today'; // 'today' | 'default'
+
+// ── INIT ──────────────────────────────────────────────────────────────────────
+async function init() {
+  updateClock();
+  setInterval(updateClock, 1000);
+  await loadData();
+  setInterval(loadData, 60000);
+}
+
+function updateClock() {
+  const now  = new Date();
+  const days = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+  const mons = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  document.getElementById('liveDate').textContent =
+    `${days[now.getDay()]}, ${mons[now.getMonth()]} ${now.getDate()}, ${now.getFullYear()}`;
+  document.getElementById('liveTime').textContent =
+    now.toLocaleTimeString('en-US', {hour:'2-digit', minute:'2-digit'});
+  document.getElementById('lastRefresh').textContent =
+    `Last refresh: ${now.toLocaleTimeString('en-US', {hour:'2-digit', minute:'2-digit', second:'2-digit'})}`;
+}
+
+async function loadData() {
+  try {
+    const today = new Date().toISOString().split('T')[0];
+    const res = await fetch(`${API_URL}/dismissal/today?date=${today}`);
+
+    if (res.ok) {
+      const data = await res.json();
+      allStudents = data.students || [];
+      dataSource  = data.source || 'today';  // 'today' or 'default' set by server
+    } else {
+      throw new Error('API error');
+    }
+  } catch(e) {
+    // Only use mock data if the API is completely unreachable (local dev preview)
+    allStudents = getMockData();
+    dataSource = 'mock';
+  }
+
+  document.getElementById('notFilledBanner').style.display =
+    (dataSource === 'default') ? 'flex' : 'none';
+
+  buildGradePills();
+  applyFilters();
+}
+
+function buildFromDefaults(students) {
+  const dayMap = ['sun','mon','tue','wed','thu','fri','sat'];
+  const dayKey = dayMap[new Date().getDay()];
+  return students.map(s => ({
+    id:           s.student_id,
+    name:         `${s.first_name} ${s.last_name}`,
+    firstName:    s.first_name,
+    lastName:     s.last_name,
+    grade:        s.grade || '?',
+    dismissal:    s[`dismissal_${dayKey}`] || null,
+    activity:     s.activity || null,
+    endsIn:       s.elective_today || 'homeroom',
+    elective:     s.elective_name || null,
+  }));
+}
+
+function getMockData() {
+  // Preview data — replace with real API data in production
+  const grades = ['JPK','SPK','K','1','2','3','4','5','6','7','8'];
+  const buses   = ['Arlington','Brewster','Dover','POK','Wappingers','Pick Up'];
+  const acts    = ['Aftercare','LS HW Club','MS MiST','JV Soccer','Piano Lessons','Book Club'];
+  const elects  = ['Art','Music','PE','Library','Technology'];
+  const names   = [
+    ['Emma','Johnson'],['Liam','Smith'],['Olivia','Brown'],['Noah','Williams'],
+    ['Ava','Jones'],['William','Garcia'],['Sophia','Miller'],['James','Davis'],
+    ['Isabella','Wilson'],['Oliver','Anderson'],['Mia','Taylor'],['Benjamin','Thomas'],
+    ['Charlotte','Jackson'],['Elijah','White'],['Amelia','Harris'],['Lucas','Martin'],
+    ['Harper','Thompson'],['Mason','Martinez'],['Evelyn','Robinson'],['Logan','Clark'],
+    ['Abigail','Rodriguez'],['Ethan','Lewis'],['Emily','Lee'],['Alexander','Walker'],
+    ['Elizabeth','Hall'],['Henry','Allen'],['Sofia','Young'],['Sebastian','Hernandez'],
+    ['Avery','King'],['Jack','Wright'],['Ella','Lopez'],['Owen','Hill'],
+    ['Scarlett','Scott'],['Daniel','Green'],['Grace','Adams'],['Samuel','Baker'],
+    ['Chloe','Gonzalez'],['David','Nelson'],['Lily','Carter'],['Joseph','Mitchell'],
+    ['Zoey','Perez'],['Carter','Roberts'],['Hannah','Turner'],['Luke','Phillips'],
+    ['Penelope','Campbell'],['Gabriel','Parker'],['Layla','Evans'],['Anthony','Edwards'],
+    ['Riley','Collins'],['Isaac','Stewart'],['Nora','Sanchez'],['Dylan','Morris'],
+  ];
+
+  return names.map((n, i) => {
+    const grade    = grades[i % grades.length];
+    const r        = Math.random();
+    let dismissal, activity, endsIn, elective;
+
+    if (r < .55) {
+      dismissal = buses[i % buses.length];
+      activity  = null;
+    } else if (r < .75) {
+      dismissal = null;
+      activity  = acts[i % acts.length];
+    } else {
+      dismissal = 'Pick Up';
+      activity  = null;
+    }
+
+    // Some students end in an elective
+    if (Math.random() < .30) {
+      endsIn   = 'elective';
+      elective = elects[i % elects.length];
+    } else {
+      endsIn   = 'homeroom';
+      elective = null;
+    }
+
+    return { id: i+1, firstName: n[0], lastName: n[1],
+             name: `${n[0]} ${n[1]}`, grade, dismissal, activity, endsIn, elective };
+  });
+}
+
+// ── GRADE PILLS ───────────────────────────────────────────────────────────────
+function buildGradePills() {
+  const gradeOrder = ['JPK','SPK','K','1','2','3','4','5','6','7','8'];
+  const present = [...new Set(allStudents.map(s => s.grade))].sort((a,b) => {
+    const ai = gradeOrder.indexOf(a), bi = gradeOrder.indexOf(b);
+    return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
+  });
+
+  const container = document.getElementById('gradePills');
+  // keep "All" pill, rebuild the rest
+  container.innerHTML = `<div class="pill ${currentGrade==='all'?'active':''}" data-grade="all" onclick="setGrade(this)">All</div>`;
+  present.forEach(g => {
+    const div = document.createElement('div');
+    div.className = `pill${currentGrade===g?' active':''}`;
+    div.dataset.grade = g;
+    div.textContent = g;
+    div.onclick = () => setGrade(div);
+    container.appendChild(div);
+  });
+}
+
+function setGrade(el) {
+  document.querySelectorAll('#gradePills .pill').forEach(p => p.classList.remove('active'));
+  el.classList.add('active');
+  currentGrade = el.dataset.grade;
+  applyFilters();
+}
+
+function setLocation(el) {
+  document.querySelectorAll('#locationPills .pill').forEach(p => p.classList.remove('active'));
+  el.classList.add('active');
+  currentLocation = el.dataset.loc;
+  applyFilters();
+}
+
+function setView(v, el) {
+  document.querySelectorAll('.view-btn').forEach(b => b.classList.remove('active'));
+  el.classList.add('active');
+  currentView = v;
+  applyFilters();
+}
+
+// ── FILTERS ───────────────────────────────────────────────────────────────────
+function applyFilters() {
+  const q = document.getElementById('searchInput').value.toLowerCase().trim();
+
+  filteredStudents = allStudents.filter(s => {
+    if (currentGrade !== 'all' && s.grade !== currentGrade) return false;
+    if (currentLocation !== 'all') {
+      const loc = (s.endsIn || 'homeroom').toLowerCase();
+      if (currentLocation === 'elective'  && loc !== 'elective')  return false;
+      if (currentLocation === 'homeroom'  && loc !== 'homeroom')  return false;
+    }
+    if (q && !s.name.toLowerCase().includes(q) && !(s.grade||'').toLowerCase().includes(q) &&
+        !(s.dismissal||'').toLowerCase().includes(q) && !(s.activity||'').toLowerCase().includes(q) &&
+        !(s.elective||'').toLowerCase().includes(q)) return false;
+    return true;
+  });
+
+  // Sort: by last name
+  filteredStudents.sort((a,b) => (a.lastName||'').localeCompare(b.lastName||''));
+
+  renderSummary();
+  if (currentView === 'table')   renderTable();
+  else                           renderGrouped();
+}
+
+// ── SUMMARY ───────────────────────────────────────────────────────────────────
+function renderSummary() {
+  const buses   = filteredStudents.filter(s => s.dismissal && BUS_ROUTES.includes(s.dismissal)).length;
+  const pickup  = filteredStudents.filter(s => s.dismissal === 'Pick Up').length;
+  const ac      = filteredStudents.filter(s => (s.activity||'').toLowerCase().includes('aftercare')).length;
+  const acts    = filteredStudents.filter(s => s.activity && !s.activity.toLowerCase().includes('aftercare')).length;
+  const elects  = filteredStudents.filter(s => (s.endsIn||'homeroom') === 'elective').length;
+
+  document.getElementById('summaryStrip').innerHTML = `
+    <div class="stat-chip"><div class="dot" style="background:#334ecd"></div><span class="count">${filteredStudents.length}</span> shown</div>
+    <div class="stat-chip"><div class="dot" style="background:${CSS_COLORS.bus}"></div><span class="count">${buses}</span> bus</div>
+    <div class="stat-chip"><div class="dot" style="background:${CSS_COLORS.pickup}"></div><span class="count">${pickup}</span> pickup</div>
+    <div class="stat-chip"><div class="dot" style="background:${CSS_COLORS.aftercare}"></div><span class="count">${ac}</span> aftercare</div>
+    <div class="stat-chip"><div class="dot" style="background:${CSS_COLORS.activity}"></div><span class="count">${acts}</span> activity</div>
+    <div class="stat-chip"><div class="dot" style="background:#e8a020"></div><span class="count">${elects}</span> ends in elective</div>
+  `;
+}
+
+const CSS_COLORS = {
+  bus:      '#1a5fa8',
+  pickup:   '#8a6000',
+  aftercare:'#1a8a7a',
+  activity: '#6b3fa0',
+  none:     '#999',
+};
+
+// ── TABLE VIEW ────────────────────────────────────────────────────────────────
+function renderTable() {
+  if (filteredStudents.length === 0) {
+    document.getElementById('mainView').innerHTML = emptyState();
+    return;
+  }
+
+  let rows = filteredStudents.map(s => `
+    <tr>
+      <td><span class="student-name">${esc(s.lastName)}, ${esc(s.firstName)}</span></td>
+      <td><span class="grade-badge">${esc(s.grade)}</span></td>
+      <td>${dismissalTag(s)}</td>
+      <td>${locationTag(s)}</td>
+    </tr>
+  `).join('');
+
+  document.getElementById('mainView').innerHTML = `
+    <div class="table-wrapper">
+      <table>
+        <thead>
+          <tr>
+            <th>Student</th>
+            <th>Grade</th>
+            <th>Dismissal</th>
+            <th>Ends Day In</th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+  `;
+}
+
+// ── GROUPED VIEW ──────────────────────────────────────────────────────────────
+function renderGrouped() {
+  if (filteredStudents.length === 0) {
+    document.getElementById('mainView').innerHTML = emptyState();
+    return;
+  }
+
+  // Group by grade if currentGrade === 'all', else group by dismissal destination
+  const groupByField = (currentGrade === 'all') ? 'grade' : 'destination';
+  const groups = {};
+
+  filteredStudents.forEach(s => {
+    let key;
+    if (groupByField === 'grade') {
+      key = s.grade || 'Unknown';
+    } else {
+      key = s.activity || s.dismissal || 'Unassigned';
+    }
+    if (!groups[key]) groups[key] = [];
+    groups[key].push(s);
+  });
+
+  const gradeOrder = ['JPK','SPK','K','1','2','3','4','5','6','7','8'];
+  const sortedKeys = Object.keys(groups).sort((a,b) => {
+    const ai = gradeOrder.indexOf(a), bi = gradeOrder.indexOf(b);
+    if (ai !== -1 && bi !== -1) return ai - bi;
+    if (ai !== -1) return -1;
+    if (bi !== -1) return 1;
+    return a.localeCompare(b);
+  });
+
+  const cards = sortedKeys.map(key => {
+    const students = groups[key];
+    const rows = students.map(s => `
+      <div class="group-student-row">
+        <span class="gsrow-name">${esc(s.lastName)}, ${esc(s.firstName)}</span>
+        <div class="gsrow-meta">
+          ${groupByField === 'grade' ? dismissalTag(s) : `<span class="grade-badge">${esc(s.grade)}</span>`}
+          ${locationTag(s)}
+        </div>
+      </div>
+    `).join('');
+
+    return `
+      <div class="group-card" style="animation-delay:${sortedKeys.indexOf(key)*0.04}s">
+        <div class="group-header">
+          <h3>${groupByField === 'grade' ? gradeIcon(key) : destIcon(key)} ${esc(key)}</h3>
+          <span class="group-count">${students.length}</span>
+        </div>
+        <div class="group-students">${rows}</div>
+      </div>
+    `;
+  }).join('');
+
+  document.getElementById('mainView').innerHTML = `<div class="groups-grid">${cards}</div>`;
+}
+
+// ── HELPERS ───────────────────────────────────────────────────────────────────
+function dismissalTag(s) {
+  if (s.activity) {
+    const cls = s.activity.toLowerCase().includes('aftercare') ? 'tag-aftercare' : 'tag-activity';
+    return `<span class="dismissal-tag ${cls}">${actIcon()} ${esc(s.activity)}</span>`;
+  }
+  if (s.dismissal === 'Pick Up') {
+    return `<span class="dismissal-tag tag-pickup">${pickupIcon()} Parent Pickup</span>`;
+  }
+  if (s.dismissal) {
+    return `<span class="dismissal-tag tag-bus">${busIcon()} ${esc(s.dismissal)}</span>`;
+  }
+  return `<span class="dismissal-tag tag-none">—</span>`;
+}
+
+function locationTag(s) {
+  if ((s.endsIn || 'homeroom') === 'elective' && s.elective) {
+    return `<span class="location-badge" title="Ends day in elective">
+      ${electiveIcon()} ${esc(s.elective)}
+    </span>`;
+  }
+  return `<span class="location-badge" style="color:#aaa">
+    ${hrIcon()} Homeroom
+  </span>`;
+}
+
+function gradeIcon(g) {
+  return `<svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="opacity:.6"><path d="M4 19V7a2 2 0 012-2h12a2 2 0 012 2v12M4 19h16M4 19H2M20 19h2"/></svg>`;
+}
+
+function destIcon(d) {
+  if (BUS_ROUTES.includes(d)) return busIcon();
+  if (d === 'Pick Up') return pickupIcon();
+  return actIcon();
+}
+
+function busIcon()      { return `<svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="1" y="7" width="22" height="13" rx="2"/><path d="M16 7V4a1 1 0 00-1-1H9a1 1 0 00-1 1v3M7 17v2M17 17v2M1 12h22"/></svg>`; }
+function pickupIcon()   { return `<svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>`; }
+function actIcon()      { return `<svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>`; }
+function electiveIcon() { return `<svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>`; }
+function hrIcon()       { return `<svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>`; }
+
+function emptyState() {
+  return `
+    <div class="empty-state">
+      <svg width="48" height="48" fill="none" stroke="#334ecd" stroke-width="1.5" viewBox="0 0 24 24">
+        <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+      </svg>
+      <h3>No students match</h3>
+      <p>Try adjusting your grade, location, or search filters.</p>
+    </div>`;
+}
+
+function esc(str) {
+  if (!str && str !== 0) return '';
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// ── START ─────────────────────────────────────────────────────────────────────
+init();
+</script>
+</body>
+</html>
