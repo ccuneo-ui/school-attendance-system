@@ -46,6 +46,15 @@ def get_db_connection():
 
 @app.route('/')
 def index():
+    """Serve the home page"""
+    return send_from_directory('.', 'home.html')
+
+@app.route('/logo.svg')
+def serve_logo():
+    return send_from_directory('.', 'logo.svg')
+
+@app.route('/attendance')
+def attendance():
     """Serve the attendance form"""
     return send_from_directory('.', 'attendance_form.html')
 
