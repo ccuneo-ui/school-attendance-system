@@ -9,7 +9,7 @@ import sqlite3
 from datetime import datetime
 import os
 
-app = Flask(__name__)
+app = Flask(__name__, template_folder='.')
 CORS(app)  # Allow the HTML form to communicate with this server
 
 # Database file location - Uses persistent disk on Render, falls back to local for development
