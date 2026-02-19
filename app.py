@@ -427,17 +427,8 @@ def get_dismissal_today():
       date  — YYYY-MM-DD (defaults to server's today)
       grade — filter to one grade (optional)
 
-    Response shape:
-      {
-        "date":     "2026-02-18",
-        "source":   "today" | "default",
-        "students": [ { id, name, firstName, lastName, grade,
-                        dismissal, activity, endsIn, elective, notes } ]
-      }
-
-    If no dismissal_today rows exist for the requested date we fall back to
-    each student's per-day default from the students table
-    (dismissal_mon … dismissal_fri columns).
+    Reads from daily_dismissal (the admin planner table).
+    Falls back to per-day defaults if no plan has been entered yet.
     """
     init_dismissal_tables()
 
@@ -446,16 +437,16 @@ def get_dismissal_today():
 
     conn = get_db_connection()
 
-    # Check whether today's plan has been filled in at all
+    # Check whether the admin planner has been filled in for this date
     filled = conn.execute(
-        'SELECT COUNT(*) as c FROM dismissal_today WHERE plan_date = ?',
+        'SELECT COUNT(*) as c FROM daily_dismissal WHERE dismissal_date = ?',
         (date_param,)
     ).fetchone()['c']
 
     source = 'today' if filled > 0 else 'default'
 
     if source == 'today':
-        # Pull from dismissal_today joined with students
+        # Pull from daily_dismissal (admin planner table) joined with students
         grade_clause = 'AND s.grade = ?' if grade_filter else ''
         params = [date_param]
         if grade_filter:
@@ -467,14 +458,14 @@ def get_dismissal_today():
                 s.first_name            AS firstName,
                 s.last_name             AS lastName,
                 s.grade,
-                d.bus_route             AS dismissal,
-                d.activity,
-                COALESCE(d.ends_in, 'homeroom') AS endsIn,
-                d.elective_name         AS elective,
+                d.dismissal_type        AS dismissal,
+                d.destination           AS activity,
+                'homeroom'              AS endsIn,
+                NULL                    AS elective,
                 d.notes
             FROM students s
-            LEFT JOIN dismissal_today d
-                   ON d.student_id = s.student_id AND d.plan_date = ?
+            LEFT JOIN daily_dismissal d
+                   ON d.student_id = s.student_id AND d.dismissal_date = ?
             WHERE s.status = 'active'
             {grade_clause}
             ORDER BY s.last_name, s.first_name
@@ -489,10 +480,9 @@ def get_dismissal_today():
             'Thursday':  'dismissal_thu',
             'Friday':    'dismissal_fri',
         }
-        # Figure out day name from date_param
         from datetime import date as dt_date
         d_obj = dt_date.fromisoformat(date_param)
-        day_name = d_obj.strftime('%A')          # e.g. "Tuesday"
+        day_name = d_obj.strftime('%A')
         col = day_col_map.get(day_name, 'dismissal_mon')
 
         grade_clause = 'AND grade = ?' if grade_filter else ''
