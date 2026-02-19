@@ -1,201 +1,52 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Mizzentop Day School — Admin Portal</title>
-  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet"/>
-  <style>
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+{% extends "base.html" %}
 
-    :root {
-      --navy:    #1a2744;
-      --green:   #2d5016;
-      --burgundy:#4a1a2c;
-      --gold:    #c8992a;
-      --cream:   #f7f3ec;
-      --muted:   #6b7280;
-    }
+{% block title %}Mizzentop Day School — Admin Portal{% endblock %}
 
-    html, body {
-      min-height: 100%;
-      font-family: 'DM Sans', sans-serif;
-      background-color: var(--cream);
-      color: var(--navy);
-    }
+{% block fonts %}
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet"/>
+{% endblock %}
 
-    .page {
-      min-height: 100vh;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      padding: 60px 24px 80px;
-    }
+{% block styles %}
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --navy:    #1a2744;
+    --green:   #2d5016;
+    --burgundy:#4a1a2c;
+    --gold:    #c8992a;
+    --cream:   #f7f3ec;
+    --muted:   #6b7280;
+  }
+  html, body { min-height: 100%; font-family: 'DM Sans', sans-serif; background-color: var(--cream); color: var(--navy); }
+  .page { min-height: 100vh; display: flex; flex-direction: column; align-items: center; padding: 60px 24px 80px; }
+  .header { text-align: center; margin-bottom: 56px; }
+  .school-crest { width: 100px; height: 100px; margin: 0 auto 18px; }
+  .school-crest img { width: 100px; height: 100px; }
+  .eyebrow { font-size: 11px; font-weight: 500; letter-spacing: 0.18em; text-transform: uppercase; color: var(--gold); margin-bottom: 10px; }
+  .header h1 { font-family: 'Playfair Display', serif; font-size: 40px; font-weight: 700; color: var(--navy); margin-bottom: 10px; }
+  .header p { font-size: 15px; color: var(--muted); font-weight: 300; }
+  .cards { display: flex; flex-direction: row; gap: 24px; width: 100%; max-width: 1080px; }
+  .card { flex: 1; border-radius: 16px; padding: 36px 32px 32px; color: #ffffff; display: flex; flex-direction: column; }
+  .card-admin     { background-color: #1a2744; }
+  .card-reference { background-color: #2d5016; }
+  .card-billing   { background-color: #4a1a2c; opacity: 0.72; }
+  .card-badge { font-size: 10px; font-weight: 500; letter-spacing: 0.15em; text-transform: uppercase; padding: 4px 10px; border-radius: 20px; background: rgba(255,255,255,0.15); margin-bottom: 20px; display: inline-block; width: fit-content; }
+  .card-icon { width: 44px; height: 44px; margin-bottom: 16px; }
+  .card h2 { font-family: 'Playfair Display', serif; font-size: 26px; font-weight: 700; margin-bottom: 10px; color: #ffffff; }
+  .card p { font-size: 14px; line-height: 1.65; color: rgba(255,255,255,0.75); margin-bottom: 24px; flex-grow: 1; }
+  .card-links { display: flex; flex-direction: column; gap: 8px; }
+  .card-link { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 500; color: rgba(255,255,255,0.9); text-decoration: none; padding: 9px 13px; border-radius: 8px; background: rgba(255,255,255,0.12); transition: background 0.2s ease; }
+  .card-link:hover { background: rgba(255,255,255,0.25); }
+  .card-link svg { width: 14px; height: 14px; opacity: 0.75; flex-shrink: 0; }
+  .link-disabled { opacity: 0.4; cursor: default; pointer-events: none; }
+  .coming-soon { display: inline-block; margin-bottom: 16px; font-size: 10px; font-weight: 500; letter-spacing: 0.12em; text-transform: uppercase; padding: 3px 9px; border-radius: 20px; border: 1px solid rgba(255,255,255,0.35); color: rgba(255,255,255,0.6); width: fit-content; }
+  .footer { margin-top: 56px; font-size: 12px; color: var(--muted); text-align: center; }
+  @media (max-width: 800px) { .cards { flex-direction: column; } .header h1 { font-size: 30px; } }
+</style>
+{% endblock %}
 
-    /* Header */
-    .header {
-      text-align: center;
-      margin-bottom: 56px;
-    }
-
-    .school-crest {
-      width: 100px;
-      height: 100px;
-      margin: 0 auto 18px;
-    }
-
-    .school-crest img {
-      width: 100px;
-      height: 100px;
-    }
-
-    .eyebrow {
-      font-size: 11px;
-      font-weight: 500;
-      letter-spacing: 0.18em;
-      text-transform: uppercase;
-      color: var(--gold);
-      margin-bottom: 10px;
-    }
-
-    .header h1 {
-      font-family: 'Playfair Display', serif;
-      font-size: 40px;
-      font-weight: 700;
-      color: var(--navy);
-      margin-bottom: 10px;
-    }
-
-    .header p {
-      font-size: 15px;
-      color: var(--muted);
-      font-weight: 300;
-    }
-
-    /* Cards */
-    .cards {
-      display: flex;
-      flex-direction: row;
-      gap: 24px;
-      width: 100%;
-      max-width: 1080px;
-    }
-
-    .card {
-      flex: 1;
-      border-radius: 16px;
-      padding: 36px 32px 32px;
-      color: #ffffff;
-      display: flex;
-      flex-direction: column;
-    }
-
-    .card-admin     { background-color: #1a2744; }
-    .card-reference { background-color: #2d5016; }
-    .card-billing   { background-color: #4a1a2c; opacity: 0.72; }
-
-    .card-badge {
-      font-size: 10px;
-      font-weight: 500;
-      letter-spacing: 0.15em;
-      text-transform: uppercase;
-      padding: 4px 10px;
-      border-radius: 20px;
-      background: rgba(255,255,255,0.15);
-      margin-bottom: 20px;
-      display: inline-block;
-      width: fit-content;
-    }
-
-    .card-icon {
-      width: 44px;
-      height: 44px;
-      margin-bottom: 16px;
-    }
-
-    .card h2 {
-      font-family: 'Playfair Display', serif;
-      font-size: 26px;
-      font-weight: 700;
-      margin-bottom: 10px;
-      color: #ffffff;
-    }
-
-    .card p {
-      font-size: 14px;
-      line-height: 1.65;
-      color: rgba(255,255,255,0.75);
-      margin-bottom: 24px;
-      flex-grow: 1;
-    }
-
-    .card-links {
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-    }
-
-    .card-link {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      font-size: 13px;
-      font-weight: 500;
-      color: rgba(255,255,255,0.9);
-      text-decoration: none;
-      padding: 9px 13px;
-      border-radius: 8px;
-      background: rgba(255,255,255,0.12);
-      transition: background 0.2s ease;
-    }
-
-    .card-link:hover {
-      background: rgba(255,255,255,0.25);
-    }
-
-    .card-link svg {
-      width: 14px;
-      height: 14px;
-      opacity: 0.75;
-      flex-shrink: 0;
-    }
-
-    .link-disabled {
-      opacity: 0.4;
-      cursor: default;
-      pointer-events: none;
-    }
-
-    .coming-soon {
-      display: inline-block;
-      margin-bottom: 16px;
-      font-size: 10px;
-      font-weight: 500;
-      letter-spacing: 0.12em;
-      text-transform: uppercase;
-      padding: 3px 9px;
-      border-radius: 20px;
-      border: 1px solid rgba(255,255,255,0.35);
-      color: rgba(255,255,255,0.6);
-      width: fit-content;
-    }
-
-    .footer {
-      margin-top: 56px;
-      font-size: 12px;
-      color: var(--muted);
-      text-align: center;
-    }
-
-    @media (max-width: 800px) {
-      .cards { flex-direction: column; }
-      .header h1 { font-size: 30px; }
-    }
-  </style>
-</head>
-<body>
+{% block content %}
 <div class="page">
-
   <header class="header">
     <div class="school-crest">
       <img src="/logo.svg" alt="Mizzentop Day School Logo" />
@@ -206,7 +57,6 @@
   </header>
 
   <div class="cards">
-
     <!-- ADMIN -->
     <div class="card card-admin">
       <span class="card-badge">Staff Input</span>
@@ -271,13 +121,10 @@
         </div>
       </div>
     </div>
-
   </div>
 
   <footer class="footer">
     Mizzentop Day School &nbsp;·&nbsp; Internal Use Only
   </footer>
-
 </div>
-</body>
-</html>
+{% endblock %}

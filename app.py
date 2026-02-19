@@ -3,7 +3,7 @@ School Attendance System - Backend Server
 This Flask app connects the HTML attendance form to your SQLite database
 """
 
-from flask import Flask, request, jsonify, send_from_directory
+from flask import Flask, request, jsonify, send_from_directory, render_template
 from flask_cors import CORS
 import sqlite3
 from datetime import datetime
@@ -47,7 +47,7 @@ def get_db_connection():
 @app.route('/')
 def index():
     """Serve the home page"""
-    return send_from_directory('.', 'home.html')
+    return render_template('home.html')
 
 @app.route('/logo.svg')
 def serve_logo():
@@ -56,7 +56,7 @@ def serve_logo():
 @app.route('/attendance')
 def attendance():
     """Serve the attendance form"""
-    return send_from_directory('.', 'attendance_form.html')
+    return render_template('attendance_form.html')
 
 @app.route('/api/programs', methods=['GET'])
 def get_programs():
@@ -272,7 +272,7 @@ def init_mcard_table():
 @app.route('/mcard')
 def mcard():
     """Serve the M Card charge tracker"""
-    return send_from_directory('.', 'mcard_tracker.html')
+    return render_template('mcard_tracker.html')
 
 @app.route('/api/mcard/students', methods=['GET'])
 def get_mcard_students():
@@ -412,7 +412,7 @@ def init_dismissal_tables():
 @app.route('/dismissal-staff')
 def dismissal_staff():
     """Serve the read-only staff dismissal dashboard"""
-    return send_from_directory('.', 'dismissal_staff_view.html')
+    return render_template('dismissal_staff_view.html')
 
 
 @app.route('/api/electives', methods=['GET'])
@@ -653,7 +653,7 @@ def clear_dismissal_today():
 @app.route('/dismissal')
 def dismissal():
     """Serve the admin dismissal planner page"""
-    return send_from_directory('.', 'dismissal_planner.html')
+    return render_template('dismissal_planner.html')
 
 @app.route('/api/dismissal/students', methods=['GET'])
 def get_dismissal_students():

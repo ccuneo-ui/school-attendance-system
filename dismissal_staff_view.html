@@ -1,11 +1,14 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Dismissal Board – Staff View</title>
+{% extends "base.html" %}
+
+{% block title %}Dismissal Staff View — Mizzentop Day School{% endblock %}
+
+{% block fonts %}
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=Epilogue:wght@400;500;600&display=swap" rel="stylesheet">
+{% endblock %}
+
+{% block styles %}
 <style>
+
   :root {
     --navy:    #0f1f3d;
     --navy2:   #162847;
@@ -521,10 +524,11 @@
     #searchInput { width: 100%; }
     #liveDate { display: none; }
   }
-</style>
-</head>
-<body>
 
+</style>
+{% endblock %}
+
+{% block content %}
 <!-- HEADER -->
 <header>
   <div class="header-left">
@@ -976,5 +980,4 @@ function esc(str) {
 // ── START ─────────────────────────────────────────────────────────────────────
 init();
 </script>
-</body>
-</html>
+{% endblock %}

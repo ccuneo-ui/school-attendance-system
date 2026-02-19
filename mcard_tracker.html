@@ -1,11 +1,14 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>M Card Charge Tracker</title>
+{% extends "base.html" %}
+
+{% block title %}M Card Tracker — Mizzentop Day School{% endblock %}
+
+{% block fonts %}
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@700;900&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+{% endblock %}
+
+{% block styles %}
 <style>
+
   :root {
     --navy: #1a2744;
     --gold: #f5c842;
@@ -339,10 +342,11 @@
 
   .flash.show { opacity: 1; transform: translateY(0); }
   .flash.error { background: var(--red); }
-</style>
-</head>
-<body>
 
+</style>
+{% endblock %}
+
+{% block content %}
 <header>
   <div class="logo-badge">M</div>
   <div>
@@ -632,5 +636,4 @@
 
   Promise.all([loadStudents(), loadCharges()]);
 </script>
-</body>
-</html>
+{% endblock %}

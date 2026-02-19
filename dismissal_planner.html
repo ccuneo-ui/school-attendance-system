@@ -1,11 +1,14 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Dismissal Planner</title>
+{% extends "base.html" %}
+
+{% block title %}Dismissal Planner — Mizzentop Day School{% endblock %}
+
+{% block fonts %}
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+{% endblock %}
+
+{% block styles %}
 <style>
+
   :root {
     --bg: #f0ece4;
     --surface: #faf8f4;
@@ -425,10 +428,11 @@
     .view-toggle { margin-left: 0; }
     .stats-bar { flex-wrap: wrap; }
   }
-</style>
-</head>
-<body>
 
+</style>
+{% endblock %}
+
+{% block content %}
 <header>
   <h1>🏫 <span>Dismissal</span> Planner</h1>
   <div class="header-nav">
@@ -1106,5 +1110,4 @@ document.querySelectorAll('.modal-overlay').forEach(overlay => {
 
 init();
 </script>
-</body>
-</html>
+{% endblock %}
