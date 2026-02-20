@@ -1,14 +1,11 @@
-{% extends "base.html" %}
-
-{% block title %}Dismissal Planner — Mizzentop Day School{% endblock %}
-
-{% block fonts %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dismissal Planner</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
-{% endblock %}
-
-{% block styles %}
 <style>
-
   :root {
     --bg: #f0ece4;
     --surface: #faf8f4;
@@ -428,11 +425,10 @@
     .view-toggle { margin-left: 0; }
     .stats-bar { flex-wrap: wrap; }
   }
-
 </style>
-{% endblock %}
+</head>
+<body>
 
-{% block content %}
 <header>
   <h1>🏫 <span>Dismissal</span> Planner</h1>
   <div class="header-nav">
@@ -787,6 +783,21 @@ function renderGroupView() {
 
   const html = [];
 
+  // Not Set Card (first so admin sees unassigned students immediately)
+  const unsetStudents = groups.unset['Not Set'];
+  if (unsetStudents.length > 0) {
+    html.push(`<div class="group-card group-unset">
+      <div class="group-header">
+        <div class="group-icon">❓</div>
+        <div class="group-title">Not Set</div>
+        <span class="group-count">${unsetStudents.length}</span>
+      </div>
+      <div class="group-body">
+        ${unsetStudents.map(s => renderStudentRow(s)).join('')}
+      </div>
+    </div>`);
+  }
+
   // Bus Card
   const busStudentIds = Object.values(groups.bus).flat().map(s=>s.student_id);
   const busTotal = busStudentIds.length;
@@ -834,20 +845,6 @@ function renderGroupView() {
     </div>
   </div>`);
 
-  // Unset Card
-  const unsetStudents = groups.unset['Not Set'];
-  if (unsetStudents.length > 0) {
-    html.push(`<div class="group-card group-unset">
-      <div class="group-header">
-        <div class="group-icon">❓</div>
-        <div class="group-title">Not Set</div>
-        <span class="group-count">${unsetStudents.length}</span>
-      </div>
-      <div class="group-body">
-        ${unsetStudents.map(s => renderStudentRow(s)).join('')}
-      </div>
-    </div>`);
-  }
 
   container.innerHTML = html.join('');
 }
@@ -1110,4 +1107,5 @@ document.querySelectorAll('.modal-overlay').forEach(overlay => {
 
 init();
 </script>
-{% endblock %}
+</body>
+</html>
