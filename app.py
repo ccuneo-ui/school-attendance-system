@@ -47,7 +47,7 @@ def get_db_connection():
 @app.route('/')
 def index():
     """Serve the home page"""
-    return render_template('home.html')
+    return send_from_directory('.', 'home.html')
 
 @app.route('/logo.svg')
 def serve_logo():
@@ -56,7 +56,7 @@ def serve_logo():
 @app.route('/attendance')
 def attendance():
     """Serve the attendance form"""
-    return render_template('attendance_form.html')
+    return send_from_directory('.', 'attendance_form.html')
 
 @app.route('/api/programs', methods=['GET'])
 def get_programs():
@@ -272,7 +272,7 @@ def init_mcard_table():
 @app.route('/mcard')
 def mcard():
     """Serve the M Card charge tracker"""
-    return render_template('mcard_tracker.html')
+    return send_from_directory('.', 'mcard_tracker.html')
 
 @app.route('/api/mcard/students', methods=['GET'])
 def get_mcard_students():
@@ -412,7 +412,7 @@ def init_dismissal_tables():
 @app.route('/dismissal-staff')
 def dismissal_staff():
     """Serve the read-only staff dismissal dashboard"""
-    return render_template('dismissal_staff_view.html')
+    return send_from_directory('.', 'dismissal_staff_view.html')
 
 
 @app.route('/api/electives', methods=['GET'])
@@ -653,15 +653,12 @@ def clear_dismissal_today():
 @app.route('/dismissal')
 def dismissal():
     """Serve the admin dismissal planner page"""
-    return render_template('dismissal_planner.html')
+    return send_from_directory('.', 'dismissal_planner.html')
 
 @app.route('/api/dismissal/attendance/<date>', methods=['GET'])
 def get_dismissal_attendance(date):
-    """Get attendance records for all students for a given date (for dismissal planner)"""
     conn = get_db_connection()
-    program = conn.execute(
-        "SELECT program_id FROM programs WHERE program_name = 'General Attendance' AND status = 'active' LIMIT 1"
-    ).fetchone()
+    program = conn.execute("SELECT program_id FROM programs WHERE program_name = 'General Attendance' AND status = 'active' LIMIT 1").fetchone()
     if not program:
         conn.close()
         return jsonify([])
@@ -677,33 +674,22 @@ def get_dismissal_attendance(date):
 
 @app.route('/api/dismissal/attendance', methods=['POST'])
 def save_dismissal_attendance():
-    """Save a single student's attendance from the dismissal planner"""
     data = request.json
     student_id = data.get('student_id')
-    date       = data.get('date')
-    status     = data.get('status', '')
-
+    date = data.get('date')
+    status = data.get('status', '')
     if not student_id or not date:
         return jsonify({'error': 'Missing student_id or date'}), 400
-
     conn = get_db_connection()
-    program = conn.execute(
-        "SELECT program_id FROM programs WHERE program_name = 'General Attendance' AND status = 'active' LIMIT 1"
-    ).fetchone()
+    program = conn.execute("SELECT program_id FROM programs WHERE program_name = 'General Attendance' AND status = 'active' LIMIT 1").fetchone()
     if not program:
         conn.close()
         return jsonify({'error': 'General Attendance program not found'}), 404
-
-    enrollment = conn.execute(
-        "SELECT enrollment_id FROM enrollments WHERE student_id = ? AND program_id = ? AND status = 'active'",
-        (student_id, program['program_id'])
-    ).fetchone()
+    enrollment = conn.execute("SELECT enrollment_id FROM enrollments WHERE student_id = ? AND program_id = ? AND status = 'active'", (student_id, program['program_id'])).fetchone()
     if not enrollment:
         conn.close()
         return jsonify({'error': 'Student not enrolled in General Attendance'}), 404
-
     enrollment_id = enrollment['enrollment_id']
-
     if not status:
         conn.execute('DELETE FROM attendance_records WHERE enrollment_id = ? AND attendance_date = ?', (enrollment_id, date))
     else:
@@ -712,7 +698,6 @@ def save_dismissal_attendance():
             conn.execute('UPDATE attendance_records SET status=?, recorded_at=CURRENT_TIMESTAMP WHERE attendance_id=?', (status, existing['attendance_id']))
         else:
             conn.execute('INSERT INTO attendance_records (enrollment_id, attendance_date, status, recorded_by, notes) VALUES (?,?,?,1,"")', (enrollment_id, date, status))
-
     conn.commit()
     conn.close()
     return jsonify({'success': True})

@@ -1,365 +1,86 @@
-{% extends "base.html" %}
-
-{% block title %}M Card Tracker — Mizzentop Day School{% endblock %}
-
-{% block fonts %}
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@700;900&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
-{% endblock %}
-
-{% block styles %}
-<style>
-
-  :root {
-    --navy: #1a2744;
-    --gold: #f5c842;
-    --gold-dark: #d4a800;
-    --cream: #fef9ee;
-    --red: #e84040;
-    --green: #2eaa6e;
-    --card-bg: #ffffff;
-    --border: #e2d9c8;
-    --text: #1a2744;
-    --muted: #7a7a8c;
-  }
-
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-
-  body {
-    font-family: 'DM Sans', sans-serif;
-    background: var(--cream);
-    min-height: 100vh;
-    color: var(--text);
-  }
-
-  header {
-    background: var(--navy);
-    padding: 18px 32px;
-    display: flex;
-    align-items: center;
-    gap: 16px;
-    box-shadow: 0 4px 20px rgba(26,39,68,0.3);
-  }
-
-  .logo-badge {
-    background: var(--gold);
-    color: var(--navy);
-    font-family: 'Fraunces', serif;
-    font-weight: 900;
-    font-size: 22px;
-    width: 48px; height: 48px;
-    border-radius: 12px;
-    display: flex; align-items: center; justify-content: center;
-    flex-shrink: 0;
-  }
-
-  header h1 { font-family: 'Fraunces', serif; font-weight: 700; font-size: 22px; color: #fff; line-height: 1.2; }
-  header p { color: #a0aec0; font-size: 13px; margin-top: 2px; }
-
-  .nav-link {
-    margin-left: auto;
-    color: var(--gold);
-    text-decoration: none;
-    font-size: 13px;
-    font-weight: 600;
-    border: 2px solid var(--gold);
-    padding: 7px 16px;
-    border-radius: 8px;
-    transition: all 0.15s;
-  }
-  .nav-link:hover { background: var(--gold); color: var(--navy); }
-
-  .container { max-width: 960px; margin: 0 auto; padding: 32px 20px; }
-
-  .form-card {
-    background: var(--card-bg);
-    border-radius: 20px;
-    padding: 28px;
-    border: 2px solid var(--border);
-    box-shadow: 0 4px 24px rgba(26,39,68,0.06);
-    margin-bottom: 28px;
-  }
-
-  .form-card h2 { font-family: 'Fraunces', serif; font-size: 18px; margin-bottom: 20px; color: var(--navy); }
-
-  .form-grid {
-    display: grid;
-    grid-template-columns: 2fr 1fr auto auto;
-    gap: 14px;
-    align-items: end;
-  }
-
-  @media (max-width: 640px) { .form-grid { grid-template-columns: 1fr; } }
-
-  label {
-    font-size: 12px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    color: var(--muted);
-    display: block;
-    margin-bottom: 6px;
-  }
-
-  .student-select-wrap { position: relative; }
-
-  #studentSearch {
-    width: 100%;
-    padding: 12px 14px;
-    border: 2px solid var(--border);
-    border-radius: 12px;
-    font-size: 15px;
-    font-family: 'DM Sans', sans-serif;
-    background: var(--cream);
-    color: var(--text);
-    outline: none;
-    transition: border-color 0.2s;
-  }
-
-  #studentSearch:focus { border-color: var(--gold-dark); background: #fff; }
-
-  .dropdown-list {
-    position: absolute;
-    top: calc(100% + 4px);
-    left: 0; right: 0;
-    background: #fff;
-    border: 2px solid var(--gold-dark);
-    border-radius: 12px;
-    max-height: 240px;
-    overflow-y: auto;
-    z-index: 100;
-    display: none;
-    box-shadow: 0 8px 24px rgba(26,39,68,0.12);
-  }
-
-  .dropdown-list.open { display: block; }
-
-  .dropdown-item {
-    padding: 10px 14px;
-    cursor: pointer;
-    font-size: 14px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    transition: background 0.1s;
-  }
-
-  .dropdown-item:hover { background: #faf6ec; }
-
-  .dropdown-item .grade-tag {
-    font-size: 11px;
-    background: var(--navy);
-    color: #fff;
-    border-radius: 6px;
-    padding: 2px 8px;
-    font-weight: 600;
-  }
-
-  .dropdown-empty { padding: 14px; color: var(--muted); font-size: 14px; text-align: center; }
-
-  input[type="date"] {
-    width: 100%;
-    padding: 12px 14px;
-    border: 2px solid var(--border);
-    border-radius: 12px;
-    font-size: 15px;
-    font-family: 'DM Sans', sans-serif;
-    background: var(--cream);
-    color: var(--text);
-    outline: none;
-    transition: border-color 0.2s;
-  }
-
-  input[type="date"]:focus { border-color: var(--gold-dark); background: #fff; }
-
-  .btn-add, .btn-add-2 {
-    border: none;
-    padding: 12px 22px;
-    border-radius: 12px;
-    font-size: 15px;
-    font-weight: 700;
-    font-family: 'DM Sans', sans-serif;
-    cursor: pointer;
-    white-space: nowrap;
-    transition: background 0.15s, transform 0.1s;
-    height: 48px;
-  }
-
-  .btn-add { background: var(--gold); color: var(--navy); }
-  .btn-add:hover { background: var(--gold-dark); }
-
-  .btn-add-2 { background: var(--navy); color: var(--gold); }
-  .btn-add-2:hover { background: #0f1a33; }
-
-  .btn-add:active, .btn-add-2:active { transform: scale(0.97); }
-  .btn-add:disabled, .btn-add-2:disabled { opacity: 0.5; cursor: not-allowed; }
-
-  .summary-strip { display: flex; gap: 14px; margin-bottom: 28px; flex-wrap: wrap; }
-
-  .stat-box {
-    background: var(--card-bg);
-    border: 2px solid var(--border);
-    border-radius: 16px;
-    padding: 16px 22px;
-    flex: 1; min-width: 130px; text-align: center;
-  }
-
-  .stat-box .val { font-family: 'Fraunces', serif; font-size: 32px; font-weight: 900; color: var(--navy); line-height: 1; }
-  .stat-box .lbl { font-size: 12px; color: var(--muted); margin-top: 4px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.07em; }
-
-  .table-card {
-    background: var(--card-bg);
-    border-radius: 20px;
-    border: 2px solid var(--border);
-    overflow: hidden;
-    box-shadow: 0 4px 24px rgba(26,39,68,0.06);
-  }
-
-  .table-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 18px 24px;
-    border-bottom: 2px solid var(--border);
-    flex-wrap: wrap;
-    gap: 10px;
-  }
-
-  .table-header h2 { font-family: 'Fraunces', serif; font-size: 17px; color: var(--navy); }
-
-  .search-input {
-    padding: 8px 14px;
-    border: 2px solid var(--border);
-    border-radius: 10px;
-    font-size: 13px;
-    font-family: 'DM Sans', sans-serif;
-    outline: none;
-    width: 200px;
-    background: var(--cream);
-  }
-
-  .search-input:focus { border-color: var(--gold-dark); }
-
-  .btn-export {
-    background: var(--navy);
-    color: #fff;
-    border: none;
-    padding: 9px 20px;
-    border-radius: 10px;
-    font-size: 13px;
-    font-weight: 600;
-    font-family: 'DM Sans', sans-serif;
-    cursor: pointer;
-    transition: opacity 0.15s;
-  }
-
-  .btn-export:hover { opacity: 0.85; }
-
-  table { width: 100%; border-collapse: collapse; }
-
-  thead th {
-    background: var(--navy);
-    color: #fff;
-    font-size: 12px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    padding: 12px 20px;
-    text-align: left;
-  }
-
-  tbody tr { border-bottom: 1px solid var(--border); transition: background 0.1s; }
-  tbody tr:last-child { border-bottom: none; }
-  tbody tr:hover { background: #faf6ec; }
-
-  td { padding: 13px 20px; font-size: 14px; vertical-align: middle; }
-
-  .charge-badge {
-    background: var(--gold);
-    color: var(--navy);
-    font-weight: 700;
-    border-radius: 8px;
-    padding: 3px 12px;
-    font-size: 14px;
-    display: inline-block;
-  }
-
-  .grade-pill {
-    background: var(--navy);
-    color: #fff;
-    font-size: 11px;
-    font-weight: 600;
-    border-radius: 6px;
-    padding: 2px 8px;
-    display: inline-block;
-  }
-
-  .btn-remove {
-    background: none;
-    border: 2px solid #e2d9c8;
-    color: var(--muted);
-    border-radius: 8px;
-    padding: 5px 12px;
-    font-size: 12px;
-    font-family: 'DM Sans', sans-serif;
-    cursor: pointer;
-    transition: all 0.15s;
-    font-weight: 600;
-  }
-
-  .btn-remove:hover { border-color: var(--red); color: var(--red); background: #fff0f0; }
-
-  .empty-state { text-align: center; padding: 48px 20px; color: var(--muted); font-size: 15px; }
-  .empty-state span { font-size: 40px; display: block; margin-bottom: 10px; }
-
-  .error-banner {
-    background: #fff0f0;
-    border: 2px solid var(--red);
-    color: var(--red);
-    border-radius: 12px;
-    padding: 14px 20px;
-    margin-bottom: 20px;
-    font-size: 14px;
-    font-weight: 600;
-    display: none;
-  }
-
-  .flash {
-    position: fixed;
-    bottom: 24px; right: 24px;
-    background: var(--green);
-    color: #fff;
-    padding: 12px 22px;
-    border-radius: 12px;
-    font-weight: 600;
-    font-size: 14px;
-    box-shadow: 0 8px 24px rgba(0,0,0,0.15);
-    opacity: 0;
-    transform: translateY(10px);
-    transition: all 0.2s;
-    pointer-events: none;
-    z-index: 999;
-  }
-
-  .flash.show { opacity: 1; transform: translateY(0); }
-  .flash.error { background: var(--red); }
-
-</style>
-{% endblock %}
-
-{% block content %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>M Card Tracker — Mizzentop Day School</title>
+  <link rel="icon" type="image/svg+xml" href="/logo.svg">
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@700;900&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root { --navy:#1a2744; --gold:#f5c842; --gold-dark:#d4a800; --cream:#fef9ee; --red:#e84040; --green:#2eaa6e; --card-bg:#ffffff; --border:#e2d9c8; --text:#1a2744; --muted:#7a7a8c; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'DM Sans', sans-serif; background: var(--cream); min-height: 100vh; color: var(--text); }
+    header { background: var(--navy); padding: 18px 32px; display: flex; align-items: center; gap: 16px; box-shadow: 0 4px 20px rgba(26,39,68,0.3); }
+    .logo-badge { background: var(--gold); color: var(--navy); font-family: 'Fraunces', serif; font-weight: 900; font-size: 22px; width: 48px; height: 48px; border-radius: 12px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    header h1 { font-family: 'Fraunces', serif; font-weight: 700; font-size: 22px; color: #fff; line-height: 1.2; }
+    header p { color: #a0aec0; font-size: 13px; margin-top: 2px; }
+    .nav-link { margin-left: auto; color: var(--gold); text-decoration: none; font-size: 13px; font-weight: 600; border: 2px solid var(--gold); padding: 7px 16px; border-radius: 8px; transition: all 0.15s; }
+    .nav-link:hover { background: var(--gold); color: var(--navy); }
+    .container { max-width: 960px; margin: 0 auto; padding: 32px 20px; }
+    .form-card { background: var(--card-bg); border-radius: 20px; padding: 28px; border: 2px solid var(--border); box-shadow: 0 4px 24px rgba(26,39,68,0.06); margin-bottom: 28px; }
+    .form-card h2 { font-family: 'Fraunces', serif; font-size: 18px; margin-bottom: 20px; color: var(--navy); }
+    .form-grid { display: grid; grid-template-columns: 2fr 1fr auto auto; gap: 14px; align-items: end; }
+    @media (max-width: 640px) { .form-grid { grid-template-columns: 1fr; } }
+    label { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); display: block; margin-bottom: 6px; }
+    .student-select-wrap { position: relative; }
+    #studentSearch { width: 100%; padding: 12px 14px; border: 2px solid var(--border); border-radius: 12px; font-size: 15px; font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(--text); outline: none; transition: border-color 0.2s; }
+    #studentSearch:focus { border-color: var(--gold-dark); background: #fff; }
+    .dropdown-list { position: absolute; top: calc(100% + 4px); left: 0; right: 0; background: #fff; border: 2px solid var(--gold-dark); border-radius: 12px; max-height: 240px; overflow-y: auto; z-index: 100; display: none; box-shadow: 0 8px 24px rgba(26,39,68,0.12); }
+    .dropdown-list.open { display: block; }
+    .dropdown-item { padding: 10px 14px; cursor: pointer; font-size: 14px; display: flex; justify-content: space-between; align-items: center; transition: background 0.1s; }
+    .dropdown-item:hover { background: #faf6ec; }
+    .dropdown-item .grade-tag { font-size: 11px; background: var(--navy); color: #fff; border-radius: 6px; padding: 2px 8px; font-weight: 600; }
+    .dropdown-empty { padding: 14px; color: var(--muted); font-size: 14px; text-align: center; }
+    input[type="date"] { width: 100%; padding: 12px 14px; border: 2px solid var(--border); border-radius: 12px; font-size: 15px; font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(--text); outline: none; transition: border-color 0.2s; }
+    input[type="date"]:focus { border-color: var(--gold-dark); background: #fff; }
+    .btn-add, .btn-add-2 { border: none; padding: 12px 22px; border-radius: 12px; font-size: 15px; font-weight: 700; font-family: 'DM Sans', sans-serif; cursor: pointer; white-space: nowrap; transition: background 0.15s, transform 0.1s; height: 48px; }
+    .btn-add { background: var(--gold); color: var(--navy); }
+    .btn-add:hover { background: var(--gold-dark); }
+    .btn-add-2 { background: var(--navy); color: var(--gold); }
+    .btn-add-2:hover { background: #0f1a33; }
+    .btn-add:active, .btn-add-2:active { transform: scale(0.97); }
+    .btn-add:disabled, .btn-add-2:disabled { opacity: 0.5; cursor: not-allowed; }
+    .summary-strip { display: flex; gap: 14px; margin-bottom: 28px; flex-wrap: wrap; }
+    .stat-box { background: var(--card-bg); border: 2px solid var(--border); border-radius: 16px; padding: 16px 22px; flex: 1; min-width: 130px; text-align: center; }
+    .stat-box .val { font-family: 'Fraunces', serif; font-size: 32px; font-weight: 900; color: var(--navy); line-height: 1; }
+    .stat-box .lbl { font-size: 12px; color: var(--muted); margin-top: 4px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.07em; }
+    .table-card { background: var(--card-bg); border-radius: 20px; border: 2px solid var(--border); overflow: hidden; box-shadow: 0 4px 24px rgba(26,39,68,0.06); }
+    .table-header { display: flex; justify-content: space-between; align-items: center; padding: 18px 24px; border-bottom: 2px solid var(--border); flex-wrap: wrap; gap: 10px; }
+    .table-header h2 { font-family: 'Fraunces', serif; font-size: 17px; color: var(--navy); }
+    .search-input { padding: 8px 14px; border: 2px solid var(--border); border-radius: 10px; font-size: 13px; font-family: 'DM Sans', sans-serif; outline: none; width: 200px; background: var(--cream); }
+    .search-input:focus { border-color: var(--gold-dark); }
+    .btn-export { background: var(--navy); color: #fff; border: none; padding: 9px 20px; border-radius: 10px; font-size: 13px; font-weight: 600; font-family: 'DM Sans', sans-serif; cursor: pointer; transition: opacity 0.15s; }
+    .btn-export:hover { opacity: 0.85; }
+    table { width: 100%; border-collapse: collapse; }
+    thead th { background: var(--navy); color: #fff; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; padding: 12px 20px; text-align: left; }
+    tbody tr { border-bottom: 1px solid var(--border); transition: background 0.1s; }
+    tbody tr:last-child { border-bottom: none; }
+    tbody tr:hover { background: #faf6ec; }
+    td { padding: 13px 20px; font-size: 14px; vertical-align: middle; }
+    .charge-badge { background: var(--gold); color: var(--navy); font-weight: 700; border-radius: 8px; padding: 3px 12px; font-size: 14px; display: inline-block; }
+    .grade-pill { background: var(--navy); color: #fff; font-size: 11px; font-weight: 600; border-radius: 6px; padding: 2px 8px; display: inline-block; }
+    .btn-remove { background: none; border: 2px solid #e2d9c8; color: var(--muted); border-radius: 8px; padding: 5px 12px; font-size: 12px; font-family: 'DM Sans', sans-serif; cursor: pointer; transition: all 0.15s; font-weight: 600; }
+    .btn-remove:hover { border-color: var(--red); color: var(--red); background: #fff0f0; }
+    .empty-state { text-align: center; padding: 48px 20px; color: var(--muted); font-size: 15px; }
+    .empty-state span { font-size: 40px; display: block; margin-bottom: 10px; }
+    .error-banner { background: #fff0f0; border: 2px solid var(--red); color: var(--red); border-radius: 12px; padding: 14px 20px; margin-bottom: 20px; font-size: 14px; font-weight: 600; display: none; }
+    .flash { position: fixed; bottom: 24px; right: 24px; background: var(--green); color: #fff; padding: 12px 22px; border-radius: 12px; font-weight: 600; font-size: 14px; box-shadow: 0 8px 24px rgba(0,0,0,0.15); opacity: 0; transform: translateY(10px); transition: all 0.2s; pointer-events: none; z-index: 999; }
+    .flash.show { opacity: 1; transform: translateY(0); }
+    .flash.error { background: var(--red); }
+  </style>
+</head>
+<body>
 <header>
   <div class="logo-badge">M</div>
   <div>
     <h1>M Card Charge Tracker</h1>
     <p>Snack Cart Charges — Staff Use Only</p>
   </div>
-  <a href="/" class="nav-link">← Attendance</a>
+  <a href="/" class="nav-link">← Home</a>
 </header>
 
 <div class="container">
-
   <div class="error-banner" id="errorBanner">⚠️ Could not connect to server. Please check your connection.</div>
-
   <div class="form-card">
     <h2>🛒 Add Snack Charge</h2>
     <div class="form-grid">
@@ -374,28 +95,15 @@
         <label for="chargeDate">Date</label>
         <input type="date" id="chargeDate">
       </div>
-      <div>
-        <button class="btn-add" id="addBtn1" onclick="addCharge(1)">+ 1 Snack</button>
-      </div>
-      <div>
-        <button class="btn-add-2" id="addBtn2" onclick="addCharge(2)">+ 2 Snacks</button>
-      </div>
+      <div><button class="btn-add" id="addBtn1" onclick="addCharge(1)">+ 1 Snack</button></div>
+      <div><button class="btn-add-2" id="addBtn2" onclick="addCharge(2)">+ 2 Snacks</button></div>
     </div>
   </div>
 
   <div class="summary-strip">
-    <div class="stat-box">
-      <div class="val" id="statTotal">—</div>
-      <div class="lbl">Total Charges</div>
-    </div>
-    <div class="stat-box">
-      <div class="val" id="statStudents">—</div>
-      <div class="lbl">Students</div>
-    </div>
-    <div class="stat-box">
-      <div class="val" id="statToday">—</div>
-      <div class="lbl">Today</div>
-    </div>
+    <div class="stat-box"><div class="val" id="statTotal">—</div><div class="lbl">Total Charges</div></div>
+    <div class="stat-box"><div class="val" id="statStudents">—</div><div class="lbl">Students</div></div>
+    <div class="stat-box"><div class="val" id="statToday">—</div><div class="lbl">Today</div></div>
   </div>
 
   <div class="table-card">
@@ -406,11 +114,8 @@
         <button class="btn-export" onclick="exportCSV()">⬇ Export CSV</button>
       </div>
     </div>
-    <div id="tableWrap">
-      <div class="empty-state"><span>⏳</span>Loading...</div>
-    </div>
+    <div id="tableWrap"><div class="empty-state"><span>⏳</span>Loading...</div></div>
   </div>
-
 </div>
 
 <div class="flash" id="flash"></div>
@@ -420,69 +125,36 @@
   const today = new Date().toISOString().split('T')[0];
   document.getElementById('chargeDate').value = today;
 
-  let allStudents = [];
-  let charges = [];
-  let selectedStudentId = null;
-  let selectedStudentName = '';
+  let allStudents = [], charges = [], selectedStudentId = null, selectedStudentName = '';
 
-  // ── Student search dropdown ──────────────────────────
   async function loadStudents() {
-    try {
-      const res = await fetch(`${API_BASE}/api/mcard/students`);
-      allStudents = await res.json();
-    } catch(e) {
-      document.getElementById('errorBanner').style.display = 'block';
-    }
+    try { const res = await fetch(`${API_BASE}/api/mcard/students`); allStudents = await res.json(); }
+    catch(e) { document.getElementById('errorBanner').style.display = 'block'; }
   }
 
   const searchInput = document.getElementById('studentSearch');
   const dropdown = document.getElementById('dropdownList');
 
   searchInput.addEventListener('input', () => {
-    selectedStudentId = null;
-    selectedStudentName = '';
+    selectedStudentId = null; selectedStudentName = '';
     const q = searchInput.value.trim().toLowerCase();
     if (!q) { closeDropdown(); return; }
-
-    const matches = allStudents.filter(s =>
-      (s.first_name + ' ' + s.last_name).toLowerCase().includes(q)
-    ).slice(0, 20);
-
+    const matches = allStudents.filter(s => (s.first_name + ' ' + s.last_name).toLowerCase().includes(q)).slice(0, 20);
     if (matches.length === 0) {
       dropdown.innerHTML = '<div class="dropdown-empty">No students found</div>';
     } else {
-      dropdown.innerHTML = matches.map(s => `
-        <div class="dropdown-item" data-id="${s.student_id}" data-name="${esc(s.first_name + ' ' + s.last_name)}">
-          <span>${esc(s.first_name)} ${esc(s.last_name)}</span>
-          <span class="grade-tag">Grade ${esc(s.grade || '?')}</span>
-        </div>
-      `).join('');
-
+      dropdown.innerHTML = matches.map(s => `<div class="dropdown-item" data-id="${s.student_id}" data-name="${esc(s.first_name + ' ' + s.last_name)}"><span>${esc(s.first_name)} ${esc(s.last_name)}</span><span class="grade-tag">Grade ${esc(s.grade || '?')}</span></div>`).join('');
       dropdown.querySelectorAll('.dropdown-item').forEach(el => {
-        el.addEventListener('mousedown', (e) => {
-          e.preventDefault();
-          selectedStudentId = parseInt(el.dataset.id);
-          selectedStudentName = el.dataset.name;
-          searchInput.value = selectedStudentName;
-          closeDropdown();
-        });
+        el.addEventListener('mousedown', e => { e.preventDefault(); selectedStudentId = parseInt(el.dataset.id); selectedStudentName = el.dataset.name; searchInput.value = selectedStudentName; closeDropdown(); });
       });
     }
-
     dropdown.classList.add('open');
   });
 
-  searchInput.addEventListener('focus', () => {
-    if (searchInput.value.trim()) searchInput.dispatchEvent(new Event('input'));
-  });
-
-  document.addEventListener('click', e => {
-    if (!e.target.closest('.student-select-wrap')) closeDropdown();
-  });
-
+  searchInput.addEventListener('focus', () => { if (searchInput.value.trim()) searchInput.dispatchEvent(new Event('input')); });
+  document.addEventListener('click', e => { if (!e.target.closest('.student-select-wrap')) closeDropdown(); });
   function closeDropdown() { dropdown.classList.remove('open'); }
 
-  // ── Charges ──────────────────────────────────────────
   async function loadCharges() {
     try {
       const res = await fetch(`${API_BASE}/api/mcard/charges`);
@@ -492,148 +164,78 @@
       renderTable();
     } catch(e) {
       document.getElementById('errorBanner').style.display = 'block';
-      document.getElementById('tableWrap').innerHTML =
-        '<div class="empty-state"><span>⚠️</span>Unable to load charges from server.</div>';
+      document.getElementById('tableWrap').innerHTML = '<div class="empty-state"><span>⚠️</span>Unable to load charges from server.</div>';
     }
   }
 
   async function addCharge(quantity) {
-    if (!selectedStudentId) {
-      searchInput.focus();
-      searchInput.style.borderColor = 'var(--red)';
-      setTimeout(() => searchInput.style.borderColor = '', 1500);
-      showFlash('Please select a student from the list.', true);
-      return;
-    }
+    if (!selectedStudentId) { searchInput.focus(); searchInput.style.borderColor = 'var(--red)'; setTimeout(() => searchInput.style.borderColor = '', 1500); showFlash('Please select a student from the list.', true); return; }
     const date = document.getElementById('chargeDate').value;
     if (!date) { document.getElementById('chargeDate').focus(); return; }
-
-    const btn1 = document.getElementById('addBtn1');
-    const btn2 = document.getElementById('addBtn2');
-    btn1.disabled = true; btn2.disabled = true;
-    btn1.textContent = 'Saving...'; btn2.textContent = 'Saving...';
-
+    const btn1 = document.getElementById('addBtn1'), btn2 = document.getElementById('addBtn2');
+    btn1.disabled = true; btn2.disabled = true; btn1.textContent = 'Saving...'; btn2.textContent = 'Saving...';
     const nameForFlash = selectedStudentName;
-
     try {
-      const res = await fetch(`${API_BASE}/api/mcard/charges`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ student_id: selectedStudentId, charge_date: date, quantity: quantity })
-      });
-
+      const res = await fetch(`${API_BASE}/api/mcard/charges`, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({student_id: selectedStudentId, charge_date: date, quantity}) });
       if (!res.ok) throw new Error();
       const result = await res.json();
-
       const student = allStudents.find(s => s.student_id === selectedStudentId);
-      charges.unshift({
-        charge_id: result.charge_id,
-        student_id: selectedStudentId,
-        student_name: selectedStudentName,
-        grade: student ? student.grade : '',
-        charge_date: date,
-        quantity: quantity
-      });
-
-      searchInput.value = '';
-      selectedStudentId = null;
-      selectedStudentName = '';
-      searchInput.focus();
-      renderTable();
-      showFlash('+' + quantity + ' snack' + (quantity > 1 ? 's' : '') + ' added for ' + nameForFlash + '!', false);
-    } catch(e) {
-      showFlash('Error saving charge. Try again.', true);
-    }
-
-    btn1.disabled = false; btn2.disabled = false;
-    btn1.textContent = '+ 1 Snack'; btn2.textContent = '+ 2 Snacks';
+      charges.unshift({charge_id: result.charge_id, student_id: selectedStudentId, student_name: selectedStudentName, grade: student ? student.grade : '', charge_date: date, quantity});
+      searchInput.value = ''; selectedStudentId = null; selectedStudentName = ''; searchInput.focus();
+      renderTable(); showFlash('+' + quantity + ' snack' + (quantity > 1 ? 's' : '') + ' added for ' + nameForFlash + '!', false);
+    } catch(e) { showFlash('Error saving charge. Try again.', true); }
+    btn1.disabled = false; btn2.disabled = false; btn1.textContent = '+ 1 Snack'; btn2.textContent = '+ 2 Snacks';
   }
 
   async function removeCharge(id) {
     try {
-      const res = await fetch(`${API_BASE}/api/mcard/charges/${id}`, { method: 'DELETE' });
+      const res = await fetch(`${API_BASE}/api/mcard/charges/${id}`, {method: 'DELETE'});
       if (!res.ok) throw new Error();
-      charges = charges.filter(c => c.charge_id !== id);
-      renderTable();
-      showFlash('Charge removed.', false);
-    } catch(e) {
-      showFlash('Error removing charge.', true);
-    }
+      charges = charges.filter(c => c.charge_id !== id); renderTable(); showFlash('Charge removed.', false);
+    } catch(e) { showFlash('Error removing charge.', true); }
   }
 
   function renderTable() {
     const search = document.getElementById('searchInput').value.toLowerCase();
     const filtered = charges.filter(c => c.student_name.toLowerCase().includes(search));
-
     const uniqueStudents = new Set(charges.map(c => c.student_id)).size;
     const todayCount = charges.filter(c => c.charge_date === today).reduce((s,c) => s + (c.quantity || 1), 0);
     document.getElementById('statTotal').textContent = charges.reduce((s,c) => s + (c.quantity || 1), 0);
     document.getElementById('statStudents').textContent = uniqueStudents;
     document.getElementById('statToday').textContent = todayCount;
-
     const wrap = document.getElementById('tableWrap');
-    if (filtered.length === 0) {
-      wrap.innerHTML = '<div class="empty-state"><span>🍎</span>No charges found.</div>';
-      return;
-    }
-
-    let html = `<table><thead><tr>
-      <th>#</th><th>Student</th><th>Grade</th><th>Date</th><th>Charge</th><th></th>
-    </tr></thead><tbody>`;
-
+    if (filtered.length === 0) { wrap.innerHTML = '<div class="empty-state"><span>🍎</span>No charges found.</div>'; return; }
+    let html = `<table><thead><tr><th>#</th><th>Student</th><th>Grade</th><th>Date</th><th>Charge</th><th></th></tr></thead><tbody>`;
     filtered.forEach((c, i) => {
       const d = new Date(c.charge_date + 'T12:00:00');
-      const dateStr = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-      html += `<tr>
-        <td style="color:var(--muted);font-size:13px">${filtered.length - i}</td>
-        <td style="font-weight:600">${esc(c.student_name)}</td>
-        <td><span class="grade-pill">${esc(c.grade || '?')}</span></td>
-        <td style="color:var(--muted)">${dateStr}</td>
-        <td><span class="charge-badge">+${c.quantity || 1}</span></td>
-        <td><button class="btn-remove" onclick="removeCharge(${c.charge_id})">Remove</button></td>
-      </tr>`;
+      const dateStr = d.toLocaleDateString('en-US', {month:'short', day:'numeric', year:'numeric'});
+      html += `<tr><td style="color:var(--muted);font-size:13px">${filtered.length - i}</td><td style="font-weight:600">${esc(c.student_name)}</td><td><span class="grade-pill">${esc(c.grade || '?')}</span></td><td style="color:var(--muted)">${dateStr}</td><td><span class="charge-badge">+${c.quantity || 1}</span></td><td><button class="btn-remove" onclick="removeCharge(${c.charge_id})">Remove</button></td></tr>`;
     });
-
     html += '</tbody></table>';
     wrap.innerHTML = html;
   }
 
   function showFlash(msg, isError) {
     const f = document.getElementById('flash');
-    f.textContent = msg;
-    f.classList.toggle('error', isError);
-    f.classList.add('show');
+    f.textContent = msg; f.classList.toggle('error', isError); f.classList.add('show');
     setTimeout(() => f.classList.remove('show'), 2200);
   }
 
-  function esc(str) {
-    return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-  }
+  function esc(str) { return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
   function exportCSV() {
     if (charges.length === 0) { alert('No charges to export.'); return; }
     let csv = 'Student ID,Student Name,Grade,Date\n';
-    [...charges].sort((a,b) => b.charge_date.localeCompare(a.charge_date)).forEach(c => {
-      csv += `${c.student_id},"${c.student_name}","${c.grade}","${c.charge_date}"\n`;
-    });
-
+    [...charges].sort((a,b) => b.charge_date.localeCompare(a.charge_date)).forEach(c => { csv += `${c.student_id},"${c.student_name}","${c.grade}","${c.charge_date}"\n`; });
     const grouped = {};
-    charges.forEach(c => {
-      if (!grouped[c.student_id]) grouped[c.student_id] = { name: c.student_name, grade: c.grade, count: 0 };
-      grouped[c.student_id].count++;
-    });
+    charges.forEach(c => { if (!grouped[c.student_id]) grouped[c.student_id] = {name: c.student_name, grade: c.grade, count: 0}; grouped[c.student_id].count++; });
     csv += '\nStudent Summary\nStudent ID,Name,Grade,Total Charges\n';
-    Object.entries(grouped).sort((a,b)=>b[1].count-a[1].count).forEach(([id, d]) => {
-      csv += `${id},"${d.name}","${d.grade}",${d.count}\n`;
-    });
-
-    const blob = new Blob([csv], { type: 'text/csv' });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = `mcard-charges-${today}.csv`;
-    a.click();
+    Object.entries(grouped).sort((a,b)=>b[1].count-a[1].count).forEach(([id, d]) => { csv += `${id},"${d.name}","${d.grade}",${d.count}\n`; });
+    const blob = new Blob([csv], {type: 'text/csv'});
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `mcard-charges-${today}.csv`; a.click();
   }
 
   Promise.all([loadStudents(), loadCharges()]);
 </script>
-{% endblock %}
+</body>
+</html>
