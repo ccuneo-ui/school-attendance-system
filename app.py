@@ -9,7 +9,7 @@ import sqlite3
 from datetime import datetime
 import os
 
-app = Flask(__name__, template_folder='.')
+app = Flask(__name__)
 CORS(app)  # Allow the HTML form to communicate with this server
 
 # Database file location - Uses persistent disk on Render, falls back to local for development
@@ -654,6 +654,69 @@ def clear_dismissal_today():
 def dismissal():
     """Serve the admin dismissal planner page"""
     return render_template('dismissal_planner.html')
+
+@app.route('/api/dismissal/attendance/<date>', methods=['GET'])
+def get_dismissal_attendance(date):
+    """Get attendance records for all students for a given date (for dismissal planner)"""
+    conn = get_db_connection()
+    program = conn.execute(
+        "SELECT program_id FROM programs WHERE program_name = 'General Attendance' AND status = 'active' LIMIT 1"
+    ).fetchone()
+    if not program:
+        conn.close()
+        return jsonify([])
+    records = conn.execute('''
+        SELECT e.student_id, a.status
+        FROM attendance_records a
+        JOIN enrollments e ON a.enrollment_id = e.enrollment_id
+        WHERE e.program_id = ? AND a.attendance_date = ? AND e.status = 'active'
+    ''', (program['program_id'], date)).fetchall()
+    conn.close()
+    return jsonify([dict(r) for r in records])
+
+
+@app.route('/api/dismissal/attendance', methods=['POST'])
+def save_dismissal_attendance():
+    """Save a single student's attendance from the dismissal planner"""
+    data = request.json
+    student_id = data.get('student_id')
+    date       = data.get('date')
+    status     = data.get('status', '')
+
+    if not student_id or not date:
+        return jsonify({'error': 'Missing student_id or date'}), 400
+
+    conn = get_db_connection()
+    program = conn.execute(
+        "SELECT program_id FROM programs WHERE program_name = 'General Attendance' AND status = 'active' LIMIT 1"
+    ).fetchone()
+    if not program:
+        conn.close()
+        return jsonify({'error': 'General Attendance program not found'}), 404
+
+    enrollment = conn.execute(
+        "SELECT enrollment_id FROM enrollments WHERE student_id = ? AND program_id = ? AND status = 'active'",
+        (student_id, program['program_id'])
+    ).fetchone()
+    if not enrollment:
+        conn.close()
+        return jsonify({'error': 'Student not enrolled in General Attendance'}), 404
+
+    enrollment_id = enrollment['enrollment_id']
+
+    if not status:
+        conn.execute('DELETE FROM attendance_records WHERE enrollment_id = ? AND attendance_date = ?', (enrollment_id, date))
+    else:
+        existing = conn.execute('SELECT attendance_id FROM attendance_records WHERE enrollment_id = ? AND attendance_date = ?', (enrollment_id, date)).fetchone()
+        if existing:
+            conn.execute('UPDATE attendance_records SET status=?, recorded_at=CURRENT_TIMESTAMP WHERE attendance_id=?', (status, existing['attendance_id']))
+        else:
+            conn.execute('INSERT INTO attendance_records (enrollment_id, attendance_date, status, recorded_by, notes) VALUES (?,?,?,1,"")', (enrollment_id, date, status))
+
+    conn.commit()
+    conn.close()
+    return jsonify({'success': True})
+
 
 @app.route('/api/dismissal/students', methods=['GET'])
 def get_dismissal_students():

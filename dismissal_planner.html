@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Dismissal Planner</title>
+<title>Daily Ops — Mizzentop Day School</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
   :root {
@@ -16,302 +16,143 @@
     --accent-light: #e8f0e7;
     --bus: #1a4a8a;
     --bus-light: #e6edf8;
-    --pickup: #7a4a00;
-    --pickup-light: #fdf0dc;
     --activity: #5a1a6a;
     --activity-light: #f5e8f8;
     --override: #8a1a1a;
     --override-light: #fde8e8;
+    --present: #2d5a27;
+    --present-light: #e8f0e7;
+    --absent: #8a1a1a;
+    --absent-light: #fde8e8;
+    --ed: #7a4a00;
+    --ed-light: #fdf0dc;
+    --excused: #1a4a8a;
+    --excused-light: #e6edf8;
+    --fieldtrip: #5a1a6a;
+    --fieldtrip-light: #f5e8f8;
+    --nsd: #555;
+    --nsd-light: #eee;
     --shadow: 0 2px 8px rgba(0,0,0,0.08);
   }
-
   * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
 
-  body {
-    font-family: 'DM Sans', sans-serif;
-    background: var(--bg);
-    color: var(--text);
-    min-height: 100vh;
-  }
-
-  /* ── Header ── */
+  /* Header */
   header {
-    background: var(--text);
-    color: white;
-    padding: 0 24px;
-    display: flex;
-    align-items: center;
-    gap: 20px;
-    height: 60px;
-    position: sticky;
-    top: 0;
-    z-index: 100;
+    background: var(--text); color: white;
+    padding: 0 24px; display: flex; align-items: center; gap: 20px;
+    height: 60px; position: sticky; top: 0; z-index: 100;
     box-shadow: 0 2px 12px rgba(0,0,0,0.2);
   }
   header h1 { font-size: 1.1rem; font-weight: 700; letter-spacing: -0.02em; flex: 1; }
   header h1 span { color: #a8d5a2; }
-
-  .header-nav { display: flex; gap: 8px; align-items: center; }
   .header-nav a {
-    color: rgba(255,255,255,0.65);
-    text-decoration: none;
-    font-size: 0.85rem;
-    padding: 6px 12px;
-    border-radius: 6px;
-    transition: all 0.15s;
+    color: rgba(255,255,255,0.65); text-decoration: none;
+    font-size: 0.85rem; padding: 6px 12px; border-radius: 6px; transition: all 0.15s;
   }
   .header-nav a:hover { background: rgba(255,255,255,0.1); color: white; }
 
-  /* ── Controls Bar ── */
+  /* Controls */
   .controls {
-    background: var(--surface);
-    border-bottom: 1px solid var(--border);
-    padding: 12px 24px;
-    display: flex;
-    gap: 12px;
-    align-items: center;
-    flex-wrap: wrap;
-    position: sticky;
-    top: 60px;
-    z-index: 90;
+    background: var(--surface); border-bottom: 1px solid var(--border);
+    padding: 12px 24px; display: flex; gap: 12px; align-items: center;
+    flex-wrap: wrap; position: sticky; top: 60px; z-index: 90;
   }
-
-  .date-nav {
-    display: flex;
-    align-items: center;
-    gap: 0;
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    overflow: hidden;
-    background: white;
-  }
-  .date-nav button {
-    border: none;
-    background: none;
-    padding: 8px 12px;
-    cursor: pointer;
-    font-size: 1rem;
-    color: var(--muted);
-    transition: background 0.15s;
-  }
+  .date-nav { display: flex; align-items: center; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; background: white; }
+  .date-nav button { border: none; background: none; padding: 8px 12px; cursor: pointer; font-size: 1rem; color: var(--muted); transition: background 0.15s; }
   .date-nav button:hover { background: var(--bg); color: var(--text); }
-  #date-display {
-    padding: 8px 14px;
-    font-weight: 600;
-    font-size: 0.9rem;
-    white-space: nowrap;
-    border-left: 1px solid var(--border);
-    border-right: 1px solid var(--border);
-    min-width: 180px;
-    text-align: center;
-  }
-  #day-badge {
-    font-family: 'DM Mono', monospace;
-    font-size: 0.75rem;
-    background: var(--accent);
-    color: white;
-    padding: 2px 6px;
-    border-radius: 4px;
-    margin-left: 6px;
-  }
+  #date-display { padding: 8px 14px; font-weight: 600; font-size: 0.9rem; white-space: nowrap; border-left: 1px solid var(--border); border-right: 1px solid var(--border); min-width: 180px; text-align: center; }
+  #day-badge { font-family: 'DM Mono', monospace; font-size: 0.75rem; background: var(--accent); color: white; padding: 2px 6px; border-radius: 4px; margin-left: 6px; }
 
-  .btn {
-    padding: 8px 16px;
-    border-radius: 8px;
-    border: none;
-    font-family: 'DM Sans', sans-serif;
-    font-size: 0.875rem;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.15s;
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-  }
+  .btn { padding: 8px 16px; border-radius: 8px; border: none; font-family: 'DM Sans', sans-serif; font-size: 0.875rem; font-weight: 600; cursor: pointer; transition: all 0.15s; display: inline-flex; align-items: center; gap: 6px; }
   .btn-primary { background: var(--accent); color: white; }
   .btn-primary:hover { background: #234820; }
   .btn-secondary { background: white; color: var(--text); border: 1px solid var(--border); }
   .btn-secondary:hover { background: var(--bg); }
-  .btn-sm { padding: 5px 10px; font-size: 0.8rem; }
+  .btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
-  .view-toggle {
-    display: flex;
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    overflow: hidden;
-    background: white;
-    margin-left: auto;
-  }
-  .view-btn {
-    padding: 8px 14px;
-    border: none;
-    background: none;
-    font-family: 'DM Sans', sans-serif;
-    font-size: 0.8rem;
-    font-weight: 500;
-    cursor: pointer;
-    color: var(--muted);
-    transition: all 0.15s;
-    border-right: 1px solid var(--border);
-  }
+  .search-wrap { position: relative; }
+  .search-wrap input { padding: 8px 12px 8px 34px; border: 1px solid var(--border); border-radius: 8px; font-family: 'DM Sans', sans-serif; font-size: 0.875rem; background: white; width: 200px; outline: none; }
+  .search-wrap input:focus { border-color: var(--accent); }
+  .search-icon { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--muted); pointer-events: none; }
+
+  .view-toggle { display: flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; background: white; margin-left: auto; }
+  .view-btn { padding: 8px 14px; border: none; background: none; font-family: 'DM Sans', sans-serif; font-size: 0.8rem; font-weight: 500; cursor: pointer; color: var(--muted); transition: all 0.15s; border-right: 1px solid var(--border); }
   .view-btn:last-child { border-right: none; }
   .view-btn.active { background: var(--text); color: white; }
 
-  /* ── Stats Bar ── */
-  .stats-bar {
-    display: flex;
-    gap: 1px;
-    background: var(--border);
-    border-bottom: 1px solid var(--border);
-  }
-  .stat {
-    flex: 1;
-    background: var(--surface);
-    padding: 10px 20px;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-  }
-  .stat-dot {
-    width: 10px; height: 10px;
-    border-radius: 50%;
-    flex-shrink: 0;
-  }
-  .stat-info { line-height: 1.2; }
-  .stat-count { font-size: 1.4rem; font-weight: 700; font-family: 'DM Mono', monospace; }
+  /* Stats */
+  .stats-bar { display: flex; gap: 1px; background: var(--border); border-bottom: 1px solid var(--border); }
+  .stat { flex: 1; background: var(--surface); padding: 10px 20px; display: flex; align-items: center; gap: 10px; }
+  .stat-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+  .stat-count { font-size: 1.4rem; font-weight: 700; font-family: 'DM Mono', monospace; line-height: 1.2; }
   .stat-label { font-size: 0.75rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
   .dot-bus { background: var(--bus); }
-  .dot-pickup { background: var(--pickup); }
   .dot-activity { background: var(--activity); }
   .dot-unset { background: #ccc; }
+  .dot-present { background: var(--present); }
 
-  /* ── Main Grid ── */
+  /* Main */
   .main { padding: 20px 24px; }
-
-  /* ── Grouped View ── */
   .groups { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; align-items: start; }
 
-  .group-card {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    overflow: hidden;
-    box-shadow: var(--shadow);
-  }
-  .group-header {
-    padding: 12px 16px;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    border-bottom: 1px solid var(--border);
-  }
-  .group-icon {
-    width: 32px; height: 32px;
-    border-radius: 8px;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 1rem;
-    flex-shrink: 0;
-  }
+  /* Group cards */
+  .group-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; box-shadow: var(--shadow); }
+  .group-header { padding: 12px 16px; display: flex; align-items: center; gap: 10px; border-bottom: 1px solid var(--border); }
+  .group-icon { width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 1rem; flex-shrink: 0; }
   .group-title { font-weight: 700; font-size: 0.95rem; flex: 1; }
-  .group-count {
-    font-family: 'DM Mono', monospace;
-    font-size: 0.8rem;
-    font-weight: 500;
-    padding: 3px 8px;
-    border-radius: 20px;
-  }
+  .group-count { font-family: 'DM Mono', monospace; font-size: 0.8rem; font-weight: 500; padding: 3px 8px; border-radius: 20px; }
 
-  /* Bus group */
   .group-bus .group-header { background: var(--bus-light); }
   .group-bus .group-icon { background: var(--bus); color: white; }
   .group-bus .group-count { background: var(--bus); color: white; }
-
-  /* Pickup group */
-  .group-pickup .group-header { background: var(--pickup-light); }
-  .group-pickup .group-icon { background: var(--pickup); color: white; }
-  .group-pickup .group-count { background: var(--pickup); color: white; }
-
-  /* Activity group */
   .group-activity .group-header { background: var(--activity-light); }
   .group-activity .group-icon { background: var(--activity); color: white; }
   .group-activity .group-count { background: var(--activity); color: white; }
-
-  /* Unset group */
   .group-unset .group-header { background: #f0f0f0; }
   .group-unset .group-icon { background: #999; color: white; }
   .group-unset .group-count { background: #999; color: white; }
 
   .group-body { padding: 8px; }
-
-  /* Sub-groups (by route/activity) */
   .sub-group { margin-bottom: 6px; }
-  .sub-label {
-    font-size: 0.72rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    color: var(--muted);
-    padding: 6px 8px 4px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-  }
-  .assign-btn {
-    font-size: 0.72rem;
-    font-weight: 600;
-    padding: 3px 8px;
-    border-radius: 4px;
-    cursor: pointer;
-    border: none;
-    background: var(--accent-light);
-    color: var(--accent);
-    transition: all 0.15s;
-  }
+  .sub-label { font-size: 0.72rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); padding: 6px 8px 4px; display: flex; align-items: center; justify-content: space-between; }
+  .assign-btn { font-size: 0.72rem; font-weight: 600; padding: 3px 8px; border-radius: 4px; cursor: pointer; border: none; background: var(--accent-light); color: var(--accent); transition: all 0.15s; }
   .assign-btn:hover { background: var(--accent); color: white; }
 
-  .student-row {
-    display: flex;
-    align-items: center;
-    padding: 6px 8px;
-    border-radius: 6px;
-    gap: 8px;
-    transition: background 0.1s;
-    cursor: pointer;
-    border: 1px solid transparent;
-  }
+  /* Student rows */
+  .student-row { display: flex; align-items: center; padding: 6px 8px; border-radius: 6px; gap: 6px; transition: background 0.1s; cursor: pointer; border: 1px solid transparent; }
   .student-row:hover { background: var(--bg); }
   .student-row.override { border-color: var(--override); background: var(--override-light); }
+  .student-name { flex: 1; font-size: 0.875rem; font-weight: 500; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .student-grade { font-size: 0.72rem; font-family: 'DM Mono', monospace; color: var(--muted); background: var(--bg); padding: 2px 5px; border-radius: 4px; flex-shrink: 0; }
 
-  .student-name { flex: 1; font-size: 0.875rem; font-weight: 500; }
-  .student-grade {
-    font-size: 0.72rem;
-    font-family: 'DM Mono', monospace;
-    color: var(--muted);
-    background: var(--bg);
-    padding: 2px 5px;
-    border-radius: 4px;
-  }
-  .destination-badge {
-    font-size: 0.72rem;
-    font-weight: 600;
-    padding: 3px 8px;
-    border-radius: 4px;
-    cursor: pointer;
-    white-space: nowrap;
-  }
-  .dest-bus { background: var(--bus-light); color: var(--bus); }
-  .dest-pickup { background: var(--pickup-light); color: var(--pickup); }
-  .dest-activity { background: var(--activity-light); color: var(--activity); }
-  .dest-unset { background: #f0f0f0; color: #999; }
-  .dest-override { background: var(--override-light); color: var(--override); border: 1px solid var(--override); }
-  .override-star { color: var(--override); font-size: 0.75rem; }
+  /* Badges */
+  .badge { font-size: 0.72rem; font-weight: 600; padding: 3px 7px; border-radius: 4px; white-space: nowrap; flex-shrink: 0; }
+  .badge-present   { background: var(--present-light); color: var(--present); }
+  .badge-absent    { background: var(--absent-light); color: var(--absent); }
+  .badge-ed        { background: var(--ed-light); color: var(--ed); }
+  .badge-excused   { background: var(--excused-light); color: var(--excused); }
+  .badge-fieldtrip { background: var(--fieldtrip-light); color: var(--fieldtrip); }
+  .badge-nsd       { background: var(--nsd-light); color: var(--nsd); }
+  .badge-blank     { background: #f0f0f0; color: #aaa; border: 1px dashed #ccc; }
+  .badge-bus       { background: var(--bus-light); color: var(--bus); }
+  .badge-activity  { background: var(--activity-light); color: var(--activity); }
+  .badge-pickup    { background: var(--ed-light); color: var(--ed); }
+  .badge-unset     { background: #f0f0f0; color: #999; border: 1px dashed #ccc; }
+  .badge-override  { background: var(--override-light); color: var(--override); border: 1px solid var(--override); }
+  .override-star   { color: var(--override); font-size: 0.75rem; }
 
-  /* ── List View ── */
+  /* Unset indicators */
+  .missing-pills { display: flex; gap: 3px; flex-wrap: wrap; }
+  .missing-pill  { font-size: 0.65rem; font-weight: 700; padding: 2px 5px; border-radius: 3px; background: #fee; color: var(--absent); border: 1px solid #fcc; text-transform: uppercase; letter-spacing: 0.03em; }
+
+  /* List view */
   .list-view { display: none; }
   .list-view.active { display: block; }
-  .group-view { display: block; }
   .group-view.hidden { display: none; }
-
+  .filter-bar { display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
+  .filter-chip { padding: 5px 12px; border-radius: 20px; border: 1px solid var(--border); background: white; font-size: 0.8rem; font-weight: 500; cursor: pointer; transition: all 0.15s; font-family: 'DM Sans', sans-serif; }
+  .filter-chip.active { background: var(--text); color: white; border-color: var(--text); }
   .list-table-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; box-shadow: var(--shadow); }
   table { width: 100%; border-collapse: collapse; }
   thead { background: var(--text); color: white; }
@@ -322,238 +163,152 @@
   tbody tr.override-row { background: var(--override-light); }
   tbody td { padding: 9px 14px; font-size: 0.875rem; }
 
-  /* Filter bar above list */
-  .filter-bar { display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
-  .filter-chip {
-    padding: 5px 12px;
-    border-radius: 20px;
-    border: 1px solid var(--border);
-    background: white;
-    font-size: 0.8rem;
-    font-weight: 500;
-    cursor: pointer;
-    transition: all 0.15s;
-    font-family: 'DM Sans', sans-serif;
-  }
-  .filter-chip.active { background: var(--text); color: white; border-color: var(--text); }
-
-  /* Search */
-  .search-wrap { position: relative; }
-  .search-wrap input {
-    padding: 8px 12px 8px 34px;
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    font-family: 'DM Sans', sans-serif;
-    font-size: 0.875rem;
-    background: white;
-    width: 200px;
-    outline: none;
-  }
-  .search-wrap input:focus { border-color: var(--accent); }
-  .search-icon { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--muted); font-size: 0.9rem; pointer-events: none; }
-
-  /* ── Modal ── */
-  .modal-overlay {
-    position: fixed; inset: 0;
-    background: rgba(0,0,0,0.4);
-    z-index: 200;
-    display: none;
-    align-items: center;
-    justify-content: center;
-  }
+  /* Modal */
+  .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 200; display: none; align-items: center; justify-content: center; }
   .modal-overlay.open { display: flex; }
-  .modal {
-    background: white;
-    border-radius: 16px;
-    padding: 24px;
-    width: 440px;
-    max-width: 95vw;
-    box-shadow: 0 20px 60px rgba(0,0,0,0.2);
-  }
+  .modal { background: white; border-radius: 16px; padding: 24px; width: 460px; max-width: 95vw; box-shadow: 0 20px 60px rgba(0,0,0,0.2); }
   .modal h2 { font-size: 1.1rem; font-weight: 700; margin-bottom: 4px; }
   .modal .student-info { color: var(--muted); font-size: 0.85rem; margin-bottom: 20px; }
   .modal label { display: block; font-size: 0.8rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); margin-bottom: 6px; }
-  .modal select, .modal input[type=text] {
-    width: 100%;
-    padding: 10px 12px;
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    font-family: 'DM Sans', sans-serif;
-    font-size: 0.9rem;
-    outline: none;
-    margin-bottom: 14px;
-    background: white;
-  }
+  .modal select, .modal input[type=text] { width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; font-family: 'DM Sans', sans-serif; font-size: 0.9rem; outline: none; margin-bottom: 14px; background: white; }
   .modal select:focus, .modal input:focus { border-color: var(--accent); }
-  .type-pills { display: flex; gap: 8px; margin-bottom: 14px; }
-  .type-pill {
-    flex: 1; padding: 10px; border-radius: 8px; border: 2px solid var(--border);
-    cursor: pointer; text-align: center; font-size: 0.85rem; font-weight: 600;
-    transition: all 0.15s; background: white;
-  }
-  .type-pill.sel-bus { border-color: var(--bus); background: var(--bus-light); color: var(--bus); }
-  .type-pill.sel-pickup { border-color: var(--pickup); background: var(--pickup-light); color: var(--pickup); }
-  .type-pill.sel-activity { border-color: var(--activity); background: var(--activity-light); color: var(--activity); }
+  .modal-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
   .modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 4px; }
 
-  /* ── Bulk Assign Modal ── */
-  .bulk-modal { width: 500px; }
+  /* Bulk modal */
+  .bulk-modal { width: 480px; }
 
-  /* ── Toast ── */
-  .toast {
-    position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%) translateY(80px);
-    background: var(--text); color: white;
-    padding: 10px 20px; border-radius: 8px;
-    font-size: 0.875rem; font-weight: 500;
-    transition: transform 0.3s; z-index: 300; pointer-events: none;
-  }
+  /* Toast */
+  .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%) translateY(80px); background: var(--text); color: white; padding: 10px 20px; border-radius: 8px; font-size: 0.875rem; font-weight: 500; transition: transform 0.3s; z-index: 300; pointer-events: none; }
   .toast.show { transform: translateX(-50%) translateY(0); }
   .toast.success { background: var(--accent); }
   .toast.error { background: var(--override); }
 
-  /* ── Empty state ── */
-  .empty { text-align: center; padding: 40px; color: var(--muted); }
-  .empty-icon { font-size: 2.5rem; margin-bottom: 8px; }
+  .empty { text-align: center; padding: 30px; color: var(--muted); }
+  .empty-icon { font-size: 2rem; margin-bottom: 6px; }
   .empty p { font-size: 0.875rem; }
 
-  @media (max-width: 640px) {
-    .controls { padding: 10px 12px; }
-    .main { padding: 12px; }
-    .groups { grid-template-columns: 1fr; }
-    header { padding: 0 12px; }
-    .header-nav { display: none; }
-    .view-toggle { margin-left: 0; }
-    .stats-bar { flex-wrap: wrap; }
-  }
+  /* Save bar */
+  .save-bar { position: sticky; bottom: 0; background: var(--text); color: white; padding: 12px 24px; display: none; align-items: center; gap: 12px; z-index: 80; box-shadow: 0 -4px 20px rgba(0,0,0,0.15); }
+  .save-bar.visible { display: flex; }
+  .save-bar span { flex: 1; font-size: 0.875rem; }
+  .btn-save { background: var(--accent); color: white; border: none; padding: 10px 24px; border-radius: 8px; font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 0.9rem; cursor: pointer; }
+  .btn-cancel-save { background: rgba(255,255,255,0.15); color: white; border: none; padding: 10px 16px; border-radius: 8px; font-family: 'DM Sans', sans-serif; font-weight: 600; font-size: 0.875rem; cursor: pointer; }
 </style>
 </head>
 <body>
 
 <header>
-  <h1>🏫 <span>Dismissal</span> Planner</h1>
+  <h1>🏫 <span>Daily Ops</span> — Mizzentop Day School</h1>
   <div class="header-nav">
-    <a href="/">📋 Attendance</a>
     <a href="/mcard">💳 M Card</a>
   </div>
 </header>
 
-<!-- Controls -->
 <div class="controls">
   <div class="date-nav">
-    <button onclick="changeDate(-1)" title="Previous day">‹</button>
+    <button onclick="changeDate(-1)">‹</button>
     <div id="date-display">Loading...</div>
-    <button onclick="changeDate(1)" title="Next day">›</button>
+    <button onclick="changeDate(1)">›</button>
   </div>
   <button class="btn btn-secondary" onclick="goToday()">Today</button>
-  <button class="btn btn-primary" id="load-defaults-btn" onclick="loadDefaults()">
-    ↺ Load Defaults
-  </button>
-
+  <button class="btn btn-primary" id="load-defaults-btn" onclick="loadDefaults()">↺ Load Defaults</button>
   <div class="search-wrap">
     <span class="search-icon">🔍</span>
-    <input type="text" id="search" placeholder="Search student..." oninput="applySearch()" />
+    <input type="text" id="search" placeholder="Search student..." oninput="render()" />
   </div>
-
   <div class="view-toggle">
     <button class="view-btn active" onclick="setView('group')" id="btn-group">Group</button>
     <button class="view-btn" onclick="setView('list')" id="btn-list">List</button>
   </div>
 </div>
 
-<!-- Stats Bar -->
 <div class="stats-bar">
-  <div class="stat">
-    <div class="stat-dot dot-bus"></div>
-    <div class="stat-info">
-      <div class="stat-count" id="stat-bus">—</div>
-      <div class="stat-label">Bus</div>
-    </div>
-  </div>
-  <div class="stat">
-    <div class="stat-dot dot-pickup"></div>
-    <div class="stat-info">
-      <div class="stat-count" id="stat-pickup">—</div>
-      <div class="stat-label">Pick Up</div>
-    </div>
-  </div>
-  <div class="stat">
-    <div class="stat-dot dot-activity"></div>
-    <div class="stat-info">
-      <div class="stat-count" id="stat-activity">—</div>
-      <div class="stat-label">Activity / Aftercare</div>
-    </div>
-  </div>
-  <div class="stat">
-    <div class="stat-dot dot-unset"></div>
-    <div class="stat-info">
-      <div class="stat-count" id="stat-unset">—</div>
-      <div class="stat-label">Not Set</div>
-    </div>
-  </div>
+  <div class="stat"><div class="stat-dot dot-bus"></div><div><div class="stat-count" id="stat-bus">—</div><div class="stat-label">Bus / Pickup</div></div></div>
+  <div class="stat"><div class="stat-dot dot-activity"></div><div><div class="stat-count" id="stat-activity">—</div><div class="stat-label">Activity</div></div></div>
+  <div class="stat"><div class="stat-dot dot-present"></div><div><div class="stat-count" id="stat-present">—</div><div class="stat-label">Present</div></div></div>
+  <div class="stat"><div class="stat-dot dot-unset"></div><div><div class="stat-count" id="stat-unset">—</div><div class="stat-label">Incomplete</div></div></div>
 </div>
 
-<!-- Main Content -->
 <div class="main">
-
-  <!-- Group View -->
   <div id="group-view" class="group-view">
     <div class="groups" id="groups-container">
-      <div class="empty"><div class="empty-icon">📋</div><p>Loading dismissal plan...</p></div>
+      <div class="empty"><div class="empty-icon">📋</div><p>Loading...</p></div>
     </div>
   </div>
-
-  <!-- List View -->
   <div id="list-view" class="list-view">
     <div class="filter-bar">
-      <button class="filter-chip active" onclick="setFilter('all', this)">All</button>
-      <button class="filter-chip" onclick="setFilter('bus', this)">🚌 Bus</button>
-      <button class="filter-chip" onclick="setFilter('pickup', this)">🚗 Pick Up</button>
-      <button class="filter-chip" onclick="setFilter('activity', this)">⭐ Activity</button>
-      <button class="filter-chip" onclick="setFilter('unset', this)">❓ Not Set</button>
+      <button class="filter-chip active" onclick="setFilter('all',this)">All</button>
+      <button class="filter-chip" onclick="setFilter('bus',this)">🚌 Bus/Pickup</button>
+      <button class="filter-chip" onclick="setFilter('activity',this)">⭐ Activity</button>
+      <button class="filter-chip" onclick="setFilter('incomplete',this)">❓ Incomplete</button>
     </div>
     <div class="list-table-wrap">
       <table>
-        <thead>
-          <tr>
-            <th>Student</th>
-            <th>Grade</th>
-            <th>Type</th>
-            <th>Destination</th>
-            <th>Status</th>
-          </tr>
-        </thead>
+        <thead><tr><th>Student</th><th>Grade</th><th>Attendance</th><th>Dismissal</th><th>Destination</th></tr></thead>
         <tbody id="list-tbody"></tbody>
       </table>
     </div>
   </div>
 </div>
 
-<!-- Edit Student Modal -->
+<!-- Edit Modal -->
 <div class="modal-overlay" id="edit-modal">
   <div class="modal">
-    <h2 id="modal-student-name">Student Name</h2>
+    <h2 id="modal-student-name">Student</h2>
     <div class="student-info" id="modal-student-info"></div>
-
-    <label>Dismissal Type</label>
-    <div class="type-pills">
-      <div class="type-pill" data-type="bus" onclick="selectType('bus')">🚌 Bus</div>
-      <div class="type-pill" data-type="pickup" onclick="selectType('pickup')">🚗 Pick Up</div>
-      <div class="type-pill" data-type="activity" onclick="selectType('activity')">⭐ Activity</div>
+    <div class="modal-cols">
+      <div>
+        <label>Attendance</label>
+        <select id="modal-attendance">
+          <option value="">— Not set —</option>
+          <option value="present">Present</option>
+          <option value="absent">Absent</option>
+          <option value="ed">ED</option>
+          <option value="excused">Excused Absence</option>
+          <option value="field_trip">Field Trip</option>
+          <option value="nsd">NSD</option>
+        </select>
+      </div>
+      <div>
+        <label>Dismissal</label>
+        <select id="modal-dismissal">
+          <option value="">— Not set —</option>
+          <option value="pickup|Pick Up">Pick Up</option>
+          <optgroup label="Bus Routes">
+            <option value="bus|Arlington">Arlington</option>
+            <option value="bus|Brewster">Brewster</option>
+            <option value="bus|Carmel">Carmel</option>
+            <option value="bus|Dover">Dover</option>
+            <option value="bus|HOPE">HOPE</option>
+            <option value="bus|Minivan">Minivan</option>
+            <option value="bus|Pawling">Pawling</option>
+            <option value="bus|POK">POK</option>
+            <option value="bus|Wappingers">Wappingers</option>
+          </optgroup>
+          <optgroup label="Activities">
+            <option value="activity|Aftercare">Aftercare</option>
+            <option value="activity|Piano Lessons">Piano Lessons</option>
+            <option value="activity|LS HW Club">LS HW Club</option>
+            <option value="activity|LS MiST">LS MiST</option>
+            <option value="activity|MS HW Club">MS HW Club</option>
+            <option value="activity|MS MiST">MS MiST</option>
+            <option value="activity|JV Soccer">JV Soccer</option>
+            <option value="activity|V Soccer">V Soccer</option>
+            <option value="activity|Basketball">Basketball</option>
+            <option value="activity|Tutoring">Tutoring</option>
+            <option value="activity|KABARET">KABARET</option>
+            <option value="activity|Book Club">Book Club</option>
+            <option value="activity|Other">Other</option>
+          </optgroup>
+        </select>
+      </div>
     </div>
-
-    <div id="destination-wrap">
-      <label id="dest-label">Destination</label>
-      <select id="destination-select" onchange="onDestChange()">
-        <option value="">— Select —</option>
-      </select>
-    </div>
-
     <label>Notes (optional)</label>
-    <input type="text" id="modal-notes" placeholder="e.g. Leaving early, parent note..." />
-
+    <input type="text" id="modal-notes" placeholder="e.g. leaving early, going home with friend..." />
     <div class="modal-actions">
       <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
-      <button class="btn btn-primary" onclick="saveStudentDismissal()">Save</button>
+      <button class="btn btn-primary" onclick="saveStudentRecord()">Save</button>
     </div>
   </div>
 </div>
@@ -561,11 +316,38 @@
 <!-- Bulk Assign Modal -->
 <div class="modal-overlay" id="bulk-modal">
   <div class="modal bulk-modal">
-    <h2 id="bulk-title">Assign Bus Route</h2>
+    <h2 id="bulk-title">Bulk Assign</h2>
     <div class="student-info" id="bulk-info"></div>
-    <label id="bulk-dest-label">Select Destination</label>
+    <label id="bulk-dest-label">Destination</label>
     <select id="bulk-destination">
       <option value="">— Select —</option>
+      <option value="pickup|Pick Up">Pick Up</option>
+      <optgroup label="Bus Routes">
+        <option value="bus|Arlington">Arlington</option>
+        <option value="bus|Brewster">Brewster</option>
+        <option value="bus|Carmel">Carmel</option>
+        <option value="bus|Dover">Dover</option>
+        <option value="bus|HOPE">HOPE</option>
+        <option value="bus|Minivan">Minivan</option>
+        <option value="bus|Pawling">Pawling</option>
+        <option value="bus|POK">POK</option>
+        <option value="bus|Wappingers">Wappingers</option>
+      </optgroup>
+      <optgroup label="Activities">
+        <option value="activity|Aftercare">Aftercare</option>
+        <option value="activity|Piano Lessons">Piano Lessons</option>
+        <option value="activity|LS HW Club">LS HW Club</option>
+        <option value="activity|LS MiST">LS MiST</option>
+        <option value="activity|MS HW Club">MS HW Club</option>
+        <option value="activity|MS MiST">MS MiST</option>
+        <option value="activity|JV Soccer">JV Soccer</option>
+        <option value="activity|V Soccer">V Soccer</option>
+        <option value="activity|Basketball">Basketball</option>
+        <option value="activity|Tutoring">Tutoring</option>
+        <option value="activity|KABARET">KABARET</option>
+        <option value="activity|Book Club">Book Club</option>
+        <option value="activity|Other">Other</option>
+      </optgroup>
     </select>
     <div class="modal-actions">
       <button class="btn btn-secondary" onclick="closeBulkModal()">Cancel</button>
@@ -578,128 +360,95 @@
 
 <script>
 const API = 'https://school-attendance-system-0ax5.onrender.com/api';
-
-const BUS_ROUTES = ['Arlington','Brewster','Carmel','Dover','HOPE','Minivan','Pawling','POK','Wappingers'];
-const ACTIVITIES = ['Aftercare','Piano Lessons','LS HW Club','LS MiST','MS HW Club','MS MiST','JV Soccer','V Soccer','Basketball','Tutoring','KABARET','Book Club','Other'];
 const DAYS = ['sun','mon','tue','wed','thu','fri','sat'];
 const DAY_NAMES = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+const ATTENDANCE_LABELS = { present:'Present', absent:'Absent', ed:'ED', excused:'Excused Absence', field_trip:'Field Trip', nsd:'NSD' };
+const ATTENDANCE_CLASSES = { present:'badge-present', absent:'badge-absent', ed:'badge-ed', excused:'badge-excused', field_trip:'badge-fieldtrip', nsd:'badge-nsd' };
 
 let currentDate = new Date();
-let allStudents = [];   // from DB with defaults
-let dailyPlan = {};     // student_id -> {type, destination, notes, is_override}
+let allStudents = [];
+let dailyPlan = {};     // student_id -> {dismissal_type, destination, notes, is_override}
+let attendance = {};    // student_id -> status string
 let currentFilter = 'all';
 let currentView = 'group';
 let editingStudentId = null;
-let editingType = null;
-let bulkType = null;
-let bulkDestination = null;
 let bulkStudentIds = [];
 
-// ── Date Helpers ──
-function formatDate(d) {
-  return d.toISOString().split('T')[0];
-}
-function getDayKey(d) {
-  return DAYS[d.getDay()];
-}
-function isWeekend(d) {
-  const day = d.getDay();
-  return day === 0 || day === 6;
-}
-function updateDateDisplay() {
-  const d = currentDate;
-  const day = DAY_NAMES[d.getDay()];
-  const dateStr = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-  document.getElementById('date-display').innerHTML =
-    `${dateStr} <span id="day-badge">${day.toUpperCase()}</span>`;
-  const isWknd = isWeekend(d);
-  document.getElementById('load-defaults-btn').disabled = isWknd;
-  if (isWknd) document.getElementById('load-defaults-btn').title = 'No defaults on weekends';
-}
-function changeDate(delta) {
-  currentDate.setDate(currentDate.getDate() + delta);
-  updateDateDisplay();
-  loadDailyPlan();
-}
-function goToday() {
-  currentDate = new Date();
-  updateDateDisplay();
-  loadDailyPlan();
-}
+// ── Date helpers ──
+function formatDate(d) { return d.toISOString().split('T')[0]; }
+function getDayKey(d) { return DAYS[d.getDay()]; }
+function isWeekend(d) { const day = d.getDay(); return day === 0 || day === 6; }
 
-// ── API Calls ──
-async function fetchStudents() {
-  const res = await fetch(`${API}/dismissal/students`);
-  if (!res.ok) throw new Error('Failed to load students');
-  return res.json();
+function updateDateDisplay() {
+  const day = DAY_NAMES[currentDate.getDay()];
+  const dateStr = currentDate.toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' });
+  document.getElementById('date-display').innerHTML = `${dateStr} <span id="day-badge">${day.toUpperCase()}</span>`;
+  document.getElementById('load-defaults-btn').disabled = isWeekend(currentDate);
 }
-async function fetchDailyPlan(date) {
-  const res = await fetch(`${API}/dismissal/plan/${date}`);
-  if (!res.ok) throw new Error('Failed to load plan');
-  return res.json();
+function changeDate(d) { currentDate.setDate(currentDate.getDate() + d); updateDateDisplay(); loadAll(); }
+function goToday() { currentDate = new Date(); updateDateDisplay(); loadAll(); }
+
+// ── API ──
+async function fetchStudents() {
+  const r = await fetch(`${API}/dismissal/students`);
+  return r.json();
+}
+async function fetchPlan(date) {
+  const r = await fetch(`${API}/dismissal/plan/${date}`);
+  return r.json();
+}
+async function fetchAttendance(date) {
+  const r = await fetch(`${API}/dismissal/attendance/${date}`);
+  if (!r.ok) return [];
+  return r.json();
 }
 async function savePlan(studentId, type, destination, notes, isOverride) {
-  const res = await fetch(`${API}/dismissal/plan`, {
-    method: 'POST',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({
-      student_id: studentId,
-      dismissal_date: formatDate(currentDate),
-      dismissal_type: type,
-      destination: destination || '',
-      notes: notes || '',
-      is_override: isOverride ? 1 : 0
-    })
+  await fetch(`${API}/dismissal/plan`, {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ student_id: studentId, dismissal_date: formatDate(currentDate), dismissal_type: type, destination: destination||'', notes: notes||'', is_override: isOverride?1:0 })
   });
-  if (!res.ok) throw new Error('Failed to save');
-  return res.json();
+}
+async function saveAttendanceRecord(studentId, status) {
+  await fetch(`${API}/dismissal/attendance`, {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ student_id: studentId, date: formatDate(currentDate), status: status })
+  });
 }
 async function saveBulkPlan(studentIds, type, destination) {
-  const res = await fetch(`${API}/dismissal/plan/bulk`, {
-    method: 'POST',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({
-      student_ids: studentIds,
-      dismissal_date: formatDate(currentDate),
-      dismissal_type: type,
-      destination: destination || ''
-    })
+  await fetch(`${API}/dismissal/plan/bulk`, {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ student_ids: studentIds, dismissal_date: formatDate(currentDate), dismissal_type: type, destination: destination||'' })
   });
-  if (!res.ok) throw new Error('Failed to bulk save');
-  return res.json();
 }
 async function loadDefaultsAPI() {
   const day = getDayKey(currentDate);
-  const res = await fetch(`${API}/dismissal/load-defaults`, {
-    method: 'POST',
-    headers: {'Content-Type': 'application/json'},
+  await fetch(`${API}/dismissal/load-defaults`, {
+    method: 'POST', headers: {'Content-Type':'application/json'},
     body: JSON.stringify({ date: formatDate(currentDate), day_key: day })
   });
-  if (!res.ok) throw new Error('Failed to load defaults');
-  return res.json();
 }
 
-// ── Load & Render ──
+// ── Init & Load ──
 async function init() {
   updateDateDisplay();
   try {
     allStudents = await fetchStudents();
-    await loadDailyPlan();
-  } catch(e) {
-    showToast('Error loading data: ' + e.message, 'error');
-    renderError();
-  }
+    await loadAll();
+  } catch(e) { showToast('Error loading data', 'error'); }
 }
 
-async function loadDailyPlan() {
+async function loadAll() {
   try {
-    const plan = await fetchDailyPlan(formatDate(currentDate));
+    const [plan, att] = await Promise.all([
+      fetchPlan(formatDate(currentDate)),
+      fetchAttendance(formatDate(currentDate))
+    ]);
     dailyPlan = {};
     plan.forEach(p => { dailyPlan[p.student_id] = p; });
+    attendance = {};
+    att.forEach(a => { attendance[a.student_id] = a.status; });
     render();
-  } catch(e) {
-    showToast('Error loading plan', 'error');
-  }
+  } catch(e) { showToast('Error loading data', 'error'); }
 }
 
 async function loadDefaults() {
@@ -707,46 +456,22 @@ async function loadDefaults() {
   try {
     document.getElementById('load-defaults-btn').textContent = 'Loading...';
     await loadDefaultsAPI();
-    await loadDailyPlan();
+    await loadAll();
     showToast('Defaults loaded!', 'success');
-  } catch(e) {
-    showToast('Error: ' + e.message, 'error');
-  } finally {
-    document.getElementById('load-defaults-btn').textContent = '↺ Load Defaults';
-  }
+  } catch(e) { showToast('Error: ' + e.message, 'error'); }
+  finally { document.getElementById('load-defaults-btn').textContent = '↺ Load Defaults'; }
 }
 
-function getStudentPlan(s) {
-  if (dailyPlan[s.student_id]) return dailyPlan[s.student_id];
-  // Return null = not set for today
-  return null;
-}
-
+// ── Helpers ──
 function getDefaultType(s) {
   const day = getDayKey(currentDate);
   return s[`dismissal_${day}`] || null;
 }
 
-function render() {
-  updateStats();
-  if (currentView === 'group') renderGroupView();
-  else renderListView();
-}
-
-function updateStats() {
-  let bus=0, pickup=0, activity=0, unset=0;
-  allStudents.forEach(s => {
-    const p = getStudentPlan(s);
-    const type = p ? p.dismissal_type : null;
-    if (type === 'bus') bus++;
-    else if (type === 'pickup') pickup++;
-    else if (type === 'activity') activity++;
-    else unset++;
-  });
-  document.getElementById('stat-bus').textContent = bus;
-  document.getElementById('stat-pickup').textContent = pickup;
-  document.getElementById('stat-activity').textContent = activity;
-  document.getElementById('stat-unset').textContent = unset;
+function isIncomplete(s) {
+  const hasDismissal = !!dailyPlan[s.student_id];
+  const hasAttendance = !!attendance[s.student_id];
+  return !hasDismissal || !hasAttendance;
 }
 
 function matchesSearch(s) {
@@ -755,140 +480,149 @@ function matchesSearch(s) {
   return (s.first_name + ' ' + s.last_name).toLowerCase().includes(q);
 }
 
+// ── Render ──
+function render() {
+  updateStats();
+  if (currentView === 'group') renderGroupView();
+  else renderListView();
+}
+
+function updateStats() {
+  let bus=0, activity=0, present=0, incomplete=0;
+  allStudents.forEach(s => {
+    const p = dailyPlan[s.student_id];
+    const type = p ? p.dismissal_type : null;
+    if (type === 'bus' || type === 'pickup') bus++;
+    else if (type === 'activity') activity++;
+    if (attendance[s.student_id] === 'present') present++;
+    if (isIncomplete(s)) incomplete++;
+  });
+  document.getElementById('stat-bus').textContent = bus;
+  document.getElementById('stat-activity').textContent = activity;
+  document.getElementById('stat-present').textContent = present;
+  document.getElementById('stat-unset').textContent = incomplete;
+}
+
 function renderGroupView() {
   const container = document.getElementById('groups-container');
-
-  // Collect students by type
-  const groups = { bus: {}, pickup: { 'Pick Up': [] }, activity: {}, unset: { 'Not Set': [] } };
+  const groups = { bus: {}, activity: {}, incomplete: [] };
 
   allStudents.filter(matchesSearch).forEach(s => {
-    const p = getStudentPlan(s);
+    const p = dailyPlan[s.student_id];
     const type = p ? p.dismissal_type : null;
     const dest = p ? (p.destination || '') : '';
 
-    if (type === 'bus') {
-      const key = dest || 'No Route Assigned';
+    if (isIncomplete(s)) {
+      groups.incomplete.push(s);
+    }
+    // Also add to their dismissal group even if incomplete
+    if (type === 'bus' || type === 'pickup') {
+      const key = dest || (type === 'pickup' ? 'Pick Up' : 'No Route Assigned');
       if (!groups.bus[key]) groups.bus[key] = [];
       groups.bus[key].push(s);
-    } else if (type === 'pickup') {
-      groups.pickup['Pick Up'].push(s);
     } else if (type === 'activity') {
       const key = dest || 'No Activity Assigned';
       if (!groups.activity[key]) groups.activity[key] = [];
       groups.activity[key].push(s);
-    } else {
-      groups.unset['Not Set'].push(s);
     }
   });
 
   const html = [];
 
-  // Not Set Card (first so admin sees unassigned students immediately)
-  const unsetStudents = groups.unset['Not Set'];
-  if (unsetStudents.length > 0) {
+  // Incomplete first
+  if (groups.incomplete.length > 0) {
     html.push(`<div class="group-card group-unset">
       <div class="group-header">
         <div class="group-icon">❓</div>
-        <div class="group-title">Not Set</div>
-        <span class="group-count">${unsetStudents.length}</span>
+        <div class="group-title">Incomplete</div>
+        <span class="group-count">${groups.incomplete.length}</span>
       </div>
       <div class="group-body">
-        ${unsetStudents.map(s => renderStudentRow(s)).join('')}
+        ${groups.incomplete.map(s => renderStudentRow(s, true)).join('')}
       </div>
     </div>`);
   }
 
-  // Bus Card
-  const busStudentIds = Object.values(groups.bus).flat().map(s=>s.student_id);
-  const busTotal = busStudentIds.length;
+  // Bus/Pickup
+  const busTotal = Object.values(groups.bus).flat().length;
+  const busIds = Object.values(groups.bus).flat().map(s => s.student_id);
   html.push(`<div class="group-card group-bus">
     <div class="group-header">
       <div class="group-icon">🚌</div>
-      <div class="group-title">Bus</div>
+      <div class="group-title">Bus & Pick Up</div>
       <span class="group-count">${busTotal}</span>
-      ${busTotal > 0 ? `<button class="assign-btn" onclick="openBulkModal('bus', ${JSON.stringify(busStudentIds).replace(/"/g,"'")})">Assign All</button>` : ''}
+      ${busTotal > 0 ? `<button class="assign-btn" onclick="openBulkModal(${JSON.stringify(busIds).replace(/"/g,"'")})">Assign All</button>` : ''}
     </div>
     <div class="group-body">
-      ${renderSubGroups(groups.bus, 'bus', 'route')}
-      ${busTotal === 0 ? '<div class="empty" style="padding:20px"><div class="empty-icon" style="font-size:1.5rem">🚌</div><p>No bus students today</p></div>' : ''}
+      ${renderSubGroups(groups.bus)}
+      ${busTotal === 0 ? '<div class="empty" style="padding:20px"><p>None assigned yet</p></div>' : ''}
     </div>
   </div>`);
 
-  // Pickup Card
-  const pickupStudents = groups.pickup['Pick Up'];
-  html.push(`<div class="group-card group-pickup">
-    <div class="group-header">
-      <div class="group-icon">🚗</div>
-      <div class="group-title">Pick Up</div>
-      <span class="group-count">${pickupStudents.length}</span>
-    </div>
-    <div class="group-body">
-      ${pickupStudents.length === 0 ?
-        '<div class="empty" style="padding:20px"><div class="empty-icon" style="font-size:1.5rem">🚗</div><p>No pickup students today</p></div>' :
-        pickupStudents.map(s => renderStudentRow(s)).join('')}
-    </div>
-  </div>`);
-
-  // Activity Card
-  const actStudentIds = Object.values(groups.activity).flat().map(s=>s.student_id);
-  const actTotal = actStudentIds.length;
+  // Activity
+  const actTotal = Object.values(groups.activity).flat().length;
+  const actIds = Object.values(groups.activity).flat().map(s => s.student_id);
   html.push(`<div class="group-card group-activity">
     <div class="group-header">
       <div class="group-icon">⭐</div>
       <div class="group-title">Activity / Aftercare</div>
       <span class="group-count">${actTotal}</span>
-      ${actTotal > 0 ? `<button class="assign-btn" onclick="openBulkModal('activity', ${JSON.stringify(actStudentIds).replace(/"/g,"'")})">Assign All</button>` : ''}
+      ${actTotal > 0 ? `<button class="assign-btn" onclick="openBulkModal(${JSON.stringify(actIds).replace(/"/g,"'")})">Assign All</button>` : ''}
     </div>
     <div class="group-body">
-      ${renderSubGroups(groups.activity, 'activity', 'activity')}
-      ${actTotal === 0 ? '<div class="empty" style="padding:20px"><div class="empty-icon" style="font-size:1.5rem">⭐</div><p>No activity students today</p></div>' : ''}
+      ${renderSubGroups(groups.activity)}
+      ${actTotal === 0 ? '<div class="empty" style="padding:20px"><p>None assigned yet</p></div>' : ''}
     </div>
   </div>`);
-
 
   container.innerHTML = html.join('');
 }
 
-function renderSubGroups(subGroups, type, label) {
-  const keys = Object.keys(subGroups).sort();
-  if (keys.length === 0) return '';
-  return keys.map(key => {
+function renderSubGroups(subGroups) {
+  return Object.keys(subGroups).sort().map(key => {
     const students = subGroups[key];
-    const unassignedIds = students.filter(s => {
-      const p = getStudentPlan(s);
-      return p && !p.destination;
-    }).map(s => s.student_id);
     return `<div class="sub-group">
-      <div class="sub-label">
-        ${key}
-        ${key !== 'No Route Assigned' && key !== 'No Activity Assigned' ?
-          `<button class="assign-btn" onclick="openBulkModal('${type}', ${JSON.stringify(students.map(s=>s.student_id)).replace(/"/g,"'")}, '${key}')">✓ ${key}</button>` :
-          `<button class="assign-btn" onclick="openBulkModal('${type}', ${JSON.stringify(students.map(s=>s.student_id)).replace(/"/g,"'")})">Assign Route</button>`
-        }
-      </div>
-      ${students.map(s => renderStudentRow(s)).join('')}
+      <div class="sub-label">${key}</div>
+      ${students.map(s => renderStudentRow(s, false)).join('')}
     </div>`;
   }).join('');
 }
 
-function renderStudentRow(s) {
-  const p = getStudentPlan(s);
+function renderStudentRow(s, showMissing) {
+  const p = dailyPlan[s.student_id];
+  const att = attendance[s.student_id];
   const type = p ? p.dismissal_type : null;
   const dest = p ? p.destination : '';
   const isOverride = p ? p.is_override : false;
 
-  const badgeClass = isOverride ? 'dest-override' :
-    type === 'bus' ? 'dest-bus' :
-    type === 'pickup' ? 'dest-pickup' :
-    type === 'activity' ? 'dest-activity' : 'dest-unset';
+  // Attendance badge
+  const attBadge = att
+    ? `<span class="badge ${ATTENDANCE_CLASSES[att] || 'badge-nsd'}">${ATTENDANCE_LABELS[att] || att}</span>`
+    : `<span class="badge badge-blank">Att?</span>`;
 
-  const badgeText = dest || (type ? type.toUpperCase() : '? Not Set');
+  // Dismissal badge
+  let disBadge;
+  if (type === 'bus') disBadge = `<span class="badge badge-bus">${dest || 'Bus?'}</span>`;
+  else if (type === 'pickup') disBadge = `<span class="badge badge-pickup">Pick Up</span>`;
+  else if (type === 'activity') disBadge = `<span class="badge badge-activity">${dest || 'Activity?'}</span>`;
+  else disBadge = `<span class="badge badge-unset">Dis?</span>`;
+
+  // Missing indicators for incomplete panel
+  let missingHtml = '';
+  if (showMissing) {
+    const pills = [];
+    if (!att) pills.push('<span class="missing-pill">No Att</span>');
+    if (!p) pills.push('<span class="missing-pill">No Dis</span>');
+    missingHtml = `<div class="missing-pills">${pills.join('')}</div>`;
+  }
 
   return `<div class="student-row ${isOverride ? 'override' : ''}" onclick="openEditModal(${s.student_id})">
     <div class="student-name">${s.first_name} ${s.last_name}</div>
     <div class="student-grade">${s.grade || '?'}</div>
-    ${isOverride ? '<span class="override-star" title="Override">★</span>' : ''}
-    <span class="destination-badge ${badgeClass}">${badgeText}</span>
+    ${isOverride ? '<span class="override-star">★</span>' : ''}
+    ${attBadge}
+    ${disBadge}
+    ${missingHtml}
   </div>`;
 }
 
@@ -896,42 +630,46 @@ function renderListView() {
   const tbody = document.getElementById('list-tbody');
   const students = allStudents.filter(s => {
     if (!matchesSearch(s)) return false;
-    const p = getStudentPlan(s);
-    const type = p ? p.dismissal_type : 'unset';
     if (currentFilter === 'all') return true;
-    if (currentFilter === 'unset') return !p || !type;
-    return type === currentFilter;
+    const p = dailyPlan[s.student_id];
+    const type = p ? p.dismissal_type : null;
+    if (currentFilter === 'bus') return type === 'bus' || type === 'pickup';
+    if (currentFilter === 'activity') return type === 'activity';
+    if (currentFilter === 'incomplete') return isIncomplete(s);
+    return true;
   }).sort((a,b) => a.last_name.localeCompare(b.last_name));
 
-  if (students.length === 0) {
+  if (!students.length) {
     tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;padding:30px;color:var(--muted)">No students found</td></tr>`;
     return;
   }
 
   tbody.innerHTML = students.map(s => {
-    const p = getStudentPlan(s);
+    const p = dailyPlan[s.student_id];
+    const att = attendance[s.student_id];
     const type = p ? p.dismissal_type : null;
     const dest = p ? (p.destination || '') : '';
     const isOverride = p ? p.is_override : false;
 
-    const typeBadge = type ? `<span class="destination-badge dest-${type}">${type.toUpperCase()}</span>` :
-      `<span class="destination-badge dest-unset">Not Set</span>`;
-    const statusBadge = isOverride ?
-      `<span class="destination-badge dest-override">Override ★</span>` :
-      (p ? `<span style="color:var(--accent);font-size:0.8rem;font-weight:600">Default</span>` :
-      `<span style="color:#999;font-size:0.8rem">—</span>`);
+    const attBadge = att
+      ? `<span class="badge ${ATTENDANCE_CLASSES[att] || 'badge-nsd'}">${ATTENDANCE_LABELS[att] || att}</span>`
+      : `<span class="badge badge-blank">—</span>`;
+
+    const typeBadge = type
+      ? `<span class="badge badge-${type === 'pickup' ? 'pickup' : type}">${type === 'pickup' ? 'Pick Up' : type.toUpperCase()}</span>`
+      : `<span class="badge badge-unset">—</span>`;
 
     return `<tr class="${isOverride ? 'override-row' : ''}" onclick="openEditModal(${s.student_id})">
       <td><strong>${s.last_name}</strong>, ${s.first_name}</td>
       <td>${s.grade || '—'}</td>
+      <td>${attBadge}</td>
       <td>${typeBadge}</td>
       <td>${dest || '—'}</td>
-      <td>${statusBadge}</td>
     </tr>`;
   }).join('');
 }
 
-// ── View Toggle ──
+// ── View / Filter ──
 function setView(v) {
   currentView = v;
   document.getElementById('group-view').className = 'group-view' + (v === 'group' ? '' : ' hidden');
@@ -948,161 +686,111 @@ function setFilter(f, el) {
   renderListView();
 }
 
-function applySearch() { render(); }
-
 // ── Edit Modal ──
 function openEditModal(studentId) {
   editingStudentId = studentId;
   const s = allStudents.find(x => x.student_id === studentId);
-  const p = getStudentPlan(s);
-  editingType = p ? p.dismissal_type : getDefaultType(s);
+  const p = dailyPlan[studentId];
+  const att = attendance[studentId] || '';
 
   document.getElementById('modal-student-name').textContent = `${s.first_name} ${s.last_name}`;
-  const def = getDefaultType(s);
-  document.getElementById('modal-student-info').textContent =
-    `Grade ${s.grade || '?'} · Default today: ${def ? def.toUpperCase() : 'Not set'}`;
+  const defType = getDefaultType(s);
+  document.getElementById('modal-student-info').textContent = `Grade ${s.grade || '?'} · Default: ${defType ? defType.toUpperCase() : 'Not set'}`;
   document.getElementById('modal-notes').value = p ? (p.notes || '') : '';
+  document.getElementById('modal-attendance').value = att;
 
-  // Set type pills
-  document.querySelectorAll('.type-pill').forEach(pill => {
-    pill.className = 'type-pill';
-    if (pill.dataset.type === editingType) {
-      pill.classList.add(`sel-${editingType}`);
+  // Set dismissal dropdown
+  const disSel = document.getElementById('modal-dismissal');
+  disSel.value = '';
+  if (p) {
+    const val = p.dismissal_type === 'pickup' ? 'pickup|Pick Up' : `${p.dismissal_type}|${p.destination || ''}`;
+    // Try to find matching option
+    for (let opt of disSel.options) {
+      if (opt.value === val) { disSel.value = val; break; }
+      if (p.dismissal_type === 'pickup' && opt.value === 'pickup|Pick Up') { disSel.value = 'pickup|Pick Up'; break; }
     }
-  });
+  }
 
-  updateDestSelect(editingType, p ? p.destination : '');
   document.getElementById('edit-modal').classList.add('open');
 }
-
-function selectType(type) {
-  editingType = type;
-  document.querySelectorAll('.type-pill').forEach(pill => {
-    pill.className = 'type-pill';
-    if (pill.dataset.type === type) pill.classList.add(`sel-${type}`);
-  });
-  updateDestSelect(type, '');
-}
-
-function updateDestSelect(type, currentDest) {
-  const wrap = document.getElementById('destination-wrap');
-  const sel = document.getElementById('destination-select');
-  const lbl = document.getElementById('dest-label');
-
-  if (type === 'pickup') {
-    wrap.style.display = 'none';
-    return;
-  }
-  wrap.style.display = 'block';
-
-  const options = type === 'bus' ? BUS_ROUTES : ACTIVITIES;
-  lbl.textContent = type === 'bus' ? 'Bus Route' : 'Activity';
-  sel.innerHTML = `<option value="">— Select —</option>` +
-    options.map(o => `<option value="${o}" ${o === currentDest ? 'selected' : ''}>${o}</option>`).join('');
-}
-
-function onDestChange() {}
 
 function closeModal() {
   document.getElementById('edit-modal').classList.remove('open');
   editingStudentId = null;
-  editingType = null;
 }
 
-async function saveStudentDismissal() {
+async function saveStudentRecord() {
   const s = allStudents.find(x => x.student_id === editingStudentId);
-  const dest = editingType === 'pickup' ? '' : document.getElementById('destination-select').value;
+  const attVal = document.getElementById('modal-attendance').value;
+  const disVal = document.getElementById('modal-dismissal').value;
   const notes = document.getElementById('modal-notes').value;
-  const defType = getDefaultType(s);
-  const isOverride = editingType !== defType;
+
+  const saves = [];
+
+  // Save dismissal
+  if (disVal) {
+    const [type, dest] = disVal.split('|');
+    const defType = getDefaultType(s);
+    const isOverride = type !== defType;
+    saves.push(savePlan(editingStudentId, type, dest, notes, isOverride).then(() => {
+      dailyPlan[editingStudentId] = { student_id: editingStudentId, dismissal_type: type, destination: dest, notes, is_override: isOverride };
+    }));
+  }
+
+  // Save attendance
+  if (attVal !== undefined) {
+    saves.push(saveAttendanceRecord(editingStudentId, attVal).then(() => {
+      if (attVal) attendance[editingStudentId] = attVal;
+      else delete attendance[editingStudentId];
+    }));
+  }
 
   try {
-    await savePlan(editingStudentId, editingType, dest, notes, isOverride);
-    // Update local cache
-    dailyPlan[editingStudentId] = {
-      student_id: editingStudentId,
-      dismissal_type: editingType,
-      destination: dest,
-      notes: notes,
-      is_override: isOverride
-    };
+    await Promise.all(saves);
     closeModal();
     render();
     showToast('Saved!', 'success');
   } catch(e) {
-    showToast('Error saving: ' + e.message, 'error');
+    showToast('Error saving', 'error');
   }
 }
 
 // ── Bulk Modal ──
-function openBulkModal(type, studentIds, existingDest) {
-  bulkType = type;
+function openBulkModal(studentIds) {
   bulkStudentIds = typeof studentIds === 'string' ? JSON.parse(studentIds.replace(/'/g,'"')) : studentIds;
-
-  const typeLabel = type === 'bus' ? 'Bus Route' : 'Activity';
-  const count = bulkStudentIds.length;
-  document.getElementById('bulk-title').textContent = `Assign ${typeLabel}`;
-  document.getElementById('bulk-info').textContent = `This will assign a ${typeLabel.toLowerCase()} to ${count} student${count !== 1 ? 's' : ''}`;
-  document.getElementById('bulk-dest-label').textContent = typeLabel;
-
-  const options = type === 'bus' ? BUS_ROUTES : ACTIVITIES;
-  const sel = document.getElementById('bulk-destination');
-  sel.innerHTML = `<option value="">— Select —</option>` +
-    options.map(o => `<option value="${o}" ${o === existingDest ? 'selected' : ''}>${o}</option>`).join('');
-
+  document.getElementById('bulk-title').textContent = 'Assign Dismissal';
+  document.getElementById('bulk-info').textContent = `Assign destination to ${bulkStudentIds.length} students`;
+  document.getElementById('bulk-destination').value = '';
   document.getElementById('bulk-modal').classList.add('open');
 }
-
-function closeBulkModal() {
-  document.getElementById('bulk-modal').classList.remove('open');
-}
+function closeBulkModal() { document.getElementById('bulk-modal').classList.remove('open'); }
 
 async function saveBulkAssign() {
-  const dest = document.getElementById('bulk-destination').value;
-  if (!dest) { showToast('Please select a destination', 'error'); return; }
-
+  const val = document.getElementById('bulk-destination').value;
+  if (!val) { showToast('Please select a destination', 'error'); return; }
+  const [type, dest] = val.split('|');
   try {
-    await saveBulkPlan(bulkStudentIds, bulkType, dest);
-    // Update local cache
+    await saveBulkPlan(bulkStudentIds, type, dest);
     bulkStudentIds.forEach(id => {
       const s = allStudents.find(x => x.student_id === id);
-      const defType = getDefaultType(s);
-      dailyPlan[id] = {
-        student_id: id,
-        dismissal_type: bulkType,
-        destination: dest,
-        notes: '',
-        is_override: bulkType !== defType
-      };
+      dailyPlan[id] = { student_id: id, dismissal_type: type, destination: dest, notes: '', is_override: type !== getDefaultType(s) };
     });
     closeBulkModal();
     render();
-    showToast(`Assigned ${dest} to ${bulkStudentIds.length} students`, 'success');
-  } catch(e) {
-    showToast('Error: ' + e.message, 'error');
-  }
+    showToast(`Assigned ${dest || type} to ${bulkStudentIds.length} students`, 'success');
+  } catch(e) { showToast('Error', 'error'); }
 }
 
 // ── Toast ──
 function showToast(msg, type='') {
   const t = document.getElementById('toast');
-  t.textContent = msg;
-  t.className = 'toast show' + (type ? ' ' + type : '');
+  t.textContent = msg; t.className = 'toast show' + (type ? ' '+type : '');
   setTimeout(() => t.className = 'toast', 2500);
 }
 
-function renderError() {
-  document.getElementById('groups-container').innerHTML =
-    '<div class="empty"><div class="empty-icon">⚠️</div><p>Could not connect to server. Make sure the server is running.</p></div>';
-}
-
 // Close modals on overlay click
-document.querySelectorAll('.modal-overlay').forEach(overlay => {
-  overlay.addEventListener('click', e => {
-    if (e.target === overlay) {
-      overlay.classList.remove('open');
-    }
-  });
+document.querySelectorAll('.modal-overlay').forEach(o => {
+  o.addEventListener('click', e => { if (e.target === o) o.classList.remove('open'); });
 });
 
 init();
