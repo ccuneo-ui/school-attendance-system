@@ -27,7 +27,6 @@ google = oauth.register(
     client_kwargs={'scope': 'openid email profile'},
 )
 
-
 def people_required(f):
     @wraps(f)
     def decorated(*args, **kwargs):
@@ -37,6 +36,7 @@ def people_required(f):
             return redirect('/?error=unauthorized')
         return f(*args, **kwargs)
     return decorated
+
 
 SUPERADMIN_EMAIL = 'ccuneo@mizzentop.org'
 
@@ -150,8 +150,8 @@ def auth_callback():
         session['is_superadmin'] = (email == SUPERADMIN_EMAIL)
         if staff:
             session['can_record_attendance'] = bool(staff['can_record_attendance'])
-        session['can_manage_people'] = bool(staff['can_manage_people']) if 'can_manage_people' in staff.keys() else False
             session['can_manage_billing'] = bool(staff['can_manage_billing'])
+            session['can_manage_people'] = bool(staff['can_manage_people']) if 'can_manage_people' in staff.keys() else False
             session['user_role'] = staff['role']
         else:
             session['can_record_attendance'] = True
@@ -977,15 +977,21 @@ def load_dismissal_defaults():
 
 # ============================================
 # PEOPLE - Staff Management
+
+# ============================================
+
+
+# ============================================
+# PEOPLE - Staff Management
 # ============================================
 
 @app.route('/people')
 @people_required
 def people():
     conn = get_db_connection()
-    for col in ['title TEXT', 'can_manage_people INTEGER DEFAULT 0']:
+    for col_def in ['title TEXT', 'can_manage_people INTEGER DEFAULT 0']:
         try:
-            conn.execute(f'ALTER TABLE staff ADD COLUMN {col}')
+            conn.execute(f'ALTER TABLE staff ADD COLUMN {col_def}')
             conn.commit()
         except Exception:
             pass
@@ -996,9 +1002,9 @@ def people():
 @login_required
 def get_people_staff():
     conn = get_db_connection()
-    for col in ['title TEXT', 'can_manage_people INTEGER DEFAULT 0']:
+    for col_def in ['title TEXT', 'can_manage_people INTEGER DEFAULT 0']:
         try:
-            conn.execute(f'ALTER TABLE staff ADD COLUMN {col}')
+            conn.execute(f'ALTER TABLE staff ADD COLUMN {col_def}')
             conn.commit()
         except Exception:
             pass
@@ -1014,10 +1020,11 @@ def add_people_staff():
     data = request.get_json()
     conn = get_db_connection()
     conn.execute(
-        'INSERT INTO staff (first_name, last_name, email, role, title, status, can_record_attendance, can_manage_billing, hire_date) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        'INSERT INTO staff (first_name, last_name, email, role, title, status, can_record_attendance, can_manage_billing, can_manage_people, hire_date) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
         (data.get('first_name'), data.get('last_name'), data.get('email'),
          data.get('role', 'staff'), data.get('title', ''), data.get('status', 'active'),
-         data.get('can_record_attendance', 0), data.get('can_manage_billing', 0), '2025-09-01')
+         data.get('can_record_attendance', 0), data.get('can_manage_billing', 0),
+         data.get('can_manage_people', 0), '2025-09-01')
     )
     conn.commit()
     conn.close()
@@ -1028,7 +1035,8 @@ def add_people_staff():
 def update_people_staff(staff_id):
     data = request.get_json()
     conn = get_db_connection()
-    allowed = ['first_name', 'last_name', 'email', 'role', 'title', 'status', 'can_record_attendance', 'can_manage_billing', 'can_manage_people']
+    allowed = ['first_name', 'last_name', 'email', 'role', 'title', 'status',
+               'can_record_attendance', 'can_manage_billing', 'can_manage_people']
     fields = [f + ' = ?' for f in allowed if f in data]
     values = [data[f] for f in allowed if f in data]
     if not fields:
