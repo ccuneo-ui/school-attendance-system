@@ -27,6 +27,17 @@ google = oauth.register(
     client_kwargs={'scope': 'openid email profile'},
 )
 
+
+def people_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if not session.get('user_email'):
+            return redirect('/login')
+        if not session.get('is_superadmin') and not session.get('can_manage_people'):
+            return redirect('/?error=unauthorized')
+        return f(*args, **kwargs)
+    return decorated
+
 SUPERADMIN_EMAIL = 'ccuneo@mizzentop.org'
 
 def get_current_user():
@@ -139,11 +150,13 @@ def auth_callback():
         session['is_superadmin'] = (email == SUPERADMIN_EMAIL)
         if staff:
             session['can_record_attendance'] = bool(staff['can_record_attendance'])
+        session['can_manage_people'] = bool(staff['can_manage_people']) if 'can_manage_people' in staff.keys() else False
             session['can_manage_billing'] = bool(staff['can_manage_billing'])
             session['user_role'] = staff['role']
         else:
             session['can_record_attendance'] = True
             session['can_manage_billing'] = True
+            session['can_manage_people'] = True
             session['user_role'] = 'superadmin'
 
         return redirect('/')
@@ -168,6 +181,7 @@ def get_session():
         'is_superadmin': session.get('is_superadmin', False),
         'can_record_attendance': session.get('can_record_attendance', False),
         'can_manage_billing': session.get('can_manage_billing', False),
+        'can_manage_people': session.get('can_manage_people', False),
         'role': session.get('user_role'),
     })
 
@@ -966,14 +980,15 @@ def load_dismissal_defaults():
 # ============================================
 
 @app.route('/people')
-@superadmin_required
+@people_required
 def people():
     conn = get_db_connection()
-    try:
-        conn.execute('ALTER TABLE staff ADD COLUMN title TEXT')
-        conn.commit()
-    except Exception:
-        pass
+    for col in ['title TEXT', 'can_manage_people INTEGER DEFAULT 0']:
+        try:
+            conn.execute(f'ALTER TABLE staff ADD COLUMN {col}')
+            conn.commit()
+        except Exception:
+            pass
     conn.close()
     return send_from_directory('.', 'people.html')
 
@@ -981,19 +996,20 @@ def people():
 @login_required
 def get_people_staff():
     conn = get_db_connection()
-    try:
-        conn.execute('ALTER TABLE staff ADD COLUMN title TEXT')
-        conn.commit()
-    except Exception:
-        pass
+    for col in ['title TEXT', 'can_manage_people INTEGER DEFAULT 0']:
+        try:
+            conn.execute(f'ALTER TABLE staff ADD COLUMN {col}')
+            conn.commit()
+        except Exception:
+            pass
     rows = conn.execute(
-        'SELECT staff_id, first_name, last_name, email, role, status, can_record_attendance, can_manage_billing, title FROM staff ORDER BY last_name, first_name'
+        'SELECT staff_id, first_name, last_name, email, role, status, can_record_attendance, can_manage_billing, can_manage_people, title FROM staff ORDER BY last_name, first_name'
     ).fetchall()
     conn.close()
     return jsonify([dict(r) for r in rows])
 
 @app.route('/api/people/staff', methods=['POST'])
-@superadmin_required
+@people_required
 def add_people_staff():
     data = request.get_json()
     conn = get_db_connection()
@@ -1008,11 +1024,11 @@ def add_people_staff():
     return jsonify({'success': True}), 201
 
 @app.route('/api/people/staff/<int:staff_id>', methods=['PUT'])
-@superadmin_required
+@people_required
 def update_people_staff(staff_id):
     data = request.get_json()
     conn = get_db_connection()
-    allowed = ['first_name', 'last_name', 'email', 'role', 'title', 'status', 'can_record_attendance', 'can_manage_billing']
+    allowed = ['first_name', 'last_name', 'email', 'role', 'title', 'status', 'can_record_attendance', 'can_manage_billing', 'can_manage_people']
     fields = [f + ' = ?' for f in allowed if f in data]
     values = [data[f] for f in allowed if f in data]
     if not fields:
@@ -1024,7 +1040,7 @@ def update_people_staff(staff_id):
     return jsonify({'success': True})
 
 @app.route('/api/people/staff/<int:staff_id>', methods=['DELETE'])
-@superadmin_required
+@people_required
 def delete_people_staff(staff_id):
     conn = get_db_connection()
     conn.execute('DELETE FROM staff WHERE staff_id = ?', (staff_id,))

@@ -302,7 +302,7 @@
           ${capitalize(s.status)}
         </td>
         <td style="font-size:12px;color:var(--muted);">
-          ${[s.can_record_attendance ? 'Attendance' : '', s.can_manage_billing ? 'Billing' : ''].filter(Boolean).join(', ') || '—'}
+          ${[s.can_record_attendance ? 'Attendance' : '', s.can_manage_people ? 'People' : '', s.can_manage_billing ? 'Billing' : ''].filter(Boolean).join(', ') || '—'}
         </td>
         <td>
           <div class="actions">
@@ -358,6 +358,7 @@
     document.getElementById('staffRole').value = s.title || '';
     document.getElementById('permAttendance').checked = !!s.can_record_attendance;
     document.getElementById('permBilling').checked = !!s.can_manage_billing;
+    document.getElementById('permPeople').checked = !!s.can_manage_people;
     document.getElementById('modalOverlay').classList.add('open');
   }
 
@@ -390,6 +391,7 @@
       title: document.getElementById('staffRole').value.trim(),
       can_record_attendance: document.getElementById('permAttendance').checked ? 1 : 0,
       can_manage_billing: document.getElementById('permBilling').checked ? 1 : 0,
+      can_manage_people: document.getElementById('permPeople').checked ? 1 : 0,
     };
 
     const url = id ? `/api/people/staff/${id}` : '/api/people/staff';
