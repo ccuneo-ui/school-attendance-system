@@ -3,14 +3,60 @@ School Attendance System - Backend Server
 This Flask app connects the HTML attendance form to your SQLite database
 """
 
-from flask import Flask, request, jsonify, send_from_directory, render_template
+from flask import Flask, request, jsonify, send_from_directory, render_template, session, redirect, url_for
 from flask_cors import CORS
+from authlib.integrations.flask_client import OAuth
+from functools import wraps
 import sqlite3
 from datetime import datetime
 import os
 
 app = Flask(__name__)
-CORS(app)  # Allow the HTML form to communicate with this server
+CORS(app)
+
+# Session secret key
+app.secret_key = os.environ.get('SECRET_KEY', 'dev-secret-change-in-production')
+
+# ── Google OAuth ──
+oauth = OAuth(app)
+google = oauth.register(
+    name='google',
+    client_id=os.environ.get('GOOGLE_CLIENT_ID'),
+    client_secret=os.environ.get('GOOGLE_CLIENT_SECRET'),
+    server_metadata_url='https://accounts.google.com/.well-known/openid-configuration',
+    client_kwargs={'scope': 'openid email profile'},
+)
+
+SUPERADMIN_EMAIL = 'scaroppoli@mizzentop.org'  # Update to your email if needed
+
+def get_current_user():
+    email = session.get('user_email')
+    if not email:
+        return None
+    conn = get_db_connection()
+    user = conn.execute(
+        'SELECT * FROM staff WHERE email = ? AND status = ?', (email, 'active')
+    ).fetchone()
+    conn.close()
+    return user
+
+def login_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if not session.get('user_email'):
+            return redirect('/login')
+        return f(*args, **kwargs)
+    return decorated
+
+def superadmin_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if not session.get('user_email'):
+            return redirect('/login')
+        if not session.get('is_superadmin'):
+            return redirect('/?error=unauthorized')
+        return f(*args, **kwargs)
+    return decorated
 
 # Database file location - Uses persistent disk on Render, falls back to local for development
 PERSISTENT_DB = '/var/data/school.db'  # Persistent disk path on Render
@@ -45,15 +91,92 @@ def get_db_connection():
 # ============================================
 
 @app.route('/')
+@login_required
 def index():
     """Serve the home page"""
     return send_from_directory('.', 'home.html')
+
+# ── AUTH ROUTES ──
+
+@app.route('/login')
+def login():
+    """Serve the login page"""
+    if session.get('user_email'):
+        return redirect('/')
+    return send_from_directory('.', 'login.html')
+
+@app.route('/auth/google')
+def auth_google():
+    """Redirect to Google OAuth"""
+    redirect_uri = 'https://admin.mizzentopdayschool.org/auth/callback'
+    return google.authorize_redirect(redirect_uri)
+
+@app.route('/auth/callback')
+def auth_callback():
+    """Handle Google OAuth callback"""
+    try:
+        token = google.authorize_access_token()
+        user_info = token.get('userinfo')
+        email = user_info.get('email', '').lower()
+
+        # Check if email is from mizzentop.org
+        if not email.endswith('@mizzentop.org'):
+            return redirect('/login?error=domain')
+
+        # Check if staff record exists
+        conn = get_db_connection()
+        staff = conn.execute(
+            'SELECT * FROM staff WHERE email = ? AND status = ?', (email, 'active')
+        ).fetchone()
+        conn.close()
+
+        if not staff and email != SUPERADMIN_EMAIL:
+            return redirect('/login?error=notfound')
+
+        # Set session
+        session['user_email'] = email
+        session['user_name'] = user_info.get('name', '')
+        session['is_superadmin'] = (email == SUPERADMIN_EMAIL)
+        if staff:
+            session['can_record_attendance'] = bool(staff['can_record_attendance'])
+            session['can_manage_billing'] = bool(staff['can_manage_billing'])
+            session['user_role'] = staff['role']
+        else:
+            session['can_record_attendance'] = True
+            session['can_manage_billing'] = True
+            session['user_role'] = 'superadmin'
+
+        return redirect('/')
+    except Exception as e:
+        print(f"Auth error: {e}")
+        return redirect('/login?error=auth')
+
+@app.route('/auth/logout')
+def logout():
+    session.clear()
+    return redirect('/login')
+
+@app.route('/api/session')
+def get_session():
+    """Return current session info for frontend"""
+    if not session.get('user_email'):
+        return jsonify({'logged_in': False}), 401
+    return jsonify({
+        'logged_in': True,
+        'email': session.get('user_email'),
+        'name': session.get('user_name'),
+        'is_superadmin': session.get('is_superadmin', False),
+        'can_record_attendance': session.get('can_record_attendance', False),
+        'can_manage_billing': session.get('can_manage_billing', False),
+        'role': session.get('user_role'),
+    })
 
 @app.route('/logo.svg')
 def serve_logo():
     return send_from_directory('.', 'logo.svg')
 
 @app.route('/attendance')
+@login_required
 def attendance():
     """Serve the attendance form"""
     return send_from_directory('.', 'attendance_form.html')
@@ -270,6 +393,7 @@ def init_mcard_table():
     conn.close()
 
 @app.route('/mcard')
+@login_required
 def mcard():
     """Serve the M Card charge tracker"""
     return send_from_directory('.', 'mcard_tracker.html')
@@ -410,6 +534,7 @@ def init_dismissal_tables():
 
 
 @app.route('/dismissal-staff')
+@login_required
 def dismissal_staff():
     """Serve the read-only staff dismissal dashboard"""
     return send_from_directory('.', 'dismissal_staff_view.html')
@@ -651,6 +776,7 @@ def clear_dismissal_today():
 # ============================================
 
 @app.route('/dismissal')
+@login_required
 def dismissal():
     """Serve the admin dismissal planner page"""
     return send_from_directory('.', 'dismissal_planner.html')
@@ -839,92 +965,6 @@ def load_dismissal_defaults():
 # ============================================
 
 BACKUP_PASSWORD = 'school2026'  # Change this to something only you know!
-
-# ============================================
-# PEOPLE — Staff Management
-# ============================================
-
-@app.route('/people')
-def people():
-    """Serve the People management page"""
-    # Ensure title column exists (migration)
-    conn = get_db_connection()
-    try:
-        conn.execute('ALTER TABLE staff ADD COLUMN title TEXT')
-        conn.commit()
-    except Exception:
-        pass  # Column already exists
-    conn.close()
-    return send_from_directory('.', 'people.html')
-
-@app.route('/api/people/staff', methods=['GET'])
-def get_people_staff():
-    """Return all staff members"""
-    conn = get_db_connection()
-    # Ensure title column exists
-    try:
-        conn.execute('ALTER TABLE staff ADD COLUMN title TEXT')
-        conn.commit()
-    except Exception:
-        pass
-    rows = conn.execute('''
-        SELECT staff_id, first_name, last_name, email, role, status,
-               can_record_attendance, can_manage_billing, title
-        FROM staff ORDER BY last_name, first_name
-    ''').fetchall()
-    conn.close()
-    return jsonify([dict(r) for r in rows])
-
-@app.route('/api/people/staff', methods=['POST'])
-def add_people_staff():
-    """Add a new staff member"""
-    data = request.get_json()
-    conn = get_db_connection()
-    conn.execute('''
-        INSERT INTO staff (first_name, last_name, email, role, title, status,
-                           can_record_attendance, can_manage_billing, hire_date)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-    ''', (
-        data.get('first_name'), data.get('last_name'), data.get('email'),
-        data.get('role', 'staff'), data.get('title', ''),
-        data.get('status', 'active'),
-        data.get('can_record_attendance', 0), data.get('can_manage_billing', 0),
-        '2025-09-01'
-    ))
-    conn.commit()
-    conn.close()
-    return jsonify({'success': True}), 201
-
-@app.route('/api/people/staff/<int:staff_id>', methods=['PUT'])
-def update_people_staff(staff_id):
-    """Update a staff member"""
-    data = request.get_json()
-    conn = get_db_connection()
-    # Build dynamic update from whatever fields are provided
-    fields = []
-    values = []
-    allowed = ['first_name', 'last_name', 'email', 'role', 'title', 'status',
-               'can_record_attendance', 'can_manage_billing']
-    for field in allowed:
-        if field in data:
-            fields.append(f'{field} = ?')
-            values.append(data[field])
-    if not fields:
-        return jsonify({'error': 'No fields to update'}), 400
-    values.append(staff_id)
-    conn.execute(f'UPDATE staff SET {", ".join(fields)} WHERE staff_id = ?', values)
-    conn.commit()
-    conn.close()
-    return jsonify({'success': True})
-
-@app.route('/api/people/staff/<int:staff_id>', methods=['DELETE'])
-def delete_people_staff(staff_id):
-    """Delete a staff member"""
-    conn = get_db_connection()
-    conn.execute('DELETE FROM staff WHERE staff_id = ?', (staff_id,))
-    conn.commit()
-    conn.close()
-    return jsonify({'success': True})
 
 @app.route('/backup/download', methods=['GET'])
 def download_backup():
