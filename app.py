@@ -865,6 +865,95 @@ def download_backup():
         mimetype='application/octet-stream'
     )
 
+@app.route('/backup/restore', methods=['GET', 'POST'])
+def restore_backup():
+    """Upload and restore a database file - password protected"""
+    if request.method == 'GET':
+        password = request.args.get('key', '')
+        if password != BACKUP_PASSWORD:
+            return jsonify({'error': 'Unauthorized - invalid key'}), 401
+        # Show a simple upload form
+        return f'''
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Restore Database</title>
+            <style>
+                body {{ font-family: Arial, sans-serif; max-width: 500px; margin: 80px auto; padding: 20px; }}
+                h2 {{ color: #1a3a5c; }}
+                .warning {{ background: #fff3cd; border: 1px solid #ffc107; padding: 12px; border-radius: 6px; margin-bottom: 20px; }}
+                input[type=file] {{ margin: 10px 0 20px; display: block; }}
+                button {{ background: #1a3a5c; color: white; padding: 10px 24px; border: none; border-radius: 6px; cursor: pointer; font-size: 16px; }}
+                button:hover {{ background: #c8a84b; }}
+            </style>
+        </head>
+        <body>
+            <h2>🗄️ Restore Database</h2>
+            <div class="warning">
+                ⚠️ <strong>Warning:</strong> This will completely replace the live database. Make sure you have a backup first.
+            </div>
+            <form method="POST" enctype="multipart/form-data">
+                <input type="hidden" name="key" value="{password}">
+                <label>Select .db file to restore:</label>
+                <input type="file" name="db_file" accept=".db" required>
+                <button type="submit">Upload & Restore</button>
+            </form>
+        </body>
+        </html>
+        '''
+
+    # POST - handle the upload
+    password = request.form.get('key', '')
+    if password != BACKUP_PASSWORD:
+        return jsonify({'error': 'Unauthorized - invalid key'}), 401
+
+    if 'db_file' not in request.files:
+        return 'No file uploaded', 400
+
+    db_file = request.files['db_file']
+    if not db_file.filename.endswith('.db'):
+        return 'File must be a .db file', 400
+
+    # Save to a temp location first, then replace
+    import tempfile, shutil
+    with tempfile.NamedTemporaryFile(delete=False, suffix='.db') as tmp:
+        db_file.save(tmp.name)
+        tmp_path = tmp.name
+
+    # Verify it's a valid SQLite file
+    try:
+        import sqlite3
+        test_conn = sqlite3.connect(tmp_path)
+        test_conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()
+        test_conn.close()
+    except Exception as e:
+        os.remove(tmp_path)
+        return f'Invalid database file: {e}', 400
+
+    # Replace the live database
+    shutil.move(tmp_path, DATABASE)
+
+    return '''
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>Restore Complete</title>
+        <style>
+            body { font-family: Arial, sans-serif; max-width: 500px; margin: 80px auto; padding: 20px; }
+            .success { background: #d4edda; border: 1px solid #28a745; padding: 16px; border-radius: 6px; }
+            a { color: #1a3a5c; }
+        </style>
+    </head>
+    <body>
+        <div class="success">
+            ✅ <strong>Database restored successfully!</strong><br><br>
+            The live database has been replaced.<br><br>
+            <a href="/">← Back to Admin Portal</a>
+        </div>
+    </body>
+    </html>
+    '''
+
 # ============================================
 # RUN SERVER
 # ============================================
