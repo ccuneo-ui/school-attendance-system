@@ -27,7 +27,7 @@ google = oauth.register(
     client_kwargs={'scope': 'openid email profile'},
 )
 
-SUPERADMIN_EMAIL = 'scaroppoli@mizzentop.org'  # Update to your email if needed
+SUPERADMIN_EMAIL = 'ccuneo@mizzentop.org'
 
 def get_current_user():
     email = session.get('user_email')
