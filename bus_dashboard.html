@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bus Dashboard — Mizzentop Day School</title>
+  <link rel="icon" type="image/svg+xml" href="/logo.svg">
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet"/>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --navy:   #1a2744;
+      --gold:   #c8992a;
+      --cream:  #f7f3ec;
+      --muted:  #6b7280;
+      --light:  #e8e2d9;
+      --green:  #2d5016;
+    }
+    html, body { min-height: 100%; font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(--navy); }
+
+    /* NAV */
+    .topnav { background: var(--navy); display: flex; align-items: center; gap: 16px; padding: 0 28px; height: 56px; }
+    .topnav-title { color: #fff; font-size: 14px; font-weight: 500; }
+    .topnav-badge { font-size: 10px; font-weight: 500; letter-spacing: 0.15em; text-transform: uppercase; padding: 3px 10px; border-radius: 20px; background: rgba(200,153,42,0.25); color: var(--gold); border: 1px solid rgba(200,153,42,0.4); }
+    .home-btn { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; padding: 7px 14px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.25); color: rgba(255,255,255,0.85); text-decoration: none; font-size: 13px; font-weight: 500; transition: background 0.15s; }
+    .home-btn:hover { background: rgba(255,255,255,0.1); }
+
+    /* PAGE */
+    .page { max-width: 1000px; margin: 0 auto; padding: 40px 24px 80px; }
+    .page-header { display: flex; align-items: flex-end; justify-content: space-between; margin-bottom: 28px; flex-wrap: wrap; gap: 16px; }
+    .page-header h1 { font-family: 'Playfair Display', serif; font-size: 32px; font-weight: 700; color: var(--navy); margin-bottom: 4px; }
+    .page-header p { font-size: 14px; color: var(--muted); }
+
+    /* DATE NAV */
+    .date-controls { display: flex; align-items: center; gap: 8px; }
+    .date-nav { display: flex; align-items: center; border: 1px solid var(--light); border-radius: 8px; overflow: hidden; background: #fff; }
+    .date-nav button { border: none; background: none; padding: 7px 13px; cursor: pointer; font-size: 15px; color: var(--muted); transition: background 0.15s; }
+    .date-nav button:hover { background: var(--cream); color: var(--navy); }
+    .date-nav span { padding: 7px 14px; font-size: 13px; font-weight: 500; color: var(--navy); border-left: 1px solid var(--light); border-right: 1px solid var(--light); white-space: nowrap; }
+    .btn-today { padding: 7px 14px; border: 1px solid var(--light); border-radius: 8px; background: #fff; font-size: 13px; font-weight: 500; color: var(--navy); cursor: pointer; font-family: 'DM Sans', sans-serif; transition: all 0.15s; }
+    .btn-today:hover { border-color: var(--navy); }
+
+    /* SOURCE BANNER */
+    .source-banner { display: none; align-items: center; gap: 10px; padding: 12px 18px; border-radius: 10px; margin-bottom: 20px; font-size: 13px; }
+    .source-banner.default { background: #fff8e0; border: 1.5px solid #f5c842; color: #7a5800; display: flex; }
+    .source-banner.live { background: #f0fdf4; border: 1.5px solid #86efac; color: #166534; display: flex; }
+
+    /* SUMMARY */
+    .summary-bar { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 24px; }
+    .stat-chip { background: #fff; border: 1px solid var(--light); border-radius: 8px; padding: 10px 16px; font-size: 13px; color: var(--muted); display: flex; align-items: center; gap: 8px; }
+    .stat-chip strong { font-size: 20px; font-weight: 700; color: var(--navy); font-family: 'Playfair Display', serif; }
+
+    /* TABLE */
+    .table-wrap { background: #fff; border-radius: 12px; border: 1px solid var(--light); overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
+    table { width: 100%; border-collapse: collapse; }
+
+    /* BUS GROUP HEADER ROW */
+    .bus-header td { background: var(--navy); color: #fff; padding: 10px 18px; font-size: 13px; font-weight: 600; letter-spacing: 0.04em; }
+    .bus-header .bus-name { font-size: 15px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
+    .bus-count { background: rgba(255,255,255,0.2); color: #fff; font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 12px; }
+
+    /* COLUMN HEADERS */
+    .col-headers th { padding: 9px 18px; text-align: left; font-size: 11px; font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); background: #f9f7f4; border-bottom: 1px solid var(--light); }
+
+    /* DATA ROWS */
+    tbody tr.student-row { border-bottom: 1px solid #f3f0eb; transition: background 0.1s; }
+    tbody tr.student-row:hover td { background: #faf8f5; }
+    tbody tr.student-row td { padding: 11px 18px; font-size: 13px; }
+    .student-name { font-weight: 500; color: var(--navy); }
+    .grade-badge { display: inline-block; padding: 2px 8px; border-radius: 5px; font-size: 11px; font-weight: 600; background: rgba(26,39,68,0.08); color: var(--navy); }
+    .teacher-name { color: var(--muted); font-size: 12px; }
+
+    /* SPACER ROW between bus groups */
+    .spacer-row td { height: 12px; background: var(--cream); border: none; }
+
+    /* EMPTY / LOADING */
+    .empty-state { text-align: center; padding: 60px 20px; color: var(--muted); }
+    .empty-state p { font-size: 14px; margin-top: 8px; }
+  </style>
+</head>
+<body>
+
+<nav class="topnav">
+  <span class="topnav-title">Bus Dashboard</span>
+  <span class="topnav-badge">Reference</span>
+  <a class="home-btn" href="/">← Home</a>
+</nav>
+
+<div class="page">
+  <div class="page-header">
+    <div>
+      <h1>Bus Dashboard</h1>
+      <p>Students assigned to each bus route today.</p>
+    </div>
+    <div class="date-controls">
+      <div class="date-nav">
+        <button onclick="changeDate(-1)">‹</button>
+        <span id="dateDisplay">—</span>
+        <button onclick="changeDate(1)">›</button>
+      </div>
+      <button class="btn-today" onclick="goToday()">Today</button>
+    </div>
+  </div>
+
+  <div class="source-banner" id="sourceBanner"></div>
+
+  <div class="summary-bar" id="summaryBar"></div>
+
+  <div class="table-wrap">
+    <table id="busTable">
+      <tbody id="busBody">
+        <tr><td colspan="3" class="empty-state"><p>Loading…</p></td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+  let currentDate = new Date();
+
+  function dateStr(d) {
+    return d.toISOString().split('T')[0];
+  }
+
+  function formatDateDisplay(d) {
+    const days = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+    const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+    return `${days[d.getDay()]}, ${months[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`;
+  }
+
+  function changeDate(delta) {
+    currentDate.setDate(currentDate.getDate() + delta);
+    loadData();
+  }
+
+  function goToday() {
+    currentDate = new Date();
+    loadData();
+  }
+
+  async function loadData() {
+    document.getElementById('dateDisplay').textContent = formatDateDisplay(currentDate);
+    document.getElementById('busBody').innerHTML = '<tr><td colspan="3" class="empty-state"><p>Loading…</p></td></tr>';
+    document.getElementById('summaryBar').innerHTML = '';
+
+    try {
+      const res = await fetch(`/api/dismissal/buses?date=${dateStr(currentDate)}`);
+      if (!res.ok) throw new Error();
+      const data = await res.json();
+      renderBanner(data.source);
+      renderSummary(data.buses);
+      renderTable(data.buses);
+    } catch(e) {
+      document.getElementById('busBody').innerHTML = '<tr><td colspan="3" class="empty-state"><p>Failed to load data.</p></td></tr>';
+    }
+  }
+
+  function renderBanner(source) {
+    const el = document.getElementById('sourceBanner');
+    if (source === 'default') {
+      el.className = 'source-banner default';
+      el.innerHTML = `<svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        Today's dismissal plan hasn't been filled in yet — showing default schedule for this day of the week.`;
+    } else {
+      el.className = 'source-banner live';
+      el.innerHTML = `<svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+        Showing today's actual dismissal plan.`;
+    }
+  }
+
+  function renderSummary(buses) {
+    const totalStudents = buses.reduce((sum, b) => sum + b.count, 0);
+    const totalBuses = buses.length;
+    document.getElementById('summaryBar').innerHTML = `
+      <div class="stat-chip"><strong>${totalBuses}</strong> buses running</div>
+      <div class="stat-chip"><strong>${totalStudents}</strong> students riding</div>
+      ${buses.map(b => `<div class="stat-chip"><strong>${b.count}</strong> ${esc(b.route)}</div>`).join('')}
+    `;
+  }
+
+  function renderTable(buses) {
+    const tbody = document.getElementById('busBody');
+
+    if (!buses.length) {
+      tbody.innerHTML = '<tr><td colspan="3" class="empty-state"><p>No bus assignments found for this date.</p></td></tr>';
+      return;
+    }
+
+    let html = '';
+    buses.forEach((bus, i) => {
+      // Spacer between groups
+      if (i > 0) html += '<tr class="spacer-row"><td colspan="3"></td></tr>';
+
+      // Bus header
+      html += `
+        <tr class="bus-header">
+          <td colspan="3">
+            <div class="bus-name">
+              <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="1" y="7" width="22" height="13" rx="2"/><path d="M16 7V4a1 1 0 00-1-1H9a1 1 0 00-1 1v3M7 17v2M17 17v2M1 12h22"/></svg>
+              ${esc(bus.route)}
+              <span class="bus-count">${bus.count} student${bus.count !== 1 ? 's' : ''}</span>
+            </div>
+          </td>
+        </tr>
+        <tr class="col-headers">
+          <th>Student</th>
+          <th>Grade</th>
+          <th>Homeroom Teacher</th>
+        </tr>
+      `;
+
+      // Student rows
+      bus.students.forEach(s => {
+        html += `
+          <tr class="student-row">
+            <td><span class="student-name">${esc(s.last_name)}, ${esc(s.first_name)}</span></td>
+            <td><span class="grade-badge">${esc(s.grade)}</span></td>
+            <td><span class="teacher-name">${esc(s.homeroom_teacher)}</span></td>
+          </tr>
+        `;
+      });
+    });
+
+    tbody.innerHTML = html;
+  }
+
+  function esc(str) {
+    if (!str && str !== 0) return '—';
+    return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  loadData();
+</script>
+</body>
+</html>
