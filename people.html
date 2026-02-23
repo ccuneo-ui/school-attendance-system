@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>People — Mizzentop Day School</title>
+  <link rel="icon" type="image/svg+xml" href="/logo.svg">
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet"/>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --navy:    #1a2744;
+      --green:   #2d5016;
+      --gold:    #c8992a;
+      --cream:   #f7f3ec;
+      --muted:   #6b7280;
+      --light:   #e8e2d9;
+      --danger:  #9b1c1c;
+    }
+    html, body { min-height: 100%; font-family: 'DM Sans', sans-serif; background-color: var(--cream); color: var(--navy); }
+
+    /* ── TOP NAV ── */
+    .topnav { background: var(--navy); display: flex; align-items: center; gap: 16px; padding: 0 28px; height: 56px; }
+    .topnav a.home { display: flex; align-items: center; gap: 8px; color: rgba(255,255,255,0.7); text-decoration: none; font-size: 13px; font-weight: 500; }
+    .topnav a.home:hover { color: #fff; }
+    .topnav a.home svg { width: 16px; height: 16px; }
+    .topnav-divider { color: rgba(255,255,255,0.25); font-size: 14px; }
+    .topnav-title { color: #fff; font-size: 14px; font-weight: 500; }
+    .topnav-badge { margin-left: auto; font-size: 10px; font-weight: 500; letter-spacing: 0.15em; text-transform: uppercase; padding: 3px 10px; border-radius: 20px; background: rgba(200,153,42,0.25); color: var(--gold); border: 1px solid rgba(200,153,42,0.4); }
+
+    /* ── PAGE LAYOUT ── */
+    .page { max-width: 1100px; margin: 0 auto; padding: 40px 24px 80px; }
+    .page-header { margin-bottom: 32px; }
+    .page-header h1 { font-family: 'Playfair Display', serif; font-size: 32px; font-weight: 700; color: var(--navy); margin-bottom: 4px; }
+    .page-header p { font-size: 14px; color: var(--muted); }
+
+    /* ── TABS ── */
+    .tabs { display: flex; gap: 4px; border-bottom: 2px solid var(--light); margin-bottom: 28px; }
+    .tab { padding: 10px 20px; font-size: 13px; font-weight: 500; color: var(--muted); cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -2px; transition: all 0.15s; }
+    .tab:hover { color: var(--navy); }
+    .tab.active { color: var(--navy); border-bottom-color: var(--navy); }
+
+    /* ── TOOLBAR ── */
+    .toolbar { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; }
+    .search-wrap { position: relative; flex: 1; max-width: 320px; }
+    .search-wrap svg { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); width: 15px; height: 15px; color: var(--muted); pointer-events: none; }
+    .search-input { width: 100%; padding: 8px 12px 8px 34px; border: 1px solid var(--light); border-radius: 8px; font-size: 13px; font-family: 'DM Sans', sans-serif; background: #fff; color: var(--navy); outline: none; }
+    .search-input:focus { border-color: var(--navy); }
+    .filter-select { padding: 8px 12px; border: 1px solid var(--light); border-radius: 8px; font-size: 13px; font-family: 'DM Sans', sans-serif; background: #fff; color: var(--navy); outline: none; cursor: pointer; }
+    .filter-select:focus { border-color: var(--navy); }
+    .btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px; border-radius: 8px; font-size: 13px; font-weight: 500; font-family: 'DM Sans', sans-serif; cursor: pointer; border: none; transition: all 0.15s; }
+    .btn-primary { background: var(--navy); color: #fff; }
+    .btn-primary:hover { background: #243560; }
+    .btn-sm { padding: 5px 11px; font-size: 12px; }
+    .btn-ghost { background: transparent; color: var(--muted); border: 1px solid var(--light); }
+    .btn-ghost:hover { border-color: var(--navy); color: var(--navy); }
+    .btn-danger { background: transparent; color: var(--danger); border: 1px solid #fca5a5; }
+    .btn-danger:hover { background: #fee2e2; }
+    .count-badge { margin-left: auto; font-size: 12px; color: var(--muted); }
+
+    /* ── STAFF TABLE ── */
+    .table-wrap { background: #fff; border-radius: 12px; border: 1px solid var(--light); overflow: hidden; }
+    table { width: 100%; border-collapse: collapse; }
+    thead { background: #f9f7f4; }
+    th { padding: 11px 16px; text-align: left; font-size: 11px; font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); border-bottom: 1px solid var(--light); }
+    td { padding: 13px 16px; font-size: 13px; border-bottom: 1px solid #f3f0eb; vertical-align: middle; }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: #faf8f5; }
+    .staff-name { font-weight: 500; color: var(--navy); }
+    .staff-email { color: var(--muted); font-size: 12px; }
+    .role-badge { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: 500; }
+    .role-admin { background: rgba(26,39,68,0.1); color: var(--navy); }
+    .role-teacher { background: rgba(45,80,22,0.1); color: var(--green); }
+    .role-staff { background: rgba(200,153,42,0.12); color: #7a5a10; }
+    .status-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 5px; }
+    .status-active { background: #16a34a; }
+    .status-inactive { background: var(--muted); }
+    .actions { display: flex; gap: 6px; }
+    .empty-state { text-align: center; padding: 60px 20px; color: var(--muted); }
+    .empty-state svg { width: 36px; height: 36px; margin: 0 auto 12px; display: block; opacity: 0.4; }
+
+    /* ── MODAL ── */
+    .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 100; align-items: center; justify-content: center; }
+    .modal-overlay.open { display: flex; }
+    .modal { background: #fff; border-radius: 16px; width: 100%; max-width: 520px; padding: 32px; margin: 20px; max-height: 90vh; overflow-y: auto; }
+    .modal-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; }
+    .modal-header h2 { font-family: 'Playfair Display', serif; font-size: 22px; color: var(--navy); }
+    .modal-close { background: none; border: none; cursor: pointer; color: var(--muted); padding: 4px; }
+    .modal-close:hover { color: var(--navy); }
+    .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .form-group { display: flex; flex-direction: column; gap: 5px; }
+    .form-group.full { grid-column: 1 / -1; }
+    label { font-size: 12px; font-weight: 500; color: var(--muted); letter-spacing: 0.04em; text-transform: uppercase; }
+    input[type=text], input[type=email], select, textarea {
+      padding: 9px 12px; border: 1px solid var(--light); border-radius: 8px;
+      font-size: 13px; font-family: 'DM Sans', sans-serif; color: var(--navy);
+      background: #fff; outline: none; transition: border-color 0.15s;
+    }
+    input:focus, select:focus, textarea:focus { border-color: var(--navy); }
+    .permissions-group { display: flex; flex-direction: column; gap: 10px; margin-top: 4px; }
+    .perm-item { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid var(--light); border-radius: 8px; cursor: pointer; }
+    .perm-item:hover { border-color: var(--navy); background: #faf8f5; }
+    .perm-item input[type=checkbox] { width: 15px; height: 15px; accent-color: var(--navy); cursor: pointer; }
+    .perm-label { flex: 1; }
+    .perm-label strong { font-size: 13px; font-weight: 500; display: block; }
+    .perm-label span { font-size: 11px; color: var(--muted); }
+    .modal-footer { display: flex; gap: 10px; justify-content: flex-end; margin-top: 28px; padding-top: 20px; border-top: 1px solid var(--light); }
+
+    /* ── TOAST ── */
+    .toast { position: fixed; bottom: 24px; right: 24px; background: var(--navy); color: #fff; padding: 12px 20px; border-radius: 10px; font-size: 13px; font-weight: 500; z-index: 200; transform: translateY(80px); opacity: 0; transition: all 0.3s ease; pointer-events: none; }
+    .toast.show { transform: translateY(0); opacity: 1; }
+    .toast.success { background: #166534; }
+    .toast.error { background: var(--danger); }
+  </style>
+</head>
+<body>
+
+<!-- TOP NAV -->
+<nav class="topnav">
+  <a class="home" href="/">
+    <svg viewBox="0 0 24 24" fill="none"><path d="M3 12L12 3l9 9M5 10v9a1 1 0 001 1h4v-5h4v5h4a1 1 0 001-1v-9" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    Portal
+  </a>
+  <span class="topnav-divider">›</span>
+  <span class="topnav-title">People</span>
+  <span class="topnav-badge">Records</span>
+</nav>
+
+<!-- PAGE -->
+<div class="page">
+  <div class="page-header">
+    <h1>People</h1>
+    <p>Manage staff records, roles, and system permissions.</p>
+  </div>
+
+  <!-- TABS -->
+  <div class="tabs">
+    <div class="tab active" onclick="switchTab('staff')">Staff</div>
+    <div class="tab" onclick="switchTab('students')">Students <span style="font-size:11px;color:var(--muted);margin-left:4px;">(coming soon)</span></div>
+  </div>
+
+  <!-- TOOLBAR -->
+  <div class="toolbar">
+    <div class="search-wrap">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+      <input class="search-input" id="searchInput" type="text" placeholder="Search staff…" oninput="filterTable()">
+    </div>
+    <select class="filter-select" id="statusFilter" onchange="filterTable()">
+      <option value="">All statuses</option>
+      <option value="active">Active</option>
+      <option value="inactive">Inactive</option>
+    </select>
+    <select class="filter-select" id="roleFilter" onchange="filterTable()">
+      <option value="">All roles</option>
+      <option value="admin">Admin</option>
+      <option value="teacher">Teacher</option>
+      <option value="staff">Staff</option>
+    </select>
+    <span class="count-badge" id="countBadge"></span>
+    <button class="btn btn-primary" onclick="openAddModal()">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>
+      Add Staff
+    </button>
+  </div>
+
+  <!-- TABLE -->
+  <div class="table-wrap">
+    <table id="staffTable">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Email</th>
+          <th>Role</th>
+          <th>Title</th>
+          <th>Status</th>
+          <th>Permissions</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody id="staffBody">
+        <tr><td colspan="7" class="empty-state">Loading…</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ADD/EDIT MODAL -->
+<div class="modal-overlay" id="modalOverlay" onclick="closeModalOnOverlay(event)">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 id="modalTitle">Add Staff Member</h2>
+      <button class="modal-close" onclick="closeModal()">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg>
+      </button>
+    </div>
+
+    <form id="staffForm" onsubmit="submitStaff(event)">
+      <input type="hidden" id="staffId">
+      <div class="form-grid">
+        <div class="form-group">
+          <label>First Name</label>
+          <input type="text" id="firstName" required placeholder="First name">
+        </div>
+        <div class="form-group">
+          <label>Last Name</label>
+          <input type="text" id="lastName" required placeholder="Last name">
+        </div>
+        <div class="form-group full">
+          <label>Email</label>
+          <input type="email" id="email" required placeholder="firstinitiallastname@mizzentop.org">
+        </div>
+        <div class="form-group">
+          <label>Role</label>
+          <select id="role">
+            <option value="staff">Staff</option>
+            <option value="teacher">Teacher</option>
+            <option value="admin">Admin</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Status</label>
+          <select id="status">
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
+          </select>
+        </div>
+        <div class="form-group full">
+          <label>Title / Position</label>
+          <input type="text" id="staffRole" placeholder="e.g. Fourth Grade Homeroom Teacher">
+        </div>
+        <div class="form-group full">
+          <label>Permissions</label>
+          <div class="permissions-group">
+            <label class="perm-item">
+              <input type="checkbox" id="permAttendance">
+              <div class="perm-label">
+                <strong>Record Attendance</strong>
+                <span>Can access Daily Ops and mark attendance</span>
+              </div>
+            </label>
+            <label class="perm-item">
+              <input type="checkbox" id="permBilling">
+              <div class="perm-label">
+                <strong>Manage Billing</strong>
+                <span>Can access billing reports and M Card data</span>
+              </div>
+            </label>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+        <button type="submit" class="btn btn-primary" id="submitBtn">Save Staff Member</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<script>
+  let allStaff = [];
+  let editingId = null;
+
+  // ── LOAD STAFF ──
+  async function loadStaff() {
+    try {
+      const res = await fetch('/api/people/staff');
+      allStaff = await res.json();
+      renderTable(allStaff);
+    } catch(e) {
+      showToast('Failed to load staff', 'error');
+    }
+  }
+
+  // ── RENDER TABLE ──
+  function renderTable(data) {
+    const tbody = document.getElementById('staffBody');
+    document.getElementById('countBadge').textContent = `${data.length} member${data.length !== 1 ? 's' : ''}`;
+
+    if (!data.length) {
+      tbody.innerHTML = `<tr><td colspan="7">
+        <div class="empty-state">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>
+          No staff found
+        </div>
+      </td></tr>`;
+      return;
+    }
+
+    tbody.innerHTML = data.map(s => `
+      <tr>
+        <td>
+          <div class="staff-name">${s.first_name} ${s.last_name}</div>
+        </td>
+        <td class="staff-email">${s.email || '—'}</td>
+        <td><span class="role-badge role-${s.role || 'staff'}">${capitalize(s.role || 'staff')}</span></td>
+        <td style="font-size:12px;color:var(--muted);max-width:200px;">${s.title || '—'}</td>
+        <td>
+          <span class="status-dot status-${s.status}"></span>
+          ${capitalize(s.status)}
+        </td>
+        <td style="font-size:12px;color:var(--muted);">
+          ${[s.can_record_attendance ? 'Attendance' : '', s.can_manage_billing ? 'Billing' : ''].filter(Boolean).join(', ') || '—'}
+        </td>
+        <td>
+          <div class="actions">
+            <button class="btn btn-sm btn-ghost" onclick="openEditModal(${s.staff_id})">Edit</button>
+            <button class="btn btn-sm btn-danger" onclick="deactivateStaff(${s.staff_id}, '${s.first_name} ${s.last_name}', '${s.status}')">
+              ${s.status === 'active' ? 'Deactivate' : 'Reactivate'}
+            </button>
+          </div>
+        </td>
+      </tr>
+    `).join('');
+  }
+
+  // ── FILTER ──
+  function filterTable() {
+    const q = document.getElementById('searchInput').value.toLowerCase();
+    const status = document.getElementById('statusFilter').value;
+    const role = document.getElementById('roleFilter').value;
+    const filtered = allStaff.filter(s => {
+      const name = `${s.first_name} ${s.last_name}`.toLowerCase();
+      const email = (s.email || '').toLowerCase();
+      const matchQ = !q || name.includes(q) || email.includes(q);
+      const matchStatus = !status || s.status === status;
+      const matchRole = !role || s.role === role;
+      return matchQ && matchStatus && matchRole;
+    });
+    renderTable(filtered);
+  }
+
+  // ── MODAL: ADD ──
+  function openAddModal() {
+    editingId = null;
+    document.getElementById('modalTitle').textContent = 'Add Staff Member';
+    document.getElementById('submitBtn').textContent = 'Add Staff Member';
+    document.getElementById('staffForm').reset();
+    document.getElementById('staffId').value = '';
+    document.getElementById('modalOverlay').classList.add('open');
+  }
+
+  // ── MODAL: EDIT ──
+  function openEditModal(id) {
+    const s = allStaff.find(x => x.staff_id === id);
+    if (!s) return;
+    editingId = id;
+    document.getElementById('modalTitle').textContent = 'Edit Staff Member';
+    document.getElementById('submitBtn').textContent = 'Save Changes';
+    document.getElementById('staffId').value = id;
+    document.getElementById('firstName').value = s.first_name || '';
+    document.getElementById('lastName').value = s.last_name || '';
+    document.getElementById('email').value = s.email || '';
+    document.getElementById('role').value = s.role || 'staff';
+    document.getElementById('status').value = s.status || 'active';
+    document.getElementById('staffRole').value = s.title || '';
+    document.getElementById('permAttendance').checked = !!s.can_record_attendance;
+    document.getElementById('permBilling').checked = !!s.can_manage_billing;
+    document.getElementById('modalOverlay').classList.add('open');
+  }
+
+  function closeModal() { document.getElementById('modalOverlay').classList.remove('open'); }
+  function closeModalOnOverlay(e) { if (e.target === document.getElementById('modalOverlay')) closeModal(); }
+
+  // ── AUTO EMAIL ──
+  document.getElementById('firstName').addEventListener('blur', autoEmail);
+  document.getElementById('lastName').addEventListener('blur', autoEmail);
+  function autoEmail() {
+    const emailField = document.getElementById('email');
+    if (editingId || emailField.value) return; // don't overwrite on edit or if already set
+    const first = document.getElementById('firstName').value.trim();
+    const last = document.getElementById('lastName').value.trim();
+    if (first && last) {
+      emailField.value = (first[0] + last).toLowerCase().replace(/'/g,'') + '@mizzentop.org';
+    }
+  }
+
+  // ── SUBMIT ──
+  async function submitStaff(e) {
+    e.preventDefault();
+    const id = document.getElementById('staffId').value;
+    const payload = {
+      first_name: document.getElementById('firstName').value.trim(),
+      last_name: document.getElementById('lastName').value.trim(),
+      email: document.getElementById('email').value.trim(),
+      role: document.getElementById('role').value,
+      status: document.getElementById('status').value,
+      title: document.getElementById('staffRole').value.trim(),
+      can_record_attendance: document.getElementById('permAttendance').checked ? 1 : 0,
+      can_manage_billing: document.getElementById('permBilling').checked ? 1 : 0,
+    };
+
+    const url = id ? `/api/people/staff/${id}` : '/api/people/staff';
+    const method = id ? 'PUT' : 'POST';
+
+    try {
+      const res = await fetch(url, { method, headers: {'Content-Type':'application/json'}, body: JSON.stringify(payload) });
+      if (!res.ok) throw new Error();
+      closeModal();
+      showToast(id ? 'Staff member updated' : 'Staff member added', 'success');
+      loadStaff();
+    } catch {
+      showToast('Something went wrong', 'error');
+    }
+  }
+
+  // ── DEACTIVATE / REACTIVATE ──
+  async function deactivateStaff(id, name, currentStatus) {
+    const newStatus = currentStatus === 'active' ? 'inactive' : 'active';
+    const action = newStatus === 'inactive' ? 'deactivate' : 'reactivate';
+    if (!confirm(`${capitalize(action)} ${name}?`)) return;
+    try {
+      const res = await fetch(`/api/people/staff/${id}`, {
+        method: 'PUT',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ status: newStatus })
+      });
+      if (!res.ok) throw new Error();
+      showToast(`${name} ${action}d`, 'success');
+      loadStaff();
+    } catch {
+      showToast('Something went wrong', 'error');
+    }
+  }
+
+  // ── TABS ──
+  function switchTab(tab) {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    event.target.classList.add('active');
+    // Students tab coming soon — no-op for now
+  }
+
+  // ── HELPERS ──
+  function capitalize(s) { return s ? s.charAt(0).toUpperCase() + s.slice(1) : ''; }
+
+  function showToast(msg, type='') {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.className = `toast ${type} show`;
+    setTimeout(() => t.className = 'toast', 3000);
+  }
+
+  loadStaff();
+</script>
+</body>
+</html>

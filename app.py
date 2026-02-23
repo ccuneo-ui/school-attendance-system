@@ -840,6 +840,92 @@ def load_dismissal_defaults():
 
 BACKUP_PASSWORD = 'school2026'  # Change this to something only you know!
 
+# ============================================
+# PEOPLE — Staff Management
+# ============================================
+
+@app.route('/people')
+def people():
+    """Serve the People management page"""
+    # Ensure title column exists (migration)
+    conn = get_db_connection()
+    try:
+        conn.execute('ALTER TABLE staff ADD COLUMN title TEXT')
+        conn.commit()
+    except Exception:
+        pass  # Column already exists
+    conn.close()
+    return send_from_directory('.', 'people.html')
+
+@app.route('/api/people/staff', methods=['GET'])
+def get_people_staff():
+    """Return all staff members"""
+    conn = get_db_connection()
+    # Ensure title column exists
+    try:
+        conn.execute('ALTER TABLE staff ADD COLUMN title TEXT')
+        conn.commit()
+    except Exception:
+        pass
+    rows = conn.execute('''
+        SELECT staff_id, first_name, last_name, email, role, status,
+               can_record_attendance, can_manage_billing, title
+        FROM staff ORDER BY last_name, first_name
+    ''').fetchall()
+    conn.close()
+    return jsonify([dict(r) for r in rows])
+
+@app.route('/api/people/staff', methods=['POST'])
+def add_people_staff():
+    """Add a new staff member"""
+    data = request.get_json()
+    conn = get_db_connection()
+    conn.execute('''
+        INSERT INTO staff (first_name, last_name, email, role, title, status,
+                           can_record_attendance, can_manage_billing, hire_date)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ''', (
+        data.get('first_name'), data.get('last_name'), data.get('email'),
+        data.get('role', 'staff'), data.get('title', ''),
+        data.get('status', 'active'),
+        data.get('can_record_attendance', 0), data.get('can_manage_billing', 0),
+        '2025-09-01'
+    ))
+    conn.commit()
+    conn.close()
+    return jsonify({'success': True}), 201
+
+@app.route('/api/people/staff/<int:staff_id>', methods=['PUT'])
+def update_people_staff(staff_id):
+    """Update a staff member"""
+    data = request.get_json()
+    conn = get_db_connection()
+    # Build dynamic update from whatever fields are provided
+    fields = []
+    values = []
+    allowed = ['first_name', 'last_name', 'email', 'role', 'title', 'status',
+               'can_record_attendance', 'can_manage_billing']
+    for field in allowed:
+        if field in data:
+            fields.append(f'{field} = ?')
+            values.append(data[field])
+    if not fields:
+        return jsonify({'error': 'No fields to update'}), 400
+    values.append(staff_id)
+    conn.execute(f'UPDATE staff SET {", ".join(fields)} WHERE staff_id = ?', values)
+    conn.commit()
+    conn.close()
+    return jsonify({'success': True})
+
+@app.route('/api/people/staff/<int:staff_id>', methods=['DELETE'])
+def delete_people_staff(staff_id):
+    """Delete a staff member"""
+    conn = get_db_connection()
+    conn.execute('DELETE FROM staff WHERE staff_id = ?', (staff_id,))
+    conn.commit()
+    conn.close()
+    return jsonify({'success': True})
+
 @app.route('/backup/download', methods=['GET'])
 def download_backup():
     """Download the live database file - password protected"""
