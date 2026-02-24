@@ -123,7 +123,7 @@
   /* Student rows */
   .student-row { display: flex; align-items: center; padding: 6px 8px; border-radius: 6px; gap: 6px; transition: background 0.1s; cursor: pointer; border: 1px solid transparent; }
   .student-row:hover { background: var(--bg); }
-  .student-row.override { border-color: var(--override); background: var(--override-light); }
+  .student-row.override { }
   .student-name { flex: 1; font-size: 0.875rem; font-weight: 500; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .student-grade { font-size: 0.72rem; font-family: 'DM Mono', monospace; color: var(--muted); background: var(--bg); padding: 2px 5px; border-radius: 4px; flex-shrink: 0; }
 
@@ -161,7 +161,7 @@
   tbody tr { border-bottom: 1px solid var(--border); transition: background 0.1s; cursor: pointer; }
   tbody tr:last-child { border-bottom: none; }
   tbody tr:hover { background: var(--bg); }
-  tbody tr.override-row { background: var(--override-light); }
+  tbody tr.override-row { }
   tbody td { padding: 9px 14px; font-size: 0.875rem; }
 
   /* Modal */
@@ -618,7 +618,6 @@ function renderStudentRow(s, showMissing) {
   return `<div class="student-row ${isOverride ? 'override' : ''}" onclick="openEditModal(${s.student_id})">
     <div class="student-name">${s.first_name} ${s.last_name}</div>
     <div class="student-grade">${s.grade || '?'}</div>
-    ${isOverride ? '<span class="override-star">★</span>' : ''}
     ${attBadge}
     ${disBadge}
     ${missingHtml}
