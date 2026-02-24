@@ -539,7 +539,6 @@
   <div class="header-right">
     <span id="liveDate"></span>
     <span id="liveTime"></span>
-    <a href="/" style="display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border-radius:8px;border:1px solid rgba(255,255,255,0.25);color:rgba(255,255,255,0.85);text-decoration:none;font-size:13px;font-weight:500;transition:all 0.15s;" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='transparent'">← Home</a>
   </div>
 </header>
 
@@ -568,8 +567,8 @@
   <div class="filter-group">
     <span class="filter-label">View</span>
     <div class="view-toggle">
-      <button class="view-btn active" onclick="setView('table', this)">Table</button>
-      <button class="view-btn" onclick="setView('grouped', this)">Grouped</button>
+      <button class="view-btn" onclick="setView('table', this)">Table</button>
+      <button class="view-btn active" onclick="setView('grouped', this)">Grouped</button>
     </div>
   </div>
 
@@ -618,7 +617,7 @@ let allStudents = [];
 let filteredStudents = [];
 let currentGrade    = 'all';
 let currentLocation = 'all';
-let currentView     = 'table';
+let currentView     = 'grouped';
 let groupBy         = 'grade'; // used in grouped view
 let dataSource      = 'today'; // 'today' | 'default'
 
