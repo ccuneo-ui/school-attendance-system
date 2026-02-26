@@ -544,22 +544,6 @@ def init_dismissal_tables():
         for name in default_electives:
             conn.execute('INSERT OR IGNORE INTO electives (name) VALUES (?)', (name,))
 
-    # Daily dismissal planner table (used by dismissal_planner.html)
-    conn.execute('''
-        CREATE TABLE IF NOT EXISTS daily_dismissal (
-            dismissal_id   INTEGER PRIMARY KEY AUTOINCREMENT,
-            student_id     INTEGER NOT NULL,
-            dismissal_date TEXT NOT NULL,
-            dismissal_type TEXT NOT NULL,
-            destination    TEXT DEFAULT '',
-            notes          TEXT DEFAULT '',
-            is_override    INTEGER DEFAULT 0,
-            recorded_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (student_id) REFERENCES students(student_id),
-            UNIQUE(student_id, dismissal_date)
-        )
-    ''')
-
     conn.commit()
     conn.close()
 
@@ -916,6 +900,15 @@ def save_dismissal_plan():
             is_override    = excluded.is_override,
             recorded_at    = CURRENT_TIMESTAMP
     ''', (student_id, date, d_type, destination, notes, is_override))
+    conn.commit()
+    conn.close()
+    return jsonify({'success': True})
+
+@app.route('/api/dismissal/plan/<date>/<int:student_id>', methods=['DELETE'])
+def delete_dismissal_plan(date, student_id):
+    """Delete a student's dismissal record for a specific date"""
+    conn = get_db_connection()
+    conn.execute('DELETE FROM daily_dismissal WHERE student_id = ? AND dismissal_date = ?', (student_id, date))
     conn.commit()
     conn.close()
     return jsonify({'success': True})
@@ -1287,11 +1280,6 @@ def restore_backup():
     </body>
     </html>
     '''
-
-# ============================================
-# STARTUP INITIALIZATION (runs under gunicorn too)
-# ============================================
-init_dismissal_tables()
 
 # ============================================
 # RUN SERVER

@@ -307,6 +307,7 @@
     <input type="text" id="modal-notes" placeholder="e.g. leaving early, going home with friend..." />
     <div class="modal-actions">
       <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-danger" onclick="clearStudentDismissal()" id="clear-dismissal-btn" style="margin-right:auto;background:#fee;color:#8a1a1a;border:1px solid #fcc;">Clear Dismissal</button>
       <button class="btn btn-primary" onclick="saveStudentRecord()">Save</button>
     </div>
   </div>
@@ -419,6 +420,25 @@ async function saveBulkPlan(studentIds, type, destination) {
     body: JSON.stringify({ student_ids: studentIds, dismissal_date: formatDate(currentDate), dismissal_type: type, destination: destination||'' })
   });
 }
+async function deletePlan(studentId) {
+  await fetch(`${API}/dismissal/plan/${formatDate(currentDate)}/${studentId}`, {
+    method: 'DELETE'
+  });
+}
+
+async function clearStudentDismissal() {
+  if (!editingStudentId) return;
+  try {
+    await deletePlan(editingStudentId);
+    delete dailyPlan[editingStudentId];
+    closeModal();
+    render();
+    showToast('Dismissal cleared', 'success');
+  } catch(e) {
+    showToast('Error clearing dismissal', 'error');
+  }
+}
+
 async function loadDefaultsAPI() {
   const day = getDayKey(currentDate);
   await fetch(`${API}/dismissal/load-defaults`, {
@@ -732,6 +752,11 @@ async function saveStudentRecord() {
     const isOverride = type !== defType;
     saves.push(savePlan(editingStudentId, type, dest, notes, isOverride).then(() => {
       dailyPlan[editingStudentId] = { student_id: editingStudentId, dismissal_type: type, destination: dest, notes, is_override: isOverride };
+    }));
+  } else if (dailyPlan[editingStudentId]) {
+    // Dismissal was cleared - delete from DB
+    saves.push(deletePlan(editingStudentId).then(() => {
+      delete dailyPlan[editingStudentId];
     }));
   }
 
