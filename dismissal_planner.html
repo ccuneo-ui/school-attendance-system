@@ -374,7 +374,7 @@ let editingStudentId = null;
 let bulkStudentIds = [];
 
 // ── Date helpers ──
-function formatDate(d) { return d.toISOString().split('T')[0]; }
+function formatDate(d) { return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
 function getDayKey(d) { return DAYS[d.getDay()]; }
 function isWeekend(d) { const day = d.getDay(); return day === 0 || day === 6; }
 
