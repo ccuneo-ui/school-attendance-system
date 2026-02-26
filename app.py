@@ -544,6 +544,22 @@ def init_dismissal_tables():
         for name in default_electives:
             conn.execute('INSERT OR IGNORE INTO electives (name) VALUES (?)', (name,))
 
+    # Daily dismissal planner table
+    conn.execute('''
+        CREATE TABLE IF NOT EXISTS daily_dismissal (
+            dismissal_id   INTEGER PRIMARY KEY AUTOINCREMENT,
+            student_id     INTEGER NOT NULL,
+            dismissal_date TEXT NOT NULL,
+            dismissal_type TEXT NOT NULL,
+            destination    TEXT DEFAULT '',
+            notes          TEXT DEFAULT '',
+            is_override    INTEGER DEFAULT 0,
+            recorded_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (student_id) REFERENCES students(student_id),
+            UNIQUE(student_id, dismissal_date)
+        )
+    ''')
+
     conn.commit()
     conn.close()
 
@@ -1281,9 +1297,48 @@ def restore_backup():
     </html>
     '''
 
+
+def migrate_attendance_status_constraint():
+    """Remove old CHECK constraint on attendance_records.status"""
+    conn = get_db_connection()
+    try:
+        conn.execute("INSERT INTO attendance_records (enrollment_id, attendance_date, status, recorded_by, notes) VALUES (0, '1900-01-01', 'ed', 1, 'test')")
+        conn.execute("DELETE FROM attendance_records WHERE attendance_date = '1900-01-01'")
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        conn.execute('''
+            CREATE TABLE IF NOT EXISTS attendance_records_new (
+                attendance_id   INTEGER PRIMARY KEY AUTOINCREMENT,
+                enrollment_id   INTEGER NOT NULL,
+                attendance_date TEXT NOT NULL,
+                status          TEXT NOT NULL,
+                recorded_by     INTEGER,
+                notes           TEXT DEFAULT \'\',
+                recorded_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (enrollment_id) REFERENCES enrollments(enrollment_id),
+                UNIQUE(enrollment_id, attendance_date)
+            )
+        ''')
+        conn.execute('''
+            INSERT OR IGNORE INTO attendance_records_new
+            SELECT attendance_id, enrollment_id, attendance_date, status, recorded_by, notes, recorded_at
+            FROM attendance_records
+        ''')
+        conn.execute('DROP TABLE attendance_records')
+        conn.execute('ALTER TABLE attendance_records_new RENAME TO attendance_records')
+        conn.commit()
+        print("Migration complete: removed status CHECK constraint")
+    finally:
+        conn.close()
+
 # ============================================
 # RUN SERVER
 # ============================================
+
+# Run on startup (works with gunicorn too)
+init_dismissal_tables()
+migrate_attendance_status_constraint()
 
 if __name__ == '__main__':
     # Initialize dismissal tables on startup
