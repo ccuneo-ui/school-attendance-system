@@ -1325,8 +1325,21 @@ def migrate_attendance_status_constraint():
             SELECT attendance_id, enrollment_id, attendance_date, status, recorded_by, notes, recorded_at
             FROM attendance_records
         ''')
+        conn.execute('DROP VIEW IF EXISTS v_attendance_summary')
         conn.execute('DROP TABLE attendance_records')
         conn.execute('ALTER TABLE attendance_records_new RENAME TO attendance_records')
+        # Recreate the view
+        conn.execute('''
+            CREATE VIEW IF NOT EXISTS v_attendance_summary AS
+            SELECT
+                s.student_id, s.first_name, s.last_name, s.grade,
+                a.attendance_date, a.status,
+                p.program_name
+            FROM attendance_records a
+            JOIN enrollments e ON a.enrollment_id = e.enrollment_id
+            JOIN students s ON e.student_id = s.student_id
+            JOIN programs p ON e.program_id = p.program_id
+        ''')
         conn.commit()
         print("Migration complete: removed status CHECK constraint")
     finally:
