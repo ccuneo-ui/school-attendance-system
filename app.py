@@ -93,8 +93,9 @@ DATABASE = get_database_path()
 
 def get_db_connection():
     """Create a connection to the SQLite database"""
-    conn = sqlite3.connect(DATABASE)
+    conn = sqlite3.connect(DATABASE, timeout=10)  # Wait up to 10s if database is locked
     conn.row_factory = sqlite3.Row  # Return rows as dictionaries
+    conn.execute('PRAGMA journal_mode=WAL')  # Allow concurrent reads and writes
     return conn
 
 # ============================================
