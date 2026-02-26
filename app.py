@@ -544,6 +544,22 @@ def init_dismissal_tables():
         for name in default_electives:
             conn.execute('INSERT OR IGNORE INTO electives (name) VALUES (?)', (name,))
 
+    # Daily dismissal planner table (used by dismissal_planner.html)
+    conn.execute('''
+        CREATE TABLE IF NOT EXISTS daily_dismissal (
+            dismissal_id   INTEGER PRIMARY KEY AUTOINCREMENT,
+            student_id     INTEGER NOT NULL,
+            dismissal_date TEXT NOT NULL,
+            dismissal_type TEXT NOT NULL,
+            destination    TEXT DEFAULT '',
+            notes          TEXT DEFAULT '',
+            is_override    INTEGER DEFAULT 0,
+            recorded_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (student_id) REFERENCES students(student_id),
+            UNIQUE(student_id, dismissal_date)
+        )
+    ''')
+
     conn.commit()
     conn.close()
 
@@ -1271,6 +1287,11 @@ def restore_backup():
     </body>
     </html>
     '''
+
+# ============================================
+# STARTUP INITIALIZATION (runs under gunicorn too)
+# ============================================
+init_dismissal_tables()
 
 # ============================================
 # RUN SERVER
