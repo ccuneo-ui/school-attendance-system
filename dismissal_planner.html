@@ -570,7 +570,7 @@ function renderGroupView() {
       <div class="group-icon">🚌</div>
       <div class="group-title">Bus & Pick Up</div>
       <span class="group-count">${busTotal}</span>
-      ${busTotal > 0 ? `<button class="assign-btn" onclick="openBulkModal(${JSON.stringify(busIds).replace(/"/g,"'")})">Assign All</button>` : ''}
+
     </div>
     <div class="group-body">
       ${renderSubGroups(groups.bus)}
@@ -586,7 +586,7 @@ function renderGroupView() {
       <div class="group-icon">⭐</div>
       <div class="group-title">Activity / Aftercare</div>
       <span class="group-count">${actTotal}</span>
-      ${actTotal > 0 ? `<button class="assign-btn" onclick="openBulkModal(${JSON.stringify(actIds).replace(/"/g,"'")})">Assign All</button>` : ''}
+
     </div>
     <div class="group-body">
       ${renderSubGroups(groups.activity)}
