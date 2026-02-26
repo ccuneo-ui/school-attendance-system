@@ -743,33 +743,25 @@ async function saveStudentRecord() {
   const disVal = document.getElementById('modal-dismissal').value;
   const notes = document.getElementById('modal-notes').value;
 
-  const saves = [];
-
-  // Save dismissal
-  if (disVal) {
-    const [type, dest] = disVal.split('|');
-    const defType = getDefaultType(s);
-    const isOverride = type !== defType;
-    saves.push(savePlan(editingStudentId, type, dest, notes, isOverride).then(() => {
+  try {
+    // Save dismissal first, then attendance — sequential to avoid DB lock
+    if (disVal) {
+      const [type, dest] = disVal.split('|');
+      const defType = getDefaultType(s);
+      const isOverride = type !== defType;
+      await savePlan(editingStudentId, type, dest, notes, isOverride);
       dailyPlan[editingStudentId] = { student_id: editingStudentId, dismissal_type: type, destination: dest, notes, is_override: isOverride };
-    }));
-  } else if (dailyPlan[editingStudentId]) {
-    // Dismissal was cleared - delete from DB
-    saves.push(deletePlan(editingStudentId).then(() => {
+    } else if (dailyPlan[editingStudentId]) {
+      await deletePlan(editingStudentId);
       delete dailyPlan[editingStudentId];
-    }));
-  }
+    }
 
-  // Save attendance
-  if (attVal !== undefined) {
-    saves.push(saveAttendanceRecord(editingStudentId, attVal).then(() => {
+    if (attVal !== undefined) {
+      await saveAttendanceRecord(editingStudentId, attVal);
       if (attVal) attendance[editingStudentId] = attVal;
       else delete attendance[editingStudentId];
-    }));
-  }
+    }
 
-  try {
-    await Promise.all(saves);
     closeModal();
     render();
     showToast('Saved!', 'success');
