@@ -947,9 +947,40 @@ BACKUP_PASSWORD = "school2026"
 
 @app.route("/backup/download")
 def download_backup():
-    if request.args.get("key","") != BACKUP_PASSWORD:
-        return jsonify({"error":"Unauthorized"}),401
-    return jsonify({"info":"Use Render dashboard to export PostgreSQL backups"}),200
+    """Export all key tables as a JSON backup file."""
+    if request.args.get("key", "") != BACKUP_PASSWORD:
+        return jsonify({"error": "Unauthorized"}), 401
+
+    conn = get_db_connection()
+    try:
+        backup = {}
+        tables = [
+            "students", "staff", "programs", "enrollments",
+            "attendance_records", "mcard_charges", "electives",
+            "daily_dismissal", "dismissal_today"
+        ]
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            for table in tables:
+                cur.execute(f"SELECT * FROM {table}")
+                rows = fa(cur)
+                # Convert any non-serializable types
+                for row in rows:
+                    for k, v in row.items():
+                        if hasattr(v, 'isoformat'):
+                            row[k] = v.isoformat()
+                backup[table] = rows
+    finally:
+        conn.close()
+
+    from flask import Response
+    import json
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    filename = f"mizzentop_backup_{timestamp}.json"
+    return Response(
+        json.dumps(backup, indent=2),
+        mimetype="application/json",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
 
 
 # ============================================
