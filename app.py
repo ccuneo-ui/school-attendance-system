@@ -436,7 +436,7 @@ def add_mcard_charge():
             if not fo(cur):
                 return jsonify({"error":"Student not found"}),404
             cur.execute("INSERT INTO mcard_charges (student_id,charge_date,quantity) VALUES (%s,%s,%s) RETURNING charge_id",(student_id,charge_date,quantity))
-            charge_id = cur.fetchone()[0]
+            charge_id = cur.fetchone()["charge_id"]
         conn.commit()
         return jsonify({"success":True,"charge_id":charge_id})
     except Exception as e:
