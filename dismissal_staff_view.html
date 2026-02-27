@@ -606,7 +606,7 @@
 
 <script>
 // ── CONFIG ────────────────────────────────────────────────────────────────────
-const API_URL = 'https://school-attendance-system-0ax5.onrender.com/api';
+const API_URL = '/api';
 
 // Bus routes, activities, etc.
 const BUS_ROUTES  = ['Arlington','Brewster','Carmel','Dover','HOPE','Minivan','Pawling','POK','Wappingers'];
@@ -672,9 +672,9 @@ function buildFromDefaults(students) {
   const dayKey = dayMap[new Date().getDay()];
   return students.map(s => ({
     id:           s.student_id,
-    name:         `${s.first_name} ${s.last_name}`,
-    firstName:    s.first_name,
-    lastName:     s.last_name,
+    name:         s.name || `${s.firstName} ${s.lastName}`,
+    firstName:    s.firstName || s.first_name,
+    lastName:     s.lastName || s.last_name,
     grade:        s.grade || '?',
     dismissal:    s[`dismissal_${dayKey}`] || null,
     activity:     s.activity || null,

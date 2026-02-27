@@ -483,8 +483,8 @@ def get_dismissal_today():
     conn = get_db_connection()
     try:
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
-            cur.execute("SELECT COUNT(*) FROM daily_dismissal WHERE dismissal_date=%s",(date_param,))
-            filled = cur.fetchone()[0]
+            cur.execute("SELECT COUNT(*) AS c FROM daily_dismissal WHERE dismissal_date=%s",(date_param,))
+            filled = cur.fetchone()["c"]
             source = "today" if filled > 0 else "default"
             if source == "today":
                 grade_clause = "AND s.grade=%s" if grade_filter else ""
@@ -775,8 +775,8 @@ def get_bus_dashboard():
     conn = get_db_connection()
     try:
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
-            cur.execute("SELECT COUNT(*) FROM daily_dismissal WHERE dismissal_date=%s",(date_param,))
-            filled = cur.fetchone()[0]
+            cur.execute("SELECT COUNT(*) AS c FROM daily_dismissal WHERE dismissal_date=%s",(date_param,))
+            filled = cur.fetchone()["c"]
             source = "today" if filled > 0 else "default"
             if source == "today":
                 cur.execute("""
