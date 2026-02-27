@@ -1466,6 +1466,53 @@ def migrate_attendance_status_constraint():
     finally:
         conn.close()
 
+
+def migrate_student_status_constraint():
+    """Remove CHECK constraint on students.status to allow 'guest' value."""
+    conn = get_db_connection()
+    try:
+        schema = conn.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name='students'").fetchone()
+        if not schema or 'CHECK' not in schema['sql'] or 'guest' in schema['sql']:
+            return  # Already migrated or no constraint
+        cols_info = conn.execute("PRAGMA table_info(students)").fetchall()
+        col_names = [c['name'] for c in cols_info]
+        cols_sql = ', '.join(col_names)
+        conn.execute('''
+            CREATE TABLE students_new (
+                student_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                first_name TEXT NOT NULL,
+                last_name TEXT NOT NULL,
+                date_of_birth DATE NOT NULL,
+                email TEXT,
+                phone TEXT,
+                address TEXT,
+                emergency_contact_name TEXT,
+                emergency_contact_phone TEXT,
+                enrollment_date DATE NOT NULL DEFAULT (date('now')),
+                status TEXT DEFAULT 'active',
+                notes TEXT,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                grade TEXT,
+                dismissal_mon TEXT DEFAULT NULL,
+                dismissal_tue TEXT DEFAULT NULL,
+                dismissal_wed TEXT DEFAULT NULL,
+                dismissal_thu TEXT DEFAULT NULL,
+                dismissal_fri TEXT DEFAULT NULL,
+                before_care INTEGER DEFAULT 0
+            )
+        ''')
+        conn.execute(f"INSERT INTO students_new ({cols_sql}) SELECT {cols_sql} FROM students")
+        conn.execute('DROP TABLE students')
+        conn.execute('ALTER TABLE students_new RENAME TO students')
+        conn.commit()
+        print("Migration complete: students status constraint removed")
+    except Exception as e:
+        conn.rollback()
+        print(f"Student migration error: {e}")
+    finally:
+        conn.close()
+
 # ============================================
 # RUN SERVER
 # ============================================
@@ -1473,6 +1520,7 @@ def migrate_attendance_status_constraint():
 # Run on startup (works with gunicorn too)
 init_dismissal_tables()
 migrate_attendance_status_constraint()
+migrate_student_status_constraint()
 
 if __name__ == '__main__':
     # Initialize dismissal tables on startup
