@@ -1106,7 +1106,126 @@ def bus_dashboard():
 # PEOPLE - Staff Management
 # ============================================
 
-@app.route('/people')
+
+@app.route('/students')
+@people_required
+def students():
+    """Student directory and profile editor"""
+    # Migrate status constraint to allow 'guest'
+    conn = get_db_connection()
+    try:
+        conn.execute("INSERT INTO students (first_name, last_name, date_of_birth, enrollment_date, status) VALUES ('_test','_test','1900-01-01','1900-01-01','guest')")
+        conn.execute("DELETE FROM students WHERE first_name='_test'")
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        # Recreate students table without old CHECK constraint
+        conn.execute('''
+            CREATE TABLE IF NOT EXISTS students_new (
+                student_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                first_name TEXT NOT NULL,
+                last_name TEXT NOT NULL,
+                date_of_birth DATE NOT NULL,
+                email TEXT,
+                phone TEXT,
+                address TEXT,
+                emergency_contact_name TEXT,
+                emergency_contact_phone TEXT,
+                enrollment_date DATE NOT NULL DEFAULT (date('now')),
+                status TEXT DEFAULT 'active',
+                notes TEXT,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                grade TEXT,
+                dismissal_mon TEXT DEFAULT NULL,
+                dismissal_tue TEXT DEFAULT NULL,
+                dismissal_wed TEXT DEFAULT NULL,
+                dismissal_thu TEXT DEFAULT NULL,
+                dismissal_fri TEXT DEFAULT NULL,
+                before_care INTEGER DEFAULT 0
+            )
+        ''')
+        conn.execute('''
+            INSERT OR IGNORE INTO students_new
+            SELECT student_id, first_name, last_name, date_of_birth, email, phone,
+                   address, emergency_contact_name, emergency_contact_phone,
+                   enrollment_date, status, notes, created_at, updated_at,
+                   grade, dismissal_mon, dismissal_tue, dismissal_wed,
+                   dismissal_thu, dismissal_fri, before_care
+            FROM students
+        ''')
+        conn.execute('DROP TABLE students')
+        conn.execute('ALTER TABLE students_new RENAME TO students')
+        conn.commit()
+    finally:
+        conn.close()
+    return send_from_directory('.', 'students.html')
+
+@app.route('/api/students', methods=['GET'])
+@login_required
+def get_students_list():
+    """Get all students for the directory"""
+    conn = get_db_connection()
+    students = conn.execute('''
+        SELECT student_id, first_name, last_name, grade, status,
+               date_of_birth, email, phone, address,
+               emergency_contact_name, emergency_contact_phone,
+               enrollment_date, notes, before_care,
+               dismissal_mon, dismissal_tue, dismissal_wed,
+               dismissal_thu, dismissal_fri
+        FROM students
+        ORDER BY last_name, first_name
+    ''').fetchall()
+    conn.close()
+    return jsonify([dict(s) for s in students])
+
+@app.route('/api/students/<int:student_id>', methods=['PUT'])
+@people_required
+def update_student(student_id):
+    """Update a student's profile"""
+    data = request.json
+    conn = get_db_connection()
+    conn.execute('''
+        UPDATE students SET
+            first_name = ?,
+            last_name = ?,
+            grade = ?,
+            status = ?,
+            date_of_birth = ?,
+            email = ?,
+            phone = ?,
+            address = ?,
+            emergency_contact_name = ?,
+            emergency_contact_phone = ?,
+            enrollment_date = ?,
+            notes = ?,
+            before_care = ?,
+            dismissal_mon = ?,
+            dismissal_tue = ?,
+            dismissal_wed = ?,
+            dismissal_thu = ?,
+            dismissal_fri = ?,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE student_id = ?
+    ''', (
+        data.get('first_name'), data.get('last_name'),
+        data.get('grade'), data.get('status'),
+        data.get('date_of_birth'), data.get('email'),
+        data.get('phone'), data.get('address'),
+        data.get('emergency_contact_name'), data.get('emergency_contact_phone'),
+        data.get('enrollment_date'), data.get('notes'),
+        1 if data.get('before_care') else 0,
+        data.get('dismissal_mon'), data.get('dismissal_tue'),
+        data.get('dismissal_wed'), data.get('dismissal_thu'),
+        data.get('dismissal_fri'),
+        student_id
+    ))
+    conn.commit()
+    conn.close()
+    return jsonify({'success': True})
+
+@app.route('/staff')
+@app.route('/people')  # legacy redirect
 @people_required
 def people():
     conn = get_db_connection()
