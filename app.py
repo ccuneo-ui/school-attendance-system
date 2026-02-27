@@ -1472,11 +1472,13 @@ def migrate_student_status_constraint():
     conn = get_db_connection()
     try:
         schema = conn.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name='students'").fetchone()
-        if not schema or 'CHECK' not in schema['sql'] or 'guest' in schema['sql']:
-            return  # Already migrated or no constraint
+        if not schema or 'CHECK' not in schema['sql']:
+            return  # No constraint to remove
+        # Constraint exists - rebuild table without it
         cols_info = conn.execute("PRAGMA table_info(students)").fetchall()
         col_names = [c['name'] for c in cols_info]
         cols_sql = ', '.join(col_names)
+        conn.execute("DROP TABLE IF EXISTS students_new")
         conn.execute('''
             CREATE TABLE students_new (
                 student_id INTEGER PRIMARY KEY AUTOINCREMENT,
