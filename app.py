@@ -1114,49 +1114,51 @@ def students():
     # Migrate status constraint to allow 'guest'
     conn = get_db_connection()
     try:
-        conn.execute("INSERT INTO students (first_name, last_name, date_of_birth, enrollment_date, status) VALUES ('_test','_test','1900-01-01','1900-01-01','guest')")
-        conn.execute("DELETE FROM students WHERE first_name='_test'")
-        conn.commit()
-    except Exception:
+        # Check if 'guest' status is already allowed by looking at the schema
+        schema = conn.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name='students'").fetchone()
+        if schema and 'CHECK' in schema['sql'] and 'guest' not in schema['sql']:
+            # Need to remove the CHECK constraint - get current columns dynamically
+            cols_info = conn.execute("PRAGMA table_info(students)").fetchall()
+            col_names = [c['name'] for c in cols_info]
+            cols_sql = ', '.join(col_names)
+            # Create new table without CHECK constraint, matching exact current schema
+            conn.execute(f"""
+                CREATE TABLE IF NOT EXISTS students_new AS
+                SELECT * FROM students WHERE 0
+            """)
+            conn.execute("DROP TABLE students_new")
+            conn.execute('''
+                CREATE TABLE students_new (
+                    student_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    first_name TEXT NOT NULL,
+                    last_name TEXT NOT NULL,
+                    date_of_birth DATE NOT NULL,
+                    email TEXT,
+                    phone TEXT,
+                    address TEXT,
+                    emergency_contact_name TEXT,
+                    emergency_contact_phone TEXT,
+                    enrollment_date DATE NOT NULL DEFAULT (date('now')),
+                    status TEXT DEFAULT 'active',
+                    notes TEXT,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    grade TEXT,
+                    dismissal_mon TEXT DEFAULT NULL,
+                    dismissal_tue TEXT DEFAULT NULL,
+                    dismissal_wed TEXT DEFAULT NULL,
+                    dismissal_thu TEXT DEFAULT NULL,
+                    dismissal_fri TEXT DEFAULT NULL,
+                    before_care INTEGER DEFAULT 0
+                )
+            ''')
+            conn.execute(f"INSERT INTO students_new ({cols_sql}) SELECT {cols_sql} FROM students")
+            conn.execute('DROP TABLE students')
+            conn.execute('ALTER TABLE students_new RENAME TO students')
+            conn.commit()
+    except Exception as e:
         conn.rollback()
-        # Recreate students table without old CHECK constraint
-        conn.execute('''
-            CREATE TABLE IF NOT EXISTS students_new (
-                student_id INTEGER PRIMARY KEY AUTOINCREMENT,
-                first_name TEXT NOT NULL,
-                last_name TEXT NOT NULL,
-                date_of_birth DATE NOT NULL,
-                email TEXT,
-                phone TEXT,
-                address TEXT,
-                emergency_contact_name TEXT,
-                emergency_contact_phone TEXT,
-                enrollment_date DATE NOT NULL DEFAULT (date('now')),
-                status TEXT DEFAULT 'active',
-                notes TEXT,
-                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                grade TEXT,
-                dismissal_mon TEXT DEFAULT NULL,
-                dismissal_tue TEXT DEFAULT NULL,
-                dismissal_wed TEXT DEFAULT NULL,
-                dismissal_thu TEXT DEFAULT NULL,
-                dismissal_fri TEXT DEFAULT NULL,
-                before_care INTEGER DEFAULT 0
-            )
-        ''')
-        conn.execute('''
-            INSERT OR IGNORE INTO students_new
-            SELECT student_id, first_name, last_name, date_of_birth, email, phone,
-                   address, emergency_contact_name, emergency_contact_phone,
-                   enrollment_date, status, notes, created_at, updated_at,
-                   grade, dismissal_mon, dismissal_tue, dismissal_wed,
-                   dismissal_thu, dismissal_fri, before_care
-            FROM students
-        ''')
-        conn.execute('DROP TABLE students')
-        conn.execute('ALTER TABLE students_new RENAME TO students')
-        conn.commit()
+        print(f"Student migration error: {e}")
     finally:
         conn.close()
     return send_from_directory('.', 'students.html')
