@@ -97,10 +97,10 @@
       font-family: 'DM Sans', sans-serif; font-size: 13px; background: var(--white);
       min-width: 180px;
     }
-    .student-search {
+    .student-search, .teacher-search {
       position: relative;
     }
-    .student-search input {
+    .student-search input, .teacher-search input {
       width: 260px;
     }
     .search-dropdown {
@@ -274,9 +274,12 @@
         <div class="search-dropdown" id="searchDropdown"></div>
         <input type="hidden" id="selectedStudentId">
       </div>
-      <div class="field">
+      <div class="field teacher-search">
         <label>Teacher</label>
-        <input type="text" id="teacherInput" placeholder="Teacher name">
+        <input type="text" id="teacherSearch" placeholder="Start typing a name…" autocomplete="off"
+               oninput="filterTeachers()" onfocus="filterTeachers()">
+        <div class="search-dropdown" id="teacherDropdown"></div>
+        <input type="hidden" id="selectedTeacherName">
       </div>
       <div class="field" id="hwTimeField" style="display:none;">
         <label>Time</label>
@@ -319,7 +322,9 @@
   // ── State ──
   let currentTab = 'og';
   let allStudents = [];
+  let allStaff = [];
   let selectedStudentId = null;
+  let selectedTeacherName = null;
   let hwUnits = 1.5; // default for homework center
   let records = [];
 
@@ -333,9 +338,13 @@
   document.addEventListener('DOMContentLoaded', () => {
     setToday();
     loadStudents();
+    loadStaff();
     document.addEventListener('click', (e) => {
       if (!e.target.closest('.student-search')) {
         document.getElementById('searchDropdown').classList.remove('open');
+      }
+      if (!e.target.closest('.teacher-search')) {
+        document.getElementById('teacherDropdown').classList.remove('open');
       }
     });
   });
@@ -431,6 +440,51 @@
     document.getElementById('searchDropdown').classList.remove('open');
   }
 
+  // ── Staff / Teachers ──
+  async function loadStaff() {
+    try {
+      const res = await fetch('/api/people/staff');
+      const data = await res.json();
+      allStaff = data.filter(s => s.status === 'active');
+    } catch(e) {
+      console.error('Failed to load staff:', e);
+    }
+  }
+
+  function filterTeachers() {
+    const query = document.getElementById('teacherSearch').value.toLowerCase().trim();
+    const dropdown = document.getElementById('teacherDropdown');
+    if (!query || query.length < 1) {
+      dropdown.classList.remove('open');
+      return;
+    }
+    const matches = allStaff.filter(s =>
+      `${s.last_name} ${s.first_name}`.toLowerCase().includes(query) ||
+      `${s.first_name} ${s.last_name}`.toLowerCase().includes(query)
+    ).slice(0, 10);
+
+    if (matches.length === 0) {
+      dropdown.innerHTML = '<div class="search-option" style="color:var(--muted);">No matches</div>';
+    } else {
+      dropdown.innerHTML = matches.map(s => {
+        const displayName = `${s.first_name} ${s.last_name}`;
+        const role = s.title || s.role || '';
+        return `<div class="search-option" onclick="selectTeacher('${escHtml(displayName)}')">
+          ${escHtml(displayName)}
+          ${role ? `<span class="grade-tag">${escHtml(role)}</span>` : ''}
+        </div>`;
+      }).join('');
+    }
+    dropdown.classList.add('open');
+  }
+
+  function selectTeacher(name) {
+    selectedTeacherName = name;
+    document.getElementById('teacherSearch').value = name;
+    document.getElementById('selectedTeacherName').value = name;
+    document.getElementById('teacherDropdown').classList.remove('open');
+  }
+
   function escHtml(str) {
     if (!str) return '';
     return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
@@ -450,7 +504,7 @@
       return;
     }
     const date = document.getElementById('sessionDate').value;
-    const teacher = document.getElementById('teacherInput').value.trim();
+    const teacher = document.getElementById('teacherSearch').value.trim();
     const prog = PROGRAMS[currentTab];
     const units = currentTab === 'homework' ? hwUnits : 1;
 
