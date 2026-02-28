@@ -1,0 +1,582 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Program Attendance — Mizzentop Admin</title>
+  <link rel="icon" type="image/svg+xml" href="/logo.svg">
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --navy: #1a2744;
+      --green: #2d5016;
+      --burgundy: #4a1a2c;
+      --gold: #c8992a;
+      --cream: #f7f3ec;
+      --muted: #6b7280;
+      --white: #ffffff;
+      --border: #e5e1da;
+      --light-bg: #f0ece4;
+      --og-color: #2d5016;
+      --hw-color: #1a2744;
+      --tutor-color: #4a1a2c;
+      --red: #c0392b;
+    }
+    html, body { min-height: 100vh; font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(--navy); }
+
+    /* ── Top bar ── */
+    .topbar {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 14px 28px; background: var(--navy); color: var(--white);
+    }
+    .topbar a { color: rgba(255,255,255,0.75); text-decoration: none; font-size: 13px; font-weight: 500; }
+    .topbar a:hover { color: var(--white); }
+    .topbar-title { font-family: 'Playfair Display', serif; font-size: 18px; font-weight: 700; }
+
+    /* ── Container ── */
+    .container { max-width: 960px; margin: 0 auto; padding: 32px 24px 80px; }
+
+    /* ── Page header ── */
+    .page-header { margin-bottom: 28px; }
+    .page-header h1 { font-family: 'Playfair Display', serif; font-size: 30px; font-weight: 700; margin-bottom: 6px; }
+    .page-header p { color: var(--muted); font-size: 14px; }
+
+    /* ── Tab navigation ── */
+    .tab-bar {
+      display: flex; gap: 4px; margin-bottom: 24px;
+      background: var(--light-bg); border-radius: 10px; padding: 4px;
+    }
+    .tab-btn {
+      flex: 1; padding: 10px 16px; border: none; border-radius: 8px;
+      font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 600;
+      cursor: pointer; background: transparent; color: var(--muted);
+      transition: all 0.2s ease;
+    }
+    .tab-btn.active { background: var(--white); color: var(--navy); box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+    .tab-btn:hover:not(.active) { color: var(--navy); }
+    .tab-btn .tab-dot {
+      display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; vertical-align: middle;
+    }
+    .dot-og { background: var(--og-color); }
+    .dot-hw { background: var(--hw-color); }
+    .dot-tutor { background: var(--tutor-color); }
+
+    /* ── Date bar ── */
+    .date-bar {
+      display: flex; align-items: center; gap: 12px; margin-bottom: 20px;
+      flex-wrap: wrap;
+    }
+    .date-bar input[type="date"] {
+      padding: 8px 12px; border: 1px solid var(--border); border-radius: 8px;
+      font-family: 'DM Sans', sans-serif; font-size: 14px; background: var(--white);
+    }
+    .date-bar button {
+      padding: 8px 14px; border: 1px solid var(--border); border-radius: 8px;
+      font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 500;
+      cursor: pointer; background: var(--white); color: var(--navy);
+      transition: background 0.15s;
+    }
+    .date-bar button:hover { background: var(--light-bg); }
+    .date-label {
+      font-size: 14px; font-weight: 600; color: var(--navy);
+    }
+
+    /* ── Student search / add ── */
+    .add-section {
+      background: var(--white); border: 1px solid var(--border); border-radius: 12px;
+      padding: 20px; margin-bottom: 20px;
+    }
+    .add-section h3 { font-size: 14px; font-weight: 600; margin-bottom: 12px; }
+    .add-row { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; }
+    .add-row .field { display: flex; flex-direction: column; gap: 4px; }
+    .add-row .field label { font-size: 11px; font-weight: 500; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; }
+    .add-row .field select,
+    .add-row .field input {
+      padding: 8px 12px; border: 1px solid var(--border); border-radius: 8px;
+      font-family: 'DM Sans', sans-serif; font-size: 13px; background: var(--white);
+      min-width: 180px;
+    }
+    .student-search {
+      position: relative;
+    }
+    .student-search input {
+      width: 260px;
+    }
+    .search-dropdown {
+      position: absolute; top: 100%; left: 0; right: 0; z-index: 100;
+      background: var(--white); border: 1px solid var(--border); border-radius: 8px;
+      max-height: 200px; overflow-y: auto; display: none;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+    .search-dropdown.open { display: block; }
+    .search-option {
+      padding: 8px 12px; cursor: pointer; font-size: 13px;
+      border-bottom: 1px solid var(--border);
+    }
+    .search-option:last-child { border-bottom: none; }
+    .search-option:hover { background: var(--light-bg); }
+    .search-option .grade-tag {
+      display: inline-block; background: var(--light-bg); border-radius: 4px;
+      padding: 1px 6px; font-size: 11px; color: var(--muted); margin-left: 6px;
+    }
+
+    /* ── HW time selector ── */
+    .hw-time-btns { display: flex; gap: 4px; }
+    .hw-time-btn {
+      padding: 7px 12px; border: 1px solid var(--border); border-radius: 6px;
+      font-family: 'DM Sans', sans-serif; font-size: 12px; font-weight: 500;
+      cursor: pointer; background: var(--white); color: var(--navy);
+      transition: all 0.15s;
+    }
+    .hw-time-btn.selected { background: var(--hw-color); color: var(--white); border-color: var(--hw-color); }
+    .hw-time-btn:hover:not(.selected) { background: var(--light-bg); }
+
+    /* ── Record button ── */
+    .btn-record {
+      padding: 8px 18px; border: none; border-radius: 8px;
+      font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 600;
+      cursor: pointer; color: var(--white); transition: opacity 0.15s;
+    }
+    .btn-record:hover { opacity: 0.85; }
+    .btn-record:disabled { opacity: 0.4; cursor: not-allowed; }
+    .btn-og { background: var(--og-color); }
+    .btn-hw { background: var(--hw-color); }
+    .btn-tutor { background: var(--tutor-color); }
+
+    /* ── Today's records table ── */
+    .records-card {
+      background: var(--white); border: 1px solid var(--border); border-radius: 12px;
+      overflow: hidden;
+    }
+    .records-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 16px 20px; border-bottom: 1px solid var(--border);
+    }
+    .records-header h3 { font-size: 15px; font-weight: 600; }
+    .records-count {
+      display: inline-block; background: var(--light-bg); border-radius: 20px;
+      padding: 3px 10px; font-size: 12px; font-weight: 500; color: var(--muted);
+    }
+    .records-table { width: 100%; border-collapse: collapse; }
+    .records-table th {
+      text-align: left; padding: 10px 16px; font-size: 11px; font-weight: 600;
+      text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted);
+      background: var(--light-bg); border-bottom: 1px solid var(--border);
+    }
+    .records-table td {
+      padding: 10px 16px; font-size: 13px; border-bottom: 1px solid var(--border);
+    }
+    .records-table tr:last-child td { border-bottom: none; }
+    .records-table tr:hover { background: #faf8f4; }
+    .units-badge {
+      display: inline-block; padding: 2px 8px; border-radius: 4px;
+      font-size: 12px; font-weight: 600;
+    }
+    .units-session { background: #e8f5e9; color: #2e7d32; }
+    .units-time { background: #e3f2fd; color: #1565c0; }
+    .btn-remove {
+      padding: 4px 10px; border: 1px solid var(--border); border-radius: 6px;
+      font-size: 11px; cursor: pointer; background: var(--white); color: var(--red);
+      font-family: 'DM Sans', sans-serif; transition: all 0.15s;
+    }
+    .btn-remove:hover { background: #fef2f2; border-color: var(--red); }
+
+    .empty-state {
+      padding: 40px 20px; text-align: center; color: var(--muted); font-size: 14px;
+    }
+
+    /* ── Stats row ── */
+    .stats-row {
+      display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap;
+    }
+    .stat-card {
+      flex: 1; min-width: 120px; background: var(--white); border: 1px solid var(--border);
+      border-radius: 10px; padding: 14px 16px; text-align: center;
+    }
+    .stat-value { font-size: 24px; font-weight: 700; font-family: 'Playfair Display', serif; }
+    .stat-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; margin-top: 2px; }
+
+    /* ── Toast ── */
+    .toast {
+      position: fixed; bottom: 24px; right: 24px; padding: 12px 20px;
+      background: var(--navy); color: var(--white); border-radius: 10px;
+      font-size: 13px; font-weight: 500; box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+      transform: translateY(80px); opacity: 0; transition: all 0.3s ease;
+      z-index: 1000;
+    }
+    .toast.show { transform: translateY(0); opacity: 1; }
+
+    @media (max-width: 640px) {
+      .container { padding: 20px 16px 60px; }
+      .add-row { flex-direction: column; }
+      .add-row .field select, .add-row .field input { min-width: 100%; }
+      .student-search input { width: 100%; }
+      .tab-btn { font-size: 11px; padding: 8px 8px; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="topbar">
+  <span class="topbar-title">Mizzentop Admin</span>
+  <a href="/">← Home</a>
+</div>
+
+<div class="container">
+  <div class="page-header">
+    <h1>Program Attendance</h1>
+    <p>Record attendance for billable after-school programs.</p>
+  </div>
+
+  <!-- Tab bar -->
+  <div class="tab-bar">
+    <button class="tab-btn active" onclick="switchTab('og')">
+      <span class="tab-dot dot-og"></span>OG Tutoring
+    </button>
+    <button class="tab-btn" onclick="switchTab('homework')">
+      <span class="tab-dot dot-hw"></span>Homework Center
+    </button>
+    <button class="tab-btn" onclick="switchTab('tutoring')">
+      <span class="tab-dot dot-tutor"></span>1-on-1 Tutoring
+    </button>
+  </div>
+
+  <!-- Date bar -->
+  <div class="date-bar">
+    <button onclick="changeDate(-1)">◀</button>
+    <input type="date" id="sessionDate" onchange="loadRecords()">
+    <button onclick="changeDate(1)">▶</button>
+    <button onclick="setToday()">Today</button>
+    <span class="date-label" id="dayLabel"></span>
+  </div>
+
+  <!-- Stats -->
+  <div class="stats-row">
+    <div class="stat-card">
+      <div class="stat-value" id="statStudents">0</div>
+      <div class="stat-label">Students Today</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value" id="statUnits">0</div>
+      <div class="stat-label" id="statUnitsLabel">Sessions</div>
+    </div>
+  </div>
+
+  <!-- Add record section -->
+  <div class="add-section">
+    <h3 id="addTitle">Record Attendance</h3>
+    <div class="add-row">
+      <div class="field student-search">
+        <label>Student</label>
+        <input type="text" id="studentSearch" placeholder="Start typing a name…" autocomplete="off"
+               oninput="filterStudents()" onfocus="filterStudents()">
+        <div class="search-dropdown" id="searchDropdown"></div>
+        <input type="hidden" id="selectedStudentId">
+      </div>
+      <div class="field">
+        <label>Teacher</label>
+        <input type="text" id="teacherInput" placeholder="Teacher name">
+      </div>
+      <div class="field" id="hwTimeField" style="display:none;">
+        <label>Time</label>
+        <div class="hw-time-btns">
+          <button class="hw-time-btn" onclick="selectHwTime(0.5, this)">30m</button>
+          <button class="hw-time-btn" onclick="selectHwTime(1.0, this)">1hr</button>
+          <button class="hw-time-btn selected" onclick="selectHwTime(1.5, this)">1.5hr</button>
+          <button class="hw-time-btn" onclick="selectHwTime(2.0, this)">2hr</button>
+        </div>
+      </div>
+      <button class="btn-record btn-og" id="btnRecord" onclick="saveRecord()">+ Record</button>
+    </div>
+  </div>
+
+  <!-- Records table -->
+  <div class="records-card">
+    <div class="records-header">
+      <h3 id="recordsTitle">Today's Records</h3>
+      <span class="records-count" id="recordsCount">0 records</span>
+    </div>
+    <table class="records-table" id="recordsTable">
+      <thead>
+        <tr>
+          <th>Student</th>
+          <th>Grade</th>
+          <th>Teacher</th>
+          <th id="unitsHeader">Session</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody id="recordsBody"></tbody>
+    </table>
+    <div class="empty-state" id="emptyState">No records for this date yet.</div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+  // ── State ──
+  let currentTab = 'og';
+  let allStudents = [];
+  let selectedStudentId = null;
+  let hwUnits = 1.5; // default for homework center
+  let records = [];
+
+  const PROGRAMS = {
+    og:       { label: 'OG Tutoring', type: 'og', color: 'var(--og-color)', btnClass: 'btn-og', unitLabel: 'Session', unitType: 'session' },
+    homework: { label: 'Homework Center', type: 'homework', color: 'var(--hw-color)', btnClass: 'btn-hw', unitLabel: 'Hours', unitType: 'time' },
+    tutoring: { label: '1-on-1 Tutoring', type: 'tutoring', color: 'var(--tutor-color)', btnClass: 'btn-tutor', unitLabel: 'Session', unitType: 'session' }
+  };
+
+  // ── Init ──
+  document.addEventListener('DOMContentLoaded', () => {
+    setToday();
+    loadStudents();
+    document.addEventListener('click', (e) => {
+      if (!e.target.closest('.student-search')) {
+        document.getElementById('searchDropdown').classList.remove('open');
+      }
+    });
+  });
+
+  function setToday() {
+    const today = new Date();
+    document.getElementById('sessionDate').value = formatDate(today);
+    updateDayLabel();
+    loadRecords();
+  }
+
+  function formatDate(d) {
+    return d.toISOString().slice(0, 10);
+  }
+
+  function changeDate(delta) {
+    const input = document.getElementById('sessionDate');
+    const d = new Date(input.value + 'T12:00:00');
+    d.setDate(d.getDate() + delta);
+    input.value = formatDate(d);
+    updateDayLabel();
+    loadRecords();
+  }
+
+  function updateDayLabel() {
+    const input = document.getElementById('sessionDate');
+    const d = new Date(input.value + 'T12:00:00');
+    const days = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+    const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+    document.getElementById('dayLabel').textContent = `${days[d.getDay()]}, ${months[d.getMonth()]} ${d.getDate()}`;
+  }
+
+  // ── Tab switching ──
+  function switchTab(tab) {
+    currentTab = tab;
+    document.querySelectorAll('.tab-btn').forEach((btn, i) => {
+      btn.classList.toggle('active', ['og','homework','tutoring'][i] === tab);
+    });
+
+    const prog = PROGRAMS[tab];
+    const btnRecord = document.getElementById('btnRecord');
+    btnRecord.className = 'btn-record ' + prog.btnClass;
+
+    // Show/hide HW time field
+    document.getElementById('hwTimeField').style.display = tab === 'homework' ? '' : 'none';
+
+    // Update headers
+    document.getElementById('unitsHeader').textContent = tab === 'homework' ? 'Time' : 'Session';
+    document.getElementById('addTitle').textContent = `Record ${prog.label} Attendance`;
+
+    loadRecords();
+  }
+
+  // ── Students ──
+  async function loadStudents() {
+    try {
+      const res = await fetch('/api/program-attendance/students');
+      allStudents = await res.json();
+    } catch(e) {
+      console.error('Failed to load students:', e);
+    }
+  }
+
+  function filterStudents() {
+    const query = document.getElementById('studentSearch').value.toLowerCase().trim();
+    const dropdown = document.getElementById('searchDropdown');
+    if (!query || query.length < 1) {
+      dropdown.classList.remove('open');
+      return;
+    }
+    const matches = allStudents.filter(s =>
+      `${s.last_name} ${s.first_name}`.toLowerCase().includes(query) ||
+      `${s.first_name} ${s.last_name}`.toLowerCase().includes(query)
+    ).slice(0, 15);
+
+    if (matches.length === 0) {
+      dropdown.innerHTML = '<div class="search-option" style="color:var(--muted);">No matches</div>';
+    } else {
+      dropdown.innerHTML = matches.map(s => `
+        <div class="search-option" onclick="selectStudent(${s.student_id}, '${escHtml(s.last_name)}, ${escHtml(s.first_name)}')">
+          ${escHtml(s.last_name)}, ${escHtml(s.first_name)}
+          <span class="grade-tag">${escHtml(s.grade || '—')}</span>
+        </div>
+      `).join('');
+    }
+    dropdown.classList.add('open');
+  }
+
+  function selectStudent(id, name) {
+    selectedStudentId = id;
+    document.getElementById('studentSearch').value = name;
+    document.getElementById('selectedStudentId').value = id;
+    document.getElementById('searchDropdown').classList.remove('open');
+  }
+
+  function escHtml(str) {
+    if (!str) return '';
+    return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+  }
+
+  // ── HW time ──
+  function selectHwTime(val, btn) {
+    hwUnits = val;
+    document.querySelectorAll('.hw-time-btn').forEach(b => b.classList.remove('selected'));
+    btn.classList.add('selected');
+  }
+
+  // ── Save record ──
+  async function saveRecord() {
+    if (!selectedStudentId) {
+      showToast('Please select a student first.');
+      return;
+    }
+    const date = document.getElementById('sessionDate').value;
+    const teacher = document.getElementById('teacherInput').value.trim();
+    const prog = PROGRAMS[currentTab];
+    const units = currentTab === 'homework' ? hwUnits : 1;
+
+    const btnRecord = document.getElementById('btnRecord');
+    btnRecord.disabled = true;
+
+    try {
+      const res = await fetch('/api/program-attendance', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          student_id: selectedStudentId,
+          program_type: prog.type,
+          session_date: date,
+          units: units,
+          teacher: teacher
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        showToast('Attendance recorded ✓');
+        // Clear student but keep teacher for batch entry
+        document.getElementById('studentSearch').value = '';
+        selectedStudentId = null;
+        document.getElementById('selectedStudentId').value = '';
+        loadRecords();
+      } else {
+        showToast('Error: ' + (data.error || 'Unknown'));
+      }
+    } catch(e) {
+      showToast('Network error. Please try again.');
+    } finally {
+      btnRecord.disabled = false;
+    }
+  }
+
+  // ── Load records ──
+  async function loadRecords() {
+    const date = document.getElementById('sessionDate').value;
+    const prog = PROGRAMS[currentTab];
+
+    try {
+      const res = await fetch(`/api/program-attendance/records?program_type=${prog.type}&date=${date}`);
+      records = await res.json();
+      renderRecords();
+    } catch(e) {
+      console.error('Failed to load records:', e);
+    }
+  }
+
+  function renderRecords() {
+    const tbody = document.getElementById('recordsBody');
+    const empty = document.getElementById('emptyState');
+    const prog = PROGRAMS[currentTab];
+    const isHw = currentTab === 'homework';
+
+    if (records.length === 0) {
+      tbody.innerHTML = '';
+      empty.style.display = '';
+    } else {
+      empty.style.display = 'none';
+      tbody.innerHTML = records.map(r => {
+        let unitDisplay;
+        if (isHw) {
+          const mins = r.units * 60;
+          const hrs = Math.floor(mins / 60);
+          const m = mins % 60;
+          unitDisplay = hrs > 0 ? `${hrs}h${m > 0 ? ` ${m}m` : ''}` : `${m}m`;
+        } else {
+          unitDisplay = '✓';
+        }
+        return `<tr>
+          <td><strong>${escHtml(r.last_name)}, ${escHtml(r.first_name)}</strong></td>
+          <td>${escHtml(r.grade || '—')}</td>
+          <td>${escHtml(r.teacher || '—')}</td>
+          <td><span class="units-badge ${isHw ? 'units-time' : 'units-session'}">${unitDisplay}</span></td>
+          <td><button class="btn-remove" onclick="removeRecord(${r.record_id})">Remove</button></td>
+        </tr>`;
+      }).join('');
+    }
+
+    // Update counts
+    document.getElementById('recordsCount').textContent = `${records.length} record${records.length !== 1 ? 's' : ''}`;
+    document.getElementById('statStudents').textContent = records.length;
+
+    if (isHw) {
+      const totalUnits = records.reduce((sum, r) => sum + parseFloat(r.units || 0), 0);
+      const totalMins = totalUnits * 60;
+      const hrs = Math.floor(totalMins / 60);
+      const m = totalMins % 60;
+      document.getElementById('statUnits').textContent = hrs > 0 ? `${hrs}h ${m}m` : `${m}m`;
+      document.getElementById('statUnitsLabel').textContent = 'Total Time';
+    } else {
+      document.getElementById('statUnits').textContent = records.length;
+      document.getElementById('statUnitsLabel').textContent = 'Sessions';
+    }
+
+    // Update records title
+    const date = document.getElementById('sessionDate').value;
+    const d = new Date(date + 'T12:00:00');
+    const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    document.getElementById('recordsTitle').textContent =
+      `${prog.label} — ${months[d.getMonth()]} ${d.getDate()}`;
+  }
+
+  // ── Remove record ──
+  async function removeRecord(recordId) {
+    try {
+      const res = await fetch(`/api/program-attendance/${recordId}`, { method: 'DELETE' });
+      const data = await res.json();
+      if (data.success) {
+        showToast('Record removed');
+        loadRecords();
+      }
+    } catch(e) {
+      showToast('Error removing record.');
+    }
+  }
+
+  // ── Toast ──
+  function showToast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    setTimeout(() => t.classList.remove('show'), 2500);
+  }
+</script>
+</body>
+</html>

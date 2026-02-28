@@ -138,6 +138,20 @@ def init_db():
                     UNIQUE(student_id, dismissal_date)
                 )
             """)
+            # Program attendance for billable after-school programs
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS program_attendance (
+                    record_id      SERIAL PRIMARY KEY,
+                    student_id     INTEGER NOT NULL,
+                    program_type   TEXT NOT NULL,
+                    session_date   TEXT NOT NULL,
+                    units          NUMERIC(3,1) NOT NULL DEFAULT 1,
+                    teacher        TEXT DEFAULT '',
+                    recorded_by    TEXT DEFAULT '',
+                    recorded_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    UNIQUE(student_id, program_type, session_date)
+                )
+            """)
         conn.commit()
         print("DB init OK")
     except Exception as e:
@@ -260,6 +274,11 @@ def students():
 @people_required
 def people():
     return send_from_directory(".", "people.html")
+
+@app.route("/program-attendance")
+@login_required
+def program_attendance():
+    return send_from_directory(".", "program_attendance.html")
 
 @app.route("/api/test")
 def test():
@@ -940,6 +959,147 @@ def delete_people_staff(staff_id):
 
 
 # ============================================
+# PROGRAM ATTENDANCE (OG, Homework Center, 1-1 Tutoring)
+# ============================================
+
+@app.route("/api/program-attendance/students")
+@login_required
+def get_program_attendance_students():
+    """Get all active + guest students for program attendance"""
+    conn = get_db_connection()
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute("""
+                SELECT student_id, first_name, last_name, grade, status
+                FROM students WHERE status IN ('active','guest')
+                ORDER BY last_name, first_name
+            """)
+            return jsonify(fa(cur))
+    finally:
+        conn.close()
+
+@app.route("/api/program-attendance/records")
+@login_required
+def get_program_attendance_records():
+    """Get attendance records filtered by program_type and date range"""
+    program_type = request.args.get("program_type")
+    start_date   = request.args.get("start_date")
+    end_date     = request.args.get("end_date")
+    date         = request.args.get("date")
+    if not program_type:
+        return jsonify({"error":"program_type required"}),400
+    conn = get_db_connection()
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            if date:
+                cur.execute("""
+                    SELECT pa.record_id, pa.student_id, pa.program_type,
+                           pa.session_date, pa.units, pa.teacher, pa.recorded_by, pa.recorded_at,
+                           s.first_name, s.last_name, s.grade
+                    FROM program_attendance pa
+                    JOIN students s ON pa.student_id=s.student_id
+                    WHERE pa.program_type=%s AND pa.session_date=%s
+                    ORDER BY s.last_name, s.first_name
+                """, (program_type, date))
+            elif start_date and end_date:
+                cur.execute("""
+                    SELECT pa.record_id, pa.student_id, pa.program_type,
+                           pa.session_date, pa.units, pa.teacher, pa.recorded_by, pa.recorded_at,
+                           s.first_name, s.last_name, s.grade
+                    FROM program_attendance pa
+                    JOIN students s ON pa.student_id=s.student_id
+                    WHERE pa.program_type=%s AND pa.session_date BETWEEN %s AND %s
+                    ORDER BY pa.session_date DESC, s.last_name, s.first_name
+                """, (program_type, start_date, end_date))
+            else:
+                cur.execute("""
+                    SELECT pa.record_id, pa.student_id, pa.program_type,
+                           pa.session_date, pa.units, pa.teacher, pa.recorded_by, pa.recorded_at,
+                           s.first_name, s.last_name, s.grade
+                    FROM program_attendance pa
+                    JOIN students s ON pa.student_id=s.student_id
+                    WHERE pa.program_type=%s
+                    ORDER BY pa.session_date DESC, s.last_name, s.first_name
+                """, (program_type,))
+            return jsonify(fa(cur))
+    finally:
+        conn.close()
+
+@app.route("/api/program-attendance", methods=["POST"])
+@login_required
+def save_program_attendance():
+    """Save or update a program attendance record"""
+    data = request.json
+    student_id   = data.get("student_id")
+    program_type = data.get("program_type")
+    session_date = data.get("session_date")
+    units        = data.get("units", 1)
+    teacher      = data.get("teacher", "")
+    recorded_by  = session.get("user_name", "")
+    if not all([student_id, program_type, session_date]):
+        return jsonify({"error":"Missing required fields"}),400
+    conn = get_db_connection()
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute("""
+                INSERT INTO program_attendance (student_id, program_type, session_date, units, teacher, recorded_by)
+                VALUES (%s,%s,%s,%s,%s,%s)
+                ON CONFLICT (student_id, program_type, session_date) DO UPDATE SET
+                    units=EXCLUDED.units, teacher=EXCLUDED.teacher,
+                    recorded_by=EXCLUDED.recorded_by, recorded_at=CURRENT_TIMESTAMP
+                RETURNING record_id
+            """, (student_id, program_type, session_date, units, teacher, recorded_by))
+            record = fo(cur)
+        conn.commit()
+        return jsonify({"success":True, "record_id": record["record_id"] if record else None})
+    except Exception as e:
+        conn.rollback()
+        return jsonify({"error":str(e)}),500
+    finally:
+        conn.close()
+
+@app.route("/api/program-attendance/<int:record_id>", methods=["DELETE"])
+@login_required
+def delete_program_attendance(record_id):
+    """Remove a program attendance record"""
+    conn = get_db_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM program_attendance WHERE record_id=%s",(record_id,))
+        conn.commit()
+        return jsonify({"success":True})
+    finally:
+        conn.close()
+
+@app.route("/api/program-attendance/summary")
+@login_required
+def get_program_attendance_summary():
+    """Get summary totals by student for a program within a date range"""
+    program_type = request.args.get("program_type")
+    start_date   = request.args.get("start_date")
+    end_date     = request.args.get("end_date")
+    if not all([program_type, start_date, end_date]):
+        return jsonify({"error":"program_type, start_date, end_date required"}),400
+    conn = get_db_connection()
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute("""
+                SELECT s.student_id, s.first_name, s.last_name, s.grade,
+                       pa.teacher,
+                       COUNT(*) as session_count,
+                       SUM(pa.units) as total_units
+                FROM program_attendance pa
+                JOIN students s ON pa.student_id=s.student_id
+                WHERE pa.program_type=%s AND pa.session_date BETWEEN %s AND %s
+                GROUP BY s.student_id, s.first_name, s.last_name, s.grade, pa.teacher
+                ORDER BY s.last_name, s.first_name
+            """, (program_type, start_date, end_date))
+            return jsonify(fa(cur))
+    finally:
+        conn.close()
+
+
+# ============================================
 # BACKUP
 # ============================================
 
@@ -957,7 +1117,7 @@ def download_backup():
         tables = [
             "students", "staff", "programs", "enrollments",
             "attendance_records", "mcard_charges", "electives",
-            "daily_dismissal", "dismissal_today"
+            "daily_dismissal", "dismissal_today", "program_attendance"
         ]
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
             for table in tables:
