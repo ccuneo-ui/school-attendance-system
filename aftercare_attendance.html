@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Aftercare Attendance — Mizzentop Admin</title>
+  <link rel="icon" type="image/svg+xml" href="/logo.svg">
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --navy: #1a2744;
+      --green: #2d5016;
+      --burgundy: #4a1a2c;
+      --gold: #c8992a;
+      --cream: #f7f3ec;
+      --muted: #6b7280;
+      --white: #ffffff;
+      --border: #e5e1da;
+      --light-bg: #f0ece4;
+      --accent: #5b4a8a;
+      --red: #c0392b;
+    }
+    html, body { min-height: 100vh; font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(--navy); }
+
+    .topbar {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 14px 28px; background: var(--accent); color: var(--white);
+    }
+    .topbar a { color: rgba(255,255,255,0.75); text-decoration: none; font-size: 13px; font-weight: 500; }
+    .topbar a:hover { color: var(--white); }
+    .topbar-title { font-family: 'Playfair Display', serif; font-size: 18px; font-weight: 700; }
+
+    .container { max-width: 960px; margin: 0 auto; padding: 32px 24px 80px; }
+
+    .page-header { margin-bottom: 28px; }
+    .page-header h1 { font-family: 'Playfair Display', serif; font-size: 30px; font-weight: 700; margin-bottom: 6px; }
+    .page-header p { color: var(--muted); font-size: 14px; }
+
+    /* ── Date bar ── */
+    .date-bar {
+      display: flex; align-items: center; gap: 12px; margin-bottom: 20px; flex-wrap: wrap;
+    }
+    .date-bar input[type="date"] {
+      padding: 8px 12px; border: 1px solid var(--border); border-radius: 8px;
+      font-family: 'DM Sans', sans-serif; font-size: 14px; background: var(--white);
+    }
+    .date-bar button {
+      padding: 8px 14px; border: 1px solid var(--border); border-radius: 8px;
+      font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 500;
+      cursor: pointer; background: var(--white); color: var(--navy); transition: background 0.15s;
+    }
+    .date-bar button:hover { background: var(--light-bg); }
+    .date-label { font-size: 14px; font-weight: 600; color: var(--navy); }
+
+    /* ── Stats ── */
+    .stats-row { display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }
+    .stat-card {
+      flex: 1; min-width: 120px; background: var(--white); border: 1px solid var(--border);
+      border-radius: 10px; padding: 14px 16px; text-align: center;
+    }
+    .stat-value { font-size: 24px; font-weight: 700; font-family: 'Playfair Display', serif; }
+    .stat-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; margin-top: 2px; }
+
+    /* ── Add section ── */
+    .add-section {
+      background: var(--white); border: 1px solid var(--border); border-radius: 12px;
+      padding: 20px; margin-bottom: 20px;
+    }
+    .add-section h3 { font-size: 14px; font-weight: 600; margin-bottom: 12px; }
+    .add-row { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; }
+    .add-row .field { display: flex; flex-direction: column; gap: 4px; }
+    .add-row .field label {
+      font-size: 11px; font-weight: 500; color: var(--muted);
+      text-transform: uppercase; letter-spacing: 0.08em;
+    }
+
+    /* ── Student search ── */
+    .student-search { position: relative; }
+    .student-search input {
+      width: 260px; padding: 8px 12px; border: 1px solid var(--border); border-radius: 8px;
+      font-family: 'DM Sans', sans-serif; font-size: 13px; background: var(--white);
+    }
+    .search-dropdown {
+      position: absolute; top: 100%; left: 0; right: 0; z-index: 100;
+      background: var(--white); border: 1px solid var(--border); border-radius: 8px;
+      max-height: 200px; overflow-y: auto; display: none;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+    .search-dropdown.open { display: block; }
+    .search-option {
+      padding: 8px 12px; cursor: pointer; font-size: 13px;
+      border-bottom: 1px solid var(--border);
+    }
+    .search-option:last-child { border-bottom: none; }
+    .search-option:hover { background: var(--light-bg); }
+    .search-option .grade-tag {
+      display: inline-block; background: var(--light-bg); border-radius: 4px;
+      padding: 1px 6px; font-size: 11px; color: var(--muted); margin-left: 6px;
+    }
+
+    /* ── Time picker grid ── */
+    .time-grid {
+      display: flex; flex-wrap: wrap; gap: 4px;
+    }
+    .time-btn {
+      padding: 7px 10px; border: 1px solid var(--border); border-radius: 6px;
+      font-family: 'DM Sans', sans-serif; font-size: 12px; font-weight: 500;
+      cursor: pointer; background: var(--white); color: var(--navy);
+      transition: all 0.15s; min-width: 58px; text-align: center;
+    }
+    .time-btn.selected { background: var(--accent); color: var(--white); border-color: var(--accent); }
+    .time-btn:hover:not(.selected) { background: var(--light-bg); }
+
+    .btn-record {
+      padding: 8px 18px; border: none; border-radius: 8px;
+      font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 600;
+      cursor: pointer; color: var(--white); background: var(--accent);
+      transition: opacity 0.15s;
+    }
+    .btn-record:hover { opacity: 0.85; }
+    .btn-record:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    /* ── Records ── */
+    .records-card {
+      background: var(--white); border: 1px solid var(--border); border-radius: 12px; overflow: hidden;
+    }
+    .records-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 16px 20px; border-bottom: 1px solid var(--border);
+    }
+    .records-header h3 { font-size: 15px; font-weight: 600; }
+    .records-count {
+      display: inline-block; background: var(--light-bg); border-radius: 20px;
+      padding: 3px 10px; font-size: 12px; font-weight: 500; color: var(--muted);
+    }
+    .records-table { width: 100%; border-collapse: collapse; }
+    .records-table th {
+      text-align: left; padding: 10px 16px; font-size: 11px; font-weight: 600;
+      text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted);
+      background: var(--light-bg); border-bottom: 1px solid var(--border);
+    }
+    .records-table td {
+      padding: 10px 16px; font-size: 13px; border-bottom: 1px solid var(--border);
+    }
+    .records-table tr:last-child td { border-bottom: none; }
+    .records-table tr:hover { background: #faf8f4; }
+
+    .time-badge {
+      display: inline-block; padding: 3px 10px; border-radius: 6px;
+      font-size: 12px; font-weight: 600; background: #ede7f6; color: #4a148c;
+    }
+    .btn-remove {
+      padding: 4px 10px; border: 1px solid var(--border); border-radius: 6px;
+      font-size: 11px; cursor: pointer; background: var(--white); color: var(--red);
+      font-family: 'DM Sans', sans-serif; transition: all 0.15s;
+    }
+    .btn-remove:hover { background: #fef2f2; border-color: var(--red); }
+
+    .empty-state {
+      padding: 40px 20px; text-align: center; color: var(--muted); font-size: 14px;
+    }
+
+    /* ── Still here indicator ── */
+    .still-here-section {
+      background: var(--white); border: 1px solid var(--border); border-radius: 12px;
+      padding: 16px 20px; margin-bottom: 20px;
+    }
+    .still-here-section h3 { font-size: 14px; font-weight: 600; margin-bottom: 8px; color: var(--accent); }
+    .still-here-list {
+      display: flex; flex-wrap: wrap; gap: 6px;
+    }
+    .still-here-chip {
+      display: inline-block; padding: 4px 12px; border-radius: 20px;
+      font-size: 12px; font-weight: 500; background: #ede7f6; color: #4a148c;
+    }
+
+    .toast {
+      position: fixed; bottom: 24px; right: 24px; padding: 12px 20px;
+      background: var(--navy); color: var(--white); border-radius: 10px;
+      font-size: 13px; font-weight: 500; box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+      transform: translateY(80px); opacity: 0; transition: all 0.3s ease; z-index: 1000;
+    }
+    .toast.show { transform: translateY(0); opacity: 1; }
+
+    @media (max-width: 640px) {
+      .container { padding: 20px 16px 60px; }
+      .add-row { flex-direction: column; }
+      .student-search input { width: 100%; }
+      .time-grid { gap: 3px; }
+      .time-btn { min-width: 48px; font-size: 11px; padding: 6px 6px; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="topbar">
+  <span class="topbar-title">Mizzentop Admin</span>
+  <a href="/">← Home</a>
+</div>
+
+<div class="container">
+  <div class="page-header">
+    <h1>Aftercare Attendance</h1>
+    <p>Record student pickup times. Billed in 15-minute increments from 4:30 PM.</p>
+  </div>
+
+  <!-- Date bar -->
+  <div class="date-bar">
+    <button onclick="changeDate(-1)">◀</button>
+    <input type="date" id="sessionDate" onchange="loadRecords()">
+    <button onclick="changeDate(1)">▶</button>
+    <button onclick="setToday()">Today</button>
+    <span class="date-label" id="dayLabel"></span>
+  </div>
+
+  <!-- Stats -->
+  <div class="stats-row">
+    <div class="stat-card">
+      <div class="stat-value" id="statStudents">0</div>
+      <div class="stat-label">Students Today</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value" id="statPickedUp">0</div>
+      <div class="stat-label">Picked Up</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value" id="statStillHere">0</div>
+      <div class="stat-label">Still Here</div>
+    </div>
+  </div>
+
+  <!-- Add record -->
+  <div class="add-section">
+    <h3>Record Pickup</h3>
+    <div class="add-row">
+      <div class="field student-search">
+        <label>Student</label>
+        <input type="text" id="studentSearch" placeholder="Start typing a name…" autocomplete="off"
+               oninput="filterStudents()" onfocus="filterStudents()">
+        <div class="search-dropdown" id="searchDropdown"></div>
+        <input type="hidden" id="selectedStudentId">
+      </div>
+      <div class="field">
+        <label>Pickup Time</label>
+        <div class="time-grid" id="timeGrid"></div>
+      </div>
+      <button class="btn-record" id="btnRecord" onclick="saveRecord()">+ Record Pickup</button>
+    </div>
+  </div>
+
+  <!-- Records table -->
+  <div class="records-card">
+    <div class="records-header">
+      <h3 id="recordsTitle">Today's Pickups</h3>
+      <span class="records-count" id="recordsCount">0 records</span>
+    </div>
+    <table class="records-table">
+      <thead>
+        <tr>
+          <th>Student</th>
+          <th>Grade</th>
+          <th>Pickup Time</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody id="recordsBody"></tbody>
+    </table>
+    <div class="empty-state" id="emptyState">No aftercare records for this date yet.</div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+  let allStudents = [];
+  let selectedStudentId = null;
+  let selectedTime = '4:30 PM';
+  let records = [];
+
+  // Build time slots: 4:30 PM to 6:00 PM in 15-min increments
+  const TIME_SLOTS = [];
+  (function buildSlots() {
+    let h = 16, m = 30; // 4:30 PM
+    while (h < 18 || (h === 18 && m === 0)) {
+      const ampm = h >= 12 ? 'PM' : 'AM';
+      const h12 = h > 12 ? h - 12 : h;
+      const label = `${h12}:${String(m).padStart(2,'0')} ${ampm}`;
+      TIME_SLOTS.push(label);
+      m += 15;
+      if (m >= 60) { m = 0; h++; }
+    }
+  })();
+
+  document.addEventListener('DOMContentLoaded', () => {
+    buildTimeGrid();
+    setToday();
+    loadStudents();
+    document.addEventListener('click', (e) => {
+      if (!e.target.closest('.student-search')) {
+        document.getElementById('searchDropdown').classList.remove('open');
+      }
+    });
+  });
+
+  function buildTimeGrid() {
+    const grid = document.getElementById('timeGrid');
+    grid.innerHTML = TIME_SLOTS.map((t, i) =>
+      `<button class="time-btn${i === 0 ? ' selected' : ''}" onclick="selectTime('${t}', this)">${t}</button>`
+    ).join('');
+  }
+
+  function selectTime(time, btn) {
+    selectedTime = time;
+    document.querySelectorAll('.time-btn').forEach(b => b.classList.remove('selected'));
+    btn.classList.add('selected');
+  }
+
+  function setToday() {
+    const today = new Date();
+    document.getElementById('sessionDate').value = formatDate(today);
+    updateDayLabel();
+    loadRecords();
+  }
+
+  function formatDate(d) { return d.toISOString().slice(0, 10); }
+
+  function changeDate(delta) {
+    const input = document.getElementById('sessionDate');
+    const d = new Date(input.value + 'T12:00:00');
+    d.setDate(d.getDate() + delta);
+    input.value = formatDate(d);
+    updateDayLabel();
+    loadRecords();
+  }
+
+  function updateDayLabel() {
+    const input = document.getElementById('sessionDate');
+    const d = new Date(input.value + 'T12:00:00');
+    const days = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+    const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+    document.getElementById('dayLabel').textContent = `${days[d.getDay()]}, ${months[d.getMonth()]} ${d.getDate()}`;
+  }
+
+  // ── Students ──
+  async function loadStudents() {
+    try {
+      const res = await fetch('/api/program-attendance/students');
+      allStudents = await res.json();
+    } catch(e) { console.error('Failed to load students:', e); }
+  }
+
+  function filterStudents() {
+    const query = document.getElementById('studentSearch').value.toLowerCase().trim();
+    const dropdown = document.getElementById('searchDropdown');
+    if (!query) { dropdown.classList.remove('open'); return; }
+    const matches = allStudents.filter(s =>
+      `${s.last_name} ${s.first_name}`.toLowerCase().includes(query) ||
+      `${s.first_name} ${s.last_name}`.toLowerCase().includes(query)
+    ).slice(0, 15);
+    if (matches.length === 0) {
+      dropdown.innerHTML = '<div class="search-option" style="color:var(--muted);">No matches</div>';
+    } else {
+      dropdown.innerHTML = matches.map(s => `
+        <div class="search-option" onclick="selectStudent(${s.student_id}, '${escHtml(s.last_name)}, ${escHtml(s.first_name)}')">
+          ${escHtml(s.last_name)}, ${escHtml(s.first_name)}
+          <span class="grade-tag">${escHtml(s.grade || '—')}</span>
+        </div>
+      `).join('');
+    }
+    dropdown.classList.add('open');
+  }
+
+  function selectStudent(id, name) {
+    selectedStudentId = id;
+    document.getElementById('studentSearch').value = name;
+    document.getElementById('selectedStudentId').value = id;
+    document.getElementById('searchDropdown').classList.remove('open');
+  }
+
+  function escHtml(str) {
+    if (!str) return '';
+    return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+  }
+
+  // ── Save ──
+  async function saveRecord() {
+    if (!selectedStudentId) { showToast('Please select a student first.'); return; }
+    const date = document.getElementById('sessionDate').value;
+    const btn = document.getElementById('btnRecord');
+    btn.disabled = true;
+    try {
+      const res = await fetch('/api/aftercare', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          student_id: selectedStudentId,
+          session_date: date,
+          pickup_time: selectedTime
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        showToast('Pickup recorded ✓');
+        document.getElementById('studentSearch').value = '';
+        selectedStudentId = null;
+        loadRecords();
+      } else {
+        showToast('Error: ' + (data.error || 'Unknown'));
+      }
+    } catch(e) { showToast('Network error.'); }
+    finally { btn.disabled = false; }
+  }
+
+  // ── Load records ──
+  async function loadRecords() {
+    const date = document.getElementById('sessionDate').value;
+    try {
+      const res = await fetch(`/api/aftercare/records?date=${date}`);
+      records = await res.json();
+      renderRecords();
+    } catch(e) { console.error('Failed to load records:', e); }
+  }
+
+  function renderRecords() {
+    const tbody = document.getElementById('recordsBody');
+    const empty = document.getElementById('emptyState');
+    const date = document.getElementById('sessionDate').value;
+    const d = new Date(date + 'T12:00:00');
+    const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+    if (records.length === 0) {
+      tbody.innerHTML = '';
+      empty.style.display = '';
+    } else {
+      empty.style.display = 'none';
+      tbody.innerHTML = records.map(r => `<tr>
+        <td><strong>${escHtml(r.last_name)}, ${escHtml(r.first_name)}</strong></td>
+        <td>${escHtml(r.grade || '—')}</td>
+        <td><span class="time-badge">${escHtml(r.pickup_time)}</span></td>
+        <td><button class="btn-remove" onclick="removeRecord(${r.record_id})">Remove</button></td>
+      </tr>`).join('');
+    }
+
+    document.getElementById('recordsCount').textContent = `${records.length} record${records.length !== 1 ? 's' : ''}`;
+    document.getElementById('recordsTitle').textContent = `Aftercare — ${months[d.getMonth()]} ${d.getDate()}`;
+    document.getElementById('statStudents').textContent = records.length;
+    document.getElementById('statPickedUp').textContent = records.length;
+    document.getElementById('statStillHere').textContent = '—';
+  }
+
+  async function removeRecord(recordId) {
+    try {
+      const res = await fetch(`/api/aftercare/${recordId}`, { method: 'DELETE' });
+      const data = await res.json();
+      if (data.success) { showToast('Record removed'); loadRecords(); }
+    } catch(e) { showToast('Error removing record.'); }
+  }
+
+  function showToast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    setTimeout(() => t.classList.remove('show'), 2500);
+  }
+</script>
+</body>
+</html>

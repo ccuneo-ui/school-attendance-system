@@ -152,6 +152,18 @@ def init_db():
                     UNIQUE(student_id, program_type, session_date)
                 )
             """)
+            # Aftercare attendance — billed by pickup time in 15-min increments
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS aftercare_attendance (
+                    record_id      SERIAL PRIMARY KEY,
+                    student_id     INTEGER NOT NULL,
+                    session_date   TEXT NOT NULL,
+                    pickup_time    TEXT NOT NULL,
+                    recorded_by    TEXT DEFAULT '',
+                    recorded_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    UNIQUE(student_id, session_date)
+                )
+            """)
         conn.commit()
         print("DB init OK")
     except Exception as e:
@@ -279,6 +291,11 @@ def people():
 @login_required
 def program_attendance():
     return send_from_directory(".", "program_attendance.html")
+
+@app.route("/aftercare")
+@login_required
+def aftercare():
+    return send_from_directory(".", "aftercare_attendance.html")
 
 @app.route("/api/test")
 def test():
@@ -1100,6 +1117,97 @@ def get_program_attendance_summary():
 
 
 # ============================================
+# AFTERCARE ATTENDANCE
+# ============================================
+
+@app.route("/api/aftercare/records")
+@login_required
+def get_aftercare_records():
+    date = request.args.get("date")
+    start_date = request.args.get("start_date")
+    end_date = request.args.get("end_date")
+    conn = get_db_connection()
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            if date:
+                cur.execute("""
+                    SELECT a.record_id, a.student_id, a.session_date, a.pickup_time,
+                           a.recorded_by, a.recorded_at,
+                           s.first_name, s.last_name, s.grade
+                    FROM aftercare_attendance a
+                    JOIN students s ON a.student_id=s.student_id
+                    WHERE a.session_date=%s
+                    ORDER BY a.pickup_time, s.last_name, s.first_name
+                """, (date,))
+            elif start_date and end_date:
+                cur.execute("""
+                    SELECT a.record_id, a.student_id, a.session_date, a.pickup_time,
+                           a.recorded_by, a.recorded_at,
+                           s.first_name, s.last_name, s.grade
+                    FROM aftercare_attendance a
+                    JOIN students s ON a.student_id=s.student_id
+                    WHERE a.session_date BETWEEN %s AND %s
+                    ORDER BY a.session_date DESC, a.pickup_time, s.last_name
+                """, (start_date, end_date))
+            else:
+                cur.execute("""
+                    SELECT a.record_id, a.student_id, a.session_date, a.pickup_time,
+                           a.recorded_by, a.recorded_at,
+                           s.first_name, s.last_name, s.grade
+                    FROM aftercare_attendance a
+                    JOIN students s ON a.student_id=s.student_id
+                    ORDER BY a.session_date DESC, a.pickup_time, s.last_name
+                    LIMIT 200
+                """)
+            return jsonify(fa(cur))
+    finally:
+        conn.close()
+
+@app.route("/api/aftercare", methods=["POST"])
+@login_required
+def save_aftercare():
+    data = request.json
+    student_id  = data.get("student_id")
+    session_date = data.get("session_date")
+    pickup_time = data.get("pickup_time")
+    recorded_by = session.get("user_name", "")
+    if not all([student_id, session_date, pickup_time]):
+        return jsonify({"error": "Missing required fields"}), 400
+    conn = get_db_connection()
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute("""
+                INSERT INTO aftercare_attendance (student_id, session_date, pickup_time, recorded_by)
+                VALUES (%s,%s,%s,%s)
+                ON CONFLICT (student_id, session_date) DO UPDATE SET
+                    pickup_time=EXCLUDED.pickup_time,
+                    recorded_by=EXCLUDED.recorded_by,
+                    recorded_at=CURRENT_TIMESTAMP
+                RETURNING record_id
+            """, (student_id, session_date, pickup_time, recorded_by))
+            record = fo(cur)
+        conn.commit()
+        return jsonify({"success": True, "record_id": record["record_id"] if record else None})
+    except Exception as e:
+        conn.rollback()
+        return jsonify({"error": str(e)}), 500
+    finally:
+        conn.close()
+
+@app.route("/api/aftercare/<int:record_id>", methods=["DELETE"])
+@login_required
+def delete_aftercare(record_id):
+    conn = get_db_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM aftercare_attendance WHERE record_id=%s", (record_id,))
+        conn.commit()
+        return jsonify({"success": True})
+    finally:
+        conn.close()
+
+
+# ============================================
 # BACKUP
 # ============================================
 
@@ -1117,7 +1225,8 @@ def download_backup():
         tables = [
             "students", "staff", "programs", "enrollments",
             "attendance_records", "mcard_charges", "electives",
-            "daily_dismissal", "dismissal_today", "program_attendance"
+            "daily_dismissal", "dismissal_today", "program_attendance",
+            "aftercare_attendance"
         ]
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
             for table in tables:
