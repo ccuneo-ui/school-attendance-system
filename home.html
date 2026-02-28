@@ -28,7 +28,7 @@
     .card { flex: 1; border-radius: 16px; padding: 36px 32px 32px; color: #ffffff; display: flex; flex-direction: column; }
     .card-admin     { background-color: #1a2744; }
     .card-reference { background-color: #2d5016; }
-    .card-billing   { background-color: #4a1a2c; opacity: 0.72; }
+    .card-billing   { background-color: #4a1a2c; }
     .card-badge { font-size: 10px; font-weight: 500; letter-spacing: 0.15em; text-transform: uppercase; padding: 4px 10px; border-radius: 20px; background: rgba(255,255,255,0.15); margin-bottom: 20px; display: inline-block; width: fit-content; }
     .card-icon { width: 44px; height: 44px; margin-bottom: 16px; }
     .card h2 { font-family: 'Playfair Display', serif; font-size: 26px; font-weight: 700; margin-bottom: 10px; color: #ffffff; }
@@ -132,21 +132,20 @@
 
     <!-- BILLING -->
     <div class="card card-billing">
-      <span class="coming-soon">Coming Soon</span>
       <span class="card-badge">Finance Access</span>
       <svg class="card-icon" viewBox="0 0 24 24" fill="none">
         <path d="M12 2v20M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
       </svg>
       <h2>Billing</h2>
-      <p>Reports and exports for finance staff. M Card charge summaries, attendance billing, and account statements.</p>
+      <p>Configure billing rates and generate reports for M Card charges, program attendance, and before &amp; aftercare.</p>
       <div class="card-links">
+        <a class="card-link" href="/billing-rates">
+          <svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="white" stroke-width="2"/><path d="M12 6v12M15 9.5H10.5a2.5 2.5 0 000 5H14a2.5 2.5 0 010 5H9" stroke="white" stroke-width="2" stroke-linecap="round"/></svg>
+          Billing Rates
+        </a>
         <div class="card-link link-disabled">
           <svg viewBox="0 0 24 24" fill="none"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" stroke="white" stroke-width="2"/><polyline points="14 2 14 8 20 8" stroke="white" stroke-width="2"/></svg>
-          M Card Reports
-        </div>
-        <div class="card-link link-disabled">
-          <svg viewBox="0 0 24 24" fill="none"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" stroke="white" stroke-width="2"/><polyline points="14 2 14 8 20 8" stroke="white" stroke-width="2"/></svg>
-          Attendance Billing
+          Billing Reports (Coming Soon)
         </div>
       </div>
     </div>

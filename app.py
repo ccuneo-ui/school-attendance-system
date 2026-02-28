@@ -164,6 +164,34 @@ def init_db():
                     UNIQUE(student_id, session_date)
                 )
             """)
+            # Billing rates configuration
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS billing_rates (
+                    rate_id        SERIAL PRIMARY KEY,
+                    rate_key       TEXT NOT NULL UNIQUE,
+                    rate_value     NUMERIC(10,2) NOT NULL DEFAULT 0,
+                    label          TEXT NOT NULL DEFAULT '',
+                    unit           TEXT NOT NULL DEFAULT '',
+                    updated_by     TEXT DEFAULT '',
+                    updated_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+            # Seed default rates if empty
+            cur.execute("SELECT COUNT(*) FROM billing_rates")
+            if cur.fetchone()[0] == 0:
+                defaults = [
+                    ('aftercare_hourly',    0, 'Aftercare',        'per hour'),
+                    ('beforecare_session',  0, 'Before Care',      'per session'),
+                    ('mcard_snack',         0, 'M Card Snack',     'per snack'),
+                    ('tutoring_session',    0, '1-on-1 Tutoring',  'per session'),
+                    ('og_session',          0, 'OG Tutoring',      'per session'),
+                    ('homework_hourly',     0, 'Homework Center',  'per hour'),
+                ]
+                for key, val, label, unit in defaults:
+                    cur.execute(
+                        "INSERT INTO billing_rates (rate_key, rate_value, label, unit) VALUES (%s,%s,%s,%s) ON CONFLICT DO NOTHING",
+                        (key, val, label, unit)
+                    )
         conn.commit()
         print("DB init OK")
     except Exception as e:
@@ -296,6 +324,11 @@ def program_attendance():
 @login_required
 def aftercare():
     return send_from_directory(".", "aftercare_attendance.html")
+
+@app.route("/billing-rates")
+@login_required
+def billing_rates():
+    return send_from_directory(".", "billing_rates.html")
 
 @app.route("/api/test")
 def test():
@@ -1208,6 +1241,52 @@ def delete_aftercare(record_id):
 
 
 # ============================================
+# BILLING RATES
+# ============================================
+
+@app.route("/api/billing/rates")
+@login_required
+def get_billing_rates():
+    conn = get_db_connection()
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute("SELECT rate_id, rate_key, rate_value, label, unit, updated_by, updated_at FROM billing_rates ORDER BY rate_id")
+            rows = fa(cur)
+            for r in rows:
+                if hasattr(r.get('rate_value'), '__float__'):
+                    r['rate_value'] = float(r['rate_value'])
+                if hasattr(r.get('updated_at'), 'isoformat'):
+                    r['updated_at'] = r['updated_at'].isoformat()
+            return jsonify(rows)
+    finally:
+        conn.close()
+
+@app.route("/api/billing/rates", methods=["POST"])
+@login_required
+def save_billing_rates():
+    data = request.json
+    rates = data.get("rates", [])
+    if not rates:
+        return jsonify({"error": "No rates provided"}), 400
+    updated_by = session.get("user_name", "")
+    conn = get_db_connection()
+    try:
+        with conn.cursor() as cur:
+            for r in rates:
+                cur.execute("""
+                    UPDATE billing_rates SET rate_value=%s, updated_by=%s, updated_at=CURRENT_TIMESTAMP
+                    WHERE rate_key=%s
+                """, (r.get("rate_value", 0), updated_by, r.get("rate_key")))
+        conn.commit()
+        return jsonify({"success": True})
+    except Exception as e:
+        conn.rollback()
+        return jsonify({"error": str(e)}), 500
+    finally:
+        conn.close()
+
+
+# ============================================
 # BACKUP
 # ============================================
 
@@ -1226,7 +1305,7 @@ def download_backup():
             "students", "staff", "programs", "enrollments",
             "attendance_records", "mcard_charges", "electives",
             "daily_dismissal", "dismissal_today", "program_attendance",
-            "aftercare_attendance"
+            "aftercare_attendance", "billing_rates"
         ]
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
             for table in tables:

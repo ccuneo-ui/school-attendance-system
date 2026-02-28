@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Billing Rates — Mizzentop Admin</title>
+  <link rel="icon" type="image/svg+xml" href="/logo.svg">
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --navy: #1a2744;
+      --burgundy: #4a1a2c;
+      --cream: #f7f3ec;
+      --muted: #6b7280;
+      --white: #ffffff;
+      --border: #e5e1da;
+      --light-bg: #f0ece4;
+      --gold: #c8992a;
+      --green: #2d5016;
+      --red: #c0392b;
+    }
+    html, body { min-height: 100vh; font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(--navy); }
+
+    .topbar {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 14px 28px; background: var(--burgundy); color: var(--white);
+    }
+    .topbar a { color: rgba(255,255,255,0.75); text-decoration: none; font-size: 13px; font-weight: 500; }
+    .topbar a:hover { color: var(--white); }
+    .topbar-title { font-family: 'Playfair Display', serif; font-size: 18px; font-weight: 700; }
+
+    .container { max-width: 680px; margin: 0 auto; padding: 32px 24px 80px; }
+
+    .page-header { margin-bottom: 32px; }
+    .page-header h1 { font-family: 'Playfair Display', serif; font-size: 30px; font-weight: 700; margin-bottom: 6px; }
+    .page-header p { color: var(--muted); font-size: 14px; line-height: 1.6; }
+
+    /* ── Rates card ── */
+    .rates-card {
+      background: var(--white); border: 1px solid var(--border); border-radius: 14px;
+      overflow: hidden; margin-bottom: 20px;
+    }
+    .rates-card-header {
+      padding: 18px 24px; border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .rates-card-header h2 {
+      font-family: 'Playfair Display', serif; font-size: 20px; font-weight: 700;
+    }
+    .last-updated {
+      font-size: 11px; color: var(--muted);
+    }
+
+    .rate-row {
+      display: flex; align-items: center; padding: 16px 24px;
+      border-bottom: 1px solid var(--border); gap: 16px;
+      transition: background 0.15s;
+    }
+    .rate-row:last-child { border-bottom: none; }
+    .rate-row:hover { background: #faf8f4; }
+
+    .rate-icon {
+      width: 40px; height: 40px; border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0; font-size: 18px;
+    }
+    .icon-aftercare  { background: #ede7f6; color: #5b4a8a; }
+    .icon-beforecare { background: #fff3e0; color: #b8860b; }
+    .icon-mcard      { background: #e3f2fd; color: #1565c0; }
+    .icon-tutoring   { background: #fce4ec; color: #880e4f; }
+    .icon-og         { background: #e8f5e9; color: #2e7d32; }
+    .icon-homework   { background: #e8eaf6; color: #283593; }
+
+    .rate-info { flex: 1; }
+    .rate-label { font-size: 14px; font-weight: 600; margin-bottom: 2px; }
+    .rate-unit { font-size: 12px; color: var(--muted); }
+
+    .rate-input-wrap {
+      display: flex; align-items: center; gap: 2px;
+    }
+    .rate-dollar {
+      font-size: 16px; font-weight: 600; color: var(--muted);
+    }
+    .rate-input {
+      width: 100px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px;
+      font-family: 'DM Sans', sans-serif; font-size: 16px; font-weight: 600;
+      text-align: right; background: var(--white); color: var(--navy);
+      transition: border-color 0.2s;
+    }
+    .rate-input:focus { outline: none; border-color: var(--burgundy); }
+    .rate-input.changed {
+      border-color: var(--gold); background: #fffdf5;
+    }
+
+    /* ── Save bar ── */
+    .save-bar {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 16px 24px; background: var(--white); border: 1px solid var(--border);
+      border-radius: 12px;
+    }
+    .save-status { font-size: 13px; color: var(--muted); }
+    .save-status.unsaved { color: var(--gold); font-weight: 600; }
+    .save-status.saved { color: var(--green); font-weight: 600; }
+
+    .btn-save {
+      padding: 10px 24px; border: none; border-radius: 8px;
+      font-family: 'DM Sans', sans-serif; font-size: 14px; font-weight: 600;
+      cursor: pointer; color: var(--white); background: var(--burgundy);
+      transition: opacity 0.15s;
+    }
+    .btn-save:hover { opacity: 0.85; }
+    .btn-save:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    /* ── Loading ── */
+    .loading {
+      padding: 60px 20px; text-align: center; color: var(--muted); font-size: 14px;
+    }
+
+    .toast {
+      position: fixed; bottom: 24px; right: 24px; padding: 12px 20px;
+      background: var(--navy); color: var(--white); border-radius: 10px;
+      font-size: 13px; font-weight: 500; box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+      transform: translateY(80px); opacity: 0; transition: all 0.3s ease; z-index: 1000;
+    }
+    .toast.show { transform: translateY(0); opacity: 1; }
+
+    @media (max-width: 640px) {
+      .container { padding: 20px 16px 60px; }
+      .rate-row { flex-wrap: wrap; gap: 10px; }
+      .rate-input { width: 80px; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="topbar">
+  <span class="topbar-title">Mizzentop Admin</span>
+  <a href="/">← Home</a>
+</div>
+
+<div class="container">
+  <div class="page-header">
+    <h1>Billing Rates</h1>
+    <p>Set the rates used to calculate charges for each program. Changes take effect immediately for all new billing reports.</p>
+  </div>
+
+  <div class="rates-card">
+    <div class="rates-card-header">
+      <h2>Program Rates</h2>
+      <span class="last-updated" id="lastUpdated"></span>
+    </div>
+    <div id="ratesContainer">
+      <div class="loading">Loading rates…</div>
+    </div>
+  </div>
+
+  <div class="save-bar">
+    <span class="save-status" id="saveStatus">All rates saved</span>
+    <button class="btn-save" id="btnSave" onclick="saveRates()" disabled>Save Changes</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+  let rates = [];
+  let originalValues = {};
+  let hasChanges = false;
+
+  const ICONS = {
+    aftercare_hourly:   { css: 'icon-aftercare',  emoji: '🌙' },
+    beforecare_session: { css: 'icon-beforecare', emoji: '🌅' },
+    mcard_snack:        { css: 'icon-mcard',      emoji: '🍎' },
+    tutoring_session:   { css: 'icon-tutoring',   emoji: '📝' },
+    og_session:         { css: 'icon-og',          emoji: '📖' },
+    homework_hourly:    { css: 'icon-homework',   emoji: '📚' },
+  };
+
+  // Display order
+  const ORDER = ['og_session', 'tutoring_session', 'homework_hourly', 'beforecare_session', 'aftercare_hourly', 'mcard_snack'];
+
+  document.addEventListener('DOMContentLoaded', loadRates);
+
+  async function loadRates() {
+    try {
+      const res = await fetch('/api/billing/rates');
+      rates = await res.json();
+
+      // Sort by our preferred order
+      rates.sort((a, b) => ORDER.indexOf(a.rate_key) - ORDER.indexOf(b.rate_key));
+
+      // Store originals
+      rates.forEach(r => { originalValues[r.rate_key] = parseFloat(r.rate_value) || 0; });
+
+      renderRates();
+      updateLastUpdated();
+    } catch(e) {
+      document.getElementById('ratesContainer').innerHTML =
+        '<div class="loading" style="color:var(--red);">Failed to load rates. Please refresh.</div>';
+    }
+  }
+
+  function renderRates() {
+    const container = document.getElementById('ratesContainer');
+    container.innerHTML = rates.map(r => {
+      const icon = ICONS[r.rate_key] || { css: 'icon-mcard', emoji: '💲' };
+      const val = parseFloat(r.rate_value) || 0;
+      return `
+        <div class="rate-row">
+          <div class="rate-icon ${icon.css}">${icon.emoji}</div>
+          <div class="rate-info">
+            <div class="rate-label">${esc(r.label)}</div>
+            <div class="rate-unit">${esc(r.unit)}</div>
+          </div>
+          <div class="rate-input-wrap">
+            <span class="rate-dollar">$</span>
+            <input type="number" class="rate-input" id="rate-${r.rate_key}"
+                   value="${val.toFixed(2)}" min="0" step="0.25"
+                   oninput="onRateChange('${r.rate_key}', this)">
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  function onRateChange(key, input) {
+    const newVal = parseFloat(input.value) || 0;
+    const origVal = originalValues[key];
+    const changed = Math.abs(newVal - origVal) > 0.001;
+
+    input.classList.toggle('changed', changed);
+    checkForChanges();
+  }
+
+  function checkForChanges() {
+    hasChanges = false;
+    rates.forEach(r => {
+      const input = document.getElementById(`rate-${r.rate_key}`);
+      if (input) {
+        const newVal = parseFloat(input.value) || 0;
+        if (Math.abs(newVal - originalValues[r.rate_key]) > 0.001) hasChanges = true;
+      }
+    });
+
+    const status = document.getElementById('saveStatus');
+    const btn = document.getElementById('btnSave');
+    if (hasChanges) {
+      status.textContent = 'You have unsaved changes';
+      status.className = 'save-status unsaved';
+      btn.disabled = false;
+    } else {
+      status.textContent = 'All rates saved';
+      status.className = 'save-status saved';
+      btn.disabled = true;
+    }
+  }
+
+  async function saveRates() {
+    const btn = document.getElementById('btnSave');
+    btn.disabled = true;
+    btn.textContent = 'Saving…';
+
+    const payload = rates.map(r => ({
+      rate_key: r.rate_key,
+      rate_value: parseFloat(document.getElementById(`rate-${r.rate_key}`).value) || 0
+    }));
+
+    try {
+      const res = await fetch('/api/billing/rates', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ rates: payload })
+      });
+      const data = await res.json();
+      if (data.success) {
+        showToast('Rates saved ✓');
+        // Update originals
+        payload.forEach(r => { originalValues[r.rate_key] = r.rate_value; });
+        document.querySelectorAll('.rate-input').forEach(i => i.classList.remove('changed'));
+        checkForChanges();
+        updateLastUpdated();
+      } else {
+        showToast('Error: ' + (data.error || 'Unknown'));
+      }
+    } catch(e) {
+      showToast('Network error.');
+    } finally {
+      btn.textContent = 'Save Changes';
+      checkForChanges();
+    }
+  }
+
+  function updateLastUpdated() {
+    const latest = rates.reduce((best, r) => {
+      if (r.updated_at && (!best || r.updated_at > best)) return r.updated_at;
+      return best;
+    }, null);
+    const el = document.getElementById('lastUpdated');
+    if (latest) {
+      const d = new Date(latest);
+      el.textContent = `Last updated ${d.toLocaleDateString()} by ${rates.find(r => r.updated_by)?.updated_by || '—'}`;
+    }
+  }
+
+  function esc(s) {
+    if (!s) return '';
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  function showToast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    setTimeout(() => t.classList.remove('show'), 2500);
+  }
+</script>
+</body>
+</html>
