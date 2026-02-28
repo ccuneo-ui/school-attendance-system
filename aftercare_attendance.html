@@ -3,29 +3,27 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Aftercare Attendance — Mizzentop Admin</title>
+  <title>Before &amp; Aftercare — Mizzentop Admin</title>
   <link rel="icon" type="image/svg+xml" href="/logo.svg">
   <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     :root {
       --navy: #1a2744;
-      --green: #2d5016;
-      --burgundy: #4a1a2c;
-      --gold: #c8992a;
       --cream: #f7f3ec;
       --muted: #6b7280;
       --white: #ffffff;
       --border: #e5e1da;
       --light-bg: #f0ece4;
-      --accent: #5b4a8a;
+      --before-color: #b8860b;
+      --after-color: #5b4a8a;
       --red: #c0392b;
     }
     html, body { min-height: 100vh; font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(--navy); }
 
     .topbar {
       display: flex; align-items: center; justify-content: space-between;
-      padding: 14px 28px; background: var(--accent); color: var(--white);
+      padding: 14px 28px; background: var(--navy); color: var(--white);
     }
     .topbar a { color: rgba(255,255,255,0.75); text-decoration: none; font-size: 13px; font-weight: 500; }
     .topbar a:hover { color: var(--white); }
@@ -36,6 +34,26 @@
     .page-header { margin-bottom: 28px; }
     .page-header h1 { font-family: 'Playfair Display', serif; font-size: 30px; font-weight: 700; margin-bottom: 6px; }
     .page-header p { color: var(--muted); font-size: 14px; }
+
+    /* ── Tabs ── */
+    .tab-bar {
+      display: flex; gap: 4px; margin-bottom: 24px;
+      background: var(--light-bg); border-radius: 10px; padding: 4px;
+    }
+    .tab-btn {
+      flex: 1; padding: 10px 16px; border: none; border-radius: 8px;
+      font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 600;
+      cursor: pointer; background: transparent; color: var(--muted);
+      transition: all 0.2s ease;
+    }
+    .tab-btn.active { background: var(--white); color: var(--navy); box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+    .tab-btn:hover:not(.active) { color: var(--navy); }
+    .tab-dot {
+      display: inline-block; width: 8px; height: 8px; border-radius: 50%;
+      margin-right: 6px; vertical-align: middle;
+    }
+    .dot-before { background: var(--before-color); }
+    .dot-after { background: var(--after-color); }
 
     /* ── Date bar ── */
     .date-bar {
@@ -75,7 +93,6 @@
       text-transform: uppercase; letter-spacing: 0.08em;
     }
 
-    /* ── Student search ── */
     .student-search { position: relative; }
     .student-search input {
       width: 260px; padding: 8px 12px; border: 1px solid var(--border); border-radius: 8px;
@@ -99,27 +116,26 @@
       padding: 1px 6px; font-size: 11px; color: var(--muted); margin-left: 6px;
     }
 
-    /* ── Time picker grid ── */
-    .time-grid {
-      display: flex; flex-wrap: wrap; gap: 4px;
-    }
+    /* ── Time grid (aftercare only) ── */
+    .time-grid { display: flex; flex-wrap: wrap; gap: 4px; }
     .time-btn {
       padding: 7px 10px; border: 1px solid var(--border); border-radius: 6px;
       font-family: 'DM Sans', sans-serif; font-size: 12px; font-weight: 500;
       cursor: pointer; background: var(--white); color: var(--navy);
       transition: all 0.15s; min-width: 58px; text-align: center;
     }
-    .time-btn.selected { background: var(--accent); color: var(--white); border-color: var(--accent); }
+    .time-btn.selected { background: var(--after-color); color: var(--white); border-color: var(--after-color); }
     .time-btn:hover:not(.selected) { background: var(--light-bg); }
 
     .btn-record {
       padding: 8px 18px; border: none; border-radius: 8px;
       font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 600;
-      cursor: pointer; color: var(--white); background: var(--accent);
-      transition: opacity 0.15s;
+      cursor: pointer; color: var(--white); transition: opacity 0.15s;
     }
     .btn-record:hover { opacity: 0.85; }
     .btn-record:disabled { opacity: 0.4; cursor: not-allowed; }
+    .btn-before { background: var(--before-color); }
+    .btn-after { background: var(--after-color); }
 
     /* ── Records ── */
     .records-card {
@@ -146,7 +162,11 @@
     .records-table tr:last-child td { border-bottom: none; }
     .records-table tr:hover { background: #faf8f4; }
 
-    .time-badge {
+    .badge-session {
+      display: inline-block; padding: 2px 8px; border-radius: 4px;
+      font-size: 12px; font-weight: 600; background: #fff3e0; color: #bf6c00;
+    }
+    .badge-time {
       display: inline-block; padding: 3px 10px; border-radius: 6px;
       font-size: 12px; font-weight: 600; background: #ede7f6; color: #4a148c;
     }
@@ -159,20 +179,6 @@
 
     .empty-state {
       padding: 40px 20px; text-align: center; color: var(--muted); font-size: 14px;
-    }
-
-    /* ── Still here indicator ── */
-    .still-here-section {
-      background: var(--white); border: 1px solid var(--border); border-radius: 12px;
-      padding: 16px 20px; margin-bottom: 20px;
-    }
-    .still-here-section h3 { font-size: 14px; font-weight: 600; margin-bottom: 8px; color: var(--accent); }
-    .still-here-list {
-      display: flex; flex-wrap: wrap; gap: 6px;
-    }
-    .still-here-chip {
-      display: inline-block; padding: 4px 12px; border-radius: 20px;
-      font-size: 12px; font-weight: 500; background: #ede7f6; color: #4a148c;
     }
 
     .toast {
@@ -201,8 +207,18 @@
 
 <div class="container">
   <div class="page-header">
-    <h1>Aftercare Attendance</h1>
-    <p>Record student pickup times. Billed in 15-minute increments from 4:30 PM.</p>
+    <h1>Before &amp; Aftercare</h1>
+    <p>Record before-care attendance and aftercare pickup times.</p>
+  </div>
+
+  <!-- Tabs -->
+  <div class="tab-bar">
+    <button class="tab-btn active" onclick="switchTab('beforecare')">
+      <span class="tab-dot dot-before"></span>Before Care
+    </button>
+    <button class="tab-btn" onclick="switchTab('aftercare')">
+      <span class="tab-dot dot-after"></span>Aftercare
+    </button>
   </div>
 
   <!-- Date bar -->
@@ -220,19 +236,11 @@
       <div class="stat-value" id="statStudents">0</div>
       <div class="stat-label">Students Today</div>
     </div>
-    <div class="stat-card">
-      <div class="stat-value" id="statPickedUp">0</div>
-      <div class="stat-label">Picked Up</div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-value" id="statStillHere">0</div>
-      <div class="stat-label">Still Here</div>
-    </div>
   </div>
 
   <!-- Add record -->
   <div class="add-section">
-    <h3>Record Pickup</h3>
+    <h3 id="addTitle">Record Before Care Attendance</h3>
     <div class="add-row">
       <div class="field student-search">
         <label>Student</label>
@@ -241,18 +249,18 @@
         <div class="search-dropdown" id="searchDropdown"></div>
         <input type="hidden" id="selectedStudentId">
       </div>
-      <div class="field">
+      <div class="field" id="timeField" style="display:none;">
         <label>Pickup Time</label>
         <div class="time-grid" id="timeGrid"></div>
       </div>
-      <button class="btn-record" id="btnRecord" onclick="saveRecord()">+ Record Pickup</button>
+      <button class="btn-record btn-before" id="btnRecord" onclick="saveRecord()">+ Record</button>
     </div>
   </div>
 
-  <!-- Records table -->
+  <!-- Records -->
   <div class="records-card">
     <div class="records-header">
-      <h3 id="recordsTitle">Today's Pickups</h3>
+      <h3 id="recordsTitle">Today's Records</h3>
       <span class="records-count" id="recordsCount">0 records</span>
     </div>
     <table class="records-table">
@@ -260,33 +268,32 @@
         <tr>
           <th>Student</th>
           <th>Grade</th>
-          <th>Pickup Time</th>
+          <th id="detailHeader">Attended</th>
           <th></th>
         </tr>
       </thead>
       <tbody id="recordsBody"></tbody>
     </table>
-    <div class="empty-state" id="emptyState">No aftercare records for this date yet.</div>
+    <div class="empty-state" id="emptyState">No records for this date yet.</div>
   </div>
 </div>
 
 <div class="toast" id="toast"></div>
 
 <script>
+  let currentTab = 'beforecare';
   let allStudents = [];
   let selectedStudentId = null;
   let selectedTime = '4:30 PM';
   let records = [];
 
-  // Build time slots: 4:30 PM to 6:00 PM in 15-min increments
+  // Aftercare time slots: 4:30 PM to 6:00 PM in 15-min increments
   const TIME_SLOTS = [];
-  (function buildSlots() {
-    let h = 16, m = 30; // 4:30 PM
+  (function() {
+    let h = 16, m = 30;
     while (h < 18 || (h === 18 && m === 0)) {
-      const ampm = h >= 12 ? 'PM' : 'AM';
       const h12 = h > 12 ? h - 12 : h;
-      const label = `${h12}:${String(m).padStart(2,'0')} ${ampm}`;
-      TIME_SLOTS.push(label);
+      TIME_SLOTS.push(`${h12}:${String(m).padStart(2,'0')} PM`);
       m += 15;
       if (m >= 60) { m = 0; h++; }
     }
@@ -297,15 +304,13 @@
     setToday();
     loadStudents();
     document.addEventListener('click', (e) => {
-      if (!e.target.closest('.student-search')) {
+      if (!e.target.closest('.student-search'))
         document.getElementById('searchDropdown').classList.remove('open');
-      }
     });
   });
 
   function buildTimeGrid() {
-    const grid = document.getElementById('timeGrid');
-    grid.innerHTML = TIME_SLOTS.map((t, i) =>
+    document.getElementById('timeGrid').innerHTML = TIME_SLOTS.map((t, i) =>
       `<button class="time-btn${i === 0 ? ' selected' : ''}" onclick="selectTime('${t}', this)">${t}</button>`
     ).join('');
   }
@@ -316,15 +321,30 @@
     btn.classList.add('selected');
   }
 
-  function setToday() {
-    const today = new Date();
-    document.getElementById('sessionDate').value = formatDate(today);
-    updateDayLabel();
+  // ── Tab switching ──
+  function switchTab(tab) {
+    currentTab = tab;
+    const isBefore = tab === 'beforecare';
+    document.querySelectorAll('.tab-btn').forEach((btn, i) => {
+      btn.classList.toggle('active', i === (isBefore ? 0 : 1));
+    });
+    document.getElementById('timeField').style.display = isBefore ? 'none' : '';
+    const btn = document.getElementById('btnRecord');
+    btn.className = 'btn-record ' + (isBefore ? 'btn-before' : 'btn-after');
+    btn.textContent = isBefore ? '+ Record' : '+ Record Pickup';
+    document.getElementById('addTitle').textContent = isBefore
+      ? 'Record Before Care Attendance' : 'Record Aftercare Pickup';
+    document.getElementById('detailHeader').textContent = isBefore ? 'Attended' : 'Pickup Time';
     loadRecords();
   }
 
+  // ── Date ──
+  function setToday() {
+    document.getElementById('sessionDate').value = formatDate(new Date());
+    updateDayLabel();
+    loadRecords();
+  }
   function formatDate(d) { return d.toISOString().slice(0, 10); }
-
   function changeDate(delta) {
     const input = document.getElementById('sessionDate');
     const d = new Date(input.value + 'T12:00:00');
@@ -333,10 +353,8 @@
     updateDayLabel();
     loadRecords();
   }
-
   function updateDayLabel() {
-    const input = document.getElementById('sessionDate');
-    const d = new Date(input.value + 'T12:00:00');
+    const d = new Date(document.getElementById('sessionDate').value + 'T12:00:00');
     const days = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
     const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
     document.getElementById('dayLabel').textContent = `${days[d.getDay()]}, ${months[d.getMonth()]} ${d.getDate()}`;
@@ -347,7 +365,7 @@
     try {
       const res = await fetch('/api/program-attendance/students');
       allStudents = await res.json();
-    } catch(e) { console.error('Failed to load students:', e); }
+    } catch(e) { console.error(e); }
   }
 
   function filterStudents() {
@@ -358,15 +376,14 @@
       `${s.last_name} ${s.first_name}`.toLowerCase().includes(query) ||
       `${s.first_name} ${s.last_name}`.toLowerCase().includes(query)
     ).slice(0, 15);
-    if (matches.length === 0) {
+    if (!matches.length) {
       dropdown.innerHTML = '<div class="search-option" style="color:var(--muted);">No matches</div>';
     } else {
       dropdown.innerHTML = matches.map(s => `
-        <div class="search-option" onclick="selectStudent(${s.student_id}, '${escHtml(s.last_name)}, ${escHtml(s.first_name)}')">
-          ${escHtml(s.last_name)}, ${escHtml(s.first_name)}
-          <span class="grade-tag">${escHtml(s.grade || '—')}</span>
-        </div>
-      `).join('');
+        <div class="search-option" onclick="selectStudent(${s.student_id}, '${esc(s.last_name)}, ${esc(s.first_name)}')">
+          ${esc(s.last_name)}, ${esc(s.first_name)}
+          <span class="grade-tag">${esc(s.grade || '—')}</span>
+        </div>`).join('');
     }
     dropdown.classList.add('open');
   }
@@ -374,13 +391,12 @@
   function selectStudent(id, name) {
     selectedStudentId = id;
     document.getElementById('studentSearch').value = name;
-    document.getElementById('selectedStudentId').value = id;
     document.getElementById('searchDropdown').classList.remove('open');
   }
 
-  function escHtml(str) {
-    if (!str) return '';
-    return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+  function esc(s) {
+    if (!s) return '';
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
   }
 
   // ── Save ──
@@ -389,19 +405,25 @@
     const date = document.getElementById('sessionDate').value;
     const btn = document.getElementById('btnRecord');
     btn.disabled = true;
+
+    let url, body;
+    if (currentTab === 'beforecare') {
+      url = '/api/program-attendance';
+      body = { student_id: selectedStudentId, program_type: 'beforecare', session_date: date, units: 1, teacher: '' };
+    } else {
+      url = '/api/aftercare';
+      body = { student_id: selectedStudentId, session_date: date, pickup_time: selectedTime };
+    }
+
     try {
-      const res = await fetch('/api/aftercare', {
+      const res = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          student_id: selectedStudentId,
-          session_date: date,
-          pickup_time: selectedTime
-        })
+        body: JSON.stringify(body)
       });
       const data = await res.json();
       if (data.success) {
-        showToast('Pickup recorded ✓');
+        showToast(currentTab === 'beforecare' ? 'Attendance recorded ✓' : 'Pickup recorded ✓');
         document.getElementById('studentSearch').value = '';
         selectedStudentId = null;
         loadRecords();
@@ -412,46 +434,61 @@
     finally { btn.disabled = false; }
   }
 
-  // ── Load records ──
+  // ── Load ──
   async function loadRecords() {
     const date = document.getElementById('sessionDate').value;
+    let url;
+    if (currentTab === 'beforecare') {
+      url = `/api/program-attendance/records?program_type=beforecare&date=${date}`;
+    } else {
+      url = `/api/aftercare/records?date=${date}`;
+    }
     try {
-      const res = await fetch(`/api/aftercare/records?date=${date}`);
+      const res = await fetch(url);
       records = await res.json();
       renderRecords();
-    } catch(e) { console.error('Failed to load records:', e); }
+    } catch(e) { console.error(e); }
   }
 
   function renderRecords() {
     const tbody = document.getElementById('recordsBody');
     const empty = document.getElementById('emptyState');
+    const isBefore = currentTab === 'beforecare';
     const date = document.getElementById('sessionDate').value;
     const d = new Date(date + 'T12:00:00');
     const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
-    if (records.length === 0) {
+    if (!records.length) {
       tbody.innerHTML = '';
       empty.style.display = '';
     } else {
       empty.style.display = 'none';
-      tbody.innerHTML = records.map(r => `<tr>
-        <td><strong>${escHtml(r.last_name)}, ${escHtml(r.first_name)}</strong></td>
-        <td>${escHtml(r.grade || '—')}</td>
-        <td><span class="time-badge">${escHtml(r.pickup_time)}</span></td>
-        <td><button class="btn-remove" onclick="removeRecord(${r.record_id})">Remove</button></td>
-      </tr>`).join('');
+      tbody.innerHTML = records.map(r => {
+        const name = `${esc(r.last_name)}, ${esc(r.first_name)}`;
+        const grade = esc(r.grade || '—');
+        const rid = r.record_id;
+        const detailCell = isBefore
+          ? '<span class="badge-session">✓</span>'
+          : `<span class="badge-time">${esc(r.pickup_time)}</span>`;
+        const deleteUrl = isBefore ? `/api/program-attendance/${rid}` : `/api/aftercare/${rid}`;
+        return `<tr>
+          <td><strong>${name}</strong></td>
+          <td>${grade}</td>
+          <td>${detailCell}</td>
+          <td><button class="btn-remove" onclick="removeRecord('${deleteUrl}')">Remove</button></td>
+        </tr>`;
+      }).join('');
     }
 
+    const label = isBefore ? 'Before Care' : 'Aftercare';
     document.getElementById('recordsCount').textContent = `${records.length} record${records.length !== 1 ? 's' : ''}`;
-    document.getElementById('recordsTitle').textContent = `Aftercare — ${months[d.getMonth()]} ${d.getDate()}`;
+    document.getElementById('recordsTitle').textContent = `${label} — ${months[d.getMonth()]} ${d.getDate()}`;
     document.getElementById('statStudents').textContent = records.length;
-    document.getElementById('statPickedUp').textContent = records.length;
-    document.getElementById('statStillHere').textContent = '—';
   }
 
-  async function removeRecord(recordId) {
+  async function removeRecord(url) {
     try {
-      const res = await fetch(`/api/aftercare/${recordId}`, { method: 'DELETE' });
+      const res = await fetch(url, { method: 'DELETE' });
       const data = await res.json();
       if (data.success) { showToast('Record removed'); loadRecords(); }
     } catch(e) { showToast('Error removing record.'); }
