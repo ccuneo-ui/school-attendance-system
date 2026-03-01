@@ -195,12 +195,14 @@
     }
     .roster-chips {
       display: flex; flex-wrap: wrap; gap: 6px;
+      overflow: hidden;
     }
     .roster-chip {
       padding: 6px 14px; border-radius: 20px; border: 1px solid var(--border);
       font-size: 12px; font-weight: 500; cursor: pointer;
       background: var(--white); color: var(--navy);
       transition: all 0.15s; white-space: nowrap;
+      flex-shrink: 0;
     }
     .roster-chip:hover { background: #ede7f6; border-color: var(--after-color); }
     .roster-chip.recorded {
@@ -293,7 +295,7 @@
   <!-- Aftercare roster quick-select (only visible on aftercare tab) -->
   <div class="roster-section" id="rosterSection" style="display:none;">
     <h3>Today's Aftercare Roster <span class="roster-count" id="rosterCount"></span></h3>
-    <div id="rosterChips"><span class="roster-empty">Loading…</span></div>
+    <div class="roster-chips" id="rosterChips"><span class="roster-empty">Loading…</span></div>
   </div>
 
   <!-- Records -->
