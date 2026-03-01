@@ -181,6 +181,39 @@
       padding: 40px 20px; text-align: center; color: var(--muted); font-size: 14px;
     }
 
+    /* ── Aftercare roster quick-select ── */
+    .roster-section {
+      background: var(--white); border: 1px solid var(--border); border-radius: 12px;
+      padding: 16px 20px; margin-bottom: 20px;
+    }
+    .roster-section h3 {
+      font-size: 13px; font-weight: 600; margin-bottom: 10px;
+      display: flex; align-items: center; gap: 8px;
+    }
+    .roster-section h3 .roster-count {
+      font-weight: 400; color: var(--muted); font-size: 12px;
+    }
+    .roster-chips {
+      display: flex; flex-wrap: wrap; gap: 6px;
+    }
+    .roster-chip {
+      padding: 6px 14px; border-radius: 20px; border: 1px solid var(--border);
+      font-size: 12px; font-weight: 500; cursor: pointer;
+      background: var(--white); color: var(--navy);
+      transition: all 0.15s; white-space: nowrap;
+    }
+    .roster-chip:hover { background: #ede7f6; border-color: var(--after-color); }
+    .roster-chip.recorded {
+      background: #e8f5e9; border-color: #a5d6a7; color: #2e7d32;
+      cursor: default; opacity: 0.7;
+    }
+    .roster-chip .chip-grade {
+      color: var(--muted); font-size: 10px; margin-left: 4px;
+    }
+    .roster-empty {
+      font-size: 13px; color: var(--muted); font-style: italic;
+    }
+
     .toast {
       position: fixed; bottom: 24px; right: 24px; padding: 12px 20px;
       background: var(--navy); color: var(--white); border-radius: 10px;
@@ -257,6 +290,12 @@
     </div>
   </div>
 
+  <!-- Aftercare roster quick-select (only visible on aftercare tab) -->
+  <div class="roster-section" id="rosterSection" style="display:none;">
+    <h3>Today's Aftercare Roster <span class="roster-count" id="rosterCount"></span></h3>
+    <div id="rosterChips"><span class="roster-empty">Loading…</span></div>
+  </div>
+
   <!-- Records -->
   <div class="records-card">
     <div class="records-header">
@@ -286,6 +325,7 @@
   let selectedStudentId = null;
   let selectedTime = '4:30 PM';
   let records = [];
+  let aftercareRoster = [];
 
   // Aftercare time slots: 4:30 PM to 6:00 PM in 15-min increments
   const TIME_SLOTS = [];
@@ -335,6 +375,7 @@
     document.getElementById('addTitle').textContent = isBefore
       ? 'Record Before Care Attendance' : 'Record Aftercare Pickup';
     document.getElementById('detailHeader').textContent = isBefore ? 'Attended' : 'Pickup Time';
+    document.getElementById('rosterSection').style.display = isBefore ? 'none' : '';
     loadRecords();
   }
 
@@ -448,6 +489,65 @@
       records = await res.json();
       renderRecords();
     } catch(e) { console.error(e); }
+
+    // Load aftercare roster from dismissal plan when on aftercare tab
+    if (currentTab === 'aftercare') {
+      loadAftercareRoster();
+    }
+  }
+
+  async function loadAftercareRoster() {
+    const date = document.getElementById('sessionDate').value;
+    const container = document.getElementById('rosterChips');
+    const countEl = document.getElementById('rosterCount');
+    try {
+      const res = await fetch(`/api/dismissal/plan/${date}`);
+      const plan = await res.json();
+      // Filter to students assigned "Aftercare" as destination
+      const aftercareIds = plan
+        .filter(p => p.destination && p.destination.toLowerCase() === 'aftercare')
+        .map(p => p.student_id);
+
+      if (aftercareIds.length === 0) {
+        container.innerHTML = '<span class="roster-empty">No students assigned to Aftercare in today\'s Daily Ops plan.</span>';
+        countEl.textContent = '';
+        aftercareRoster = [];
+        return;
+      }
+
+      // Match with student names
+      const recordedIds = new Set(records.map(r => r.student_id));
+      aftercareRoster = aftercareIds.map(id => {
+        const s = allStudents.find(st => st.student_id === id);
+        if (!s) return null;
+        return { ...s, recorded: recordedIds.has(id) };
+      }).filter(Boolean);
+
+      aftercareRoster.sort((a, b) => a.last_name.localeCompare(b.last_name));
+      countEl.textContent = `(${aftercareRoster.length} students)`;
+
+      container.innerHTML = aftercareRoster.map(s => {
+        const recorded = s.recorded;
+        return `<span class="roster-chip${recorded ? ' recorded' : ''}"
+                      onclick="${recorded ? '' : `quickSelectStudent(${s.student_id}, '${esc(s.last_name)}, ${esc(s.first_name)}')`}"
+                      title="${recorded ? 'Already recorded' : 'Click to select'}">
+          ${esc(s.last_name)}, ${esc(s.first_name)}<span class="chip-grade">${esc(s.grade || '')}</span>
+          ${recorded ? ' ✓' : ''}
+        </span>`;
+      }).join('');
+
+    } catch(e) {
+      container.innerHTML = '<span class="roster-empty">Could not load roster. Has the Daily Ops plan been filled in?</span>';
+      countEl.textContent = '';
+    }
+  }
+
+  function quickSelectStudent(id, name) {
+    selectedStudentId = id;
+    document.getElementById('studentSearch').value = name;
+    document.getElementById('searchDropdown').classList.remove('open');
+    // Scroll to the add section
+    document.querySelector('.add-section').scrollIntoView({ behavior: 'smooth', block: 'center' });
   }
 
   function renderRecords() {
