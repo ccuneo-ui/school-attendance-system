@@ -30,40 +30,41 @@
     .topbar a:hover { color: var(--white); }
     .topbar-title { font-family: 'Playfair Display', serif; font-size: 18px; font-weight: 700; }
 
-    .container { max-width: 680px; margin: 0 auto; padding: 32px 24px 80px; }
+    .container { max-width: 720px; margin: 0 auto; padding: 32px 24px 80px; }
 
     .page-header { margin-bottom: 32px; }
     .page-header h1 { font-family: 'Playfair Display', serif; font-size: 30px; font-weight: 700; margin-bottom: 6px; }
     .page-header p { color: var(--muted); font-size: 14px; line-height: 1.6; }
 
-    /* ── Rates card ── */
-    .rates-card {
+    /* ── Cards ── */
+    .card {
       background: var(--white); border: 1px solid var(--border); border-radius: 14px;
       overflow: hidden; margin-bottom: 20px;
     }
-    .rates-card-header {
+    .card-header {
       padding: 18px 24px; border-bottom: 1px solid var(--border);
-      display: flex; align-items: center; justify-content: space-between;
+      display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;
     }
-    .rates-card-header h2 {
-      font-family: 'Playfair Display', serif; font-size: 20px; font-weight: 700;
-    }
-    .last-updated {
-      font-size: 11px; color: var(--muted);
-    }
+    .card-header h2 { font-family: 'Playfair Display', serif; font-size: 20px; font-weight: 700; }
+    .card-header-sub { font-size: 12px; color: var(--muted); }
 
+    /* ── Current rates ── */
+    .current-badge {
+      display: inline-block; padding: 3px 10px; border-radius: 20px;
+      font-size: 11px; font-weight: 600; background: #e8f5e9; color: #2e7d32;
+    }
     .rate-row {
-      display: flex; align-items: center; padding: 16px 24px;
-      border-bottom: 1px solid var(--border); gap: 16px;
+      display: flex; align-items: center; padding: 14px 24px;
+      border-bottom: 1px solid var(--border); gap: 14px;
       transition: background 0.15s;
     }
     .rate-row:last-child { border-bottom: none; }
     .rate-row:hover { background: #faf8f4; }
 
     .rate-icon {
-      width: 40px; height: 40px; border-radius: 10px;
+      width: 38px; height: 38px; border-radius: 10px;
       display: flex; align-items: center; justify-content: center;
-      flex-shrink: 0; font-size: 18px;
+      flex-shrink: 0; font-size: 17px;
     }
     .icon-aftercare  { background: #ede7f6; color: #5b4a8a; }
     .icon-beforecare { background: #fff3e0; color: #b8860b; }
@@ -73,49 +74,92 @@
     .icon-homework   { background: #e8eaf6; color: #283593; }
 
     .rate-info { flex: 1; }
-    .rate-label { font-size: 14px; font-weight: 600; margin-bottom: 2px; }
+    .rate-label { font-size: 14px; font-weight: 600; margin-bottom: 1px; }
     .rate-unit { font-size: 12px; color: var(--muted); }
 
-    .rate-input-wrap {
-      display: flex; align-items: center; gap: 2px;
+    .rate-value { font-size: 18px; font-weight: 700; font-family: 'Playfair Display', serif; white-space: nowrap; }
+    .rate-value.zero { color: var(--muted); }
+
+    /* ── Set new rates ── */
+    .new-rates-section { padding: 20px 24px; }
+    .new-rates-section h3 { font-size: 15px; font-weight: 600; margin-bottom: 4px; }
+    .new-rates-section .hint { font-size: 12px; color: var(--muted); margin-bottom: 16px; line-height: 1.5; }
+
+    .effective-row {
+      display: flex; align-items: center; gap: 12px; margin-bottom: 18px; flex-wrap: wrap;
     }
-    .rate-dollar {
-      font-size: 16px; font-weight: 600; color: var(--muted);
+    .effective-row label { font-size: 13px; font-weight: 600; }
+    .effective-row input[type="date"] {
+      padding: 8px 12px; border: 1px solid var(--border); border-radius: 8px;
+      font-family: 'DM Sans', sans-serif; font-size: 14px; background: var(--white);
     }
+    .effective-row .quick-btn {
+      padding: 6px 12px; border: 1px solid var(--border); border-radius: 6px;
+      font-family: 'DM Sans', sans-serif; font-size: 12px; font-weight: 500;
+      cursor: pointer; background: var(--white); color: var(--navy); transition: all 0.15s;
+    }
+    .effective-row .quick-btn:hover { background: var(--light-bg); }
+    .effective-row .quick-btn.active { background: var(--burgundy); color: var(--white); border-color: var(--burgundy); }
+
+    .new-rate-grid {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px;
+    }
+    .new-rate-item {
+      display: flex; align-items: center; gap: 8px; padding: 10px 12px;
+      background: var(--light-bg); border-radius: 8px;
+    }
+    .new-rate-item .item-label { flex: 1; font-size: 13px; font-weight: 500; }
+    .new-rate-item .rate-input-wrap { display: flex; align-items: center; gap: 2px; }
+    .rate-dollar { font-size: 14px; font-weight: 600; color: var(--muted); }
     .rate-input {
-      width: 100px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px;
-      font-family: 'DM Sans', sans-serif; font-size: 16px; font-weight: 600;
+      width: 80px; padding: 6px 8px; border: 1px solid var(--border); border-radius: 6px;
+      font-family: 'DM Sans', sans-serif; font-size: 14px; font-weight: 600;
       text-align: right; background: var(--white); color: var(--navy);
-      transition: border-color 0.2s;
     }
     .rate-input:focus { outline: none; border-color: var(--burgundy); }
-    .rate-input.changed {
-      border-color: var(--gold); background: #fffdf5;
-    }
 
-    /* ── Save bar ── */
-    .save-bar {
-      display: flex; align-items: center; justify-content: space-between;
-      padding: 16px 24px; background: var(--white); border: 1px solid var(--border);
-      border-radius: 12px;
+    .save-row {
+      display: flex; align-items: center; justify-content: space-between; gap: 12px;
+      padding-top: 4px;
     }
-    .save-status { font-size: 13px; color: var(--muted); }
-    .save-status.unsaved { color: var(--gold); font-weight: 600; }
-    .save-status.saved { color: var(--green); font-weight: 600; }
-
+    .save-hint { font-size: 12px; color: var(--muted); }
     .btn-save {
       padding: 10px 24px; border: none; border-radius: 8px;
       font-family: 'DM Sans', sans-serif; font-size: 14px; font-weight: 600;
-      cursor: pointer; color: var(--white); background: var(--burgundy);
-      transition: opacity 0.15s;
+      cursor: pointer; color: var(--white); background: var(--burgundy); transition: opacity 0.15s;
     }
     .btn-save:hover { opacity: 0.85; }
     .btn-save:disabled { opacity: 0.4; cursor: not-allowed; }
 
-    /* ── Loading ── */
-    .loading {
-      padding: 60px 20px; text-align: center; color: var(--muted); font-size: 14px;
+    /* ── History ── */
+    .history-toggle {
+      padding: 12px 24px; cursor: pointer; font-size: 13px; font-weight: 600;
+      color: var(--burgundy); border-top: 1px solid var(--border);
+      background: var(--light-bg); transition: background 0.15s;
+      display: flex; align-items: center; justify-content: space-between;
     }
+    .history-toggle:hover { background: #e8e4dc; }
+    .history-content { display: none; }
+    .history-content.open { display: block; }
+
+    .history-table { width: 100%; border-collapse: collapse; }
+    .history-table th {
+      text-align: left; padding: 8px 16px; font-size: 11px; font-weight: 600;
+      text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted);
+      background: var(--light-bg); border-bottom: 1px solid var(--border);
+    }
+    .history-table td {
+      padding: 8px 16px; font-size: 13px; border-bottom: 1px solid var(--border);
+    }
+    .history-table tr:last-child td { border-bottom: none; }
+    .history-date { font-weight: 600; }
+    .history-current {
+      display: inline-block; padding: 1px 6px; border-radius: 4px;
+      font-size: 10px; font-weight: 600; background: #e8f5e9; color: #2e7d32;
+      margin-left: 6px;
+    }
+
+    .loading { padding: 40px 20px; text-align: center; color: var(--muted); font-size: 14px; }
 
     .toast {
       position: fixed; bottom: 24px; right: 24px; padding: 12px 20px;
@@ -127,8 +171,8 @@
 
     @media (max-width: 640px) {
       .container { padding: 20px 16px 60px; }
-      .rate-row { flex-wrap: wrap; gap: 10px; }
-      .rate-input { width: 80px; }
+      .new-rate-grid { grid-template-columns: 1fr; }
+      .rate-input { width: 70px; }
     }
   </style>
 </head>
@@ -142,31 +186,72 @@
 <div class="container">
   <div class="page-header">
     <h1>Billing Rates</h1>
-    <p>Set the rates used to calculate charges for each program. Changes take effect immediately for all new billing reports.</p>
+    <p>Rates are tied to effective dates. Changing rates here only affects billing from the date you specify — past months keep their original rates.</p>
   </div>
 
-  <div class="rates-card">
-    <div class="rates-card-header">
-      <h2>Program Rates</h2>
-      <span class="last-updated" id="lastUpdated"></span>
+  <!-- Current rates (read-only display) -->
+  <div class="card">
+    <div class="card-header">
+      <h2>Current Rates</h2>
+      <span class="current-badge" id="currentEffective">Loading…</span>
     </div>
-    <div id="ratesContainer">
+    <div id="currentRatesContainer">
       <div class="loading">Loading rates…</div>
     </div>
   </div>
 
-  <div class="save-bar">
-    <span class="save-status" id="saveStatus">All rates saved</span>
-    <button class="btn-save" id="btnSave" onclick="saveRates()" disabled>Save Changes</button>
+  <!-- Set new rates -->
+  <div class="card">
+    <div class="new-rates-section">
+      <h3>Set New Rates</h3>
+      <div class="hint">Choose an effective date and enter the new rates. This creates a new rate period — previous rates remain unchanged for past billing.</div>
+
+      <div class="effective-row">
+        <label>Effective from:</label>
+        <input type="date" id="effectiveDate">
+        <button class="quick-btn" onclick="setEffective('thisMonth')">1st of This Month</button>
+        <button class="quick-btn" onclick="setEffective('nextMonth')">1st of Next Month</button>
+        <button class="quick-btn" onclick="setEffective('nextYear')">Next School Year</button>
+      </div>
+
+      <div class="new-rate-grid" id="newRateGrid">
+        <!-- Filled by JS -->
+      </div>
+
+      <div class="save-row">
+        <span class="save-hint" id="saveHint">Rates will apply from the selected date forward.</span>
+        <button class="btn-save" id="btnSave" onclick="saveNewRates()">Save New Rates</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Rate history -->
+  <div class="card">
+    <div class="history-toggle" onclick="toggleHistory()">
+      <span>Rate History</span>
+      <span id="historyArrow">▼</span>
+    </div>
+    <div class="history-content" id="historyContent">
+      <table class="history-table">
+        <thead>
+          <tr>
+            <th>Program</th>
+            <th>Rate</th>
+            <th>Effective From</th>
+            <th>Set By</th>
+          </tr>
+        </thead>
+        <tbody id="historyBody"></tbody>
+      </table>
+    </div>
   </div>
 </div>
 
 <div class="toast" id="toast"></div>
 
 <script>
-  let rates = [];
-  let originalValues = {};
-  let hasChanges = false;
+  let currentRates = [];
+  let historyLoaded = false;
 
   const ICONS = {
     aftercare_hourly:   { css: 'icon-aftercare',  emoji: '🌙' },
@@ -177,35 +262,44 @@
     homework_hourly:    { css: 'icon-homework',   emoji: '📚' },
   };
 
-  // Display order
   const ORDER = ['og_session', 'tutoring_session', 'homework_hourly', 'beforecare_session', 'aftercare_hourly', 'mcard_snack'];
 
-  document.addEventListener('DOMContentLoaded', loadRates);
+  document.addEventListener('DOMContentLoaded', () => {
+    loadCurrentRates();
+    setEffective('thisMonth');
+  });
 
-  async function loadRates() {
+  // ── Current rates ──
+  async function loadCurrentRates() {
     try {
       const res = await fetch('/api/billing/rates');
-      rates = await res.json();
-
-      // Sort by our preferred order
-      rates.sort((a, b) => ORDER.indexOf(a.rate_key) - ORDER.indexOf(b.rate_key));
-
-      // Store originals
-      rates.forEach(r => { originalValues[r.rate_key] = parseFloat(r.rate_value) || 0; });
-
-      renderRates();
-      updateLastUpdated();
+      currentRates = await res.json();
+      currentRates.sort((a, b) => ORDER.indexOf(a.rate_key) - ORDER.indexOf(b.rate_key));
+      renderCurrentRates();
+      populateNewRateForm();
     } catch(e) {
-      document.getElementById('ratesContainer').innerHTML =
-        '<div class="loading" style="color:var(--red);">Failed to load rates. Please refresh.</div>';
+      document.getElementById('currentRatesContainer').innerHTML =
+        '<div class="loading" style="color:var(--red);">Failed to load rates.</div>';
     }
   }
 
-  function renderRates() {
-    const container = document.getElementById('ratesContainer');
-    container.innerHTML = rates.map(r => {
+  function renderCurrentRates() {
+    const container = document.getElementById('currentRatesContainer');
+
+    // Find the most recent effective_from across current rates
+    const effectiveDates = currentRates.map(r => r.effective_from).filter(Boolean);
+    const latestEffective = effectiveDates.sort().pop();
+    if (latestEffective) {
+      const d = new Date(latestEffective + 'T12:00:00');
+      const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+      document.getElementById('currentEffective').textContent =
+        `Active since ${months[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`;
+    }
+
+    container.innerHTML = currentRates.map(r => {
       const icon = ICONS[r.rate_key] || { css: 'icon-mcard', emoji: '💲' };
       const val = parseFloat(r.rate_value) || 0;
+      const valClass = val === 0 ? 'rate-value zero' : 'rate-value';
       return `
         <div class="rate-row">
           <div class="rate-icon ${icon.css}">${icon.emoji}</div>
@@ -213,96 +307,130 @@
             <div class="rate-label">${esc(r.label)}</div>
             <div class="rate-unit">${esc(r.unit)}</div>
           </div>
-          <div class="rate-input-wrap">
-            <span class="rate-dollar">$</span>
-            <input type="number" class="rate-input" id="rate-${r.rate_key}"
-                   value="${val.toFixed(2)}" min="0" step="0.25"
-                   oninput="onRateChange('${r.rate_key}', this)">
-          </div>
-        </div>
-      `;
+          <div class="${valClass}">$${val.toFixed(2)}</div>
+        </div>`;
     }).join('');
   }
 
-  function onRateChange(key, input) {
-    const newVal = parseFloat(input.value) || 0;
-    const origVal = originalValues[key];
-    const changed = Math.abs(newVal - origVal) > 0.001;
-
-    input.classList.toggle('changed', changed);
-    checkForChanges();
+  // ── New rate form ──
+  function populateNewRateForm() {
+    const grid = document.getElementById('newRateGrid');
+    grid.innerHTML = currentRates.map(r => {
+      const val = parseFloat(r.rate_value) || 0;
+      return `
+        <div class="new-rate-item">
+          <span class="item-label">${esc(r.label)}</span>
+          <div class="rate-input-wrap">
+            <span class="rate-dollar">$</span>
+            <input type="number" class="rate-input" id="new-${r.rate_key}"
+                   value="${val.toFixed(2)}" min="0" step="0.25">
+          </div>
+        </div>`;
+    }).join('');
   }
 
-  function checkForChanges() {
-    hasChanges = false;
-    rates.forEach(r => {
-      const input = document.getElementById(`rate-${r.rate_key}`);
-      if (input) {
-        const newVal = parseFloat(input.value) || 0;
-        if (Math.abs(newVal - originalValues[r.rate_key]) > 0.001) hasChanges = true;
-      }
-    });
-
-    const status = document.getElementById('saveStatus');
-    const btn = document.getElementById('btnSave');
-    if (hasChanges) {
-      status.textContent = 'You have unsaved changes';
-      status.className = 'save-status unsaved';
-      btn.disabled = false;
-    } else {
-      status.textContent = 'All rates saved';
-      status.className = 'save-status saved';
-      btn.disabled = true;
+  function setEffective(preset) {
+    const input = document.getElementById('effectiveDate');
+    const now = new Date();
+    let d;
+    if (preset === 'thisMonth') {
+      d = new Date(now.getFullYear(), now.getMonth(), 1);
+    } else if (preset === 'nextMonth') {
+      d = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+    } else if (preset === 'nextYear') {
+      // Next September 1
+      const yr = now.getMonth() >= 8 ? now.getFullYear() + 1 : now.getFullYear();
+      d = new Date(yr, 8, 1);
     }
+    input.value = d.toISOString().slice(0, 10);
+
+    // Highlight active quick button
+    document.querySelectorAll('.quick-btn').forEach(b => b.classList.remove('active'));
+    event.target.classList.add('active');
   }
 
-  async function saveRates() {
+  async function saveNewRates() {
+    const effectiveFrom = document.getElementById('effectiveDate').value;
+    if (!effectiveFrom) { showToast('Please select an effective date.'); return; }
+
     const btn = document.getElementById('btnSave');
     btn.disabled = true;
     btn.textContent = 'Saving…';
 
-    const payload = rates.map(r => ({
+    const rates = currentRates.map(r => ({
       rate_key: r.rate_key,
-      rate_value: parseFloat(document.getElementById(`rate-${r.rate_key}`).value) || 0
+      rate_value: parseFloat(document.getElementById(`new-${r.rate_key}`).value) || 0
     }));
 
     try {
       const res = await fetch('/api/billing/rates', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ rates: payload })
+        body: JSON.stringify({ rates, effective_from: effectiveFrom })
       });
       const data = await res.json();
       if (data.success) {
-        showToast('Rates saved ✓');
-        // Update originals
-        payload.forEach(r => { originalValues[r.rate_key] = r.rate_value; });
-        document.querySelectorAll('.rate-input').forEach(i => i.classList.remove('changed'));
-        checkForChanges();
-        updateLastUpdated();
+        showToast('New rates saved ✓');
+        loadCurrentRates();
+        if (historyLoaded) loadHistory();
       } else {
         showToast('Error: ' + (data.error || 'Unknown'));
       }
     } catch(e) {
       showToast('Network error.');
     } finally {
-      btn.textContent = 'Save Changes';
-      checkForChanges();
+      btn.disabled = false;
+      btn.textContent = 'Save New Rates';
     }
   }
 
-  function updateLastUpdated() {
-    const latest = rates.reduce((best, r) => {
-      if (r.updated_at && (!best || r.updated_at > best)) return r.updated_at;
-      return best;
-    }, null);
-    const el = document.getElementById('lastUpdated');
-    if (latest) {
-      const d = new Date(latest);
-      el.textContent = `Last updated ${d.toLocaleDateString()} by ${rates.find(r => r.updated_by)?.updated_by || '—'}`;
+  // ── History ──
+  function toggleHistory() {
+    const content = document.getElementById('historyContent');
+    const arrow = document.getElementById('historyArrow');
+    const isOpen = content.classList.toggle('open');
+    arrow.textContent = isOpen ? '▲' : '▼';
+    if (isOpen && !historyLoaded) loadHistory();
+  }
+
+  async function loadHistory() {
+    const tbody = document.getElementById('historyBody');
+    tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--muted);padding:20px;">Loading…</td></tr>';
+    try {
+      const res = await fetch('/api/billing/rates/history');
+      const rows = await res.json();
+      historyLoaded = true;
+
+      // Build a set of current rate IDs for badge
+      const currentIds = new Set(currentRates.map(r => r.rate_id));
+
+      if (!rows.length) {
+        tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--muted);padding:20px;">No rate history yet.</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = rows.map(r => {
+        const val = parseFloat(r.rate_value) || 0;
+        const isCurrent = currentIds.has(r.rate_id);
+        const d = r.effective_from ? new Date(r.effective_from + 'T12:00:00') : null;
+        const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+        const dateStr = d ? `${months[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}` : '—';
+        return `<tr>
+          <td>${esc(r.label)}</td>
+          <td><strong>$${val.toFixed(2)}</strong></td>
+          <td>
+            <span class="history-date">${dateStr}</span>
+            ${isCurrent ? '<span class="history-current">ACTIVE</span>' : ''}
+          </td>
+          <td>${esc(r.updated_by || '—')}</td>
+        </tr>`;
+      }).join('');
+    } catch(e) {
+      tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--red);padding:20px;">Failed to load history.</td></tr>';
     }
   }
 
+  // ── Utilities ──
   function esc(s) {
     if (!s) return '';
     return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');

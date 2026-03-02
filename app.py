@@ -164,19 +164,30 @@ def init_db():
                     UNIQUE(student_id, session_date)
                 )
             """)
-            # Billing rates configuration
+            # Billing rates with effective dates for historical accuracy
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS billing_rates (
                     rate_id        SERIAL PRIMARY KEY,
-                    rate_key       TEXT NOT NULL UNIQUE,
+                    rate_key       TEXT NOT NULL,
                     rate_value     NUMERIC(10,2) NOT NULL DEFAULT 0,
                     label          TEXT NOT NULL DEFAULT '',
                     unit           TEXT NOT NULL DEFAULT '',
+                    effective_from TEXT NOT NULL DEFAULT '2025-09-01',
                     updated_by     TEXT DEFAULT '',
-                    updated_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    updated_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    UNIQUE(rate_key, effective_from)
                 )
             """)
-            # Seed default rates if empty
+            # Migrate: if table exists but lacks effective_from column, add it
+            cur.execute("""
+                SELECT column_name FROM information_schema.columns
+                WHERE table_name='billing_rates' AND column_name='effective_from'
+            """)
+            if not cur.fetchone():
+                cur.execute("ALTER TABLE billing_rates ADD COLUMN effective_from TEXT NOT NULL DEFAULT '2025-09-01'")
+                cur.execute("ALTER TABLE billing_rates DROP CONSTRAINT IF EXISTS billing_rates_rate_key_key")
+                cur.execute("ALTER TABLE billing_rates ADD CONSTRAINT billing_rates_rate_key_effective_from_key UNIQUE (rate_key, effective_from)")
+            # Seed default rates if empty (effective from start of current school year)
             cur.execute("SELECT COUNT(*) FROM billing_rates")
             if cur.fetchone()[0] == 0:
                 defaults = [
@@ -189,8 +200,8 @@ def init_db():
                 ]
                 for key, val, label, unit in defaults:
                     cur.execute(
-                        "INSERT INTO billing_rates (rate_key, rate_value, label, unit) VALUES (%s,%s,%s,%s) ON CONFLICT DO NOTHING",
-                        (key, val, label, unit)
+                        "INSERT INTO billing_rates (rate_key, rate_value, label, unit, effective_from) VALUES (%s,%s,%s,%s,%s) ON CONFLICT DO NOTHING",
+                        (key, val, label, unit, '2025-09-01')
                     )
         conn.commit()
         print("DB init OK")
@@ -1241,16 +1252,73 @@ def delete_aftercare(record_id):
 
 
 # ============================================
-# BILLING RATES
+# BILLING RATES (effective-date based)
 # ============================================
 
 @app.route("/api/billing/rates")
 @login_required
 def get_billing_rates():
+    """Get current rates (latest effective_from <= today for each key)"""
     conn = get_db_connection()
     try:
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
-            cur.execute("SELECT rate_id, rate_key, rate_value, label, unit, updated_by, updated_at FROM billing_rates ORDER BY rate_id")
+            cur.execute("""
+                SELECT DISTINCT ON (rate_key)
+                    rate_id, rate_key, rate_value, label, unit,
+                    effective_from, updated_by, updated_at
+                FROM billing_rates
+                WHERE effective_from <= CURRENT_DATE::text
+                ORDER BY rate_key, effective_from DESC
+            """)
+            rows = fa(cur)
+            for r in rows:
+                if hasattr(r.get('rate_value'), '__float__'):
+                    r['rate_value'] = float(r['rate_value'])
+                if hasattr(r.get('updated_at'), 'isoformat'):
+                    r['updated_at'] = r['updated_at'].isoformat()
+            return jsonify(rows)
+    finally:
+        conn.close()
+
+@app.route("/api/billing/rates/for-date")
+@login_required
+def get_billing_rates_for_date():
+    """Get rates that were active on a specific date (for billing reports)"""
+    target_date = request.args.get("date")
+    if not target_date:
+        return jsonify({"error": "date param required"}), 400
+    conn = get_db_connection()
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute("""
+                SELECT DISTINCT ON (rate_key)
+                    rate_id, rate_key, rate_value, label, unit,
+                    effective_from, updated_by
+                FROM billing_rates
+                WHERE effective_from <= %s
+                ORDER BY rate_key, effective_from DESC
+            """, (target_date,))
+            rows = fa(cur)
+            for r in rows:
+                if hasattr(r.get('rate_value'), '__float__'):
+                    r['rate_value'] = float(r['rate_value'])
+            return jsonify(rows)
+    finally:
+        conn.close()
+
+@app.route("/api/billing/rates/history")
+@login_required
+def get_billing_rates_history():
+    """Get full rate history for all programs"""
+    conn = get_db_connection()
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute("""
+                SELECT rate_id, rate_key, rate_value, label, unit,
+                       effective_from, updated_by, updated_at
+                FROM billing_rates
+                ORDER BY rate_key, effective_from DESC
+            """)
             rows = fa(cur)
             for r in rows:
                 if hasattr(r.get('rate_value'), '__float__'):
@@ -1264,24 +1332,46 @@ def get_billing_rates():
 @app.route("/api/billing/rates", methods=["POST"])
 @login_required
 def save_billing_rates():
+    """Save new rates with an effective date. Creates new rows — never overwrites old ones."""
     data = request.json
     rates = data.get("rates", [])
-    if not rates:
-        return jsonify({"error": "No rates provided"}), 400
+    effective_from = data.get("effective_from")
+    if not rates or not effective_from:
+        return jsonify({"error": "rates and effective_from required"}), 400
     updated_by = session.get("user_name", "")
     conn = get_db_connection()
     try:
         with conn.cursor() as cur:
             for r in rates:
+                cur.execute("SELECT label, unit FROM billing_rates WHERE rate_key=%s LIMIT 1", (r.get("rate_key"),))
+                existing = cur.fetchone()
+                label = existing[0] if existing else r.get("rate_key")
+                unit = existing[1] if existing else ""
                 cur.execute("""
-                    UPDATE billing_rates SET rate_value=%s, updated_by=%s, updated_at=CURRENT_TIMESTAMP
-                    WHERE rate_key=%s
-                """, (r.get("rate_value", 0), updated_by, r.get("rate_key")))
+                    INSERT INTO billing_rates (rate_key, rate_value, label, unit, effective_from, updated_by)
+                    VALUES (%s,%s,%s,%s,%s,%s)
+                    ON CONFLICT (rate_key, effective_from) DO UPDATE SET
+                        rate_value=EXCLUDED.rate_value, updated_by=EXCLUDED.updated_by,
+                        updated_at=CURRENT_TIMESTAMP
+                """, (r.get("rate_key"), r.get("rate_value", 0), label, unit, effective_from, updated_by))
         conn.commit()
         return jsonify({"success": True})
     except Exception as e:
         conn.rollback()
         return jsonify({"error": str(e)}), 500
+    finally:
+        conn.close()
+
+@app.route("/api/billing/rates/<int:rate_id>", methods=["DELETE"])
+@login_required
+def delete_billing_rate(rate_id):
+    """Delete a future rate entry"""
+    conn = get_db_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM billing_rates WHERE rate_id=%s", (rate_id,))
+        conn.commit()
+        return jsonify({"success": True})
     finally:
         conn.close()
 
