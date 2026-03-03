@@ -643,9 +643,9 @@ const ELECTIVE_SUBJECTS = ['Art','Music','PE','Library','Technology','Drama','Sp
 // ── STATE ─────────────────────────────────────────────────────────────────────
 let allStudents = [];
 let filteredStudents = [];
-let currentGrade    = 'all';
+let currentGrade    = localStorage.getItem('dismissal_grade') || 'all';
 let currentLocation = 'all';
-let currentView     = 'grouped';
+let currentView     = localStorage.getItem('dismissal_view') || 'grouped';
 let groupBy         = 'grade'; // used in grouped view
 let dataSource      = 'today'; // 'today' | 'default'
 
@@ -653,6 +653,10 @@ let dataSource      = 'today'; // 'today' | 'default'
 async function init() {
   updateClock();
   setInterval(updateClock, 1000);
+  // Restore saved view toggle button state
+  document.querySelectorAll('.view-btn').forEach(b => {
+    b.classList.toggle('active', b.textContent.trim().toLowerCase() === currentView);
+  });
   await loadData();
   setInterval(loadData, 60000);
 }
@@ -788,6 +792,7 @@ function setGrade(el) {
   document.querySelectorAll('#gradePills .pill').forEach(p => p.classList.remove('active'));
   el.classList.add('active');
   currentGrade = el.dataset.grade;
+  localStorage.setItem('dismissal_grade', currentGrade);
   applyFilters();
 }
 
@@ -802,6 +807,7 @@ function setView(v, el) {
   document.querySelectorAll('.view-btn').forEach(b => b.classList.remove('active'));
   el.classList.add('active');
   currentView = v;
+  localStorage.setItem('dismissal_view', currentView);
   applyFilters();
 }
 
