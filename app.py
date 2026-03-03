@@ -566,34 +566,53 @@ def get_dismissal_today():
             cur.execute("SELECT COUNT(*) AS c FROM daily_dismissal WHERE dismissal_date=%s",(date_param,))
             filled = cur.fetchone()["c"]
             source = "today" if filled > 0 else "default"
+            # Subquery: pull today's General Attendance status per student
+            # Used in both branches so the dismissal board can show Present/Absent/Excused next to each name
+            att_join = """
+                LEFT JOIN (
+                    SELECT e.student_id, a.status AS att_status
+                    FROM attendance_records a
+                    JOIN enrollments e ON a.enrollment_id = e.enrollment_id
+                    JOIN programs p    ON e.program_id    = p.program_id
+                    WHERE p.program_name = 'General Attendance'
+                      AND a.attendance_date = %s
+                ) att ON att.student_id = s.student_id
+            """
+
             if source == "today":
                 grade_clause = "AND s.grade=%s" if grade_filter else ""
-                params = [date_param]
-                if grade_filter: params.append(grade_filter)
+                # params order: dismissal date, attendance date, [grade]
+                params = [date_param, date_param] + ([grade_filter] if grade_filter else [])
                 cur.execute(f"""
                     SELECT s.student_id AS id, s.first_name AS "firstName",
                            s.last_name AS "lastName", s.grade,
                            d.dismissal_type AS dismissal, d.destination AS activity,
-                           'homeroom' AS "endsIn", NULL AS elective, d.notes
+                           'homeroom' AS "endsIn", NULL AS elective, d.notes,
+                           att.att_status AS "attStatus"
                     FROM students s
                     LEFT JOIN daily_dismissal d ON d.student_id=s.student_id AND d.dismissal_date=%s
+                    {att_join}
                     WHERE s.status='active' {grade_clause}
                     ORDER BY s.last_name, s.first_name
-                """, params)
+                """, [date_param] + [date_param] + ([grade_filter] if grade_filter else []))
             else:
                 from datetime import date as dt_date
                 day_col_map = {"Monday":"dismissal_mon","Tuesday":"dismissal_tue",
                                "Wednesday":"dismissal_wed","Thursday":"dismissal_thu","Friday":"dismissal_fri"}
                 day_name = dt_date.fromisoformat(date_param).strftime("%A")
                 col = day_col_map.get(day_name,"dismissal_mon")
-                grade_clause = "AND grade=%s" if grade_filter else ""
-                params = [grade_filter] if grade_filter else []
+                grade_clause = "AND s.grade=%s" if grade_filter else ""
+                params = [date_param] + ([grade_filter] if grade_filter else [])
                 cur.execute(f"""
-                    SELECT student_id AS id, first_name AS "firstName", last_name AS "lastName", grade,
-                           {col} AS dismissal, NULL AS activity,
-                           'homeroom' AS "endsIn", NULL AS elective, NULL AS notes
-                    FROM students WHERE status='active' {grade_clause}
-                    ORDER BY last_name, first_name
+                    SELECT s.student_id AS id, s.first_name AS "firstName",
+                           s.last_name AS "lastName", s.grade,
+                           s.{col} AS dismissal, NULL AS activity,
+                           'homeroom' AS "endsIn", NULL AS elective, NULL AS notes,
+                           att.att_status AS "attStatus"
+                    FROM students s
+                    {att_join}
+                    WHERE s.status='active' {grade_clause}
+                    ORDER BY s.last_name, s.first_name
                 """, params)
             rows = fa(cur)
     finally:

@@ -372,6 +372,24 @@
     color: var(--muted);
   }
 
+  /* Attendance status badges shown next to student name */
+  .att-badge {
+    display: inline-block;
+    padding: 2px 7px;
+    border-radius: 4px;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+    margin-left: 7px;
+    vertical-align: middle;
+    flex-shrink: 0;
+  }
+  .att-absent  { background: #fde8e8; color: #b91c1c; border: 1px solid #fca5a5; }
+  .att-excused { background: #fff3cd; color: #92400e; border: 1px solid #fcd34d; }
+  .att-ed      { background: #ede9fe; color: #5b21b6; border: 1px solid #c4b5fd; }
+  .att-present { background: #dcfce7; color: #166534; border: 1px solid #86efac; }
+
   /* ── GROUPED VIEW ──────────────────────────────── */
   .groups-grid {
     display: grid;
@@ -674,7 +692,8 @@ function buildFromDefaults(students) {
     id:           s.student_id,
     name:         s.name || `${s.firstName} ${s.lastName}`,
     firstName:    s.firstName || s.first_name,
-    lastName:     s.lastName || s.last_name,
+    lastName:     s.lastName  || s.last_name,
+    attStatus:    s.attStatus || null,
     grade:        s.grade || '?',
     dismissal:    s[`dismissal_${dayKey}`] || null,
     activity:     s.activity || null,
@@ -837,7 +856,7 @@ function renderTable() {
 
   let rows = filteredStudents.map(s => `
     <tr>
-      <td><span class="student-name">${esc(s.lastName)}, ${esc(s.firstName)}</span></td>
+      <td><span class="student-name">${esc(s.lastName)}, ${esc(s.firstName)}</span>${attBadge(s)}</td>
       <td><span class="grade-badge">${esc(s.grade)}</span></td>
       <td>${dismissalTag(s)}</td>
       <td>${locationTag(s)}</td>
@@ -896,7 +915,7 @@ function renderGrouped() {
     const students = groups[key];
     const rows = students.map(s => `
       <div class="group-student-row">
-        <span class="gsrow-name">${esc(s.lastName)}, ${esc(s.firstName)}</span>
+        <span class="gsrow-name">${esc(s.lastName)}, ${esc(s.firstName)}</span>${attBadge(s)}
         <div class="gsrow-meta">
           ${groupByField === 'grade' ? dismissalTag(s) : `<span class="grade-badge">${esc(s.grade)}</span>`}
           ${locationTag(s)}
@@ -959,6 +978,16 @@ function pickupIcon()   { return `<svg width="12" height="12" fill="none" stroke
 function actIcon()      { return `<svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>`; }
 function electiveIcon() { return `<svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>`; }
 function hrIcon()       { return `<svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>`; }
+
+function attBadge(s) {
+  const st = (s.attStatus || '').toLowerCase();
+  if (!st || st === 'present') return '';
+  const labels = { absent: 'Absent', excused: 'Excused Absence', ed: 'Early Dismissal', 'early dismissal': 'Early Dismissal' };
+  const classes = { absent: 'att-absent', excused: 'att-excused', ed: 'att-ed', 'early dismissal': 'att-ed' };
+  const label = labels[st] || st;
+  const cls   = classes[st] || 'att-absent';
+  return `<span class="att-badge ${cls}">${esc(label)}</span>`;
+}
 
 function emptyState() {
   return `
