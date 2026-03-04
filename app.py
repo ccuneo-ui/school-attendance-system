@@ -1600,7 +1600,12 @@ def api_billing_report():
                         total_min = h * 60 + m
                         start_min = 16 * 60 + 30  # 4:30 PM
                         elapsed   = max(0, total_min - start_min)
-                        return math.ceil(elapsed / 15) * 15 / 60.0
+                        # Minimum 1 hour charge; beyond 1 hour billed in 15-min increments
+                        if elapsed <= 60:
+                            return 1.0
+                        else:
+                            over = elapsed - 60
+                            return 1.0 + math.ceil(over / 15) * 15 / 60.0
                     except Exception:
                         return 0.0
 
@@ -1636,7 +1641,6 @@ def api_billing_report():
             sp       = prog.get(sid, {})
 
             # Match program_type strings stored by program_attendance.html
-            # Actual stored values: 'og', 'homework', 'tutoring'
             og_units = sp.get("og", 0.0)
             hw_units = sp.get("homework", 0.0)
             oo_units = sp.get("tutoring", 0.0)
