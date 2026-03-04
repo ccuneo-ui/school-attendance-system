@@ -1524,8 +1524,8 @@ def api_billing_report():
                     SELECT DISTINCT ON (rate_key)
                            rate_key, rate_value
                     FROM   billing_rates
-                    WHERE  effective_from <= %s
-                    ORDER  BY rate_key, effective_from DESC
+                    WHERE  effective_from::date <= %s
+                    ORDER  BY rate_key, effective_from::date DESC
                 """, (first_day,))
                 rate_rows = cur.fetchall()
                 rates = {r["rate_key"]: float(r["rate_value"]) for r in rate_rows}
