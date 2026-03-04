@@ -665,7 +665,10 @@
         <h4 id="detailStudentName">—</h4>
         <div class="meta" id="detailPeriod">—</div>
       </div>
-      <span class="detail-total-badge" id="detailTotalBadge">$0.00</span>
+      <div style="display:flex;align-items:center;gap:10px;">
+        <button class="btn-export" id="detailExportBtn" onclick="exportDetailCSV()" style="display:none;border-color:rgba(255,255,255,0.4);color:rgba(255,255,255,0.85);background:rgba(255,255,255,0.1);">⬇ Export CSV</button>
+        <span class="detail-total-badge" id="detailTotalBadge">$0.00</span>
+      </div>
     </div>
     <div class="detail-tbl-wrap">
       <table class="detail-tbl">
@@ -690,6 +693,7 @@
 let allStudents = [];
 let selectedStudentId = null;
 let selectedStudentName = '';
+let lastDetailData = null;
 
 // ── Init detail month/year selects (mirrors main selects) ──
 (function initDetail() {
@@ -759,6 +763,7 @@ async function runLookup() {
     if(!res.ok) throw new Error(`Server error ${res.status}`);
     const data = await res.json();
     if(data.error) throw new Error(data.error);
+    lastDetailData = data;
     renderDetail(data, month, year);
   } catch(err) {
     alert('Error: ' + err.message);
@@ -805,6 +810,28 @@ function renderDetail(data, month, year) {
   </tr>`;
 
   document.getElementById('detailTotalBadge').textContent = '$' + grandTotal.toFixed(2);
+  document.getElementById('detailExportBtn').style.display = rows.length ? 'flex' : 'none';
+}
+
+function exportDetailCSV() {
+  if(!lastDetailData || !lastDetailData.rows) return;
+  const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const m = document.getElementById('detailMonth').value;
+  const y = document.getElementById('detailYear').value;
+  const label = `${months[m-1]}_${y}`;
+  const safeName = selectedStudentName.replace(/,\s*/,'_').replace(/\s+/g,'_');
+
+  const rows = [['Date','Program','Detail','Recorded By','Amount']];
+  lastDetailData.rows.forEach(r => {
+    rows.push([r.date, r.program_label, r.detail, r.recorded_by||'—', (r.amount||0).toFixed(2)]);
+  });
+  rows.push(['','','','Total', lastDetailData.total.toFixed(2)]);
+
+  const csv = rows.map(r => r.map(c => `"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([csv], {type:'text/csv'}));
+  a.download = `Mizzentop_Detail_${safeName}_${label}.csv`;
+  a.click();
 }
 </script>
 </body>
