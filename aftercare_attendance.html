@@ -382,7 +382,7 @@
   let currentTab = 'beforecare';
   let allStudents = [];
   let selectedStudentId = null;
-  let selectedCheckinTime = '3:15 PM';
+  let selectedCheckinTime = '3:30 PM';
   let records = [];
   let aftercareRoster = [];
 
@@ -390,11 +390,11 @@
   let checkoutRecordId = null;
   let checkoutSelectedTime = null;
 
-  // Check-in time slots: 3:15 PM to 5:30 PM
+  // Check-in time slots: 3:30 PM to 5:00 PM
   const CHECKIN_SLOTS = [];
   (function() {
-    let h = 15, m = 15; // 3:15 PM
-    while (h < 17 || (h === 17 && m <= 30)) {
+    let h = 15, m = 30; // 3:30 PM
+    while (h < 17 || (h === 17 && m === 0)) {
       const h12 = h > 12 ? h - 12 : h;
       CHECKIN_SLOTS.push(`${h12}:${String(m).padStart(2,'0')} PM`);
       m += 15;
@@ -607,13 +607,13 @@
           </tr>`;
         } else {
           const hasCheckout = r.pickup_time && r.pickup_time !== '';
-          const checkinBadge = `<span class="badge-checkin">${esc(r.checkin_time || '3:15 PM')}</span>`;
+          const checkinBadge = `<span class="badge-checkin">${esc(r.checkin_time || '3:30 PM')}</span>`;
           let checkoutCell;
           if (hasCheckout) {
             checkoutCell = `<span class="badge-time">${esc(r.pickup_time)}</span>`;
           } else {
             checkoutCell = `<span class="badge-waiting">Waiting</span>
-              <button class="btn-checkout" onclick="openCheckoutModal(${rid}, '${esc(name)}', '${esc(r.checkin_time || '3:15 PM')}')">Check Out</button>`;
+              <button class="btn-checkout" onclick="openCheckoutModal(${rid}, '${esc(name)}', '${esc(r.checkin_time || '3:30 PM')}')">Check Out</button>`;
           }
           return `<tr>
             <td><strong>${name}</strong></td>

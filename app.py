@@ -158,7 +158,7 @@ def init_db():
                     record_id      SERIAL PRIMARY KEY,
                     student_id     INTEGER NOT NULL,
                     session_date   TEXT NOT NULL,
-                    checkin_time   TEXT NOT NULL DEFAULT '3:15 PM',
+                    checkin_time   TEXT NOT NULL DEFAULT '3:30 PM',
                     pickup_time    TEXT DEFAULT NULL,
                     recorded_by    TEXT DEFAULT '',
                     recorded_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -171,7 +171,7 @@ def init_db():
                 WHERE table_name='aftercare_attendance' AND column_name='checkin_time'
             """)
             if not cur.fetchone():
-                cur.execute("ALTER TABLE aftercare_attendance ADD COLUMN checkin_time TEXT NOT NULL DEFAULT '3:15 PM'")
+                cur.execute("ALTER TABLE aftercare_attendance ADD COLUMN checkin_time TEXT NOT NULL DEFAULT '3:30 PM'")
             # Billing rates with effective dates for historical accuracy
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS billing_rates (
