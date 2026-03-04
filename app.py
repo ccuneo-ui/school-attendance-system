@@ -172,6 +172,13 @@ def init_db():
             """)
             if not cur.fetchone():
                 cur.execute("ALTER TABLE aftercare_attendance ADD COLUMN checkin_time TEXT NOT NULL DEFAULT '3:30 PM'")
+            # Migrate: make pickup_time nullable (was NOT NULL in old schema)
+            cur.execute("""
+                ALTER TABLE aftercare_attendance ALTER COLUMN pickup_time DROP NOT NULL
+            """)
+            cur.execute("""
+                ALTER TABLE aftercare_attendance ALTER COLUMN pickup_time SET DEFAULT NULL
+            """)
             # Billing rates with effective dates for historical accuracy
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS billing_rates (
