@@ -1492,7 +1492,7 @@ def download_backup():
 @login_required
 def billing_report():
     """Billing report page (billing silo)."""
-    return render_template("billing_report.html")
+    return send_from_directory(".", "billing_report.html")
 
 
 @app.route("/api/billing/report")
