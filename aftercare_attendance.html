@@ -18,6 +18,7 @@
       --before-color: #b8860b;
       --after-color: #5b4a8a;
       --red: #c0392b;
+      --green: #2e7d32;
     }
     html, body { min-height: 100vh; font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(--navy); }
 
@@ -74,10 +75,12 @@
     /* ── Stats ── */
     .stats-row { display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }
     .stat-card {
-      flex: 1; min-width: 120px; background: var(--white); border: 1px solid var(--border);
+      flex: 1; min-width: 100px; background: var(--white); border: 1px solid var(--border);
       border-radius: 10px; padding: 14px 16px; text-align: center;
     }
     .stat-value { font-size: 24px; font-weight: 700; font-family: 'Playfair Display', serif; }
+    .stat-value.green { color: var(--green); }
+    .stat-value.purple { color: var(--after-color); }
     .stat-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; margin-top: 2px; }
 
     /* ── Add section ── */
@@ -116,7 +119,7 @@
       padding: 1px 6px; font-size: 11px; color: var(--muted); margin-left: 6px;
     }
 
-    /* ── Time grid (aftercare only) ── */
+    /* ── Time grid ── */
     .time-grid { display: flex; flex-wrap: wrap; gap: 4px; }
     .time-btn {
       padding: 7px 10px; border: 1px solid var(--border); border-radius: 6px;
@@ -136,6 +139,31 @@
     .btn-record:disabled { opacity: 0.4; cursor: not-allowed; }
     .btn-before { background: var(--before-color); }
     .btn-after { background: var(--after-color); }
+
+    /* ── Roster chips ── */
+    .roster-section {
+      background: var(--white); border: 1px solid var(--border); border-radius: 12px;
+      padding: 16px 20px; margin-bottom: 20px;
+    }
+    .roster-section h3 {
+      font-size: 13px; font-weight: 600; margin-bottom: 10px;
+      display: flex; align-items: center; gap: 8px;
+    }
+    .roster-section h3 .roster-count { font-weight: 400; color: var(--muted); font-size: 12px; }
+    .roster-chips { display: flex; flex-wrap: wrap; gap: 6px; overflow: hidden; }
+    .roster-chip {
+      padding: 6px 14px; border-radius: 20px; border: 1px solid var(--border);
+      font-size: 12px; font-weight: 500; cursor: pointer;
+      background: var(--white); color: var(--navy);
+      transition: all 0.15s; white-space: nowrap; flex-shrink: 0;
+    }
+    .roster-chip:hover { background: #ede7f6; border-color: var(--after-color); }
+    .roster-chip.recorded {
+      background: #e8f5e9; border-color: #a5d6a7; color: #2e7d32;
+      cursor: default; opacity: 0.7;
+    }
+    .roster-chip .chip-grade { color: var(--muted); font-size: 10px; margin-left: 4px; }
+    .roster-empty { font-size: 13px; color: var(--muted); font-style: italic; }
 
     /* ── Records ── */
     .records-card {
@@ -158,6 +186,7 @@
     }
     .records-table td {
       padding: 10px 16px; font-size: 13px; border-bottom: 1px solid var(--border);
+      vertical-align: middle;
     }
     .records-table tr:last-child td { border-bottom: none; }
     .records-table tr:hover { background: #faf8f4; }
@@ -170,6 +199,26 @@
       display: inline-block; padding: 3px 10px; border-radius: 6px;
       font-size: 12px; font-weight: 600; background: #ede7f6; color: #4a148c;
     }
+    .badge-checkin {
+      display: inline-block; padding: 3px 10px; border-radius: 6px;
+      font-size: 12px; font-weight: 600; background: #e8f5e9; color: #2e7d32;
+    }
+    .badge-waiting {
+      display: inline-block; padding: 3px 10px; border-radius: 6px;
+      font-size: 12px; font-weight: 600; background: #fff3e0; color: #e65100;
+      animation: pulse 2s infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.6; }
+    }
+    .btn-checkout {
+      padding: 5px 12px; border: 1px solid var(--after-color); border-radius: 6px;
+      font-size: 11px; font-weight: 600; cursor: pointer;
+      background: var(--white); color: var(--after-color);
+      font-family: 'DM Sans', sans-serif; transition: all 0.15s;
+    }
+    .btn-checkout:hover { background: #ede7f6; }
     .btn-remove {
       padding: 4px 10px; border: 1px solid var(--border); border-radius: 6px;
       font-size: 11px; cursor: pointer; background: var(--white); color: var(--red);
@@ -177,44 +226,29 @@
     }
     .btn-remove:hover { background: #fef2f2; border-color: var(--red); }
 
-    .empty-state {
-      padding: 40px 20px; text-align: center; color: var(--muted); font-size: 14px;
-    }
+    .empty-state { padding: 40px 20px; text-align: center; color: var(--muted); font-size: 14px; }
 
-    /* ── Aftercare roster quick-select ── */
-    .roster-section {
-      background: var(--white); border: 1px solid var(--border); border-radius: 12px;
-      padding: 16px 20px; margin-bottom: 20px;
+    /* ── Checkout modal ── */
+    .modal-overlay {
+      display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4);
+      z-index: 500; align-items: center; justify-content: center;
     }
-    .roster-section h3 {
-      font-size: 13px; font-weight: 600; margin-bottom: 10px;
-      display: flex; align-items: center; gap: 8px;
+    .modal-overlay.open { display: flex; }
+    .modal-box {
+      background: var(--white); border-radius: 14px; padding: 24px;
+      width: 90%; max-width: 380px; box-shadow: 0 8px 30px rgba(0,0,0,0.2);
     }
-    .roster-section h3 .roster-count {
-      font-weight: 400; color: var(--muted); font-size: 12px;
+    .modal-box h3 { font-size: 16px; font-weight: 700; margin-bottom: 4px; }
+    .modal-box .modal-sub { font-size: 13px; color: var(--muted); margin-bottom: 16px; }
+    .modal-box .time-grid { margin-bottom: 16px; }
+    .modal-actions { display: flex; gap: 8px; justify-content: flex-end; }
+    .modal-actions button {
+      padding: 8px 16px; border-radius: 8px; font-family: 'DM Sans', sans-serif;
+      font-size: 13px; font-weight: 600; cursor: pointer; transition: opacity 0.15s;
     }
-    .roster-chips {
-      display: flex; flex-wrap: wrap; gap: 6px;
-      overflow: hidden;
-    }
-    .roster-chip {
-      padding: 6px 14px; border-radius: 20px; border: 1px solid var(--border);
-      font-size: 12px; font-weight: 500; cursor: pointer;
-      background: var(--white); color: var(--navy);
-      transition: all 0.15s; white-space: nowrap;
-      flex-shrink: 0;
-    }
-    .roster-chip:hover { background: #ede7f6; border-color: var(--after-color); }
-    .roster-chip.recorded {
-      background: #e8f5e9; border-color: #a5d6a7; color: #2e7d32;
-      cursor: default; opacity: 0.7;
-    }
-    .roster-chip .chip-grade {
-      color: var(--muted); font-size: 10px; margin-left: 4px;
-    }
-    .roster-empty {
-      font-size: 13px; color: var(--muted); font-style: italic;
-    }
+    .btn-modal-cancel { border: 1px solid var(--border); background: var(--white); color: var(--navy); }
+    .btn-modal-confirm { border: none; background: var(--after-color); color: var(--white); }
+    .btn-modal-confirm:hover { opacity: 0.85; }
 
     .toast {
       position: fixed; bottom: 24px; right: 24px; padding: 12px 20px;
@@ -243,7 +277,7 @@
 <div class="container">
   <div class="page-header">
     <h1>Before &amp; Aftercare</h1>
-    <p>Record before-care attendance and aftercare pickup times.</p>
+    <p>Record before-care attendance and aftercare check-in/check-out times.</p>
   </div>
 
   <!-- Tabs -->
@@ -266,10 +300,19 @@
   </div>
 
   <!-- Stats -->
-  <div class="stats-row">
+  <div class="stats-row" id="statsRow">
     <div class="stat-card">
       <div class="stat-value" id="statStudents">0</div>
       <div class="stat-label">Students Today</div>
+    </div>
+    <!-- Aftercare-only stats -->
+    <div class="stat-card" id="statCheckedInCard" style="display:none;">
+      <div class="stat-value purple" id="statCheckedIn">0</div>
+      <div class="stat-label">Still Here</div>
+    </div>
+    <div class="stat-card" id="statCheckedOutCard" style="display:none;">
+      <div class="stat-value green" id="statCheckedOut">0</div>
+      <div class="stat-label">Picked Up</div>
     </div>
   </div>
 
@@ -284,9 +327,9 @@
         <div class="search-dropdown" id="searchDropdown"></div>
         <input type="hidden" id="selectedStudentId">
       </div>
-      <div class="field" id="timeField" style="display:none;">
-        <label>Pickup Time</label>
-        <div class="time-grid" id="timeGrid"></div>
+      <div class="field" id="checkinTimeField" style="display:none;">
+        <label>Check-In Time</label>
+        <div class="time-grid" id="checkinTimeGrid"></div>
       </div>
       <button class="btn-record btn-before" id="btnRecord" onclick="saveRecord()">+ Record</button>
     </div>
@@ -305,11 +348,12 @@
       <span class="records-count" id="recordsCount">0 records</span>
     </div>
     <table class="records-table">
-      <thead>
-        <tr>
+      <thead id="tableHead">
+        <tr id="headerRow">
           <th>Student</th>
           <th>Grade</th>
-          <th id="detailHeader">Attended</th>
+          <th id="col3Header">Attended</th>
+          <th id="col4Header" style="display:none;">Check-Out</th>
           <th></th>
         </tr>
       </thead>
@@ -319,30 +363,59 @@
   </div>
 </div>
 
+<!-- Checkout modal -->
+<div class="modal-overlay" id="checkoutModal">
+  <div class="modal-box">
+    <h3 id="modalStudentName">Check Out Student</h3>
+    <div class="modal-sub" id="modalSub">Select pickup time</div>
+    <div class="time-grid" id="checkoutTimeGrid"></div>
+    <div class="modal-actions">
+      <button class="btn-modal-cancel" onclick="closeCheckoutModal()">Cancel</button>
+      <button class="btn-modal-confirm" onclick="confirmCheckout()">Confirm Pickup</button>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
   let currentTab = 'beforecare';
   let allStudents = [];
   let selectedStudentId = null;
-  let selectedTime = '4:30 PM';
+  let selectedCheckinTime = '3:15 PM';
   let records = [];
   let aftercareRoster = [];
 
-  // Aftercare time slots: 4:30 PM to 6:00 PM in 15-min increments
-  const TIME_SLOTS = [];
+  // Modal state
+  let checkoutRecordId = null;
+  let checkoutSelectedTime = null;
+
+  // Check-in time slots: 3:15 PM to 5:30 PM
+  const CHECKIN_SLOTS = [];
   (function() {
-    let h = 16, m = 30;
+    let h = 15, m = 15; // 3:15 PM
+    while (h < 17 || (h === 17 && m <= 30)) {
+      const h12 = h > 12 ? h - 12 : h;
+      CHECKIN_SLOTS.push(`${h12}:${String(m).padStart(2,'0')} PM`);
+      m += 15;
+      if (m >= 60) { m = 0; h++; }
+    }
+  })();
+
+  // Check-out time slots: 3:30 PM to 6:00 PM
+  const CHECKOUT_SLOTS = [];
+  (function() {
+    let h = 15, m = 30; // 3:30 PM
     while (h < 18 || (h === 18 && m === 0)) {
       const h12 = h > 12 ? h - 12 : h;
-      TIME_SLOTS.push(`${h12}:${String(m).padStart(2,'0')} PM`);
+      CHECKOUT_SLOTS.push(`${h12}:${String(m).padStart(2,'0')} PM`);
       m += 15;
       if (m >= 60) { m = 0; h++; }
     }
   })();
 
   document.addEventListener('DOMContentLoaded', () => {
-    buildTimeGrid();
+    buildCheckinGrid();
     setToday();
     loadStudents();
     document.addEventListener('click', (e) => {
@@ -351,15 +424,15 @@
     });
   });
 
-  function buildTimeGrid() {
-    document.getElementById('timeGrid').innerHTML = TIME_SLOTS.map((t, i) =>
-      `<button class="time-btn${i === 0 ? ' selected' : ''}" onclick="selectTime('${t}', this)">${t}</button>`
+  function buildCheckinGrid() {
+    document.getElementById('checkinTimeGrid').innerHTML = CHECKIN_SLOTS.map((t, i) =>
+      `<button class="time-btn${i === 0 ? ' selected' : ''}" onclick="selectCheckinTime('${t}', this)">${t}</button>`
     ).join('');
   }
 
-  function selectTime(time, btn) {
-    selectedTime = time;
-    document.querySelectorAll('.time-btn').forEach(b => b.classList.remove('selected'));
+  function selectCheckinTime(time, btn) {
+    selectedCheckinTime = time;
+    document.querySelectorAll('#checkinTimeGrid .time-btn').forEach(b => b.classList.remove('selected'));
     btn.classList.add('selected');
   }
 
@@ -370,14 +443,17 @@
     document.querySelectorAll('.tab-btn').forEach((btn, i) => {
       btn.classList.toggle('active', i === (isBefore ? 0 : 1));
     });
-    document.getElementById('timeField').style.display = isBefore ? 'none' : '';
+    document.getElementById('checkinTimeField').style.display = isBefore ? 'none' : '';
     const btn = document.getElementById('btnRecord');
     btn.className = 'btn-record ' + (isBefore ? 'btn-before' : 'btn-after');
-    btn.textContent = isBefore ? '+ Record' : '+ Record Pickup';
+    btn.textContent = isBefore ? '+ Record' : '+ Check In';
     document.getElementById('addTitle').textContent = isBefore
-      ? 'Record Before Care Attendance' : 'Record Aftercare Pickup';
-    document.getElementById('detailHeader').textContent = isBefore ? 'Attended' : 'Pickup Time';
+      ? 'Record Before Care Attendance' : 'Check In to Aftercare';
+    document.getElementById('col3Header').textContent = isBefore ? 'Attended' : 'Check-In';
+    document.getElementById('col4Header').style.display = isBefore ? 'none' : '';
     document.getElementById('rosterSection').style.display = isBefore ? 'none' : '';
+    document.getElementById('statCheckedInCard').style.display = isBefore ? 'none' : '';
+    document.getElementById('statCheckedOutCard').style.display = isBefore ? 'none' : '';
     loadRecords();
   }
 
@@ -437,12 +513,17 @@
     document.getElementById('searchDropdown').classList.remove('open');
   }
 
+  function quickSelectStudent(id, name) {
+    selectStudent(id, name);
+    document.querySelector('.add-section').scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+
   function esc(s) {
     if (!s) return '';
     return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
   }
 
-  // ── Save ──
+  // ── Save (check-in or beforecare) ──
   async function saveRecord() {
     if (!selectedStudentId) { showToast('Please select a student first.'); return; }
     const date = document.getElementById('sessionDate').value;
@@ -455,7 +536,7 @@
       body = { student_id: selectedStudentId, program_type: 'beforecare', session_date: date, units: 1, teacher: '' };
     } else {
       url = '/api/aftercare';
-      body = { student_id: selectedStudentId, session_date: date, pickup_time: selectedTime };
+      body = { student_id: selectedStudentId, session_date: date, checkin_time: selectedCheckinTime, pickup_time: null };
     }
 
     try {
@@ -466,7 +547,7 @@
       });
       const data = await res.json();
       if (data.success) {
-        showToast(currentTab === 'beforecare' ? 'Attendance recorded ✓' : 'Pickup recorded ✓');
+        showToast(currentTab === 'beforecare' ? 'Attendance recorded ✓' : 'Checked in ✓');
         document.getElementById('studentSearch').value = '';
         selectedStudentId = null;
         loadRecords();
@@ -477,7 +558,7 @@
     finally { btn.disabled = false; }
   }
 
-  // ── Load ──
+  // ── Load records ──
   async function loadRecords() {
     const date = document.getElementById('sessionDate').value;
     let url;
@@ -492,64 +573,9 @@
       renderRecords();
     } catch(e) { console.error(e); }
 
-    // Load aftercare roster from dismissal plan when on aftercare tab
     if (currentTab === 'aftercare') {
       loadAftercareRoster();
     }
-  }
-
-  async function loadAftercareRoster() {
-    const date = document.getElementById('sessionDate').value;
-    const container = document.getElementById('rosterChips');
-    const countEl = document.getElementById('rosterCount');
-    try {
-      const res = await fetch(`/api/dismissal/plan/${date}`);
-      const plan = await res.json();
-      // Filter to students assigned "Aftercare" as destination
-      const aftercareIds = plan
-        .filter(p => p.destination && p.destination.toLowerCase() === 'aftercare')
-        .map(p => p.student_id);
-
-      if (aftercareIds.length === 0) {
-        container.innerHTML = '<span class="roster-empty">No students assigned to Aftercare in today\'s Daily Ops plan.</span>';
-        countEl.textContent = '';
-        aftercareRoster = [];
-        return;
-      }
-
-      // Match with student names
-      const recordedIds = new Set(records.map(r => r.student_id));
-      aftercareRoster = aftercareIds.map(id => {
-        const s = allStudents.find(st => st.student_id === id);
-        if (!s) return null;
-        return { ...s, recorded: recordedIds.has(id) };
-      }).filter(Boolean);
-
-      aftercareRoster.sort((a, b) => a.last_name.localeCompare(b.last_name));
-      countEl.textContent = `(${aftercareRoster.length} students)`;
-
-      container.innerHTML = aftercareRoster.map(s => {
-        const recorded = s.recorded;
-        return `<span class="roster-chip${recorded ? ' recorded' : ''}"
-                      onclick="${recorded ? '' : `quickSelectStudent(${s.student_id}, '${esc(s.last_name)}, ${esc(s.first_name)}')`}"
-                      title="${recorded ? 'Already recorded' : 'Click to select'}">
-          ${esc(s.last_name)}, ${esc(s.first_name)}<span class="chip-grade">${esc(s.grade || '')}</span>
-          ${recorded ? ' ✓' : ''}
-        </span>`;
-      }).join('');
-
-    } catch(e) {
-      container.innerHTML = '<span class="roster-empty">Could not load roster. Has the Daily Ops plan been filled in?</span>';
-      countEl.textContent = '';
-    }
-  }
-
-  function quickSelectStudent(id, name) {
-    selectedStudentId = id;
-    document.getElementById('studentSearch').value = name;
-    document.getElementById('searchDropdown').classList.remove('open');
-    // Scroll to the add section
-    document.querySelector('.add-section').scrollIntoView({ behavior: 'smooth', block: 'center' });
   }
 
   function renderRecords() {
@@ -569,16 +595,34 @@
         const name = `${esc(r.last_name)}, ${esc(r.first_name)}`;
         const grade = esc(r.grade || '—');
         const rid = r.record_id;
-        const detailCell = isBefore
-          ? '<span class="badge-session">✓</span>'
-          : `<span class="badge-time">${esc(r.pickup_time)}</span>`;
-        const deleteUrl = isBefore ? `/api/program-attendance/${rid}` : `/api/aftercare/${rid}`;
-        return `<tr>
-          <td><strong>${name}</strong></td>
-          <td>${grade}</td>
-          <td>${detailCell}</td>
-          <td><button class="btn-remove" onclick="removeRecord('${deleteUrl}')">Remove</button></td>
-        </tr>`;
+
+        if (isBefore) {
+          const deleteUrl = `/api/program-attendance/${rid}`;
+          return `<tr>
+            <td><strong>${name}</strong></td>
+            <td>${grade}</td>
+            <td><span class="badge-session">✓</span></td>
+            <td style="display:none;"></td>
+            <td><button class="btn-remove" onclick="removeRecord('${deleteUrl}')">Remove</button></td>
+          </tr>`;
+        } else {
+          const hasCheckout = r.pickup_time && r.pickup_time !== '';
+          const checkinBadge = `<span class="badge-checkin">${esc(r.checkin_time || '3:15 PM')}</span>`;
+          let checkoutCell;
+          if (hasCheckout) {
+            checkoutCell = `<span class="badge-time">${esc(r.pickup_time)}</span>`;
+          } else {
+            checkoutCell = `<span class="badge-waiting">Waiting</span>
+              <button class="btn-checkout" onclick="openCheckoutModal(${rid}, '${esc(name)}', '${esc(r.checkin_time || '3:15 PM')}')">Check Out</button>`;
+          }
+          return `<tr>
+            <td><strong>${name}</strong></td>
+            <td>${grade}</td>
+            <td>${checkinBadge}</td>
+            <td>${checkoutCell}</td>
+            <td><button class="btn-remove" onclick="removeRecord('/api/aftercare/${rid}')">Remove</button></td>
+          </tr>`;
+        }
       }).join('');
     }
 
@@ -586,6 +630,105 @@
     document.getElementById('recordsCount').textContent = `${records.length} record${records.length !== 1 ? 's' : ''}`;
     document.getElementById('recordsTitle').textContent = `${label} — ${months[d.getMonth()]} ${d.getDate()}`;
     document.getElementById('statStudents').textContent = records.length;
+
+    if (!isBefore) {
+      const checkedOut = records.filter(r => r.pickup_time && r.pickup_time !== '').length;
+      const stillHere = records.length - checkedOut;
+      document.getElementById('statCheckedIn').textContent = stillHere;
+      document.getElementById('statCheckedOut').textContent = checkedOut;
+    }
+  }
+
+  // ── Checkout modal ──
+  function openCheckoutModal(recordId, studentName, checkinTime) {
+    checkoutRecordId = recordId;
+    checkoutSelectedTime = null;
+    document.getElementById('modalStudentName').textContent = `Check Out: ${studentName}`;
+    document.getElementById('modalSub').textContent = `Checked in at ${checkinTime}. Select pickup time:`;
+
+    // Build checkout time grid
+    const grid = document.getElementById('checkoutTimeGrid');
+    grid.innerHTML = CHECKOUT_SLOTS.map(t =>
+      `<button class="time-btn" onclick="selectCheckoutTime('${t}', this)">${t}</button>`
+    ).join('');
+
+    document.getElementById('checkoutModal').classList.add('open');
+  }
+
+  function selectCheckoutTime(time, btn) {
+    checkoutSelectedTime = time;
+    document.querySelectorAll('#checkoutTimeGrid .time-btn').forEach(b => b.classList.remove('selected'));
+    btn.classList.add('selected');
+  }
+
+  function closeCheckoutModal() {
+    document.getElementById('checkoutModal').classList.remove('open');
+    checkoutRecordId = null;
+    checkoutSelectedTime = null;
+  }
+
+  async function confirmCheckout() {
+    if (!checkoutSelectedTime) { showToast('Please select a pickup time.'); return; }
+    try {
+      const res = await fetch(`/api/aftercare/${checkoutRecordId}/checkout`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pickup_time: checkoutSelectedTime })
+      });
+      const data = await res.json();
+      if (data.success) {
+        showToast('Checked out ✓');
+        closeCheckoutModal();
+        loadRecords();
+      } else {
+        showToast('Error: ' + (data.error || 'Unknown'));
+      }
+    } catch(e) { showToast('Network error.'); }
+  }
+
+  // ── Aftercare roster ──
+  async function loadAftercareRoster() {
+    const date = document.getElementById('sessionDate').value;
+    const container = document.getElementById('rosterChips');
+    const countEl = document.getElementById('rosterCount');
+    try {
+      const res = await fetch(`/api/dismissal/plan/${date}`);
+      const plan = await res.json();
+      const aftercareIds = plan
+        .filter(p => p.destination && p.destination.toLowerCase() === 'aftercare')
+        .map(p => p.student_id);
+
+      if (aftercareIds.length === 0) {
+        container.innerHTML = '<span class="roster-empty">No students assigned to Aftercare in today\'s Daily Ops plan.</span>';
+        countEl.textContent = '';
+        aftercareRoster = [];
+        return;
+      }
+
+      const recordedIds = new Set(records.map(r => r.student_id));
+      aftercareRoster = aftercareIds.map(id => {
+        const s = allStudents.find(st => st.student_id === id);
+        if (!s) return null;
+        return { ...s, recorded: recordedIds.has(id) };
+      }).filter(Boolean);
+
+      aftercareRoster.sort((a, b) => a.last_name.localeCompare(b.last_name));
+      countEl.textContent = `(${aftercareRoster.length} students)`;
+
+      container.innerHTML = aftercareRoster.map(s => {
+        const recorded = s.recorded;
+        return `<span class="roster-chip${recorded ? ' recorded' : ''}"
+                      onclick="${recorded ? '' : `quickSelectStudent(${s.student_id}, '${esc(s.last_name)}, ${esc(s.first_name)}')`}"
+                      title="${recorded ? 'Already checked in' : 'Click to select'}">
+          ${esc(s.last_name)}, ${esc(s.first_name)}<span class="chip-grade">${esc(s.grade || '')}</span>
+          ${recorded ? ' ✓' : ''}
+        </span>`;
+      }).join('');
+
+    } catch(e) {
+      container.innerHTML = '<span class="roster-empty">Could not load roster.</span>';
+      countEl.textContent = '';
+    }
   }
 
   async function removeRecord(url) {
