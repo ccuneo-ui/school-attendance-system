@@ -1,0 +1,690 @@
+{% extends "base.html" %}
+
+{% block title %}Billing Reports – Mizzentop Admin{% endblock %}
+
+{% block content %}
+<style>
+  /* ── Typography & Tokens ── */
+  :root {
+    --navy:   #1a2744;
+    --gold:   #c9a84c;
+    --gold-lt:#f0d98a;
+    --green:  #2d5a3d;
+    --slate:  #3a4a6b;
+    --mist:   #eef1f8;
+    --white:  #ffffff;
+    --border: #d4dae8;
+    --text:   #1a2744;
+    --sub:    #5a6a8a;
+    --radius: 10px;
+    --shadow: 0 2px 12px rgba(26,39,68,.10);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Georgia', 'Times New Roman', serif;
+    background: var(--mist);
+    color: var(--text);
+    min-height: 100vh;
+  }
+
+  /* ── Page Header ── */
+  .page-header {
+    background: linear-gradient(135deg, var(--navy) 0%, var(--slate) 100%);
+    color: var(--white);
+    padding: 2.5rem 2rem 2rem;
+    border-bottom: 3px solid var(--gold);
+  }
+  .page-header h1 {
+    font-family: 'Playfair Display', Georgia, serif;
+    font-size: 2rem;
+    font-weight: 700;
+    letter-spacing: .02em;
+  }
+  .page-header p {
+    color: rgba(255,255,255,.65);
+    margin-top: .35rem;
+    font-size: .92rem;
+    font-family: 'Helvetica Neue', Arial, sans-serif;
+  }
+  .breadcrumb {
+    font-family: 'Helvetica Neue', Arial, sans-serif;
+    font-size: .8rem;
+    color: rgba(255,255,255,.5);
+    margin-bottom: .75rem;
+  }
+  .breadcrumb a { color: var(--gold-lt); text-decoration: none; }
+  .breadcrumb a:hover { text-decoration: underline; }
+
+  /* ── Controls Bar ── */
+  .controls-bar {
+    background: var(--white);
+    border-bottom: 1px solid var(--border);
+    padding: 1.25rem 2rem;
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+    flex-wrap: wrap;
+    position: sticky;
+    top: 0;
+    z-index: 50;
+    box-shadow: var(--shadow);
+  }
+  .controls-bar label {
+    font-family: 'Helvetica Neue', Arial, sans-serif;
+    font-size: .78rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    color: var(--sub);
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+  }
+  .controls-bar select {
+    font-family: 'Helvetica Neue', Arial, sans-serif;
+    font-size: .88rem;
+    padding: .45rem .9rem;
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--white);
+    color: var(--text);
+    cursor: pointer;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%235a6a8a' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right .75rem center;
+    padding-right: 2.2rem;
+    min-width: 160px;
+  }
+  .controls-bar select:focus { outline: none; border-color: var(--navy); }
+
+  .btn-generate {
+    font-family: 'Helvetica Neue', Arial, sans-serif;
+    font-size: .88rem;
+    font-weight: 600;
+    letter-spacing: .04em;
+    padding: .5rem 1.4rem;
+    background: var(--navy);
+    color: var(--white);
+    border: none;
+    border-radius: var(--radius);
+    cursor: pointer;
+    transition: background .2s;
+  }
+  .btn-generate:hover { background: var(--slate); }
+
+  .btn-export {
+    font-family: 'Helvetica Neue', Arial, sans-serif;
+    font-size: .85rem;
+    font-weight: 600;
+    padding: .5rem 1.2rem;
+    background: var(--white);
+    color: var(--green);
+    border: 1.5px solid var(--green);
+    border-radius: var(--radius);
+    cursor: pointer;
+    transition: all .2s;
+    display: none;
+  }
+  .btn-export:hover { background: var(--green); color: var(--white); }
+  .btn-export.visible { display: inline-flex; align-items: center; gap: .4rem; }
+
+  /* ── Main Content ── */
+  .main { padding: 2rem; max-width: 1200px; margin: 0 auto; }
+
+  /* ── Summary Cards ── */
+  .summary-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 1rem;
+    margin-bottom: 2rem;
+  }
+  .summary-card {
+    background: var(--white);
+    border-radius: var(--radius);
+    padding: 1.25rem 1.5rem;
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow);
+  }
+  .summary-card .label {
+    font-family: 'Helvetica Neue', Arial, sans-serif;
+    font-size: .72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .1em;
+    color: var(--sub);
+    margin-bottom: .4rem;
+  }
+  .summary-card .value {
+    font-family: 'Playfair Display', Georgia, serif;
+    font-size: 1.8rem;
+    font-weight: 700;
+    color: var(--navy);
+    line-height: 1;
+  }
+  .summary-card .sub-value {
+    font-family: 'Helvetica Neue', Arial, sans-serif;
+    font-size: .78rem;
+    color: var(--sub);
+    margin-top: .3rem;
+  }
+  .summary-card.gold-accent { border-left: 4px solid var(--gold); }
+  .summary-card.green-accent { border-left: 4px solid var(--green); }
+
+  /* ── Report Table ── */
+  .report-wrapper {
+    background: var(--white);
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow);
+    overflow: hidden;
+  }
+  .report-header {
+    background: var(--navy);
+    color: var(--white);
+    padding: 1rem 1.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .report-header h2 {
+    font-family: 'Playfair Display', Georgia, serif;
+    font-size: 1.15rem;
+    font-weight: 700;
+  }
+  .report-header .period-badge {
+    font-family: 'Helvetica Neue', Arial, sans-serif;
+    font-size: .78rem;
+    background: rgba(201,168,76,.25);
+    color: var(--gold-lt);
+    padding: .3rem .75rem;
+    border-radius: 20px;
+    border: 1px solid rgba(201,168,76,.4);
+  }
+
+  .table-scroll { overflow-x: auto; }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-family: 'Helvetica Neue', Arial, sans-serif;
+    font-size: .85rem;
+  }
+  thead th {
+    background: #f3f5fb;
+    padding: .75rem 1rem;
+    text-align: left;
+    font-size: .72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    color: var(--sub);
+    border-bottom: 2px solid var(--border);
+    white-space: nowrap;
+  }
+  thead th.amt { text-align: right; }
+
+  tbody tr { border-bottom: 1px solid var(--border); transition: background .1s; }
+  tbody tr:hover { background: var(--mist); }
+  tbody tr.grade-header {
+    background: #f8f9fd;
+  }
+  tbody tr.grade-header td {
+    font-weight: 700;
+    font-size: .78rem;
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    color: var(--sub);
+    padding: .5rem 1rem;
+    border-bottom: 1px solid var(--border);
+  }
+  tbody td {
+    padding: .75rem 1rem;
+    color: var(--text);
+    vertical-align: middle;
+  }
+  tbody td.amt { text-align: right; font-variant-numeric: tabular-nums; }
+  tbody td.zero { color: #bbb; }
+
+  .student-name { font-weight: 600; }
+  .student-grade {
+    font-size: .75rem;
+    color: var(--sub);
+    margin-top: .1rem;
+  }
+
+  .program-chip {
+    display: inline-block;
+    font-size: .7rem;
+    font-weight: 600;
+    padding: .15rem .5rem;
+    border-radius: 4px;
+    background: #eef1f8;
+    color: var(--slate);
+    white-space: nowrap;
+  }
+
+  .total-row td {
+    background: var(--navy);
+    color: var(--white);
+    font-weight: 700;
+    border-bottom: none;
+  }
+  .total-row td.amt { font-size: 1rem; }
+
+  /* ── Empty / Loading ── */
+  .empty-state {
+    text-align: center;
+    padding: 4rem 2rem;
+    color: var(--sub);
+  }
+  .empty-state .icon {
+    font-size: 3rem;
+    margin-bottom: 1rem;
+    opacity: .3;
+  }
+  .empty-state h3 {
+    font-family: 'Playfair Display', Georgia, serif;
+    font-size: 1.3rem;
+    color: var(--navy);
+    margin-bottom: .5rem;
+    opacity: .5;
+  }
+
+  .loading-state {
+    text-align: center;
+    padding: 3rem;
+    color: var(--sub);
+    font-family: 'Helvetica Neue', Arial, sans-serif;
+    font-size: .9rem;
+  }
+  .spinner {
+    display: inline-block;
+    width: 24px; height: 24px;
+    border: 3px solid var(--border);
+    border-top-color: var(--navy);
+    border-radius: 50%;
+    animation: spin .7s linear infinite;
+    margin-bottom: .75rem;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── Grade filter pills ── */
+  .grade-pills {
+    display: flex;
+    gap: .4rem;
+    flex-wrap: wrap;
+  }
+  .grade-pill {
+    font-family: 'Helvetica Neue', Arial, sans-serif;
+    font-size: .75rem;
+    font-weight: 600;
+    padding: .3rem .7rem;
+    border-radius: 20px;
+    border: 1.5px solid var(--border);
+    background: var(--white);
+    color: var(--sub);
+    cursor: pointer;
+    transition: all .15s;
+  }
+  .grade-pill.active {
+    background: var(--navy);
+    color: var(--white);
+    border-color: var(--navy);
+  }
+
+  @media (max-width: 700px) {
+    .controls-bar { padding: 1rem; gap: 1rem; }
+    .main { padding: 1rem; }
+    thead th, tbody td { padding: .6rem .75rem; }
+  }
+</style>
+
+<div class="page-header">
+  <div class="breadcrumb"><a href="/">Home</a> › Billing</div>
+  <h1>Billing Reports</h1>
+  <p>Monthly charges per student broken out by program</p>
+</div>
+
+<!-- Controls -->
+<div class="controls-bar">
+  <label>
+    Month
+    <select id="monthSelect"></select>
+  </label>
+  <label>
+    Year
+    <select id="yearSelect"></select>
+  </label>
+  <button class="btn-generate" onclick="generateReport()">Generate Report</button>
+  <button class="btn-export" id="exportBtn" onclick="exportCSV()">
+    ⬇ Export CSV
+  </button>
+
+  <div style="margin-left:auto; display:flex; align-items:center; gap:.5rem;">
+    <span style="font-family:'Helvetica Neue',Arial,sans-serif;font-size:.75rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--sub);">Grade</span>
+    <div class="grade-pills" id="gradePills">
+      <div class="grade-pill active" data-grade="all">All</div>
+    </div>
+  </div>
+</div>
+
+<!-- Main -->
+<div class="main" id="mainContent">
+  <!-- Summary cards (hidden until report loads) -->
+  <div class="summary-row" id="summaryRow" style="display:none;">
+    <div class="summary-card gold-accent">
+      <div class="label">Total Billing</div>
+      <div class="value" id="totalBilling">—</div>
+      <div class="sub-value" id="totalStudents">— students</div>
+    </div>
+    <div class="summary-card">
+      <div class="label">M Card Snacks</div>
+      <div class="value" id="mcardTotal">—</div>
+      <div class="sub-value" id="mcardCount">— charges</div>
+    </div>
+    <div class="summary-card">
+      <div class="label">Program Attendance</div>
+      <div class="value" id="programTotal">—</div>
+      <div class="sub-value" id="programSessions">— sessions/hours</div>
+    </div>
+    <div class="summary-card green-accent">
+      <div class="label">Before &amp; Aftercare</div>
+      <div class="value" id="careTotal">—</div>
+      <div class="sub-value" id="careDays">— days</div>
+    </div>
+  </div>
+
+  <!-- Report table -->
+  <div class="report-wrapper" id="reportWrapper">
+    <div class="empty-state" id="emptyState">
+      <div class="icon">📋</div>
+      <h3>Select a month and generate a report</h3>
+      <p>Billing data will appear here broken out by student and program.</p>
+    </div>
+    <div class="loading-state" id="loadingState" style="display:none;">
+      <div><div class="spinner"></div></div>
+      Generating report…
+    </div>
+    <div id="reportInner" style="display:none;">
+      <div class="report-header">
+        <h2>Monthly Billing Detail</h2>
+        <span class="period-badge" id="periodBadge"></span>
+      </div>
+      <div class="table-scroll">
+        <table id="billingTable">
+          <thead>
+            <tr>
+              <th>Student</th>
+              <th>Grade</th>
+              <th class="amt">M Card<br>Snacks</th>
+              <th class="amt">Before<br>Care</th>
+              <th class="amt">After<br>Care</th>
+              <th class="amt">OG<br>Tutoring</th>
+              <th class="amt">Homework<br>Center</th>
+              <th class="amt">1-on-1<br>Tutoring</th>
+              <th class="amt" style="background:#f0f4ea;color:var(--green);">Total</th>
+            </tr>
+          </thead>
+          <tbody id="billingTbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── State ──────────────────────────────────────────────────────
+let reportData = [];
+let activeGrade = 'all';
+let currentMonth, currentYear;
+
+// ── Init ───────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  const now = new Date();
+  buildMonthSelect(now.getMonth() + 1);
+  buildYearSelect(now.getFullYear());
+});
+
+function buildMonthSelect(selectedMonth) {
+  const months = ['January','February','March','April','May','June',
+                  'July','August','September','October','November','December'];
+  const sel = document.getElementById('monthSelect');
+  months.forEach((m, i) => {
+    const opt = new Option(m, i + 1);
+    if (i + 1 === selectedMonth) opt.selected = true;
+    sel.appendChild(opt);
+  });
+}
+
+function buildYearSelect(selectedYear) {
+  const sel = document.getElementById('yearSelect');
+  for (let y = selectedYear; y >= selectedYear - 3; y--) {
+    const opt = new Option(y, y);
+    if (y === selectedYear) opt.selected = true;
+    sel.appendChild(opt);
+  }
+}
+
+// ── Generate Report ────────────────────────────────────────────
+async function generateReport() {
+  currentMonth = parseInt(document.getElementById('monthSelect').value);
+  currentYear  = parseInt(document.getElementById('yearSelect').value);
+
+  showLoading(true);
+
+  try {
+    const res = await fetch(`/api/billing/report?month=${currentMonth}&year=${currentYear}`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    reportData = data.students || [];
+    buildGradePills(reportData);
+    renderReport(reportData, currentMonth, currentYear);
+  } catch (err) {
+    console.error(err);
+    showLoading(false);
+    document.getElementById('emptyState').style.display = '';
+    document.getElementById('emptyState').innerHTML = `
+      <div class="icon">⚠️</div>
+      <h3>Error loading report</h3>
+      <p>${err.message}</p>`;
+  }
+}
+
+function showLoading(on) {
+  document.getElementById('emptyState').style.display = on ? 'none' : '';
+  document.getElementById('loadingState').style.display = on ? '' : 'none';
+  document.getElementById('reportInner').style.display = 'none';
+  document.getElementById('summaryRow').style.display = 'none';
+}
+
+// ── Build grade filter pills ───────────────────────────────────
+function buildGradePills(students) {
+  const grades = [...new Set(students.map(s => s.grade))].sort((a,b) => {
+    const n = x => parseInt(x) || 0;
+    return n(a) - n(b);
+  });
+  const container = document.getElementById('gradePills');
+  container.innerHTML = '<div class="grade-pill active" data-grade="all" onclick="filterGrade(\'all\', this)">All</div>';
+  grades.forEach(g => {
+    const el = document.createElement('div');
+    el.className = 'grade-pill';
+    el.dataset.grade = g;
+    el.textContent = `Gr ${g}`;
+    el.onclick = () => filterGrade(g, el);
+    container.appendChild(el);
+  });
+}
+
+function filterGrade(grade, el) {
+  activeGrade = grade;
+  document.querySelectorAll('.grade-pill').forEach(p => p.classList.remove('active'));
+  el.classList.add('active');
+  const filtered = grade === 'all' ? reportData : reportData.filter(s => s.grade === grade);
+  renderTable(filtered);
+  updateSummary(filtered);
+}
+
+// ── Render ─────────────────────────────────────────────────────
+function renderReport(students, month, year) {
+  document.getElementById('loadingState').style.display = 'none';
+  document.getElementById('emptyState').style.display  = 'none';
+
+  const months = ['January','February','March','April','May','June',
+                  'July','August','September','October','November','December'];
+  document.getElementById('periodBadge').textContent = `${months[month-1]} ${year}`;
+
+  const filtered = activeGrade === 'all' ? students : students.filter(s => s.grade === activeGrade);
+  updateSummary(filtered);
+  renderTable(filtered);
+
+  document.getElementById('summaryRow').style.display = '';
+  document.getElementById('reportInner').style.display = '';
+  document.getElementById('exportBtn').classList.add('visible');
+}
+
+function fmt(n) {
+  if (!n || n === 0) return '<span class="zero">—</span>';
+  return '$' + n.toFixed(2);
+}
+
+function renderTable(students) {
+  const tbody = document.getElementById('billingTbody');
+  tbody.innerHTML = '';
+
+  if (!students.length) {
+    tbody.innerHTML = `<tr><td colspan="9" style="text-align:center;padding:2rem;color:var(--sub);">No billing data for this period.</td></tr>`;
+    return;
+  }
+
+  // Group by grade
+  const byGrade = {};
+  students.forEach(s => {
+    if (!byGrade[s.grade]) byGrade[s.grade] = [];
+    byGrade[s.grade].push(s);
+  });
+
+  const sortedGrades = Object.keys(byGrade).sort((a,b) => (parseInt(a)||0) - (parseInt(b)||0));
+
+  let grandTotal = 0;
+
+  sortedGrades.forEach(grade => {
+    // Grade header row
+    const gradeRow = document.createElement('tr');
+    gradeRow.className = 'grade-header';
+    gradeRow.innerHTML = `<td colspan="9">Grade ${grade}</td>`;
+    tbody.appendChild(gradeRow);
+
+    byGrade[grade].forEach(s => {
+      const total = (s.mcard||0) + (s.beforecare||0) + (s.aftercare||0) +
+                    (s.og_tutoring||0) + (s.homework_center||0) + (s.one_on_one||0);
+      grandTotal += total;
+
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td class="student-name">${escHtml(s.name)}</td>
+        <td>${escHtml(s.grade)}</td>
+        <td class="amt">${fmt(s.mcard)}</td>
+        <td class="amt">${fmt(s.beforecare)}</td>
+        <td class="amt">${fmt(s.aftercare)}</td>
+        <td class="amt">${fmt(s.og_tutoring)}</td>
+        <td class="amt">${fmt(s.homework_center)}</td>
+        <td class="amt">${fmt(s.one_on_one)}</td>
+        <td class="amt" style="font-weight:700;color:var(--navy);">${total > 0 ? '$'+total.toFixed(2) : '<span class="zero">—</span>'}</td>
+      `;
+      tbody.appendChild(tr);
+    });
+  });
+
+  // Grand total row
+  const totalRow = document.createElement('tr');
+  totalRow.className = 'total-row';
+
+  const totals = { mcard:0, beforecare:0, aftercare:0, og:0, hw:0, oo:0 };
+  students.forEach(s => {
+    totals.mcard += s.mcard||0;
+    totals.beforecare += s.beforecare||0;
+    totals.aftercare += s.aftercare||0;
+    totals.og += s.og_tutoring||0;
+    totals.hw += s.homework_center||0;
+    totals.oo += s.one_on_one||0;
+  });
+
+  totalRow.innerHTML = `
+    <td colspan="2" style="font-weight:700;">Total — ${students.length} student${students.length!==1?'s':''}</td>
+    <td class="amt">$${totals.mcard.toFixed(2)}</td>
+    <td class="amt">$${totals.beforecare.toFixed(2)}</td>
+    <td class="amt">$${totals.aftercare.toFixed(2)}</td>
+    <td class="amt">$${totals.og.toFixed(2)}</td>
+    <td class="amt">$${totals.hw.toFixed(2)}</td>
+    <td class="amt">$${totals.oo.toFixed(2)}</td>
+    <td class="amt" style="font-size:1.05rem;">$${grandTotal.toFixed(2)}</td>
+  `;
+  tbody.appendChild(totalRow);
+}
+
+function updateSummary(students) {
+  const tot = { mcard:0, beforecare:0, aftercare:0, program:0, total:0 };
+  let mcardCount=0, programSessions=0, careDays=0;
+
+  students.forEach(s => {
+    tot.mcard      += s.mcard||0;
+    tot.beforecare += s.beforecare||0;
+    tot.aftercare  += s.aftercare||0;
+    tot.program    += (s.og_tutoring||0) + (s.homework_center||0) + (s.one_on_one||0);
+    mcardCount     += s.mcard_qty||0;
+    programSessions+= s.program_sessions||0;
+    careDays       += s.care_days||0;
+  });
+  tot.total = tot.mcard + tot.beforecare + tot.aftercare + tot.program;
+
+  document.getElementById('totalBilling').textContent  = '$' + tot.total.toFixed(2);
+  document.getElementById('totalStudents').textContent  = `${students.length} student${students.length!==1?'s':''}`;
+  document.getElementById('mcardTotal').textContent     = '$' + tot.mcard.toFixed(2);
+  document.getElementById('mcardCount').textContent     = `${mcardCount} snacks`;
+  document.getElementById('programTotal').textContent   = '$' + tot.program.toFixed(2);
+  document.getElementById('programSessions').textContent= `${programSessions} sessions/hours`;
+  document.getElementById('careTotal').textContent      = '$' + (tot.beforecare+tot.aftercare).toFixed(2);
+  document.getElementById('careDays').textContent       = `${careDays} days`;
+}
+
+// ── CSV Export ─────────────────────────────────────────────────
+function exportCSV() {
+  const months = ['January','February','March','April','May','June',
+                  'July','August','September','October','November','December'];
+  const label = `${months[currentMonth-1]}_${currentYear}`;
+  const filtered = activeGrade === 'all' ? reportData : reportData.filter(s => s.grade === activeGrade);
+
+  const rows = [
+    ['Student','Grade','M Card Snacks','Before Care','After Care','OG Tutoring','Homework Center','1-on-1 Tutoring','Total']
+  ];
+  filtered.forEach(s => {
+    const total = (s.mcard||0)+(s.beforecare||0)+(s.aftercare||0)+
+                  (s.og_tutoring||0)+(s.homework_center||0)+(s.one_on_one||0);
+    rows.push([
+      s.name, s.grade,
+      (s.mcard||0).toFixed(2),
+      (s.beforecare||0).toFixed(2),
+      (s.aftercare||0).toFixed(2),
+      (s.og_tutoring||0).toFixed(2),
+      (s.homework_center||0).toFixed(2),
+      (s.one_on_one||0).toFixed(2),
+      total.toFixed(2)
+    ]);
+  });
+
+  const csv = rows.map(r => r.map(c => `"${c}"`).join(',')).join('\n');
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `Mizzentop_Billing_${label}.csv`;
+  a.click();
+}
+
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+</script>
+{% endblock %}

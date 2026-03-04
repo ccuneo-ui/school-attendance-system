@@ -1485,6 +1485,195 @@ def download_backup():
 
 
 # ============================================
+# BILLING REPORT
+# ============================================
+
+@app.route("/billing-report")
+@login_required
+def billing_report():
+    """Billing report page (billing silo)."""
+    return render_template("billing_report.html")
+
+
+@app.route("/api/billing/report")
+@login_required
+def api_billing_report():
+    """
+    Monthly billing totals per student, broken out by program.
+    Query params: month (1-12), year (e.g. 2026)
+    """
+    import calendar as cal_mod
+    import math
+    from datetime import date as dt_date
+
+    try:
+        month = int(request.args.get("month", 0))
+        year  = int(request.args.get("year",  0))
+        if not (1 <= month <= 12) or year < 2020:
+            return jsonify({"error": "Invalid month or year"}), 400
+
+        first_day = dt_date(year, month, 1)
+        last_day  = dt_date(year, month, cal_mod.monthrange(year, month)[1])
+
+        conn = get_db_connection()
+        try:
+            with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+
+                # 1. Billing rates active as of first of month
+                cur.execute("""
+                    SELECT DISTINCT ON (rate_key)
+                           rate_key, rate_value
+                    FROM   billing_rates
+                    WHERE  effective_from <= %s
+                    ORDER  BY rate_key, effective_from DESC
+                """, (first_day,))
+                rate_rows = cur.fetchall()
+                rates = {r["rate_key"]: float(r["rate_value"]) for r in rate_rows}
+                defaults = {
+                    "mcard_snack":        1.50,
+                    "beforecare_session": 5.00,
+                    "aftercare_hourly":  15.00,
+                    "og_session":        30.00,
+                    "homework_hourly":   15.00,
+                    "tutoring_session":  30.00,
+                }
+                for k, v in defaults.items():
+                    rates.setdefault(k, v)
+
+                # 2. M Card charges
+                cur.execute("""
+                    SELECT student_id, SUM(quantity) AS qty
+                    FROM   mcard_charges
+                    WHERE  charge_date >= %s AND charge_date <= %s
+                    GROUP  BY student_id
+                """, (first_day, last_day))
+                mcard = {r["student_id"]: int(r["qty"]) for r in cur.fetchall()}
+
+                # 3. Program attendance (beforecare + tutoring programs)
+                cur.execute("""
+                    SELECT student_id, program_type, SUM(units) AS total_units
+                    FROM   program_attendance
+                    WHERE  session_date >= %s AND session_date <= %s
+                    GROUP  BY student_id, program_type
+                """, (first_day, last_day))
+                prog = {}
+                for r in cur.fetchall():
+                    sid = r["student_id"]
+                    if sid not in prog:
+                        prog[sid] = {}
+                    prog[sid][r["program_type"]] = float(r["total_units"])
+
+                # 4. Before care distinct days
+                cur.execute("""
+                    SELECT student_id, COUNT(DISTINCT session_date) AS days
+                    FROM   program_attendance
+                    WHERE  program_type = 'beforecare'
+                      AND  session_date >= %s AND session_date <= %s
+                    GROUP  BY student_id
+                """, (first_day, last_day))
+                before_days = {r["student_id"]: int(r["days"]) for r in cur.fetchall()}
+
+                # 5. Aftercare — compute hours from pickup_time vs 4:30 PM start
+                cur.execute("""
+                    SELECT student_id, date, pickup_time
+                    FROM   aftercare_attendance
+                    WHERE  date >= %s AND date <= %s
+                      AND  pickup_time IS NOT NULL
+                """, (first_day, last_day))
+                aftercare_hours = {}
+                aftercare_days_d = {}
+
+                def pickup_hours(pickup_str):
+                    try:
+                        # Handles "HH:MM" or "H:MM PM" style
+                        s = str(pickup_str).strip().upper()
+                        pm_offset = 0
+                        if "PM" in s:
+                            pm_offset = 12
+                            s = s.replace("PM", "").strip()
+                        if "AM" in s:
+                            s = s.replace("AM", "").strip()
+                        parts = s.split(":")
+                        h, m = int(parts[0]), int(parts[1])
+                        if pm_offset and h != 12:
+                            h += pm_offset
+                        total_min = h * 60 + m
+                        start_min = 16 * 60 + 30  # 4:30 PM
+                        elapsed   = max(0, total_min - start_min)
+                        return math.ceil(elapsed / 15) * 15 / 60.0
+                    except Exception:
+                        return 0.0
+
+                for r in cur.fetchall():
+                    sid = r["student_id"]
+                    hrs = pickup_hours(r["pickup_time"])
+                    aftercare_hours[sid] = aftercare_hours.get(sid, 0.0) + hrs
+                    if sid not in aftercare_days_d:
+                        aftercare_days_d[sid] = set()
+                    aftercare_days_d[sid].add(str(r["date"]))
+
+                # 6. All active students
+                cur.execute("""
+                    SELECT student_id, first_name, last_name, grade
+                    FROM   students
+                    WHERE  status = 'active'
+                    ORDER  BY grade, last_name, first_name
+                """)
+                student_rows = cur.fetchall()
+
+        finally:
+            conn.close()
+
+        # 7. Build results — only students with activity this month
+        results = []
+        for s in student_rows:
+            sid = s["student_id"]
+
+            mc_qty   = mcard.get(sid, 0)
+            bc_days  = before_days.get(sid, 0)
+            ac_hours = aftercare_hours.get(sid, 0.0)
+            ac_days  = len(aftercare_days_d.get(sid, set()))
+            sp       = prog.get(sid, {})
+
+            # Match program_type strings stored by program_attendance.html
+            og_units = sp.get("og_tutoring", 0.0)
+            hw_units = sp.get("homework_center", 0.0)
+            oo_units = sp.get("one_on_one_tutoring", 0.0)
+
+            if not any([mc_qty, bc_days, ac_hours, og_units, hw_units, oo_units]):
+                continue
+
+            mcard_amt  = mc_qty   * rates["mcard_snack"]
+            before_amt = bc_days  * rates["beforecare_session"]
+            after_amt  = ac_hours * rates["aftercare_hourly"]
+            og_amt     = og_units * rates["og_session"]
+            hw_amt     = hw_units * rates["homework_hourly"]
+            oo_amt     = oo_units * rates["tutoring_session"]
+
+            results.append({
+                "student_id":       sid,
+                "name":             f"{s['last_name']}, {s['first_name']}",
+                "grade":            str(s["grade"]),
+                "mcard":            round(mcard_amt, 2),
+                "mcard_qty":        mc_qty,
+                "beforecare":       round(before_amt, 2),
+                "aftercare":        round(after_amt, 2),
+                "og_tutoring":      round(og_amt, 2),
+                "homework_center":  round(hw_amt, 2),
+                "one_on_one":       round(oo_amt, 2),
+                "program_sessions": round(og_units + hw_units + oo_units, 2),
+                "care_days":        bc_days + ac_days,
+            })
+
+        return jsonify({"month": month, "year": year, "students": results, "rates": rates})
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
+
+
+# ============================================
 # STARTUP + RUN
 # ============================================
 
