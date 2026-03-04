@@ -1575,9 +1575,9 @@ def api_billing_report():
 
                 # 5. Aftercare — compute hours from pickup_time vs 4:30 PM start
                 cur.execute("""
-                    SELECT student_id, date, pickup_time
+                    SELECT student_id, session_date, pickup_time
                     FROM   aftercare_attendance
-                    WHERE  date::date >= %s AND date::date <= %s
+                    WHERE  session_date::date >= %s AND session_date::date <= %s
                       AND  pickup_time IS NOT NULL
                 """, (first_day, last_day))
                 aftercare_hours = {}
@@ -1610,7 +1610,7 @@ def api_billing_report():
                     aftercare_hours[sid] = aftercare_hours.get(sid, 0.0) + hrs
                     if sid not in aftercare_days_d:
                         aftercare_days_d[sid] = set()
-                    aftercare_days_d[sid].add(str(r["date"]))
+                    aftercare_days_d[sid].add(str(r["session_date"]))
 
                 # 6. All active students
                 cur.execute("""
