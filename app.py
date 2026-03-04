@@ -1524,8 +1524,8 @@ def api_billing_report():
                     SELECT DISTINCT ON (rate_key)
                            rate_key, rate_value
                     FROM   billing_rates
-                    WHERE  effective_from <= %s
-                    ORDER  BY rate_key, effective_from DESC
+                    WHERE  effective_from::date <= %s
+                    ORDER  BY rate_key, effective_from::date DESC
                 """, (first_day,))
                 rate_rows = cur.fetchall()
                 rates = {r["rate_key"]: float(r["rate_value"]) for r in rate_rows}
@@ -1580,7 +1580,6 @@ def api_billing_report():
                     WHERE  date >= %s AND date <= %s
                       AND  pickup_time IS NOT NULL
                 """, (first_day, last_day))
-                aftercare_rows = cur.fetchall()
                 aftercare_hours = {}
                 aftercare_days_d = {}
 
@@ -1605,7 +1604,7 @@ def api_billing_report():
                     except Exception:
                         return 0.0
 
-                for r in aftercare_rows:
+                for r in cur.fetchall():
                     sid = r["student_id"]
                     hrs = pickup_hours(r["pickup_time"])
                     aftercare_hours[sid] = aftercare_hours.get(sid, 0.0) + hrs
