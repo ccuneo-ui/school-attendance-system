@@ -1678,6 +1678,144 @@ def api_billing_report():
         return jsonify({"error": str(e)}), 500
 
 
+@app.route("/api/billing/student-detail")
+@login_required
+def api_billing_student_detail():
+    """Day-by-day charge breakdown for a single student in a given month."""
+    import calendar as cal_mod
+    import math
+    from datetime import date as dt_date
+
+    try:
+        student_id = int(request.args.get("student_id", 0))
+        month      = int(request.args.get("month", 0))
+        year       = int(request.args.get("year",  0))
+        if not student_id or not (1 <= month <= 12) or year < 2020:
+            return jsonify({"error": "Invalid parameters"}), 400
+
+        first_day = dt_date(year, month, 1)
+        last_day  = dt_date(year, month, cal_mod.monthrange(year, month)[1])
+
+        conn = get_db_connection()
+        try:
+            with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+
+                # Rates for this month
+                cur.execute("""
+                    SELECT DISTINCT ON (rate_key) rate_key, rate_value
+                    FROM   billing_rates
+                    WHERE  effective_from::date <= %s
+                    ORDER  BY rate_key, effective_from::date DESC
+                """, (first_day,))
+                rates = {r["rate_key"]: float(r["rate_value"]) for r in cur.fetchall()}
+                defaults = {
+                    "mcard_snack": 1.50, "beforecare_session": 5.00,
+                    "aftercare_hourly": 15.00, "og_session": 30.00,
+                    "homework_hourly": 15.00, "tutoring_session": 30.00,
+                }
+                for k, v in defaults.items():
+                    rates.setdefault(k, v)
+
+                rows = []
+
+                # 1. M Card charges
+                cur.execute("""
+                    SELECT charge_date, quantity, recorded_at
+                    FROM   mcard_charges
+                    WHERE  student_id = %s
+                      AND  charge_date::date >= %s AND charge_date::date <= %s
+                    ORDER  BY charge_date, recorded_at
+                """, (student_id, first_day, last_day))
+                for r in cur.fetchall():
+                    qty = int(r["quantity"])
+                    rows.append({
+                        "date": str(r["charge_date"]), "program_key": "mcard",
+                        "program_label": "M Card Snack",
+                        "detail": f"{qty} snack{'s' if qty != 1 else ''}",
+                        "recorded_by": "—",
+                        "amount": round(qty * rates["mcard_snack"], 2),
+                    })
+
+                # 2. Program attendance
+                cur.execute("""
+                    SELECT session_date, program_type, units, teacher, recorded_by
+                    FROM   program_attendance
+                    WHERE  student_id = %s
+                      AND  session_date::date >= %s AND session_date::date <= %s
+                    ORDER  BY session_date, program_type
+                """, (student_id, first_day, last_day))
+                prog_labels = {
+                    "og":         ("OG Tutoring",    "og",         "og_session",         "session"),
+                    "homework":   ("Homework Center","homework",   "homework_hourly",     "hr"),
+                    "tutoring":   ("1-on-1 Tutoring","tutoring",   "tutoring_session",   "session"),
+                    "beforecare": ("Before Care",    "beforecare", "beforecare_session",  "session"),
+                }
+                for r in cur.fetchall():
+                    pt    = r["program_type"]
+                    units = float(r["units"])
+                    label, key, rate_key, unit_word = prog_labels.get(
+                        pt, (pt.replace("_"," ").title(), pt, "og_session", "unit"))
+                    amount = units * rates[rate_key]
+                    detail = f"{units:g} {unit_word}{'s' if units != 1 else ''}"
+                    if r.get("teacher"):
+                        detail += f" · Teacher: {r['teacher']}"
+                    rows.append({
+                        "date": str(r["session_date"]), "program_key": key,
+                        "program_label": label, "detail": detail,
+                        "recorded_by": r.get("recorded_by") or "—",
+                        "amount": round(amount, 2),
+                    })
+
+                # 3. Aftercare
+                cur.execute("""
+                    SELECT session_date, checkin_time, pickup_time, recorded_by
+                    FROM   aftercare_attendance
+                    WHERE  student_id = %s
+                      AND  session_date::date >= %s AND session_date::date <= %s
+                      AND  pickup_time IS NOT NULL
+                    ORDER  BY session_date
+                """, (student_id, first_day, last_day))
+
+                def ac_hours(pickup_str):
+                    try:
+                        s = str(pickup_str).strip().upper()
+                        pm = 12 if "PM" in s else 0
+                        s = s.replace("PM","").replace("AM","").strip()
+                        h, m = int(s.split(":")[0]), int(s.split(":")[1])
+                        if pm and h != 12: h += pm
+                        elapsed = max(0, h*60 + m - (16*60+30))
+                        return 1.0 if elapsed <= 60 else 1.0 + math.ceil((elapsed-60)/15)*15/60.0
+                    except Exception:
+                        return 0.0
+
+                for r in cur.fetchall():
+                    hrs    = ac_hours(r["pickup_time"])
+                    amount = hrs * rates["aftercare_hourly"]
+                    checkin = r.get("checkin_time") or "4:30 PM"
+                    pickup  = r.get("pickup_time")  or "—"
+                    rows.append({
+                        "date": str(r["session_date"]), "program_key": "aftercare",
+                        "program_label": "Aftercare",
+                        "detail": f"In: {checkin} · Out: {pickup} ({hrs:g} hr{'s' if hrs!=1 else ''})",
+                        "recorded_by": r.get("recorded_by") or "—",
+                        "amount": round(amount, 2),
+                    })
+
+        finally:
+            conn.close()
+
+        rows.sort(key=lambda x: x["date"])
+        return jsonify({
+            "student_id": student_id, "month": month, "year": year,
+            "rows": rows, "total": round(sum(r["amount"] for r in rows), 2),
+        })
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
+
+
 # ============================================
 # STARTUP + RUN
 # ============================================

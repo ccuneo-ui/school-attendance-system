@@ -423,5 +423,389 @@
 
   function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 </script>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!-- STUDENT DETAIL / DISPUTE LOOKUP                        -->
+<!-- ═══════════════════════════════════════════════════════ -->
+<style>
+  .divider {
+    max-width: 1100px;
+    margin: 0 auto 28px;
+    padding: 0 32px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+  .divider-line { flex: 1; height: 1px; background: var(--border); }
+  .divider-label {
+    font-size: 10px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    color: var(--muted);
+    white-space: nowrap;
+  }
+
+  .detail-section { padding: 0 32px 48px; max-width: 1100px; margin: 0 auto; }
+
+  .detail-controls {
+    background: var(--white);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px 24px;
+    display: flex;
+    align-items: flex-end;
+    gap: 16px;
+    flex-wrap: wrap;
+    margin-bottom: 20px;
+    box-shadow: 0 1px 6px rgba(26,39,68,0.06);
+  }
+  .detail-controls h3 {
+    font-family: 'Playfair Display', serif;
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--navy);
+    width: 100%;
+    margin-bottom: 4px;
+  }
+  .detail-controls p {
+    font-size: 12px;
+    color: var(--muted);
+    width: 100%;
+    margin-top: -8px;
+    margin-bottom: 8px;
+  }
+
+  .search-wrap { position: relative; flex: 1; min-width: 220px; }
+  .search-wrap input {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 14px;
+    padding: 8px 12px;
+    border: 1.5px solid var(--border);
+    border-radius: 8px;
+    width: 100%;
+    color: var(--navy);
+    background: var(--white);
+  }
+  .search-wrap input:focus { outline: none; border-color: var(--navy); }
+  .autocomplete-list {
+    position: absolute;
+    top: 100%; left: 0; right: 0;
+    background: var(--white);
+    border: 1.5px solid var(--border);
+    border-top: none;
+    border-radius: 0 0 8px 8px;
+    max-height: 200px;
+    overflow-y: auto;
+    z-index: 100;
+    display: none;
+    box-shadow: 0 4px 12px rgba(26,39,68,0.1);
+  }
+  .autocomplete-list.open { display: block; }
+  .autocomplete-item {
+    padding: 9px 12px;
+    font-size: 13px;
+    cursor: pointer;
+    border-bottom: 1px solid var(--border);
+    color: var(--navy);
+  }
+  .autocomplete-item:last-child { border-bottom: none; }
+  .autocomplete-item:hover { background: var(--mist); }
+  .autocomplete-item .grade-tag {
+    font-size: 10px;
+    color: var(--muted);
+    margin-left: 6px;
+  }
+
+  .btn-lookup {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 13px; font-weight: 500;
+    padding: 8px 20px;
+    background: var(--burgundy);
+    color: var(--white);
+    border: none; border-radius: 8px;
+    cursor: pointer; transition: background 0.2s;
+    white-space: nowrap;
+  }
+  .btn-lookup:hover { background: #3a1020; }
+  .btn-lookup:disabled { opacity: 0.4; cursor: default; }
+
+  /* Detail result box */
+  .detail-result {
+    background: var(--white);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 1px 6px rgba(26,39,68,0.06);
+    display: none;
+  }
+  .detail-result.show { display: block; }
+
+  .detail-result-header {
+    background: var(--navy);
+    padding: 14px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .detail-result-header h4 {
+    font-family: 'Playfair Display', serif;
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--white);
+  }
+  .detail-result-header .meta {
+    font-size: 12px;
+    color: rgba(255,255,255,0.6);
+  }
+  .detail-total-badge {
+    font-size: 13px;
+    font-weight: 600;
+    padding: 4px 14px;
+    border-radius: 20px;
+    background: rgba(200,153,42,0.25);
+    color: #f0d98a;
+    border: 1px solid rgba(200,153,42,0.4);
+  }
+
+  .detail-tbl-wrap { overflow-x: auto; }
+  .detail-tbl { width: 100%; border-collapse: collapse; font-family: 'DM Sans', sans-serif; font-size: 13px; }
+  .detail-tbl thead th {
+    background: #f8f6f2;
+    padding: 9px 14px;
+    text-align: left;
+    font-size: 10px; font-weight: 500;
+    text-transform: uppercase; letter-spacing: 0.1em;
+    color: var(--muted);
+    border-bottom: 2px solid var(--border);
+    white-space: nowrap;
+  }
+  .detail-tbl thead th.r { text-align: right; }
+  .detail-tbl tbody tr { border-bottom: 1px solid var(--border); transition: background 0.1s; }
+  .detail-tbl tbody tr:hover { background: var(--mist); }
+  .detail-tbl tbody td { padding: 10px 14px; vertical-align: middle; }
+  .detail-tbl tbody td.r { text-align: right; font-variant-numeric: tabular-nums; }
+
+  .prog-chip {
+    display: inline-block;
+    font-size: 11px; font-weight: 500;
+    padding: 2px 8px; border-radius: 4px;
+    white-space: nowrap;
+  }
+  .chip-mcard    { background: #fef3cd; color: #7a5c00; }
+  .chip-og       { background: #dbeafe; color: #1e40af; }
+  .chip-homework { background: #dcfce7; color: #166534; }
+  .chip-tutoring { background: #f3e8ff; color: #6b21a8; }
+  .chip-beforecare { background: #ffedd5; color: #9a3412; }
+  .chip-aftercare  { background: #fce7f3; color: #9d174d; }
+
+  .recorded-by { font-size: 11px; color: var(--muted); }
+
+  .detail-tbl tfoot td {
+    background: var(--navy);
+    color: var(--white);
+    font-weight: 600;
+    padding: 11px 14px;
+  }
+  .detail-tbl tfoot td.r { font-size: 14px; }
+
+  .detail-empty {
+    padding: 40px 24px;
+    text-align: center;
+    color: var(--muted);
+    font-size: 13px;
+  }
+
+  @media (max-width: 700px) {
+    .detail-section { padding: 0 16px 40px; }
+    .divider { padding: 0 16px; }
+  }
+</style>
+
+<!-- Divider -->
+<div class="divider" style="padding-top:8px;">
+  <div class="divider-line"></div>
+  <div class="divider-label">Student Detail / Dispute Lookup</div>
+  <div class="divider-line"></div>
+</div>
+
+<div class="detail-section">
+  <!-- Controls -->
+  <div class="detail-controls">
+    <h3>Student Charge Detail</h3>
+    <p>Look up every charge for a single student by month — use this to resolve billing questions.</p>
+
+    <div class="ctrl-group">
+      <span class="ctrl-label">Student</span>
+      <div class="search-wrap">
+        <input type="text" id="studentSearch" placeholder="Type student name…" autocomplete="off"
+               oninput="onStudentSearch()" onblur="scheduleCloseList()">
+        <div class="autocomplete-list" id="autocompleteList"></div>
+      </div>
+    </div>
+
+    <div class="ctrl-group">
+      <span class="ctrl-label">Month</span>
+      <select class="ctrl-select" id="detailMonth"></select>
+    </div>
+    <div class="ctrl-group">
+      <span class="ctrl-label">Year</span>
+      <select class="ctrl-select" id="detailYear"></select>
+    </div>
+
+    <button class="btn-lookup" id="lookupBtn" onclick="runLookup()" disabled>Look Up</button>
+  </div>
+
+  <!-- Result -->
+  <div class="detail-result" id="detailResult">
+    <div class="detail-result-header">
+      <div>
+        <h4 id="detailStudentName">—</h4>
+        <div class="meta" id="detailPeriod">—</div>
+      </div>
+      <span class="detail-total-badge" id="detailTotalBadge">$0.00</span>
+    </div>
+    <div class="detail-tbl-wrap">
+      <table class="detail-tbl">
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Program</th>
+            <th>Detail</th>
+            <th>Recorded By</th>
+            <th class="r">Amount</th>
+          </tr>
+        </thead>
+        <tbody id="detailTbody"></tbody>
+        <tfoot id="detailTfoot"></tfoot>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── Student Detail state ──
+let allStudents = [];
+let selectedStudentId = null;
+let selectedStudentName = '';
+
+// ── Init detail month/year selects (mirrors main selects) ──
+(function initDetail() {
+  const now = new Date();
+  const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const dm = document.getElementById('detailMonth');
+  months.forEach((m,i) => { const o=new Option(m,i+1); if(i+1===now.getMonth()+1) o.selected=true; dm.appendChild(o); });
+  const dy = document.getElementById('detailYear');
+  for(let y=now.getFullYear(); y>=now.getFullYear()-3; y--) { const o=new Option(y,y); if(y===now.getFullYear()) o.selected=true; dy.appendChild(o); }
+
+  // Load student list
+  fetch('/api/students?status=active')
+    .then(r=>r.json())
+    .then(data => {
+      allStudents = (data.students||data||[]).map(s=>({
+        id: s.student_id,
+        name: `${s.last_name}, ${s.first_name}`,
+        grade: s.grade
+      })).sort((a,b)=>a.name.localeCompare(b.name));
+    })
+    .catch(()=>{});
+})();
+
+// ── Autocomplete ──
+function onStudentSearch() {
+  const q = document.getElementById('studentSearch').value.trim().toLowerCase();
+  selectedStudentId = null;
+  document.getElementById('lookupBtn').disabled = true;
+
+  const list = document.getElementById('autocompleteList');
+  if(q.length < 1) { list.classList.remove('open'); return; }
+
+  const matches = allStudents.filter(s => s.name.toLowerCase().includes(q)).slice(0, 8);
+  if(!matches.length) { list.classList.remove('open'); return; }
+
+  list.innerHTML = matches.map(s =>
+    `<div class="autocomplete-item" onmousedown="selectStudent(${s.id},'${esc(s.name)}','${esc(s.grade)}')">
+      ${esc(s.name)}<span class="grade-tag">Gr ${esc(s.grade)}</span>
+    </div>`
+  ).join('');
+  list.classList.add('open');
+}
+
+function selectStudent(id, name, grade) {
+  selectedStudentId = id;
+  selectedStudentName = name;
+  document.getElementById('studentSearch').value = name;
+  document.getElementById('autocompleteList').classList.remove('open');
+  document.getElementById('lookupBtn').disabled = false;
+}
+
+function scheduleCloseList() {
+  setTimeout(() => document.getElementById('autocompleteList').classList.remove('open'), 200);
+}
+
+// ── Lookup ──
+async function runLookup() {
+  if(!selectedStudentId) return;
+  const month = document.getElementById('detailMonth').value;
+  const year  = document.getElementById('detailYear').value;
+
+  const btn = document.getElementById('lookupBtn');
+  btn.textContent = 'Loading…'; btn.disabled = true;
+
+  try {
+    const res  = await fetch(`/api/billing/student-detail?student_id=${selectedStudentId}&month=${month}&year=${year}`);
+    if(!res.ok) throw new Error(`Server error ${res.status}`);
+    const data = await res.json();
+    if(data.error) throw new Error(data.error);
+    renderDetail(data, month, year);
+  } catch(err) {
+    alert('Error: ' + err.message);
+  } finally {
+    btn.textContent = 'Look Up'; btn.disabled = false;
+  }
+}
+
+// ── Render detail ──
+function renderDetail(data, month, year) {
+  const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  document.getElementById('detailStudentName').textContent = selectedStudentName;
+  document.getElementById('detailPeriod').textContent = `${months[month-1]} ${year}`;
+  document.getElementById('detailResult').classList.add('show');
+
+  const rows = data.rows || [];
+  const tbody = document.getElementById('detailTbody');
+  const tfoot = document.getElementById('detailTfoot');
+  tbody.innerHTML = '';
+  tfoot.innerHTML = '';
+
+  if(!rows.length) {
+    tbody.innerHTML = '<tr><td colspan="5" class="detail-empty">No charges found for this student in this period.</td></tr>';
+    document.getElementById('detailTotalBadge').textContent = '$0.00';
+    return;
+  }
+
+  let grandTotal = 0;
+  rows.forEach(r => {
+    grandTotal += r.amount||0;
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${esc(r.date)}</td>
+      <td><span class="prog-chip chip-${esc(r.program_key)}">${esc(r.program_label)}</span></td>
+      <td>${esc(r.detail)}</td>
+      <td class="recorded-by">${esc(r.recorded_by||'—')}</td>
+      <td class="r">$${(r.amount||0).toFixed(2)}</td>`;
+    tbody.appendChild(tr);
+  });
+
+  tfoot.innerHTML = `<tr>
+    <td colspan="4">Total — ${rows.length} charge${rows.length!==1?'s':''}</td>
+    <td class="r">$${grandTotal.toFixed(2)}</td>
+  </tr>`;
+
+  document.getElementById('detailTotalBadge').textContent = '$' + grandTotal.toFixed(2);
+}
+</script>
 </body>
 </html>
