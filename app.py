@@ -1636,9 +1636,10 @@ def api_billing_report():
             sp       = prog.get(sid, {})
 
             # Match program_type strings stored by program_attendance.html
-            og_units = sp.get("og_tutoring", 0.0)
-            hw_units = sp.get("homework_center", 0.0)
-            oo_units = sp.get("one_on_one_tutoring", 0.0)
+            # Actual stored values: 'og', 'homework', 'tutoring'
+            og_units = sp.get("og", 0.0)
+            hw_units = sp.get("homework", 0.0)
+            oo_units = sp.get("tutoring", 0.0)
 
             if not any([mc_qty, bc_days, ac_hours, og_units, hw_units, oo_units]):
                 continue
