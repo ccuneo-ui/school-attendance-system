@@ -1580,6 +1580,7 @@ def api_billing_report():
                     WHERE  date >= %s AND date <= %s
                       AND  pickup_time IS NOT NULL
                 """, (first_day, last_day))
+                aftercare_rows = cur.fetchall()
                 aftercare_hours = {}
                 aftercare_days_d = {}
 
@@ -1604,7 +1605,7 @@ def api_billing_report():
                     except Exception:
                         return 0.0
 
-                for r in cur.fetchall():
+                for r in aftercare_rows:
                     sid = r["student_id"]
                     hrs = pickup_hours(r["pickup_time"])
                     aftercare_hours[sid] = aftercare_hours.get(sid, 0.0) + hrs
