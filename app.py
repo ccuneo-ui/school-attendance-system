@@ -1524,8 +1524,8 @@ def api_billing_report():
                     SELECT DISTINCT ON (rate_key)
                            rate_key, rate_value
                     FROM   billing_rates
-                    WHERE  effective_from::date <= %s
-                    ORDER  BY rate_key, effective_from::date DESC
+                    WHERE  effective_from <= %s
+                    ORDER  BY rate_key, effective_from DESC
                 """, (first_day,))
                 rate_rows = cur.fetchall()
                 rates = {r["rate_key"]: float(r["rate_value"]) for r in rate_rows}
@@ -1544,7 +1544,7 @@ def api_billing_report():
                 cur.execute("""
                     SELECT student_id, SUM(quantity) AS qty
                     FROM   mcard_charges
-                    WHERE  charge_date >= %s AND charge_date <= %s
+                    WHERE  charge_date::date >= %s AND charge_date::date <= %s
                     GROUP  BY student_id
                 """, (first_day, last_day))
                 mcard = {r["student_id"]: int(r["qty"]) for r in cur.fetchall()}
@@ -1553,7 +1553,7 @@ def api_billing_report():
                 cur.execute("""
                     SELECT student_id, program_type, SUM(units) AS total_units
                     FROM   program_attendance
-                    WHERE  session_date >= %s AND session_date <= %s
+                    WHERE  session_date::date >= %s AND session_date::date <= %s
                     GROUP  BY student_id, program_type
                 """, (first_day, last_day))
                 prog = {}
@@ -1568,7 +1568,7 @@ def api_billing_report():
                     SELECT student_id, COUNT(DISTINCT session_date) AS days
                     FROM   program_attendance
                     WHERE  program_type = 'beforecare'
-                      AND  session_date >= %s AND session_date <= %s
+                      AND  session_date::date >= %s AND session_date::date <= %s
                     GROUP  BY student_id
                 """, (first_day, last_day))
                 before_days = {r["student_id"]: int(r["days"]) for r in cur.fetchall()}
@@ -1577,7 +1577,7 @@ def api_billing_report():
                 cur.execute("""
                     SELECT student_id, date, pickup_time
                     FROM   aftercare_attendance
-                    WHERE  date >= %s AND date <= %s
+                    WHERE  date::date >= %s AND date::date <= %s
                       AND  pickup_time IS NOT NULL
                 """, (first_day, last_day))
                 aftercare_hours = {}
