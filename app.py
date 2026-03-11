@@ -2529,8 +2529,8 @@ def api_financial_aid_new_season():
     try:
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
             # Check new year doesn't already exist
-            cur.execute("SELECT COUNT(*) FROM financial_aid_families WHERE school_year=%s", (to_year,))
-            if cur.fetchone()[0] > 0:
+            cur.execute("SELECT COUNT(*) as cnt FROM financial_aid_families WHERE school_year=%s", (to_year,))
+            if cur.fetchone()['cnt'] > 0:
                 return jsonify({'error': f'{to_year} already has data. Cannot overwrite.'}), 409
 
             # Fetch active families from source year
