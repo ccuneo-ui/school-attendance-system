@@ -2600,6 +2600,64 @@ def seed_financial_aid():
 
 
 # ============================================
+# ONE-TIME MIGRATIONS
+# ============================================
+
+@app.route('/admin/migrate-financial-aid', methods=['POST'])
+@login_required
+def migrate_financial_aid():
+    """
+    One-time migration: rename old year-specific columns to generic names
+    and add status column. Safe to run multiple times.
+    """
+    conn = get_db_connection()
+    results = []
+    try:
+        with conn.cursor() as cur:
+            # Rename net_tuition_2526 -> net_tuition
+            cur.execute("""
+                SELECT column_name FROM information_schema.columns
+                WHERE table_name='financial_aid_students' AND column_name='net_tuition_2526'
+            """)
+            if cur.fetchone():
+                cur.execute("ALTER TABLE financial_aid_students RENAME COLUMN net_tuition_2526 TO net_tuition")
+                results.append("Renamed net_tuition_2526 to net_tuition")
+            else:
+                results.append("net_tuition already correct (skipped)")
+
+            # Rename family_total_2526 -> family_total
+            cur.execute("""
+                SELECT column_name FROM information_schema.columns
+                WHERE table_name='financial_aid_students' AND column_name='family_total_2526'
+            """)
+            if cur.fetchone():
+                cur.execute("ALTER TABLE financial_aid_students RENAME COLUMN family_total_2526 TO family_total")
+                results.append("Renamed family_total_2526 to family_total")
+            else:
+                results.append("family_total already correct (skipped)")
+
+            # Add status column to families if missing
+            cur.execute("""
+                SELECT column_name FROM information_schema.columns
+                WHERE table_name='financial_aid_families' AND column_name='status'
+            """)
+            if not cur.fetchone():
+                cur.execute("ALTER TABLE financial_aid_families ADD COLUMN status TEXT NOT NULL DEFAULT 'active'")
+                results.append("Added status column to financial_aid_families")
+            else:
+                results.append("status column already exists (skipped)")
+
+        conn.commit()
+        return jsonify({'ok': True, 'results': results})
+    except Exception as e:
+        conn.rollback()
+        import traceback; traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+    finally:
+        conn.close()
+
+
+# ============================================
 # STARTUP + RUN
 # ============================================
 
