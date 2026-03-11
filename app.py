@@ -356,6 +356,11 @@ def aftercare():
 def billing_rates():
     return send_from_directory(".", "billing_rates.html")
 
+@app.route("/financial-aid")
+@login_required
+def financial_aid_page():
+    return send_from_directory(".", "financial_aid.html")
+
 @app.route("/api/test")
 def test():
     return jsonify({"status": "ok", "db": "PostgreSQL"})
@@ -1814,6 +1819,413 @@ def api_billing_student_detail():
         import traceback
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
+
+
+# ============================================
+# FINANCIAL AID
+# ============================================
+
+FINANCIAL_AID_MIGRATION = """
+CREATE TABLE IF NOT EXISTS financial_aid_families (
+    id               SERIAL PRIMARY KEY,
+    family_name      TEXT NOT NULL,
+    fast_id          TEXT,
+    school_year      TEXT NOT NULL DEFAULT '2025-26',
+    contract_sent    BOOLEAN DEFAULT FALSE,
+    created_at       TIMESTAMP DEFAULT NOW(),
+    updated_at       TIMESTAMP DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS financial_aid_students (
+    id                  SERIAL PRIMARY KEY,
+    family_id           INTEGER NOT NULL REFERENCES financial_aid_families(id) ON DELETE CASCADE,
+    school              TEXT,
+    tuition             NUMERIC(10,2),
+    max_discount        NUMERIC(10,2),
+    fast_aid_rec        NUMERIC(10,2),
+    appeal_letter       TEXT,
+    family_can_pay      NUMERIC(10,2),
+    mds_aid_amount      NUMERIC(10,2),
+    net_tuition_2526    NUMERIC(10,2),
+    prior_year_tuition  NUMERIC(10,2),
+    family_total_2526   NUMERIC(10,2),
+    family_total_prior  NUMERIC(10,2),
+    parent_notes        TEXT,
+    school_notes        TEXT,
+    karins_notes        TEXT,
+    created_at          TIMESTAMP DEFAULT NOW(),
+    updated_at          TIMESTAMP DEFAULT NOW()
+);
+"""
+
+TUITION_MAP = {
+    'Kindergarten': 19338,
+    'Lower School': 24200,
+    'Middle School': 26299,
+    'Eighth Grade': 27017,
+}
+
+SEED_DATA = [
+    ("Anderson", "951677", True, [
+        ("Middle School", 26299, "Y", 11000, 15299, 11000, 11000, 11000, 11000,
+         "I am a widow of ten years. I have three dependent children, one that is in college. Mizzontop Day School has proved to be the best educational and social environment for X. Any financial aid would be greatly appreciated.",
+         None, None),
+    ]),
+    ("Lent", "952078", True, [
+        ("Lower School", 0, "Y, plus additional letter", 30000, 7000, 17200, 20900, None, None,
+         "Our family has had a large reduction in W2 earnings in 2025.",
+         "Second letter submitted and forwarded to you. I don't know if they will be able to do $38k.",
+         "ok"),
+        ("Middle School", None, None, None, 7000, 17200, 17900, None, None,
+         None, None, "ok"),
+    ]),
+    ("Laino", "952222", True, [
+        ("Lower School", 0, "Y", 15000, 9200, 15000, 17869, 15000, 17860,
+         "2024 was a tough year for the family. With X being out of work for an extended period of time due to a work injury, he was unable to work overtime as he does every other year.",
+         "This student's class will be down to 6 students without this enrollment",
+         None),
+    ]),
+    ("Selca", "952223", True, [
+        ("Middle School", 16299, "Y", 20000, 16299, 10000, 14280, None, None,
+         "I co-own an apartment building with my brother which has had us face many financial hardships over the last several years. Our mortgage rate has adjusted and my payment increased by almost $9,000 a month.",
+         None, None),
+        ("Middle School", 16299, None, None, 16299, 9700, 13390, None, None,
+         None, None, None),
+    ]),
+    ("Eyring", "952323", False, [
+        ("Eighth Grade", 27017, "Y", 7000, 16789, 10228, 9298, 10228, 9298,
+         "X has had an exceptional experience at Mizzentop and I am so thankful that she has been provided this opportunity.",
+         "This student is an asset to her class and has been with MDS since PreK. Her father is retired and on limited income.",
+         None),
+    ]),
+    ("Braham", "952339", True, [
+        ("Lower School", 0, "Y", 32250, 4000, 20200, 17900, None, None,
+         "We made plans, life had other plans. Not far into 2024, I was diagnosed with breast cancer which required multiple surgeries and extensive treatment.",
+         None, None),
+        ("Middle School", None, None, None, 6000, 20299, 17800, None, None,
+         None, None, None),
+    ]),
+    ("Botter", "952340", True, [
+        ("Middle School", 12275, "Y", 8000, 12275, 14024, 12300, 14024, 12300,
+         "We would like our son to continue his educational experience at Mizzentop Day School because its mission, vision, and educational approach aligns with our own.",
+         None, None),
+    ]),
+    ("Argueta", "952373", True, [
+        ("Eighth Grade", 0, "Y", 20000, 3800, 23217, 18800, 23217, 18800,
+         "X has been going to Mizzentop since JPK and I would love for him to finish his last year at a place where he loves to be.",
+         None, "$0 aid"),
+    ]),
+    ("Boardman", "952480", True, [
+        ("Middle School", 0, "Y", 10000, 2500, 23799, 22300, 23799, 22300,
+         "This school has made an incredible impact on my son's life and even his self confidence.",
+         None, None),
+    ]),
+    ("Welch", "952488", True, [
+        ("Lower School", 18291, "Y", 7000, 14520, 9680, 7000, None, None,
+         "Mizzentop has provided a safe and loving environment for my children to thrive.",
+         "These girls tragically lost their father 2 years ago, and it has been our mission to support their education.",
+         None),
+        ("Kindergarten", 18291, None, None, 10000, 9338, 10932, None, None,
+         None, None, None),
+    ]),
+    ("Linquist", "952525", True, [
+        ("Lower School", 26299, "Y", 4000, 19200, 5000, 3000, 5000, 3000,
+         "We greatly appreciate any and all help, and look forward to continuing to be part of the Mizzentop family.",
+         "Mizzentop took this child in when her mother was tragically killed 5 years ago, and we are committed to supporting her education through 8th grade.",
+         None),
+    ]),
+    ("Oludoja", "952542", True, [
+        ("Eighth Grade", 0, "Y", 12000, 8500, 18517, 16600, 18517, 16600,
+         "We are so glad that X is returning to Mizzentop Day School. He has come into his own and is doing so well overall.",
+         None, None),
+    ]),
+    ("Modupe", "952594", False, [
+        ("Middle School", 13702, "Y", 30000, 10450, 15849, 15050, None, None,
+         "We certainly love having all 3 of our girls at Mizzentop, but having 3 girls at Mizzentop also holds its own financial strain.",
+         None, "I think we should do $45 total?"),
+        ("Lower School", None, None, None, 8450, 15750, 14250, None, None,
+         None, None, "I think we should do $45 total?"),
+        ("Kindergarten", None, None, None, 7500, 11838, 14550, None, None,
+         None, None, "I think we should do $45 total?"),
+    ]),
+    ("Dolan", "952614", True, [
+        ("Lower School", 0, "Y", 14250, 9500, 14700, 13000, 14700, 13000,
+         "Both our boys started at Mizzentop in the Fall, and we feel so fortunate that they were able to attend such a wonderful institution.",
+         "1 student in preK not considered on this application, baby on the way.",
+         "They don't qualify?"),
+    ]),
+    ("Taylor", "952667", True, [
+        ("Lower School", 0, "Y", 18000, 6200, 18000, 8000, 18000, 32550,
+         "X enjoys being at this school and would like to continue. However we would appreciate financial aid as her brothers both will be in private high schools.",
+         None, None),
+    ]),
+    ("Cuppek", "951263", True, [
+        ("Middle School", 28598, "Y", 24000, 14900, 11399, 13215, None, None,
+         "Our two children have been enrolled at Mizzentop Day School since the Fall of 2020. This upcoming school year, we fear that with another tuition increase, we will not be able to afford to enroll our children.",
+         None, None),
+        ("Middle School", None, None, None, 13500, 12799, 14280, None, None,
+         None, None, None),
+    ]),
+    ("Sun", "950113", True, [
+        ("Kindergarten", 9338, "Y", 10000, 7735, 11603, None, 11603, None,
+         "We are a family deeply dedicated to serving in Christian mission fields. Joe's father is a pastor currently volunteering at an Australian church for a three-year term.",
+         None, None),
+    ]),
+    ("Pool", "951468", True, [
+        ("Lower School", 0, "Y", 17200, 7000, 17200, 14900, 17200, 14900,
+         "We appreciate everything that Mizzentop has provided for Cameron and our family over the past few years.",
+         None, None),
+    ]),
+    ("Conner", "951506", True, [
+        ("Kindergarten", 19338, "Y", 7000, 6338, None, None, None, None,
+         "As business owners, some years we do well and others we barely make it by.",
+         None, None),
+    ]),
+    ("Hildenbrand", "951527", True, [
+        ("Lower School", 0, "Y", 20000, 0, 24200, 17500, 24200, 17500,
+         "We all love Mizzentop. Carly has been thriving since enrolling. We are seeking any available financial aid to assist with the tuition.",
+         None, None),
+    ]),
+    ("Mazzucca", "951667", True, [
+        ("Middle School", 4799, "Y", 21500, 2500, 23799, 20000, 23799, 20000,
+         "My husband and I are both disabled retired police officers on a fixed income.",
+         None, None),
+    ]),
+    ("Gavin", "951792", True, [
+        ("Lower School", 14200, "Y", 10000, 4860, 19340, 15461, 19340, 15461,
+         "I am a single parent trying to keep my daughter in a safe nurturing school environment.",
+         None, None),
+    ]),
+    ("Wetterhorn", "951943", True, [
+        ("Middle School", 6299, "Y", 20000, 6000, 20299, 21900, 20299, 21900,
+         "I have never applied for financial aid before. I changed employers and knew it would be a difficult year taking a giant step backward financially.",
+         None, None),
+    ]),
+    ("De Harte", "952308", True, [
+        ("Middle School", 0, "Y", 0, 11845, 14454, 13140, 14454, 13140,
+         "I am trying to get my son out of Poughkeepsie Middle School.",
+         "The aid app does not show they have a severely special needs child at home who requires a lot of care.",
+         "Why did she not qualify for aid? Do we know about TP?"),
+    ]),
+    ("Johnson", "952368", True, [
+        ("Middle School", 0, "Y", 25000, 9900, 16399, 14280, None, None,
+         "The biggest factor in requesting financial aid is that my oldest daughter will be attending college in the Fall.",
+         "We gave the daughter a discount to recruit a girl last year, and she has been a gift!",
+         None),
+        ("Middle School", None, None, None, 9900, 16399, 21900, None, None,
+         None, None, None),
+    ]),
+    ("Englehart", "952405", True, [
+        ("Middle School", 14523, "Y", 30000, 10000, 16299, 15360, None, None,
+         "Thank you for your consideration of our financial aid application and hope our family will be able to continue to send our daughters to Mizzentop.",
+         None, None),
+        ("Lower School", None, None, None, 9200, 15000, 13140, None, None,
+         None, None, None),
+    ]),
+    ("Hampton", "952414", True, [
+        ("Eighth Grade", 35419, "Y", 10000, 13698, 13319, 16600, None, None,
+         "We would like to express how much our family appreciates being a part of the Mizzentop Family.",
+         None, None),
+        ("Middle School", None, None, None, 10520, 15779, 10000, None, None,
+         None, None, None),
+    ]),
+    ("Sukow", "952644", True, [
+        ("Middle School", 16299, "N", 10000, 8000, 18299, 15990, 18299, 15990,
+         None, None, None),
+    ]),
+    ("Nelson", "953108", True, [
+        ("Lower School", 38400, "Y", 10000, 12800, 11400, 11449, None, None,
+         "Mizzentop has been a continuous support for us and a great foundation for our children's education.",
+         None, None),
+        ("Lower School", None, None, None, 12800, 11400, 11449, None, None,
+         None, None, None),
+    ]),
+    ("Duplessis", "953352", True, [
+        ("Middle School", 14299, "Y", 12000, 12000, 14299, 13130, 14299, 13130,
+         "Noah is thriving at Mizzentop and I unfortunately cannot afford the school on my own finances.",
+         None, None),
+    ]),
+    ("Phillips", "953839", True, [
+        ("Eighth Grade", 6337, "Y", 15000, 10288, 16729, 13130, 16729, 13130,
+         None, None, None),
+    ]),
+    ("Lallouz", "953763", True, [
+        ("Lower School", 0, "Y", 13500, 4500, 19700, 13130, 19700, 13130,
+         "We are writing to respectfully request your consideration for financial aid for our son, James. Both of us work in the television and entertainment industry, which was significantly impacted by the SAG-AFTRA and WGA strikes.",
+         None, None),
+    ]),
+    ("Sorrentino", "956025", True, [
+        ("Lower School", None, "Y", 5000, 9680, 14520, 13130, 14520, 13130,
+         "I am a single working mother who wants my son to enjoy school. He hasn't had a positive experience in public school.",
+         None, None),
+    ]),
+    ("Myint", "955840", True, [
+        ("Lower School", 0, "Y", 10000, 2000, 22200, 13130, 22200, 13130,
+         "We are writing to respectfully request your consideration for financial aid for our son. The past two years have been incredibly challenging for our family.",
+         None, None),
+    ]),
+    ("Ball", "955900", False, [
+        ("Lower School", 19200, "N", 5000, 9680, 14520, 13130, 14520, 13130,
+         None, None, None),
+    ]),
+    ("Fitz Henley", "956127", False, [
+        ("Lower School", 5000, "N", 25000, 9680, 14520, None, None, None,
+         None, None, None),
+        ("Middle School", None, None, None, 10520, 15779, None, None, None,
+         None, None, None),
+    ]),
+    ("Garay", "955489", True, [
+        ("Middle School", 39438, None, 30000, 12500, 13799, 14750, None, 43550,
+         None, None, None),
+        ("Middle School", None, None, None, 12200, 14099, 14950, None, None,
+         None, None, None),
+        ("Lower School", None, None, None, 6600, 17600, 13850, None, None,
+         None, None, None),
+    ]),
+    ("Douglass", "957109", False, [
+        ("Middle School", 0, "Y", 8000, 10000, 16299, None, None, None,
+         None, None, None),
+    ]),
+]
+
+
+@app.route('/api/financial-aid')
+@login_required
+def api_financial_aid_list():
+    """Return all families with their students for the current school year."""
+    try:
+        conn = get_db_connection()
+        try:
+            with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+                cur.execute("""
+                    SELECT
+                        f.id, f.family_name, f.fast_id, f.contract_sent,
+                        s.id as student_id, s.school, s.tuition, s.max_discount,
+                        s.fast_aid_rec, s.appeal_letter, s.family_can_pay,
+                        s.mds_aid_amount, s.net_tuition_2526, s.prior_year_tuition,
+                        s.family_total_2526, s.family_total_prior,
+                        s.parent_notes, s.school_notes, s.karins_notes
+                    FROM financial_aid_families f
+                    LEFT JOIN financial_aid_students s ON s.family_id = f.id
+                    WHERE f.school_year = '2025-26'
+                    ORDER BY f.family_name, s.id
+                """)
+                rows = cur.fetchall()
+        finally:
+            conn.close()
+
+        families = {}
+        for row in rows:
+            fid = row["id"]
+            if fid not in families:
+                families[fid] = {
+                    'id': fid,
+                    'family_name': row["family_name"],
+                    'fast_id': row["fast_id"],
+                    'contract_sent': row["contract_sent"],
+                    'students': []
+                }
+            if row["student_id"]:
+                families[fid]['students'].append({
+                    'id': row["student_id"],
+                    'school': row["school"],
+                    'tuition': float(row["tuition"]) if row["tuition"] is not None else None,
+                    'max_discount': float(row["max_discount"]) if row["max_discount"] is not None else None,
+                    'fast_aid_rec': float(row["fast_aid_rec"]) if row["fast_aid_rec"] is not None else None,
+                    'appeal_letter': row["appeal_letter"],
+                    'family_can_pay': float(row["family_can_pay"]) if row["family_can_pay"] is not None else None,
+                    'mds_aid_amount': float(row["mds_aid_amount"]) if row["mds_aid_amount"] is not None else None,
+                    'net_tuition_2526': float(row["net_tuition_2526"]) if row["net_tuition_2526"] is not None else None,
+                    'prior_year_tuition': float(row["prior_year_tuition"]) if row["prior_year_tuition"] is not None else None,
+                    'family_total_2526': float(row["family_total_2526"]) if row["family_total_2526"] is not None else None,
+                    'family_total_prior': float(row["family_total_prior"]) if row["family_total_prior"] is not None else None,
+                    'parent_notes': row["parent_notes"],
+                    'school_notes': row["school_notes"],
+                    'karins_notes': row["karins_notes"],
+                })
+
+        return jsonify(list(families.values()))
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/financial-aid/<int:family_id>', methods=['PATCH'])
+@login_required
+def api_financial_aid_update(family_id):
+    """Update Karin's notes and contract_sent status for a family."""
+    data = request.json or {}
+    karins_notes  = data.get('karins_notes', '')
+    contract_sent = bool(data.get('contract_sent', False))
+    conn = get_db_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                UPDATE financial_aid_families
+                SET contract_sent = %s, updated_at = NOW()
+                WHERE id = %s
+            """, (contract_sent, family_id))
+            cur.execute("""
+                UPDATE financial_aid_students
+                SET karins_notes = %s, updated_at = NOW()
+                WHERE family_id = %s
+            """, (karins_notes, family_id))
+        conn.commit()
+        return jsonify({'ok': True})
+    except Exception as e:
+        conn.rollback()
+        return jsonify({'error': str(e)}), 500
+    finally:
+        conn.close()
+
+
+@app.route('/admin/seed-financial-aid', methods=['POST'])
+@login_required
+def seed_financial_aid():
+    """Seed the financial aid tables from spreadsheet data. Run once."""
+    conn = get_db_connection()
+    try:
+        with conn.cursor() as cur:
+            # Create tables
+            for stmt in FINANCIAL_AID_MIGRATION.strip().split(';'):
+                stmt = stmt.strip()
+                if stmt:
+                    cur.execute(stmt)
+            # Guard against double-seeding
+            cur.execute("SELECT COUNT(*) FROM financial_aid_families WHERE school_year = '2025-26'")
+            count = cur.fetchone()[0]
+            if count > 0:
+                return jsonify({'error': 'Already seeded. Delete rows first to re-seed.'}), 400
+            for (fname, fast_id, contract_sent, students) in SEED_DATA:
+                cur.execute("""
+                    INSERT INTO financial_aid_families (family_name, fast_id, school_year, contract_sent)
+                    VALUES (%s, %s, '2025-26', %s)
+                    RETURNING id
+                """, (fname, fast_id, contract_sent))
+                fam_id = cur.fetchone()[0]
+                for s in students:
+                    school = s[0]
+                    tuition = TUITION_MAP.get(school)
+                    cur.execute("""
+                        INSERT INTO financial_aid_students
+                        (family_id, school, tuition, fast_aid_rec, appeal_letter,
+                         family_can_pay, mds_aid_amount, net_tuition_2526,
+                         prior_year_tuition, family_total_2526, family_total_prior,
+                         parent_notes, school_notes, karins_notes)
+                        VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                    """, (fam_id, school, tuition, s[1], s[2], s[3], s[4],
+                          s[5], s[6], s[7], s[8], s[9], s[10], s[11]))
+        conn.commit()
+        return jsonify({'ok': True, 'families_seeded': len(SEED_DATA)})
+    except Exception as e:
+        conn.rollback()
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+    finally:
+        conn.close()
 
 
 # ============================================

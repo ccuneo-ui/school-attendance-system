@@ -1,0 +1,595 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Financial Aid — Mizzentop Admin</title>
+  <link rel="icon" type="image/svg+xml" href="/logo.svg">
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --navy: #1a2744;
+      --burgundy: #4a1a2c;
+      --cream: #f7f3ec;
+      --muted: #6b7280;
+      --white: #ffffff;
+      --border: #e5e1da;
+      --light-bg: #f0ece4;
+      --gold: #c8992a;
+      --green: #1a6b3c;
+      --green-bg: #eaf5ee;
+      --red: #c0392b;
+      --red-bg: #fdf1f0;
+      --yellow: #b8860b;
+      --yellow-bg: #fdf9e7;
+      --shadow: 0 2px 8px rgba(26,39,68,0.08);
+    }
+    html, body { min-height: 100vh; font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(--navy); }
+
+    /* Topbar */
+    .topbar {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 14px 28px; background: var(--burgundy); color: var(--white);
+    }
+    .topbar a { color: rgba(255,255,255,0.75); text-decoration: none; font-size: 13px; font-weight: 500; }
+    .topbar a:hover { color: var(--white); }
+    .topbar-title { font-family: 'Playfair Display', serif; font-size: 18px; font-weight: 700; }
+    .topbar-right { display: flex; align-items: center; gap: 20px; }
+
+    /* Layout */
+    .container { max-width: 1200px; margin: 0 auto; padding: 32px 24px 80px; }
+    .page-header { margin-bottom: 28px; display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 16px; }
+    .page-header-left h1 { font-family: 'Playfair Display', serif; font-size: 28px; font-weight: 700; margin-bottom: 4px; }
+    .page-header-left p { color: var(--muted); font-size: 14px; }
+    .page-header-right { display: flex; gap: 10px; flex-wrap: wrap; }
+
+    /* Summary bar */
+    .summary-bar {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 12px; margin-bottom: 24px;
+    }
+    .summary-card {
+      background: var(--white); border: 1px solid var(--border); border-radius: 10px;
+      padding: 14px 16px;
+    }
+    .summary-card .label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); margin-bottom: 4px; }
+    .summary-card .value { font-size: 20px; font-weight: 700; color: var(--navy); }
+    .summary-card .value.green { color: var(--green); }
+    .summary-card .value.gold { color: var(--gold); }
+
+    /* Filters */
+    .filters-row {
+      display: flex; align-items: center; gap: 12px; margin-bottom: 20px; flex-wrap: wrap;
+    }
+    .filter-input {
+      padding: 8px 12px; border: 1px solid var(--border); border-radius: 8px;
+      font-family: 'DM Sans', sans-serif; font-size: 13px; color: var(--navy);
+      background: var(--white); outline: none;
+    }
+    .filter-input:focus { border-color: var(--navy); }
+    .filter-input.search { min-width: 220px; }
+    .filter-label { font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+    .filter-toggle { display: flex; gap: 4px; }
+    .filter-toggle button {
+      padding: 6px 14px; border: 1px solid var(--border); border-radius: 6px;
+      font-size: 12px; font-weight: 500; cursor: pointer; background: var(--white);
+      color: var(--muted); transition: all 0.15s;
+    }
+    .filter-toggle button.active { background: var(--navy); color: var(--white); border-color: var(--navy); }
+    .filter-toggle button:hover:not(.active) { background: var(--light-bg); }
+
+    /* Family cards */
+    .family-list { display: flex; flex-direction: column; gap: 16px; }
+
+    .family-card {
+      background: var(--white); border: 1px solid var(--border); border-radius: 12px;
+      overflow: hidden; box-shadow: var(--shadow);
+    }
+    .family-card-header {
+      padding: 16px 20px; display: flex; align-items: center; justify-content: space-between;
+      gap: 12px; cursor: pointer; user-select: none;
+      border-bottom: 1px solid transparent; transition: background 0.15s;
+    }
+    .family-card-header:hover { background: var(--light-bg); }
+    .family-card.expanded .family-card-header { border-bottom-color: var(--border); }
+
+    .family-name { font-family: 'Playfair Display', serif; font-size: 17px; font-weight: 700; }
+    .family-meta { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 3px; }
+    .badge {
+      display: inline-flex; align-items: center; padding: 2px 9px;
+      border-radius: 999px; font-size: 11px; font-weight: 600;
+    }
+    .badge-school { background: #e8eaf6; color: #3949ab; }
+    .badge-fast-id { background: var(--light-bg); color: var(--muted); font-size: 10px; font-family: monospace; }
+    .badge-appeal { background: #fff3cd; color: #856404; }
+    .badge-contract { background: var(--green-bg); color: var(--green); }
+    .badge-no-contract { background: var(--red-bg); color: var(--red); }
+    .badge-pending { background: var(--yellow-bg); color: var(--yellow); }
+
+    .family-header-right { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+    .aid-summary { text-align: right; }
+    .aid-summary .requested { font-size: 14px; font-weight: 600; color: var(--navy); }
+    .aid-summary .net { font-size: 12px; color: var(--muted); margin-top: 1px; }
+    .chevron { font-size: 16px; color: var(--muted); transition: transform 0.2s; }
+    .family-card.expanded .chevron { transform: rotate(180deg); }
+
+    /* Student rows */
+    .student-section { padding: 16px 20px; border-bottom: 1px solid var(--border); }
+    .student-section:last-of-type { border-bottom: none; }
+    .student-header {
+      display: grid;
+      grid-template-columns: 1fr 100px 110px 110px 110px 120px;
+      gap: 8px; align-items: center;
+      font-size: 12px; font-weight: 600; color: var(--muted);
+      text-transform: uppercase; letter-spacing: 0.04em;
+      padding-bottom: 10px; border-bottom: 1px solid var(--border); margin-bottom: 10px;
+    }
+    .student-row {
+      display: grid;
+      grid-template-columns: 1fr 100px 110px 110px 110px 120px;
+      gap: 8px; align-items: center; padding: 8px 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .student-row:last-child { border-bottom: none; }
+    .student-name { font-weight: 600; font-size: 14px; }
+    .student-school { font-size: 12px; color: var(--muted); }
+    .money { font-size: 13px; font-weight: 500; }
+    .money.fast { color: var(--navy); }
+    .money.requested { color: var(--gold); font-weight: 600; }
+    .money.net { color: var(--green); font-weight: 600; }
+    .money.prior { color: var(--muted); }
+    .money.zero { color: var(--muted); font-style: italic; }
+
+    /* Notes panel */
+    .notes-panel { padding: 16px 20px; border-top: 1px solid var(--border); background: #fafaf8; }
+    .notes-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; }
+    .note-block label {
+      display: block; font-size: 10px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.06em; color: var(--muted); margin-bottom: 6px;
+    }
+    .note-block .note-text {
+      font-size: 13px; line-height: 1.55; color: var(--navy); padding: 10px 12px;
+      background: var(--white); border: 1px solid var(--border); border-radius: 8px;
+      min-height: 48px;
+    }
+    .note-block .note-text.empty { color: var(--muted); font-style: italic; }
+    .note-block textarea {
+      width: 100%; font-size: 13px; line-height: 1.55; color: var(--navy);
+      padding: 10px 12px; background: var(--white); border: 1px solid var(--border);
+      border-radius: 8px; min-height: 80px; resize: vertical;
+      font-family: 'DM Sans', sans-serif; outline: none;
+    }
+    .note-block textarea:focus { border-color: var(--navy); }
+
+    /* Edit controls */
+    .edit-row { display: flex; align-items: center; gap: 10px; padding: 12px 20px; background: #fafaf8; border-top: 1px solid var(--border); flex-wrap: wrap; }
+    .edit-row label { font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+    .check-item { display: flex; align-items: center; gap: 6px; }
+    .check-item input[type=checkbox] { width: 16px; height: 16px; accent-color: var(--navy); cursor: pointer; }
+    .check-item span { font-size: 13px; font-weight: 500; }
+    .btn-save {
+      margin-left: auto; padding: 8px 18px; background: var(--navy); color: var(--white);
+      border: none; border-radius: 8px; font-family: 'DM Sans', sans-serif;
+      font-size: 13px; font-weight: 600; cursor: pointer; transition: background 0.15s;
+    }
+    .btn-save:hover { background: #253460; }
+    .btn-save.saving { background: var(--muted); cursor: default; }
+    .save-feedback { font-size: 12px; color: var(--green); font-weight: 500; }
+
+    /* Buttons */
+    .btn {
+      padding: 8px 16px; border-radius: 8px; font-family: 'DM Sans', sans-serif;
+      font-size: 13px; font-weight: 600; cursor: pointer; border: none; transition: all 0.15s;
+    }
+    .btn-primary { background: var(--navy); color: var(--white); }
+    .btn-primary:hover { background: #253460; }
+    .btn-outline { background: var(--white); color: var(--navy); border: 1px solid var(--border); }
+    .btn-outline:hover { background: var(--light-bg); }
+
+    /* Year selector */
+    .year-tab { display: flex; gap: 6px; align-items: center; }
+    .year-tab button {
+      padding: 6px 14px; border-radius: 6px; font-size: 13px; font-weight: 500;
+      cursor: pointer; border: 1px solid var(--border); background: var(--white);
+      color: var(--muted); font-family: 'DM Sans', sans-serif; transition: all 0.15s;
+    }
+    .year-tab button.active { background: var(--burgundy); color: var(--white); border-color: var(--burgundy); }
+
+    /* Empty state */
+    .empty-state { text-align: center; padding: 60px 20px; color: var(--muted); }
+    .empty-state p { font-size: 15px; }
+
+    /* Loading */
+    .loading { text-align: center; padding: 40px; color: var(--muted); font-size: 14px; }
+
+    /* Toast */
+    .toast {
+      position: fixed; bottom: 24px; right: 24px; background: var(--navy); color: var(--white);
+      padding: 12px 20px; border-radius: 10px; font-size: 13px; font-weight: 500;
+      z-index: 9999; box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+      transform: translateY(80px); opacity: 0; transition: all 0.25s;
+    }
+    .toast.show { transform: translateY(0); opacity: 1; }
+    .toast.error { background: var(--red); }
+
+    @media (max-width: 700px) {
+      .student-header, .student-row { grid-template-columns: 1fr 80px 90px; }
+      .student-header > *:nth-child(n+4), .student-row > *:nth-child(n+4) { display: none; }
+      .family-header-right .aid-summary .net { display: none; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="topbar">
+  <div style="display:flex;align-items:center;gap:20px;">
+    <a href="/home">← Home</a>
+    <span class="topbar-title">Financial Aid</span>
+  </div>
+  <div class="topbar-right">
+    <a href="/billing-report">Billing Reports</a>
+    <a href="/billing-rates">Billing Rates</a>
+  </div>
+</div>
+
+<div class="container">
+  <div class="page-header">
+    <div class="page-header-left">
+      <h1>Financial Aid Applications</h1>
+      <p>2025–2026 School Year &nbsp;·&nbsp; Admin only</p>
+    </div>
+    <div class="page-header-right">
+      <button class="btn btn-outline" onclick="exportCSV()">Export CSV</button>
+    </div>
+  </div>
+
+  <div class="summary-bar" id="summaryBar">
+    <div class="summary-card">
+      <div class="label">Families</div>
+      <div class="value" id="sumFamilies">—</div>
+    </div>
+    <div class="summary-card">
+      <div class="label">Students</div>
+      <div class="value" id="sumStudents">—</div>
+    </div>
+    <div class="summary-card">
+      <div class="label">Total Aid Requested</div>
+      <div class="value gold" id="sumRequested">—</div>
+    </div>
+    <div class="summary-card">
+      <div class="label">FAST Recommended</div>
+      <div class="value" id="sumFast">—</div>
+    </div>
+    <div class="summary-card">
+      <div class="label">Contracts Sent</div>
+      <div class="value green" id="sumContracts">—</div>
+    </div>
+    <div class="summary-card">
+      <div class="label">Pending</div>
+      <div class="value gold" id="sumPending">—</div>
+    </div>
+  </div>
+
+  <div class="filters-row">
+    <input type="text" class="filter-input search" id="searchInput" placeholder="Search families..." oninput="applyFilters()">
+
+    <span class="filter-label">Division:</span>
+    <div class="filter-toggle" id="divisionFilter">
+      <button class="active" data-val="all" onclick="setFilter('division','all',this)">All</button>
+      <button data-val="Kindergarten" onclick="setFilter('division','Kindergarten',this)">K</button>
+      <button data-val="Lower School" onclick="setFilter('division','Lower School',this)">Lower</button>
+      <button data-val="Middle School" onclick="setFilter('division','Middle School',this)">Middle</button>
+      <button data-val="Eighth Grade" onclick="setFilter('division','Eighth Grade',this)">8th</button>
+    </div>
+
+    <span class="filter-label">Status:</span>
+    <div class="filter-toggle" id="statusFilter">
+      <button class="active" data-val="all" onclick="setFilter('status','all',this)">All</button>
+      <button data-val="contract" onclick="setFilter('status','contract',this)">Contract Sent</button>
+      <button data-val="pending" onclick="setFilter('status','pending',this)">Pending</button>
+    </div>
+  </div>
+
+  <div class="family-list" id="familyList">
+    <div class="loading">Loading applications...</div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+  let allFamilies = [];
+  let filters = { division: 'all', status: 'all', search: '' };
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // Data loading
+  // ──────────────────────────────────────────────────────────────────────────
+  async function loadData() {
+    try {
+      const res = await fetch('/api/financial-aid');
+      if (!res.ok) throw new Error('Server error');
+      allFamilies = await res.json();
+      renderAll();
+    } catch (e) {
+      document.getElementById('familyList').innerHTML = '<div class="loading">Failed to load data. Check console.</div>';
+      console.error(e);
+    }
+  }
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // Rendering
+  // ──────────────────────────────────────────────────────────────────────────
+  function fmt(n) {
+    if (n === null || n === undefined || n === '') return '—';
+    const num = parseFloat(n);
+    if (isNaN(num)) return '—';
+    return '$' + num.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+  }
+
+  function schoolBadgeColor(school) {
+    const s = school || '';
+    if (s.includes('Middle') || s.includes('Eighth')) return 'badge-school';
+    if (s.includes('Lower')) return 'badge-school' ;
+    if (s.includes('Kindergarten')) return 'badge-school';
+    return 'badge-school';
+  }
+
+  function renderAll() {
+    updateSummary();
+    applyFilters();
+  }
+
+  function updateSummary() {
+    let families = 0, students = 0, requested = 0, fast = 0, contracts = 0, pending = 0;
+    allFamilies.forEach(f => {
+      families++;
+      f.students.forEach(s => {
+        students++;
+        if (s.mds_aid_amount) requested += parseFloat(s.mds_aid_amount) || 0;
+        if (s.fast_aid_rec) fast += parseFloat(s.fast_aid_rec) || 0;
+      });
+      if (f.contract_sent) contracts++;
+      else pending++;
+    });
+    document.getElementById('sumFamilies').textContent = families;
+    document.getElementById('sumStudents').textContent = students;
+    document.getElementById('sumRequested').textContent = '$' + Math.round(requested).toLocaleString();
+    document.getElementById('sumFast').textContent = '$' + Math.round(fast).toLocaleString();
+    document.getElementById('sumContracts').textContent = contracts;
+    document.getElementById('sumPending').textContent = pending;
+  }
+
+  function setFilter(type, val, btn) {
+    filters[type] = val;
+    const group = btn.closest('.filter-toggle');
+    group.querySelectorAll('button').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    applyFilters();
+  }
+
+  function applyFilters() {
+    filters.search = document.getElementById('searchInput').value.toLowerCase();
+    const filtered = allFamilies.filter(f => {
+      // Search
+      if (filters.search && !f.family_name.toLowerCase().includes(filters.search)) return false;
+      // Status
+      if (filters.status === 'contract' && !f.contract_sent) return false;
+      if (filters.status === 'pending' && f.contract_sent) return false;
+      // Division
+      if (filters.division !== 'all') {
+        const match = f.students.some(s => s.school === filters.division);
+        if (!match) return false;
+      }
+      return true;
+    });
+    renderFamilies(filtered);
+  }
+
+  function renderFamilies(families) {
+    const list = document.getElementById('familyList');
+    if (families.length === 0) {
+      list.innerHTML = '<div class="empty-state"><p>No applications match your filters.</p></div>';
+      return;
+    }
+
+    list.innerHTML = families.map(f => renderFamilyCard(f)).join('');
+  }
+
+  function renderFamilyCard(f) {
+    const totalRequested = f.students.reduce((sum, s) => sum + (parseFloat(s.mds_aid_amount) || 0), 0);
+    const totalNetTuition = f.students.reduce((sum, s) => sum + (parseFloat(s.net_tuition_2526) || 0), 0);
+    const hasAppeal = f.students.some(s => s.appeal_letter && s.appeal_letter.toLowerCase().includes('y'));
+
+    const contractBadge = f.contract_sent
+      ? `<span class="badge badge-contract">Contract Sent</span>`
+      : `<span class="badge badge-no-contract">Pending</span>`;
+
+    const appealBadge = hasAppeal ? `<span class="badge badge-appeal">Appeal</span>` : '';
+
+    const schoolLevels = [...new Set(f.students.map(s => s.school).filter(Boolean))];
+    const schoolBadges = schoolLevels.map(s => `<span class="badge badge-school">${s}</span>`).join('');
+
+    const studentRows = f.students.map(s => `
+      <div class="student-row">
+        <div>
+          <div class="student-name">${s.school || 'Unknown'}</div>
+        </div>
+        <div class="money fast">${fmt(s.tuition)}</div>
+        <div class="money fast">${fmt(s.fast_aid_rec)}</div>
+        <div class="money requested">${fmt(s.mds_aid_amount)}</div>
+        <div class="money net">${fmt(s.net_tuition_2526)}</div>
+        <div class="money prior">${fmt(s.prior_year_tuition)}</div>
+      </div>
+    `).join('');
+
+    // Notes
+    const parentNote = f.students.find(s => s.parent_notes)?.parent_notes || '';
+    const schoolNote = f.students.find(s => s.school_notes)?.school_notes || '';
+    const karinNote = f.students.find(s => s.karins_notes)?.karins_notes || '';
+
+    const karinsNoteDisplay = karinNote
+      ? `<div class="note-text">${escHtml(karinNote)}</div>`
+      : `<div class="note-text empty">No notes yet</div>`;
+
+    return `
+    <div class="family-card" id="family-${f.id}">
+      <div class="family-card-header" onclick="toggleCard('family-${f.id}')">
+        <div>
+          <div class="family-name">${escHtml(f.family_name)}</div>
+          <div class="family-meta">
+            ${schoolBadges}
+            ${f.fast_id ? `<span class="badge badge-fast-id">FAST #${f.fast_id}</span>` : ''}
+            ${contractBadge}
+            ${appealBadge}
+          </div>
+        </div>
+        <div class="family-header-right">
+          <div class="aid-summary">
+            <div class="requested">${fmt(totalRequested)} requested</div>
+            <div class="net">Net tuition: ${fmt(totalNetTuition)}</div>
+          </div>
+          <span class="chevron">▼</span>
+        </div>
+      </div>
+
+      <div class="family-card-body" style="display:none;">
+        <div class="student-section">
+          <div class="student-header">
+            <div>Division</div>
+            <div>Tuition</div>
+            <div>FAST Rec</div>
+            <div>Aid Req</div>
+            <div>Net '25-26</div>
+            <div>Prior Year</div>
+          </div>
+          ${studentRows}
+        </div>
+
+        <div class="notes-panel">
+          <div class="notes-grid">
+            <div class="note-block">
+              <label>Parent Statement</label>
+              <div class="note-text">${parentNote ? escHtml(parentNote) : '<span style="color:var(--muted);font-style:italic">No letter submitted</span>'}</div>
+            </div>
+            <div class="note-block">
+              <label>School Notes (for Karin)</label>
+              <div class="note-text">${schoolNote ? escHtml(schoolNote) : '<span style="color:var(--muted);font-style:italic">No notes</span>'}</div>
+            </div>
+            <div class="note-block">
+              <label>Karin's Notes</label>
+              <textarea id="karins-note-${f.id}" placeholder="Add notes here...">${karinNote}</textarea>
+            </div>
+          </div>
+        </div>
+
+        <div class="edit-row">
+          <label>Flags:</label>
+          <div class="check-item">
+            <input type="checkbox" id="appeal-${f.id}" ${hasAppeal ? 'checked' : ''}>
+            <span>Appeal Received</span>
+          </div>
+          <div class="check-item">
+            <input type="checkbox" id="contract-${f.id}" ${f.contract_sent ? 'checked' : ''}>
+            <span>Contract Sent</span>
+          </div>
+          <span class="save-feedback" id="feedback-${f.id}"></span>
+          <button class="btn-save" onclick="saveFamily(${f.id})">Save Notes</button>
+        </div>
+      </div>
+    </div>`;
+  }
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // Interactions
+  // ──────────────────────────────────────────────────────────────────────────
+  function toggleCard(cardId) {
+    const card = document.getElementById(cardId);
+    const body = card.querySelector('.family-card-body');
+    const isOpen = body.style.display !== 'none';
+    body.style.display = isOpen ? 'none' : 'block';
+    card.classList.toggle('expanded', !isOpen);
+  }
+
+  async function saveFamily(familyId) {
+    const karinsNote = document.getElementById(`karins-note-${familyId}`)?.value || '';
+    const contractSent = document.getElementById(`contract-${familyId}`)?.checked || false;
+    const btn = document.querySelector(`#family-${familyId} .btn-save`);
+    const feedback = document.getElementById(`feedback-${familyId}`);
+
+    btn.textContent = 'Saving...';
+    btn.classList.add('saving');
+
+    try {
+      const res = await fetch(`/api/financial-aid/${familyId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ karins_notes: karinsNote, contract_sent: contractSent })
+      });
+      if (!res.ok) throw new Error('Save failed');
+      feedback.textContent = 'Saved ✓';
+      setTimeout(() => { feedback.textContent = ''; }, 3000);
+
+      // Update local data
+      const fam = allFamilies.find(f => f.id === familyId);
+      if (fam) {
+        fam.contract_sent = contractSent;
+        fam.students.forEach(s => { s.karins_notes = karinsNote; });
+      }
+      updateSummary();
+    } catch (e) {
+      feedback.textContent = 'Error saving';
+      feedback.style.color = 'var(--red)';
+      console.error(e);
+    } finally {
+      btn.textContent = 'Save Notes';
+      btn.classList.remove('saving');
+    }
+  }
+
+  function exportCSV() {
+    const rows = [['Family', 'FAST ID', 'Division', 'Tuition', 'FAST Rec', 'Aid Requested', 'Net Tuition', 'Prior Year', 'Contract Sent', 'Karin Notes']];
+    allFamilies.forEach(f => {
+      f.students.forEach(s => {
+        rows.push([
+          f.family_name,
+          f.fast_id || '',
+          s.school || '',
+          s.tuition || '',
+          s.fast_aid_rec || '',
+          s.mds_aid_amount || '',
+          s.net_tuition_2526 || '',
+          s.prior_year_tuition || '',
+          f.contract_sent ? 'Yes' : 'No',
+          (s.karins_notes || '').replace(/\n/g, ' ')
+        ]);
+      });
+    });
+    const csv = rows.map(r => r.map(c => `"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'financial_aid_2025-26.csv';
+    a.click();
+  }
+
+  function escHtml(str) {
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  function showToast(msg, isError=false) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.className = 'toast show' + (isError ? ' error' : '');
+    setTimeout(() => { t.className = 'toast'; }, 3000);
+  }
+
+  // Boot
+  loadData();
+</script>
+</body>
+</html>
