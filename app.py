@@ -1832,6 +1832,7 @@ CREATE TABLE IF NOT EXISTS financial_aid_families (
     fast_id          TEXT,
     school_year      TEXT NOT NULL DEFAULT '2025-26',
     contract_sent    BOOLEAN DEFAULT FALSE,
+    status           TEXT NOT NULL DEFAULT 'active',
     created_at       TIMESTAMP DEFAULT NOW(),
     updated_at       TIMESTAMP DEFAULT NOW()
 );
@@ -1846,9 +1847,9 @@ CREATE TABLE IF NOT EXISTS financial_aid_students (
     appeal_letter       TEXT,
     family_can_pay      NUMERIC(10,2),
     mds_aid_amount      NUMERIC(10,2),
-    net_tuition_2526    NUMERIC(10,2),
+    net_tuition         NUMERIC(10,2),
     prior_year_tuition  NUMERIC(10,2),
-    family_total_2526   NUMERIC(10,2),
+    family_total        NUMERIC(10,2),
     family_total_prior  NUMERIC(10,2),
     parent_notes        TEXT,
     school_notes        TEXT,
@@ -2089,93 +2090,443 @@ SEED_DATA = [
 ]
 
 
+def _fa_rows_to_families(rows):
+    """Convert flat DB rows into grouped family dicts."""
+    families = {}
+    order = []
+    for row in rows:
+        fid = row["id"]
+        if fid not in families:
+            order.append(fid)
+            families[fid] = {
+                'id': fid,
+                'family_name': row["family_name"],
+                'fast_id': row["fast_id"],
+                'contract_sent': row["contract_sent"],
+                'status': row["status"],
+                'school_year': row["school_year"],
+                'students': []
+            }
+        if row["student_id"]:
+            def _f(v):
+                return float(v) if v is not None else None
+            families[fid]['students'].append({
+                'id': row["student_id"],
+                'school': row["school"],
+                'tuition': _f(row["tuition"]),
+                'max_discount': _f(row["max_discount"]),
+                'fast_aid_rec': _f(row["fast_aid_rec"]),
+                'appeal_letter': row["appeal_letter"],
+                'family_can_pay': _f(row["family_can_pay"]),
+                'mds_aid_amount': _f(row["mds_aid_amount"]),
+                'net_tuition': _f(row["net_tuition"]),
+                'prior_year_tuition': _f(row["prior_year_tuition"]),
+                'family_total': _f(row["family_total"]),
+                'family_total_prior': _f(row["family_total_prior"]),
+                'parent_notes': row["parent_notes"],
+                'school_notes': row["school_notes"],
+                'karins_notes': row["karins_notes"],
+            })
+    return [families[fid] for fid in order]
+
+
+@app.route('/api/financial-aid/years')
+@login_required
+def api_financial_aid_years():
+    """Return list of school years that have data."""
+    conn = get_db_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT DISTINCT school_year FROM financial_aid_families
+                ORDER BY school_year DESC
+            """)
+            years = [r[0] for r in cur.fetchall()]
+        return jsonify(years)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    finally:
+        conn.close()
+
+
 @app.route('/api/financial-aid')
 @login_required
 def api_financial_aid_list():
-    """Return all families with their students for the current school year."""
+    """Return all families with their students for a given school year."""
+    school_year = request.args.get('year', '2025-26')
+    conn = get_db_connection()
     try:
-        conn = get_db_connection()
-        try:
-            with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
-                cur.execute("""
-                    SELECT
-                        f.id, f.family_name, f.fast_id, f.contract_sent,
-                        s.id as student_id, s.school, s.tuition, s.max_discount,
-                        s.fast_aid_rec, s.appeal_letter, s.family_can_pay,
-                        s.mds_aid_amount, s.net_tuition_2526, s.prior_year_tuition,
-                        s.family_total_2526, s.family_total_prior,
-                        s.parent_notes, s.school_notes, s.karins_notes
-                    FROM financial_aid_families f
-                    LEFT JOIN financial_aid_students s ON s.family_id = f.id
-                    WHERE f.school_year = '2025-26'
-                    ORDER BY f.family_name, s.id
-                """)
-                rows = cur.fetchall()
-        finally:
-            conn.close()
-
-        families = {}
-        for row in rows:
-            fid = row["id"]
-            if fid not in families:
-                families[fid] = {
-                    'id': fid,
-                    'family_name': row["family_name"],
-                    'fast_id': row["fast_id"],
-                    'contract_sent': row["contract_sent"],
-                    'students': []
-                }
-            if row["student_id"]:
-                families[fid]['students'].append({
-                    'id': row["student_id"],
-                    'school': row["school"],
-                    'tuition': float(row["tuition"]) if row["tuition"] is not None else None,
-                    'max_discount': float(row["max_discount"]) if row["max_discount"] is not None else None,
-                    'fast_aid_rec': float(row["fast_aid_rec"]) if row["fast_aid_rec"] is not None else None,
-                    'appeal_letter': row["appeal_letter"],
-                    'family_can_pay': float(row["family_can_pay"]) if row["family_can_pay"] is not None else None,
-                    'mds_aid_amount': float(row["mds_aid_amount"]) if row["mds_aid_amount"] is not None else None,
-                    'net_tuition_2526': float(row["net_tuition_2526"]) if row["net_tuition_2526"] is not None else None,
-                    'prior_year_tuition': float(row["prior_year_tuition"]) if row["prior_year_tuition"] is not None else None,
-                    'family_total_2526': float(row["family_total_2526"]) if row["family_total_2526"] is not None else None,
-                    'family_total_prior': float(row["family_total_prior"]) if row["family_total_prior"] is not None else None,
-                    'parent_notes': row["parent_notes"],
-                    'school_notes': row["school_notes"],
-                    'karins_notes': row["karins_notes"],
-                })
-
-        return jsonify(list(families.values()))
-
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute("""
+                SELECT f.id, f.family_name, f.fast_id, f.contract_sent, f.status, f.school_year,
+                       s.id as student_id, s.school, s.tuition, s.max_discount,
+                       s.fast_aid_rec, s.appeal_letter, s.family_can_pay,
+                       s.mds_aid_amount, s.net_tuition, s.prior_year_tuition,
+                       s.family_total, s.family_total_prior,
+                       s.parent_notes, s.school_notes, s.karins_notes
+                FROM financial_aid_families f
+                LEFT JOIN financial_aid_students s ON s.family_id = f.id
+                WHERE f.school_year = %s
+                ORDER BY f.status ASC, f.family_name, s.id
+            """, (school_year,))
+            rows = cur.fetchall()
+        return jsonify(_fa_rows_to_families(rows))
     except Exception as e:
-        import traceback
-        traceback.print_exc()
+        import traceback; traceback.print_exc()
         return jsonify({'error': str(e)}), 500
+    finally:
+        conn.close()
 
 
 @app.route('/api/financial-aid/<int:family_id>', methods=['PATCH'])
 @login_required
 def api_financial_aid_update(family_id):
-    """Update Karin's notes and contract_sent status for a family."""
+    """Update family-level fields: notes, contract_sent, status."""
     data = request.json or {}
-    karins_notes  = data.get('karins_notes', '')
-    contract_sent = bool(data.get('contract_sent', False))
     conn = get_db_connection()
     try:
         with conn.cursor() as cur:
-            cur.execute("""
-                UPDATE financial_aid_families
-                SET contract_sent = %s, updated_at = NOW()
-                WHERE id = %s
-            """, (contract_sent, family_id))
-            cur.execute("""
-                UPDATE financial_aid_students
-                SET karins_notes = %s, updated_at = NOW()
-                WHERE family_id = %s
-            """, (karins_notes, family_id))
+            # Build dynamic update for family table
+            fam_fields = []
+            fam_vals = []
+            for col in ['contract_sent', 'status']:
+                if col in data:
+                    fam_fields.append(f"{col} = %s")
+                    fam_vals.append(data[col])
+            if fam_fields:
+                fam_vals.append(family_id)
+                cur.execute(f"UPDATE financial_aid_families SET {', '.join(fam_fields)}, updated_at=NOW() WHERE id=%s", fam_vals)
+
+            # Karin's notes — stored per student but edited at family level
+            if 'karins_notes' in data:
+                cur.execute("UPDATE financial_aid_students SET karins_notes=%s, updated_at=NOW() WHERE family_id=%s",
+                            (data['karins_notes'], family_id))
         conn.commit()
         return jsonify({'ok': True})
     except Exception as e:
         conn.rollback()
+        return jsonify({'error': str(e)}), 500
+    finally:
+        conn.close()
+
+
+@app.route('/api/financial-aid/<int:family_id>/students', methods=['POST'])
+@login_required
+def api_financial_aid_add_student(family_id):
+    """Add a student to a family."""
+    data = request.json or {}
+    conn = get_db_connection()
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute("""
+                INSERT INTO financial_aid_students
+                (family_id, school, tuition, max_discount, fast_aid_rec, appeal_letter,
+                 family_can_pay, mds_aid_amount, net_tuition, prior_year_tuition,
+                 family_total, family_total_prior, parent_notes, school_notes, karins_notes)
+                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                RETURNING id
+            """, (family_id,
+                  data.get('school'), data.get('tuition'), data.get('max_discount'),
+                  data.get('fast_aid_rec'), data.get('appeal_letter'),
+                  data.get('family_can_pay'), data.get('mds_aid_amount'),
+                  data.get('net_tuition'), data.get('prior_year_tuition'),
+                  data.get('family_total'), data.get('family_total_prior'),
+                  data.get('parent_notes'), data.get('school_notes'), data.get('karins_notes')))
+            new_id = cur.fetchone()['id']
+        conn.commit()
+        return jsonify({'ok': True, 'id': new_id}), 201
+    except Exception as e:
+        conn.rollback()
+        return jsonify({'error': str(e)}), 500
+    finally:
+        conn.close()
+
+
+@app.route('/api/financial-aid/students/<int:student_id>', methods=['PUT'])
+@login_required
+def api_financial_aid_update_student(student_id):
+    """Update all editable fields on a student row."""
+    data = request.json or {}
+    conn = get_db_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                UPDATE financial_aid_students SET
+                    school=%s, tuition=%s, max_discount=%s, fast_aid_rec=%s,
+                    appeal_letter=%s, family_can_pay=%s, mds_aid_amount=%s,
+                    net_tuition=%s, prior_year_tuition=%s,
+                    family_total=%s, family_total_prior=%s,
+                    parent_notes=%s, school_notes=%s, karins_notes=%s,
+                    updated_at=NOW()
+                WHERE id=%s
+            """, (data.get('school'), data.get('tuition'), data.get('max_discount'),
+                  data.get('fast_aid_rec'), data.get('appeal_letter'),
+                  data.get('family_can_pay'), data.get('mds_aid_amount'),
+                  data.get('net_tuition'), data.get('prior_year_tuition'),
+                  data.get('family_total'), data.get('family_total_prior'),
+                  data.get('parent_notes'), data.get('school_notes'),
+                  data.get('karins_notes'), student_id))
+        conn.commit()
+        return jsonify({'ok': True})
+    except Exception as e:
+        conn.rollback()
+        return jsonify({'error': str(e)}), 500
+    finally:
+        conn.close()
+
+
+@app.route('/api/financial-aid/students/<int:student_id>', methods=['DELETE'])
+@login_required
+def api_financial_aid_delete_student(student_id):
+    """Remove a student row."""
+    conn = get_db_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM financial_aid_students WHERE id=%s", (student_id,))
+        conn.commit()
+        return jsonify({'ok': True})
+    except Exception as e:
+        conn.rollback()
+        return jsonify({'error': str(e)}), 500
+    finally:
+        conn.close()
+
+
+@app.route('/api/financial-aid/families', methods=['POST'])
+@login_required
+def api_financial_aid_add_family():
+    """Add a single new family manually."""
+    data = request.json or {}
+    family_name = (data.get('family_name') or '').strip()
+    fast_id     = (data.get('fast_id') or '').strip()
+    school_year = (data.get('school_year') or '2025-26').strip()
+    if not family_name:
+        return jsonify({'error': 'family_name required'}), 400
+    conn = get_db_connection()
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            # Check for duplicate FAST ID in same year
+            if fast_id:
+                cur.execute("SELECT id FROM financial_aid_families WHERE fast_id=%s AND school_year=%s",
+                            (fast_id, school_year))
+                if cur.fetchone():
+                    return jsonify({'error': f'FAST ID {fast_id} already exists for {school_year}'}), 409
+            cur.execute("""
+                INSERT INTO financial_aid_families (family_name, fast_id, school_year, contract_sent, status)
+                VALUES (%s,%s,%s,false,'active') RETURNING id
+            """, (family_name, fast_id or None, school_year))
+            new_id = cur.fetchone()['id']
+        conn.commit()
+        return jsonify({'ok': True, 'id': new_id}), 201
+    except Exception as e:
+        conn.rollback()
+        return jsonify({'error': str(e)}), 500
+    finally:
+        conn.close()
+
+
+@app.route('/api/financial-aid/upload', methods=['POST'])
+@login_required
+def api_financial_aid_upload():
+    """
+    Bulk upload families from ISMFast CSV export.
+    Expected columns (case-insensitive):
+      Family Name, FAST ID, School, FAST Aid Rec, Appeal Letter,
+      Family Can Pay, MDS Aid Amount, Net Tuition, Prior Year Tuition,
+      Parent Notes, School Notes
+    school_year passed as form field.
+    Skips rows where FAST ID already exists for that year.
+    """
+    import csv, io
+    school_year = request.form.get('school_year', '2025-26')
+    file = request.files.get('file')
+    if not file:
+        return jsonify({'error': 'No file uploaded'}), 400
+
+    try:
+        content = file.read().decode('utf-8-sig')  # strip BOM if present
+        reader = csv.DictReader(io.StringIO(content))
+        # Normalize headers to lowercase stripped
+        headers = [h.strip().lower() for h in (reader.fieldnames or [])]
+
+        def col(row, *names):
+            for n in names:
+                v = row.get(n, '').strip()
+                if v: return v
+            return None
+
+        def money(v):
+            if not v: return None
+            try: return float(str(v).replace('$','').replace(',','').strip())
+            except: return None
+
+        conn = get_db_connection()
+        added = skipped = errors_count = 0
+        error_names = []
+        try:
+            with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+                # Fetch existing FAST IDs for this year
+                cur.execute("SELECT fast_id FROM financial_aid_families WHERE school_year=%s AND fast_id IS NOT NULL", (school_year,))
+                existing_fast_ids = {r['fast_id'] for r in cur.fetchall()}
+
+                # Normalize row keys
+                for raw_row in reader:
+                    row = {k.strip().lower(): v.strip() for k, v in raw_row.items()}
+                    family_name = col(row, 'family name', 'family_name', 'last name', 'name')
+                    fast_id     = col(row, 'fast id', 'fast_id', 'ismfast id', 'id')
+                    school      = col(row, 'school', 'division', 'grade level')
+                    if not family_name:
+                        continue
+                    if fast_id and fast_id in existing_fast_ids:
+                        skipped += 1
+                        continue
+                    try:
+                        cur.execute("""
+                            INSERT INTO financial_aid_families (family_name, fast_id, school_year, contract_sent, status)
+                            VALUES (%s,%s,%s,false,'active') RETURNING id
+                        """, (family_name, fast_id or None, school_year))
+                        fam_id = cur.fetchone()['id']
+                        if fast_id:
+                            existing_fast_ids.add(fast_id)
+
+                        # Add student row if school info present
+                        if school:
+                            tuition_val = TUITION_MAP.get(school) or money(col(row, 'tuition'))
+                            cur.execute("""
+                                INSERT INTO financial_aid_students
+                                (family_id, school, tuition, fast_aid_rec, appeal_letter,
+                                 family_can_pay, mds_aid_amount, net_tuition,
+                                 prior_year_tuition, parent_notes, school_notes)
+                                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                            """, (fam_id, school, tuition_val,
+                                  money(col(row, 'fast aid rec', 'fast_aid_rec', 'fast rec')),
+                                  col(row, 'appeal letter', 'appeal'),
+                                  money(col(row, 'family can pay', 'family_can_pay')),
+                                  money(col(row, 'mds aid amount', 'mds_aid_amount', 'aid amount')),
+                                  money(col(row, 'net tuition', 'net_tuition')),
+                                  money(col(row, 'prior year tuition', 'prior_year_tuition', 'prior tuition')),
+                                  col(row, 'parent notes', 'parent_notes'),
+                                  col(row, 'school notes', 'school_notes')))
+                        added += 1
+                    except Exception as row_err:
+                        errors_count += 1
+                        error_names.append(family_name)
+                        print(f"Upload row error for {family_name}: {row_err}")
+            conn.commit()
+        finally:
+            conn.close()
+
+        return jsonify({
+            'ok': True,
+            'added': added,
+            'skipped': skipped,
+            'errors': errors_count,
+            'error_names': error_names
+        })
+
+    except Exception as e:
+        import traceback; traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/financial-aid/template')
+@login_required
+def api_financial_aid_template():
+    """Download a blank CSV template for ISMFast bulk upload."""
+    from flask import Response
+    headers = [
+        'Family Name', 'FAST ID', 'School', 'FAST Aid Rec', 'Appeal Letter',
+        'Family Can Pay', 'MDS Aid Amount', 'Net Tuition', 'Prior Year Tuition',
+        'Parent Notes', 'School Notes'
+    ]
+    example = [
+        'Smith', '123456', 'Lower School', '5000', 'Y',
+        '18000', '6200', '18000', '17000', 'We love Mizzentop.', ''
+    ]
+    import csv, io
+    buf = io.StringIO()
+    w = csv.writer(buf)
+    w.writerow(headers)
+    w.writerow(example)
+    return Response(
+        buf.getvalue(),
+        mimetype='text/csv',
+        headers={'Content-Disposition': 'attachment; filename=financial_aid_upload_template.csv'}
+    )
+
+
+@app.route('/api/financial-aid/new-season', methods=['POST'])
+@login_required
+def api_financial_aid_new_season():
+    """
+    Create a new school year by rolling forward active families from a prior year.
+    - Copies family name + FAST ID
+    - Rolls net_tuition → prior_year_tuition for each student
+    - Blanks all other financial figures
+    - Skips inactive families
+    - Skips families that already exist in the new year (by FAST ID)
+    """
+    data = request.json or {}
+    from_year = data.get('from_year', '').strip()
+    to_year   = data.get('to_year', '').strip()
+    if not from_year or not to_year:
+        return jsonify({'error': 'from_year and to_year required'}), 400
+    conn = get_db_connection()
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            # Check new year doesn't already exist
+            cur.execute("SELECT COUNT(*) FROM financial_aid_families WHERE school_year=%s", (to_year,))
+            if cur.fetchone()[0] > 0:
+                return jsonify({'error': f'{to_year} already has data. Cannot overwrite.'}), 409
+
+            # Fetch active families from source year
+            cur.execute("""
+                SELECT f.id, f.family_name, f.fast_id,
+                       s.id as sid, s.school, s.net_tuition, s.karins_notes
+                FROM financial_aid_families f
+                LEFT JOIN financial_aid_students s ON s.family_id = f.id
+                WHERE f.school_year = %s AND f.status = 'active'
+                ORDER BY f.family_name, s.id
+            """, (from_year,))
+            rows = cur.fetchall()
+
+            # Group by family
+            fam_map = {}
+            fam_order = []
+            for r in rows:
+                fid = r['id']
+                if fid not in fam_map:
+                    fam_order.append(fid)
+                    fam_map[fid] = {'family_name': r['family_name'], 'fast_id': r['fast_id'], 'students': []}
+                if r['sid']:
+                    fam_map[fid]['students'].append({
+                        'school': r['school'],
+                        'prior_year_tuition': float(r['net_tuition']) if r['net_tuition'] else None,
+                        'karins_notes': r['karins_notes'],
+                    })
+
+            carried = 0
+            for fid in fam_order:
+                f = fam_map[fid]
+                cur.execute("""
+                    INSERT INTO financial_aid_families (family_name, fast_id, school_year, contract_sent, status)
+                    VALUES (%s,%s,%s,false,'active') RETURNING id
+                """, (f['family_name'], f['fast_id'], to_year))
+                new_fam_id = cur.fetchone()['id']
+                for s in f['students']:
+                    tuition = TUITION_MAP.get(s['school'])
+                    cur.execute("""
+                        INSERT INTO financial_aid_students
+                        (family_id, school, tuition, prior_year_tuition)
+                        VALUES (%s,%s,%s,%s)
+                    """, (new_fam_id, s['school'], tuition, s['prior_year_tuition']))
+                carried += 1
+
+        conn.commit()
+        return jsonify({'ok': True, 'families_carried': carried, 'to_year': to_year})
+    except Exception as e:
+        conn.rollback()
+        import traceback; traceback.print_exc()
         return jsonify({'error': str(e)}), 500
     finally:
         conn.close()
@@ -2188,11 +2539,32 @@ def seed_financial_aid():
     conn = get_db_connection()
     try:
         with conn.cursor() as cur:
-            # Create tables
+            # Create tables (run migration statements individually)
             for stmt in FINANCIAL_AID_MIGRATION.strip().split(';'):
                 stmt = stmt.strip()
                 if stmt:
                     cur.execute(stmt)
+            # Add status column if migrating from old schema
+            cur.execute("""
+                SELECT column_name FROM information_schema.columns
+                WHERE table_name='financial_aid_families' AND column_name='status'
+            """)
+            if not cur.fetchone():
+                cur.execute("ALTER TABLE financial_aid_families ADD COLUMN status TEXT NOT NULL DEFAULT 'active'")
+            # Rename net_tuition_2526 → net_tuition if needed
+            cur.execute("""
+                SELECT column_name FROM information_schema.columns
+                WHERE table_name='financial_aid_students' AND column_name='net_tuition_2526'
+            """)
+            if cur.fetchone():
+                cur.execute("ALTER TABLE financial_aid_students RENAME COLUMN net_tuition_2526 TO net_tuition")
+            # Rename family_total_2526 → family_total if needed
+            cur.execute("""
+                SELECT column_name FROM information_schema.columns
+                WHERE table_name='financial_aid_students' AND column_name='family_total_2526'
+            """)
+            if cur.fetchone():
+                cur.execute("ALTER TABLE financial_aid_students RENAME COLUMN family_total_2526 TO family_total")
             # Guard against double-seeding
             cur.execute("SELECT COUNT(*) FROM financial_aid_families WHERE school_year = '2025-26'")
             count = cur.fetchone()[0]
@@ -2200,8 +2572,8 @@ def seed_financial_aid():
                 return jsonify({'error': 'Already seeded. Delete rows first to re-seed.'}), 400
             for (fname, fast_id, contract_sent, students) in SEED_DATA:
                 cur.execute("""
-                    INSERT INTO financial_aid_families (family_name, fast_id, school_year, contract_sent)
-                    VALUES (%s, %s, '2025-26', %s)
+                    INSERT INTO financial_aid_families (family_name, fast_id, school_year, contract_sent, status)
+                    VALUES (%s, %s, '2025-26', %s, 'active')
                     RETURNING id
                 """, (fname, fast_id, contract_sent))
                 fam_id = cur.fetchone()[0]
@@ -2211,8 +2583,8 @@ def seed_financial_aid():
                     cur.execute("""
                         INSERT INTO financial_aid_students
                         (family_id, school, tuition, fast_aid_rec, appeal_letter,
-                         family_can_pay, mds_aid_amount, net_tuition_2526,
-                         prior_year_tuition, family_total_2526, family_total_prior,
+                         family_can_pay, mds_aid_amount, net_tuition,
+                         prior_year_tuition, family_total, family_total_prior,
                          parent_notes, school_notes, karins_notes)
                         VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
                     """, (fam_id, school, tuition, s[1], s[2], s[3], s[4],
@@ -2221,8 +2593,7 @@ def seed_financial_aid():
         return jsonify({'ok': True, 'families_seeded': len(SEED_DATA)})
     except Exception as e:
         conn.rollback()
-        import traceback
-        traceback.print_exc()
+        import traceback; traceback.print_exc()
         return jsonify({'error': str(e)}), 500
     finally:
         conn.close()

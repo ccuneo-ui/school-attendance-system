@@ -9,214 +9,144 @@
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     :root {
-      --navy: #1a2744;
-      --burgundy: #4a1a2c;
-      --cream: #f7f3ec;
-      --muted: #6b7280;
-      --white: #ffffff;
-      --border: #e5e1da;
-      --light-bg: #f0ece4;
-      --gold: #c8992a;
-      --green: #1a6b3c;
-      --green-bg: #eaf5ee;
-      --red: #c0392b;
-      --red-bg: #fdf1f0;
-      --yellow: #b8860b;
-      --yellow-bg: #fdf9e7;
+      --navy: #1a2744; --burgundy: #4a1a2c; --cream: #f7f3ec;
+      --muted: #6b7280; --white: #ffffff; --border: #e5e1da;
+      --light-bg: #f0ece4; --gold: #c8992a; --green: #1a6b3c;
+      --green-bg: #eaf5ee; --red: #c0392b; --red-bg: #fdf1f0;
+      --yellow: #b8860b; --yellow-bg: #fdf9e7;
       --shadow: 0 2px 8px rgba(26,39,68,0.08);
     }
     html, body { min-height: 100vh; font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(--navy); }
-
-    /* Topbar */
-    .topbar {
-      display: flex; align-items: center; justify-content: space-between;
-      padding: 14px 28px; background: var(--burgundy); color: var(--white);
-    }
+    .topbar { display: flex; align-items: center; justify-content: space-between; padding: 14px 28px; background: var(--burgundy); color: var(--white); }
     .topbar a { color: rgba(255,255,255,0.75); text-decoration: none; font-size: 13px; font-weight: 500; }
     .topbar a:hover { color: var(--white); }
     .topbar-title { font-family: 'Playfair Display', serif; font-size: 18px; font-weight: 700; }
     .topbar-right { display: flex; align-items: center; gap: 20px; }
-
-    /* Layout */
     .container { max-width: 1200px; margin: 0 auto; padding: 32px 24px 80px; }
-    .page-header { margin-bottom: 28px; display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 16px; }
+    .page-header { margin-bottom: 24px; display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 16px; }
     .page-header-left h1 { font-family: 'Playfair Display', serif; font-size: 28px; font-weight: 700; margin-bottom: 4px; }
     .page-header-left p { color: var(--muted); font-size: 14px; }
-    .page-header-right { display: flex; gap: 10px; flex-wrap: wrap; }
-
-    /* Summary bar */
-    .summary-bar {
-      display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-      gap: 12px; margin-bottom: 24px;
-    }
-    .summary-card {
-      background: var(--white); border: 1px solid var(--border); border-radius: 10px;
-      padding: 14px 16px;
-    }
+    .page-header-right { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+    .year-bar { display: flex; align-items: center; gap: 10px; margin-bottom: 24px; flex-wrap: wrap; }
+    .year-label { font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+    .year-tabs { display: flex; gap: 4px; }
+    .year-tab { padding: 6px 16px; border-radius: 6px; font-size: 13px; font-weight: 500; cursor: pointer; border: 1px solid var(--border); background: var(--white); color: var(--muted); font-family: 'DM Sans', sans-serif; transition: all 0.15s; }
+    .year-tab.active { background: var(--burgundy); color: var(--white); border-color: var(--burgundy); }
+    .year-tab:hover:not(.active) { background: var(--light-bg); }
+    .btn-new-season { padding: 6px 14px; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; border: 1px solid var(--gold); background: var(--white); color: var(--gold); font-family: 'DM Sans', sans-serif; transition: all 0.15s; }
+    .btn-new-season:hover { background: var(--yellow-bg); }
+    .summary-bar { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-bottom: 24px; }
+    .summary-card { background: var(--white); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; }
     .summary-card .label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); margin-bottom: 4px; }
     .summary-card .value { font-size: 20px; font-weight: 700; color: var(--navy); }
     .summary-card .value.green { color: var(--green); }
     .summary-card .value.gold { color: var(--gold); }
-
-    /* Filters */
-    .filters-row {
-      display: flex; align-items: center; gap: 12px; margin-bottom: 20px; flex-wrap: wrap;
-    }
-    .filter-input {
-      padding: 8px 12px; border: 1px solid var(--border); border-radius: 8px;
-      font-family: 'DM Sans', sans-serif; font-size: 13px; color: var(--navy);
-      background: var(--white); outline: none;
-    }
+    .filters-row { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }
+    .filter-input { padding: 8px 12px; border: 1px solid var(--border); border-radius: 8px; font-family: 'DM Sans', sans-serif; font-size: 13px; color: var(--navy); background: var(--white); outline: none; }
     .filter-input:focus { border-color: var(--navy); }
     .filter-input.search { min-width: 220px; }
     .filter-label { font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
     .filter-toggle { display: flex; gap: 4px; }
-    .filter-toggle button {
-      padding: 6px 14px; border: 1px solid var(--border); border-radius: 6px;
-      font-size: 12px; font-weight: 500; cursor: pointer; background: var(--white);
-      color: var(--muted); transition: all 0.15s;
-    }
+    .filter-toggle button { padding: 6px 14px; border: 1px solid var(--border); border-radius: 6px; font-size: 12px; font-weight: 500; cursor: pointer; background: var(--white); color: var(--muted); transition: all 0.15s; font-family: 'DM Sans', sans-serif; }
     .filter-toggle button.active { background: var(--navy); color: var(--white); border-color: var(--navy); }
     .filter-toggle button:hover:not(.active) { background: var(--light-bg); }
-
-    /* Family cards */
     .family-list { display: flex; flex-direction: column; gap: 16px; }
-
-    .family-card {
-      background: var(--white); border: 1px solid var(--border); border-radius: 12px;
-      overflow: hidden; box-shadow: var(--shadow);
-    }
-    .family-card-header {
-      padding: 16px 20px; display: flex; align-items: center; justify-content: space-between;
-      gap: 12px; cursor: pointer; user-select: none;
-      border-bottom: 1px solid transparent; transition: background 0.15s;
-    }
+    .family-card { background: var(--white); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; box-shadow: var(--shadow); transition: opacity 0.2s; }
+    .family-card.inactive { opacity: 0.55; }
+    .family-card-header { padding: 16px 20px; display: flex; align-items: center; justify-content: space-between; gap: 12px; cursor: pointer; user-select: none; border-bottom: 1px solid transparent; transition: background 0.15s; }
     .family-card-header:hover { background: var(--light-bg); }
     .family-card.expanded .family-card-header { border-bottom-color: var(--border); }
-
     .family-name { font-family: 'Playfair Display', serif; font-size: 17px; font-weight: 700; }
     .family-meta { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 3px; }
-    .badge {
-      display: inline-flex; align-items: center; padding: 2px 9px;
-      border-radius: 999px; font-size: 11px; font-weight: 600;
-    }
+    .badge { display: inline-flex; align-items: center; padding: 2px 9px; border-radius: 999px; font-size: 11px; font-weight: 600; }
     .badge-school { background: #e8eaf6; color: #3949ab; }
     .badge-fast-id { background: var(--light-bg); color: var(--muted); font-size: 10px; font-family: monospace; }
     .badge-appeal { background: #fff3cd; color: #856404; }
     .badge-contract { background: var(--green-bg); color: var(--green); }
     .badge-no-contract { background: var(--red-bg); color: var(--red); }
-    .badge-pending { background: var(--yellow-bg); color: var(--yellow); }
-
+    .badge-inactive { background: #f3f4f6; color: var(--muted); }
     .family-header-right { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
-    .aid-summary { text-align: right; }
     .aid-summary .requested { font-size: 14px; font-weight: 600; color: var(--navy); }
     .aid-summary .net { font-size: 12px; color: var(--muted); margin-top: 1px; }
     .chevron { font-size: 16px; color: var(--muted); transition: transform 0.2s; }
     .family-card.expanded .chevron { transform: rotate(180deg); }
-
-    /* Student rows */
     .student-section { padding: 16px 20px; border-bottom: 1px solid var(--border); }
-    .student-section:last-of-type { border-bottom: none; }
-    .student-header {
-      display: grid;
-      grid-template-columns: 1fr 100px 110px 110px 110px 120px;
-      gap: 8px; align-items: center;
-      font-size: 12px; font-weight: 600; color: var(--muted);
-      text-transform: uppercase; letter-spacing: 0.04em;
-      padding-bottom: 10px; border-bottom: 1px solid var(--border); margin-bottom: 10px;
-    }
-    .student-row {
-      display: grid;
-      grid-template-columns: 1fr 100px 110px 110px 110px 120px;
-      gap: 8px; align-items: center; padding: 8px 0;
-      border-bottom: 1px solid var(--border);
-    }
+    .student-header, .student-row { display: grid; grid-template-columns: 1.2fr 100px 110px 110px 110px 120px; gap: 8px; align-items: center; }
+    .student-header { font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; padding-bottom: 10px; border-bottom: 1px solid var(--border); margin-bottom: 10px; }
+    .student-row { padding: 8px 0; border-bottom: 1px solid var(--border); }
     .student-row:last-child { border-bottom: none; }
-    .student-name { font-weight: 600; font-size: 14px; }
-    .student-school { font-size: 12px; color: var(--muted); }
     .money { font-size: 13px; font-weight: 500; }
     .money.fast { color: var(--navy); }
     .money.requested { color: var(--gold); font-weight: 600; }
     .money.net { color: var(--green); font-weight: 600; }
     .money.prior { color: var(--muted); }
-    .money.zero { color: var(--muted); font-style: italic; }
-
-    /* Notes panel */
-    .notes-panel { padding: 16px 20px; border-top: 1px solid var(--border); background: #fafaf8; }
+    .notes-panel { padding: 16px 20px; border-bottom: 1px solid var(--border); background: #fafaf8; }
     .notes-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; }
-    .note-block label {
-      display: block; font-size: 10px; font-weight: 700; text-transform: uppercase;
-      letter-spacing: 0.06em; color: var(--muted); margin-bottom: 6px;
-    }
-    .note-block .note-text {
-      font-size: 13px; line-height: 1.55; color: var(--navy); padding: 10px 12px;
-      background: var(--white); border: 1px solid var(--border); border-radius: 8px;
-      min-height: 48px;
-    }
-    .note-block .note-text.empty { color: var(--muted); font-style: italic; }
-    .note-block textarea {
-      width: 100%; font-size: 13px; line-height: 1.55; color: var(--navy);
-      padding: 10px 12px; background: var(--white); border: 1px solid var(--border);
-      border-radius: 8px; min-height: 80px; resize: vertical;
-      font-family: 'DM Sans', sans-serif; outline: none;
-    }
+    .note-block label { display: block; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin-bottom: 6px; }
+    .note-text { font-size: 13px; line-height: 1.55; color: var(--navy); padding: 10px 12px; background: var(--white); border: 1px solid var(--border); border-radius: 8px; min-height: 48px; }
+    .note-text.empty { color: var(--muted); font-style: italic; }
+    .note-block textarea { width: 100%; font-size: 13px; line-height: 1.55; color: var(--navy); padding: 10px 12px; background: var(--white); border: 1px solid var(--border); border-radius: 8px; min-height: 80px; resize: vertical; font-family: 'DM Sans', sans-serif; outline: none; }
     .note-block textarea:focus { border-color: var(--navy); }
-
-    /* Edit controls */
-    .edit-row { display: flex; align-items: center; gap: 10px; padding: 12px 20px; background: #fafaf8; border-top: 1px solid var(--border); flex-wrap: wrap; }
-    .edit-row label { font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+    .edit-row { display: flex; align-items: center; gap: 12px; padding: 12px 20px; background: #fafaf8; flex-wrap: wrap; }
+    .edit-row-label { font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
     .check-item { display: flex; align-items: center; gap: 6px; }
     .check-item input[type=checkbox] { width: 16px; height: 16px; accent-color: var(--navy); cursor: pointer; }
     .check-item span { font-size: 13px; font-weight: 500; }
-    .btn-save {
-      margin-left: auto; padding: 8px 18px; background: var(--navy); color: var(--white);
-      border: none; border-radius: 8px; font-family: 'DM Sans', sans-serif;
-      font-size: 13px; font-weight: 600; cursor: pointer; transition: background 0.15s;
-    }
-    .btn-save:hover { background: #253460; }
-    .btn-save.saving { background: var(--muted); cursor: default; }
-    .save-feedback { font-size: 12px; color: var(--green); font-weight: 500; }
-
-    /* Buttons */
-    .btn {
-      padding: 8px 16px; border-radius: 8px; font-family: 'DM Sans', sans-serif;
-      font-size: 13px; font-weight: 600; cursor: pointer; border: none; transition: all 0.15s;
-    }
+    .save-feedback { font-size: 12px; font-weight: 500; }
+    .edit-row-right { margin-left: auto; display: flex; align-items: center; gap: 10px; }
+    .btn { padding: 8px 16px; border-radius: 8px; font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 600; cursor: pointer; border: none; transition: all 0.15s; }
     .btn-primary { background: var(--navy); color: var(--white); }
     .btn-primary:hover { background: #253460; }
     .btn-outline { background: var(--white); color: var(--navy); border: 1px solid var(--border); }
     .btn-outline:hover { background: var(--light-bg); }
-
-    /* Year selector */
-    .year-tab { display: flex; gap: 6px; align-items: center; }
-    .year-tab button {
-      padding: 6px 14px; border-radius: 6px; font-size: 13px; font-weight: 500;
-      cursor: pointer; border: 1px solid var(--border); background: var(--white);
-      color: var(--muted); font-family: 'DM Sans', sans-serif; transition: all 0.15s;
-    }
-    .year-tab button.active { background: var(--burgundy); color: var(--white); border-color: var(--burgundy); }
-
-    /* Empty state */
-    .empty-state { text-align: center; padding: 60px 20px; color: var(--muted); }
-    .empty-state p { font-size: 15px; }
-
-    /* Loading */
-    .loading { text-align: center; padding: 40px; color: var(--muted); font-size: 14px; }
-
-    /* Toast */
-    .toast {
-      position: fixed; bottom: 24px; right: 24px; background: var(--navy); color: var(--white);
-      padding: 12px 20px; border-radius: 10px; font-size: 13px; font-weight: 500;
-      z-index: 9999; box-shadow: 0 4px 16px rgba(0,0,0,0.2);
-      transform: translateY(80px); opacity: 0; transition: all 0.25s;
-    }
+    .btn-danger { background: var(--white); color: var(--red); border: 1px solid var(--red); }
+    .btn-danger:hover { background: var(--red-bg); }
+    .btn-sm { padding: 5px 11px; font-size: 12px; }
+    .btn-icon { background: none; border: none; cursor: pointer; padding: 4px 6px; color: var(--muted); font-size: 14px; border-radius: 4px; }
+    .btn-icon:hover { color: var(--navy); background: var(--light-bg); }
+    .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 1000; align-items: center; justify-content: center; padding: 20px; }
+    .modal-overlay.open { display: flex; }
+    .modal { background: var(--white); border-radius: 14px; width: 100%; max-width: 680px; max-height: 90vh; overflow-y: auto; box-shadow: 0 8px 40px rgba(0,0,0,0.2); }
+    .modal-sm { max-width: 480px; }
+    .modal-header { padding: 20px 24px 16px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; background: var(--white); z-index: 1; }
+    .modal-header h2 { font-family: 'Playfair Display', serif; font-size: 20px; font-weight: 700; }
+    .modal-close { background: none; border: none; font-size: 22px; cursor: pointer; color: var(--muted); line-height: 1; padding: 4px; border-radius: 4px; }
+    .modal-close:hover { color: var(--navy); }
+    .modal-body { padding: 20px 24px; }
+    .modal-footer { padding: 16px 24px; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: 10px; position: sticky; bottom: 0; background: var(--white); }
+    .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    .form-grid.cols3 { grid-template-columns: 1fr 1fr 1fr; }
+    .form-group { display: flex; flex-direction: column; gap: 5px; }
+    .form-group.full { grid-column: 1 / -1; }
+    .form-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); }
+    .form-input, .form-select, .form-textarea { padding: 8px 10px; border: 1px solid var(--border); border-radius: 7px; font-family: 'DM Sans', sans-serif; font-size: 13px; color: var(--navy); background: var(--white); outline: none; width: 100%; }
+    .form-input:focus, .form-select:focus, .form-textarea:focus { border-color: var(--navy); }
+    .form-textarea { min-height: 72px; resize: vertical; }
+    .form-section-title { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin: 18px 0 12px; padding-bottom: 6px; border-bottom: 1px solid var(--border); }
+    .student-edit-list { display: flex; flex-direction: column; gap: 12px; margin-top: 8px; }
+    .student-edit-card { background: var(--light-bg); border: 1px solid var(--border); border-radius: 10px; padding: 14px; }
+    .student-edit-card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+    .student-edit-card-title { font-size: 13px; font-weight: 600; }
+    .add-student-btn { display: flex; align-items: center; gap: 6px; padding: 8px 14px; border: 1px dashed var(--border); border-radius: 8px; background: var(--white); color: var(--muted); font-size: 13px; font-weight: 500; cursor: pointer; width: 100%; justify-content: center; margin-top: 8px; font-family: 'DM Sans', sans-serif; }
+    .add-student-btn:hover { border-color: var(--navy); color: var(--navy); }
+    .upload-zone { border: 2px dashed var(--border); border-radius: 10px; padding: 32px; text-align: center; cursor: pointer; background: var(--white); }
+    .upload-zone:hover, .upload-zone.drag { border-color: var(--navy); background: var(--light-bg); }
+    .upload-zone p { font-size: 14px; color: var(--muted); margin-top: 8px; }
+    .upload-zone strong { font-size: 15px; color: var(--navy); }
+    .upload-result { margin-top: 16px; padding: 14px 16px; border-radius: 8px; font-size: 13px; line-height: 1.6; }
+    .upload-result.success { background: var(--green-bg); color: var(--green); }
+    .upload-result.error { background: var(--red-bg); color: var(--red); }
+    .season-info { background: var(--yellow-bg); border: 1px solid #f0d070; border-radius: 8px; padding: 14px 16px; font-size: 13px; color: #7a6000; line-height: 1.6; margin-bottom: 16px; }
+    .toast { position: fixed; bottom: 24px; right: 24px; background: var(--navy); color: var(--white); padding: 12px 20px; border-radius: 10px; font-size: 13px; font-weight: 500; z-index: 9999; box-shadow: 0 4px 16px rgba(0,0,0,0.2); transform: translateY(80px); opacity: 0; transition: all 0.25s; }
     .toast.show { transform: translateY(0); opacity: 1; }
     .toast.error { background: var(--red); }
-
+    .toast.success { background: var(--green); }
+    .loading { text-align: center; padding: 40px; color: var(--muted); font-size: 14px; }
+    .empty-state { text-align: center; padding: 60px 20px; color: var(--muted); }
     @media (max-width: 700px) {
-      .student-header, .student-row { grid-template-columns: 1fr 80px 90px; }
+      .student-header, .student-row { grid-template-columns: 1fr 90px 100px; }
       .student-header > *:nth-child(n+4), .student-row > *:nth-child(n+4) { display: none; }
-      .family-header-right .aid-summary .net { display: none; }
+      .form-grid, .form-grid.cols3 { grid-template-columns: 1fr; }
     }
   </style>
 </head>
@@ -224,7 +154,7 @@
 
 <div class="topbar">
   <div style="display:flex;align-items:center;gap:20px;">
-    <a href="/home">← Home</a>
+    <a href="/">← Home</a>
     <span class="topbar-title">Financial Aid</span>
   </div>
   <div class="topbar-right">
@@ -237,57 +167,52 @@
   <div class="page-header">
     <div class="page-header-left">
       <h1>Financial Aid Applications</h1>
-      <p>2025–2026 School Year &nbsp;·&nbsp; Admin only</p>
+      <p id="pageSubtitle">Admin only</p>
     </div>
     <div class="page-header-right">
+      <button class="btn btn-outline" onclick="openUploadModal()">⬆ Bulk Upload</button>
+      <button class="btn btn-outline" onclick="downloadTemplate()">⬇ CSV Template</button>
+      <button class="btn btn-outline" onclick="openAddFamilyModal()">+ Add Family</button>
       <button class="btn btn-outline" onclick="exportCSV()">Export CSV</button>
     </div>
   </div>
 
-  <div class="summary-bar" id="summaryBar">
-    <div class="summary-card">
-      <div class="label">Families</div>
-      <div class="value" id="sumFamilies">—</div>
-    </div>
-    <div class="summary-card">
-      <div class="label">Students</div>
-      <div class="value" id="sumStudents">—</div>
-    </div>
-    <div class="summary-card">
-      <div class="label">Total Aid Requested</div>
-      <div class="value gold" id="sumRequested">—</div>
-    </div>
-    <div class="summary-card">
-      <div class="label">FAST Recommended</div>
-      <div class="value" id="sumFast">—</div>
-    </div>
-    <div class="summary-card">
-      <div class="label">Contracts Sent</div>
-      <div class="value green" id="sumContracts">—</div>
-    </div>
-    <div class="summary-card">
-      <div class="label">Pending</div>
-      <div class="value gold" id="sumPending">—</div>
-    </div>
+  <div class="year-bar">
+    <span class="year-label">School Year:</span>
+    <div class="year-tabs" id="yearTabs"></div>
+    <button class="btn-new-season" onclick="openNewSeasonModal()">+ Start New Season</button>
+  </div>
+
+  <div class="summary-bar">
+    <div class="summary-card"><div class="label">Families</div><div class="value" id="sumFamilies">—</div></div>
+    <div class="summary-card"><div class="label">Students</div><div class="value" id="sumStudents">—</div></div>
+    <div class="summary-card"><div class="label">Total Aid Requested</div><div class="value gold" id="sumRequested">—</div></div>
+    <div class="summary-card"><div class="label">FAST Recommended</div><div class="value" id="sumFast">—</div></div>
+    <div class="summary-card"><div class="label">Contracts Sent</div><div class="value green" id="sumContracts">—</div></div>
+    <div class="summary-card"><div class="label">Pending</div><div class="value gold" id="sumPending">—</div></div>
   </div>
 
   <div class="filters-row">
     <input type="text" class="filter-input search" id="searchInput" placeholder="Search families..." oninput="applyFilters()">
-
     <span class="filter-label">Division:</span>
-    <div class="filter-toggle" id="divisionFilter">
-      <button class="active" data-val="all" onclick="setFilter('division','all',this)">All</button>
-      <button data-val="Kindergarten" onclick="setFilter('division','Kindergarten',this)">K</button>
-      <button data-val="Lower School" onclick="setFilter('division','Lower School',this)">Lower</button>
-      <button data-val="Middle School" onclick="setFilter('division','Middle School',this)">Middle</button>
-      <button data-val="Eighth Grade" onclick="setFilter('division','Eighth Grade',this)">8th</button>
+    <div class="filter-toggle">
+      <button class="active" onclick="setFilter('division','all',this)">All</button>
+      <button onclick="setFilter('division','Kindergarten',this)">K</button>
+      <button onclick="setFilter('division','Lower School',this)">Lower</button>
+      <button onclick="setFilter('division','Middle School',this)">Middle</button>
+      <button onclick="setFilter('division','Eighth Grade',this)">8th</button>
     </div>
-
     <span class="filter-label">Status:</span>
-    <div class="filter-toggle" id="statusFilter">
-      <button class="active" data-val="all" onclick="setFilter('status','all',this)">All</button>
-      <button data-val="contract" onclick="setFilter('status','contract',this)">Contract Sent</button>
-      <button data-val="pending" onclick="setFilter('status','pending',this)">Pending</button>
+    <div class="filter-toggle">
+      <button class="active" onclick="setFilter('status','all',this)">All</button>
+      <button onclick="setFilter('status','contract',this)">Contract Sent</button>
+      <button onclick="setFilter('status','pending',this)">Pending</button>
+    </div>
+    <span class="filter-label">Show:</span>
+    <div class="filter-toggle">
+      <button class="active" onclick="setFilter('activeFilter','all',this)">All</button>
+      <button onclick="setFilter('activeFilter','active',this)">Active</button>
+      <button onclick="setFilter('activeFilter','inactive',this)">Inactive</button>
     </div>
   </div>
 
@@ -296,300 +221,564 @@
   </div>
 </div>
 
+<!-- EDIT FAMILY MODAL -->
+<div class="modal-overlay" id="editModal">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 id="editModalTitle">Edit Family</h2>
+      <button class="modal-close" onclick="closeModal('editModal')">✕</button>
+    </div>
+    <div class="modal-body" id="editModalBody"></div>
+    <div class="modal-footer">
+      <button class="btn btn-sm" id="editModalStatusBtn" onclick="toggleFamilyActive()"></button>
+      <button class="btn btn-outline" onclick="closeModal('editModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveEditModal()">Save Changes</button>
+    </div>
+  </div>
+</div>
+
+<!-- ADD FAMILY MODAL -->
+<div class="modal-overlay" id="addFamilyModal">
+  <div class="modal modal-sm">
+    <div class="modal-header">
+      <h2>Add Family</h2>
+      <button class="modal-close" onclick="closeModal('addFamilyModal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-group">
+          <label class="form-label">Family Name *</label>
+          <input type="text" class="form-input" id="addFamilyName" placeholder="e.g. Smith">
+        </div>
+        <div class="form-group">
+          <label class="form-label">FAST ID</label>
+          <input type="text" class="form-input" id="addFamilyFastId" placeholder="e.g. 951677">
+        </div>
+      </div>
+      <p style="font-size:12px;color:var(--muted);margin-top:12px;">You can add students after creating the family by clicking Edit.</p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('addFamilyModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="submitAddFamily()">Create Family</button>
+    </div>
+  </div>
+</div>
+
+<!-- BULK UPLOAD MODAL -->
+<div class="modal-overlay" id="uploadModal">
+  <div class="modal">
+    <div class="modal-header">
+      <h2>Bulk Upload from ISMFast</h2>
+      <button class="modal-close" onclick="closeModal('uploadModal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:13px;color:var(--muted);margin-bottom:16px;line-height:1.6;">
+        Upload a CSV exported from ISMFast. Families whose FAST ID already exists for <strong id="uploadYearLabel"></strong> will be skipped automatically — no need to clean the file first. Run as many times as you like as applications trickle in.
+        <br><br>
+        Not sure of the format? <a href="#" onclick="downloadTemplate();return false;" style="color:var(--navy);font-weight:600;">Download the template</a> to see the expected columns.
+      </p>
+      <div class="upload-zone" id="uploadZone" onclick="document.getElementById('uploadFileInput').click()">
+        <div style="font-size:32px;">📄</div>
+        <strong>Click to choose a CSV file</strong>
+        <p>or drag and drop here</p>
+        <p id="uploadFileName" style="margin-top:8px;font-weight:600;color:var(--navy);"></p>
+      </div>
+      <input type="file" id="uploadFileInput" accept=".csv" style="display:none" onchange="handleFileSelect(this)">
+      <div id="uploadResult" style="display:none" class="upload-result"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('uploadModal')">Close</button>
+      <button class="btn btn-primary" id="uploadSubmitBtn" onclick="submitUpload()" disabled>Upload</button>
+    </div>
+  </div>
+</div>
+
+<!-- NEW SEASON MODAL -->
+<div class="modal-overlay" id="newSeasonModal">
+  <div class="modal modal-sm">
+    <div class="modal-header">
+      <h2>Start New Season</h2>
+      <button class="modal-close" onclick="closeModal('newSeasonModal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="season-info">
+        This will copy all <strong>active</strong> families from the selected year into a new school year. Each student's net tuition becomes their prior year tuition. All other financial figures will be blank, ready for new applications.
+      </div>
+      <div class="form-grid">
+        <div class="form-group">
+          <label class="form-label">Copy From</label>
+          <select class="form-select" id="seasonFromYear"></select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">New School Year *</label>
+          <input type="text" class="form-input" id="seasonToYear" placeholder="e.g. 2026-27">
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('newSeasonModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="submitNewSeason()">Create Season</button>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
   let allFamilies = [];
-  let filters = { division: 'all', status: 'all', search: '' };
+  let currentYear = '';
+  let allYears    = [];
+  let filters     = { division:'all', status:'all', activeFilter:'all', search:'' };
+  let editingFamilyId = null;
+  let editStudents    = [];
+  let selectedUploadFile = null;
 
-  // ──────────────────────────────────────────────────────────────────────────
-  // Data loading
-  // ──────────────────────────────────────────────────────────────────────────
-  async function loadData() {
+  // ─── Boot ──────────────────────────────────────────────────────────────────
+  async function boot() {
+    await loadYears();
+    await loadData();
+  }
+
+  async function loadYears() {
     try {
-      const res = await fetch('/api/financial-aid');
+      const res = await fetch('/api/financial-aid/years');
+      allYears = await res.json();
+    } catch(e) { allYears = []; }
+    if (!allYears.length) allYears = ['2025-26'];
+    currentYear = allYears[0];
+    renderYearTabs();
+  }
+
+  function renderYearTabs() {
+    document.getElementById('yearTabs').innerHTML = allYears.map(y =>
+      `<button class="year-tab ${y===currentYear?'active':''}" onclick="switchYear('${y}')">${y}</button>`
+    ).join('');
+    document.getElementById('pageSubtitle').textContent = `${currentYear} School Year · Admin only`;
+  }
+
+  async function switchYear(year) {
+    currentYear = year;
+    renderYearTabs();
+    await loadData();
+  }
+
+  async function loadData() {
+    document.getElementById('familyList').innerHTML = '<div class="loading">Loading applications...</div>';
+    try {
+      const res = await fetch(`/api/financial-aid?year=${encodeURIComponent(currentYear)}`);
       if (!res.ok) throw new Error('Server error');
       allFamilies = await res.json();
       renderAll();
-    } catch (e) {
+    } catch(e) {
       document.getElementById('familyList').innerHTML = '<div class="loading">Failed to load data. Check console.</div>';
       console.error(e);
     }
   }
 
-  // ──────────────────────────────────────────────────────────────────────────
-  // Rendering
-  // ──────────────────────────────────────────────────────────────────────────
+  // ─── Rendering ─────────────────────────────────────────────────────────────
   function fmt(n) {
-    if (n === null || n === undefined || n === '') return '—';
+    if (n===null||n===undefined||n==='') return '—';
     const num = parseFloat(n);
-    if (isNaN(num)) return '—';
-    return '$' + num.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+    return isNaN(num) ? '—' : '$'+num.toLocaleString('en-US',{minimumFractionDigits:0,maximumFractionDigits:0});
   }
 
-  function schoolBadgeColor(school) {
-    const s = school || '';
-    if (s.includes('Middle') || s.includes('Eighth')) return 'badge-school';
-    if (s.includes('Lower')) return 'badge-school' ;
-    if (s.includes('Kindergarten')) return 'badge-school';
-    return 'badge-school';
+  function esc(s) {
+    return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
   }
 
-  function renderAll() {
-    updateSummary();
-    applyFilters();
-  }
+  function renderAll() { updateSummary(); applyFilters(); }
 
   function updateSummary() {
-    let families = 0, students = 0, requested = 0, fast = 0, contracts = 0, pending = 0;
-    allFamilies.forEach(f => {
-      families++;
-      f.students.forEach(s => {
-        students++;
-        if (s.mds_aid_amount) requested += parseFloat(s.mds_aid_amount) || 0;
-        if (s.fast_aid_rec) fast += parseFloat(s.fast_aid_rec) || 0;
-      });
-      if (f.contract_sent) contracts++;
-      else pending++;
+    let fams=0,studs=0,req=0,fast=0,contracts=0,pending=0;
+    allFamilies.filter(f=>f.status!=='inactive').forEach(f=>{
+      fams++;
+      f.students.forEach(s=>{ studs++; req+=parseFloat(s.mds_aid_amount)||0; fast+=parseFloat(s.fast_aid_rec)||0; });
+      if (f.contract_sent) contracts++; else pending++;
     });
-    document.getElementById('sumFamilies').textContent = families;
-    document.getElementById('sumStudents').textContent = students;
-    document.getElementById('sumRequested').textContent = '$' + Math.round(requested).toLocaleString();
-    document.getElementById('sumFast').textContent = '$' + Math.round(fast).toLocaleString();
+    document.getElementById('sumFamilies').textContent  = fams;
+    document.getElementById('sumStudents').textContent  = studs;
+    document.getElementById('sumRequested').textContent = '$'+Math.round(req).toLocaleString();
+    document.getElementById('sumFast').textContent      = '$'+Math.round(fast).toLocaleString();
     document.getElementById('sumContracts').textContent = contracts;
-    document.getElementById('sumPending').textContent = pending;
+    document.getElementById('sumPending').textContent   = pending;
   }
 
   function setFilter(type, val, btn) {
     filters[type] = val;
-    const group = btn.closest('.filter-toggle');
-    group.querySelectorAll('button').forEach(b => b.classList.remove('active'));
+    btn.closest('.filter-toggle').querySelectorAll('button').forEach(b=>b.classList.remove('active'));
     btn.classList.add('active');
     applyFilters();
   }
 
   function applyFilters() {
     filters.search = document.getElementById('searchInput').value.toLowerCase();
-    const filtered = allFamilies.filter(f => {
-      // Search
+    let filtered = allFamilies.filter(f => {
       if (filters.search && !f.family_name.toLowerCase().includes(filters.search)) return false;
-      // Status
-      if (filters.status === 'contract' && !f.contract_sent) return false;
-      if (filters.status === 'pending' && f.contract_sent) return false;
-      // Division
-      if (filters.division !== 'all') {
-        const match = f.students.some(s => s.school === filters.division);
-        if (!match) return false;
-      }
+      if (filters.status==='contract' && !f.contract_sent) return false;
+      if (filters.status==='pending'  &&  f.contract_sent) return false;
+      if (filters.activeFilter==='active'   && f.status==='inactive') return false;
+      if (filters.activeFilter==='inactive' && f.status!=='inactive') return false;
+      if (filters.division!=='all' && !f.students.some(s=>s.school===filters.division)) return false;
       return true;
+    });
+    filtered.sort((a,b) => {
+      if (a.status==='inactive' && b.status!=='inactive') return 1;
+      if (a.status!=='inactive' && b.status==='inactive') return -1;
+      return a.family_name.localeCompare(b.family_name);
     });
     renderFamilies(filtered);
   }
 
   function renderFamilies(families) {
     const list = document.getElementById('familyList');
-    if (families.length === 0) {
-      list.innerHTML = '<div class="empty-state"><p>No applications match your filters.</p></div>';
-      return;
-    }
-
-    list.innerHTML = families.map(f => renderFamilyCard(f)).join('');
+    if (!families.length) { list.innerHTML='<div class="empty-state"><p>No applications match your filters.</p></div>'; return; }
+    list.innerHTML = families.map(f=>renderFamilyCard(f)).join('');
   }
 
   function renderFamilyCard(f) {
-    const totalRequested = f.students.reduce((sum, s) => sum + (parseFloat(s.mds_aid_amount) || 0), 0);
-    const totalNetTuition = f.students.reduce((sum, s) => sum + (parseFloat(s.net_tuition_2526) || 0), 0);
-    const hasAppeal = f.students.some(s => s.appeal_letter && s.appeal_letter.toLowerCase().includes('y'));
-
-    const contractBadge = f.contract_sent
-      ? `<span class="badge badge-contract">Contract Sent</span>`
-      : `<span class="badge badge-no-contract">Pending</span>`;
-
-    const appealBadge = hasAppeal ? `<span class="badge badge-appeal">Appeal</span>` : '';
-
-    const schoolLevels = [...new Set(f.students.map(s => s.school).filter(Boolean))];
-    const schoolBadges = schoolLevels.map(s => `<span class="badge badge-school">${s}</span>`).join('');
-
-    const studentRows = f.students.map(s => `
+    const inactive = f.status==='inactive';
+    const totalReq = f.students.reduce((s,st)=>s+(parseFloat(st.mds_aid_amount)||0),0);
+    const totalNet = f.students.reduce((s,st)=>s+(parseFloat(st.net_tuition)||0),0);
+    const hasAppeal = f.students.some(s=>s.appeal_letter&&s.appeal_letter.toLowerCase().startsWith('y'));
+    const contractBadge = f.contract_sent ? `<span class="badge badge-contract">Contract Sent</span>` : `<span class="badge badge-no-contract">Pending</span>`;
+    const appealBadge   = hasAppeal ? `<span class="badge badge-appeal">Appeal</span>` : '';
+    const inactiveBadge = inactive  ? `<span class="badge badge-inactive">Inactive</span>` : '';
+    const schoolBadges  = [...new Set(f.students.map(s=>s.school).filter(Boolean))].map(s=>`<span class="badge badge-school">${s}</span>`).join('');
+    const studentRows   = f.students.map(s=>`
       <div class="student-row">
-        <div>
-          <div class="student-name">${s.school || 'Unknown'}</div>
-        </div>
+        <div style="font-size:13px;font-weight:600;">${esc(s.school||'Unknown')}</div>
         <div class="money fast">${fmt(s.tuition)}</div>
         <div class="money fast">${fmt(s.fast_aid_rec)}</div>
         <div class="money requested">${fmt(s.mds_aid_amount)}</div>
-        <div class="money net">${fmt(s.net_tuition_2526)}</div>
+        <div class="money net">${fmt(s.net_tuition)}</div>
         <div class="money prior">${fmt(s.prior_year_tuition)}</div>
-      </div>
-    `).join('');
-
-    // Notes
-    const parentNote = f.students.find(s => s.parent_notes)?.parent_notes || '';
-    const schoolNote = f.students.find(s => s.school_notes)?.school_notes || '';
-    const karinNote = f.students.find(s => s.karins_notes)?.karins_notes || '';
-
-    const karinsNoteDisplay = karinNote
-      ? `<div class="note-text">${escHtml(karinNote)}</div>`
-      : `<div class="note-text empty">No notes yet</div>`;
-
+      </div>`).join('');
+    const parentNote = f.students.find(s=>s.parent_notes)?.parent_notes||'';
+    const schoolNote = f.students.find(s=>s.school_notes)?.school_notes||'';
+    const karinNote  = f.students.find(s=>s.karins_notes)?.karins_notes||'';
     return `
-    <div class="family-card" id="family-${f.id}">
+    <div class="family-card ${inactive?'inactive':''}" id="family-${f.id}">
       <div class="family-card-header" onclick="toggleCard('family-${f.id}')">
         <div>
-          <div class="family-name">${escHtml(f.family_name)}</div>
-          <div class="family-meta">
-            ${schoolBadges}
-            ${f.fast_id ? `<span class="badge badge-fast-id">FAST #${f.fast_id}</span>` : ''}
-            ${contractBadge}
-            ${appealBadge}
-          </div>
+          <div class="family-name">${esc(f.family_name)}</div>
+          <div class="family-meta">${schoolBadges}${f.fast_id?`<span class="badge badge-fast-id">FAST #${f.fast_id}</span>`:''}${contractBadge}${appealBadge}${inactiveBadge}</div>
         </div>
         <div class="family-header-right">
           <div class="aid-summary">
-            <div class="requested">${fmt(totalRequested)} requested</div>
-            <div class="net">Net tuition: ${fmt(totalNetTuition)}</div>
+            <div class="requested">${fmt(totalReq)} requested</div>
+            <div class="net">Net tuition: ${fmt(totalNet)}</div>
           </div>
           <span class="chevron">▼</span>
         </div>
       </div>
-
       <div class="family-card-body" style="display:none;">
         <div class="student-section">
-          <div class="student-header">
-            <div>Division</div>
-            <div>Tuition</div>
-            <div>FAST Rec</div>
-            <div>Aid Req</div>
-            <div>Net '25-26</div>
-            <div>Prior Year</div>
-          </div>
+          <div class="student-header"><div>Division</div><div>Tuition</div><div>FAST Rec</div><div>Aid Req</div><div>Net Tuition</div><div>Prior Year</div></div>
           ${studentRows}
         </div>
-
         <div class="notes-panel">
           <div class="notes-grid">
-            <div class="note-block">
-              <label>Parent Statement</label>
-              <div class="note-text">${parentNote ? escHtml(parentNote) : '<span style="color:var(--muted);font-style:italic">No letter submitted</span>'}</div>
-            </div>
-            <div class="note-block">
-              <label>School Notes (for Karin)</label>
-              <div class="note-text">${schoolNote ? escHtml(schoolNote) : '<span style="color:var(--muted);font-style:italic">No notes</span>'}</div>
-            </div>
-            <div class="note-block">
-              <label>Karin's Notes</label>
-              <textarea id="karins-note-${f.id}" placeholder="Add notes here...">${karinNote}</textarea>
-            </div>
+            <div class="note-block"><label>Parent Statement</label><div class="note-text ${parentNote?'':'empty'}">${parentNote?esc(parentNote):'No letter submitted'}</div></div>
+            <div class="note-block"><label>School Notes (for Karin)</label><div class="note-text ${schoolNote?'':'empty'}">${schoolNote?esc(schoolNote):'No notes'}</div></div>
+            <div class="note-block"><label>Karin's Notes</label><textarea id="karins-note-${f.id}" placeholder="Add notes here...">${esc(karinNote)}</textarea></div>
           </div>
         </div>
-
         <div class="edit-row">
-          <label>Flags:</label>
-          <div class="check-item">
-            <input type="checkbox" id="appeal-${f.id}" ${hasAppeal ? 'checked' : ''}>
-            <span>Appeal Received</span>
-          </div>
-          <div class="check-item">
-            <input type="checkbox" id="contract-${f.id}" ${f.contract_sent ? 'checked' : ''}>
-            <span>Contract Sent</span>
-          </div>
+          <span class="edit-row-label">Flags:</span>
+          <div class="check-item"><input type="checkbox" id="contract-${f.id}" ${f.contract_sent?'checked':''}><span>Contract Sent</span></div>
           <span class="save-feedback" id="feedback-${f.id}"></span>
-          <button class="btn-save" onclick="saveFamily(${f.id})">Save Notes</button>
+          <div class="edit-row-right">
+            <button class="btn btn-outline btn-sm" onclick="openEditModal(${f.id});event.stopPropagation()">✏ Edit</button>
+            <button class="btn btn-primary btn-sm" onclick="saveFamily(${f.id});event.stopPropagation()">Save Notes</button>
+          </div>
         </div>
       </div>
     </div>`;
   }
 
-  // ──────────────────────────────────────────────────────────────────────────
-  // Interactions
-  // ──────────────────────────────────────────────────────────────────────────
   function toggleCard(cardId) {
     const card = document.getElementById(cardId);
     const body = card.querySelector('.family-card-body');
-    const isOpen = body.style.display !== 'none';
-    body.style.display = isOpen ? 'none' : 'block';
-    card.classList.toggle('expanded', !isOpen);
+    const open = body.style.display!=='none';
+    body.style.display = open?'none':'block';
+    card.classList.toggle('expanded',!open);
   }
 
+  // ─── Quick save (notes + contract) ────────────────────────────────────────
   async function saveFamily(familyId) {
-    const karinsNote = document.getElementById(`karins-note-${familyId}`)?.value || '';
-    const contractSent = document.getElementById(`contract-${familyId}`)?.checked || false;
-    const btn = document.querySelector(`#family-${familyId} .btn-save`);
+    const note     = document.getElementById(`karins-note-${familyId}`)?.value||'';
+    const contract = document.getElementById(`contract-${familyId}`)?.checked||false;
     const feedback = document.getElementById(`feedback-${familyId}`);
-
-    btn.textContent = 'Saving...';
-    btn.classList.add('saving');
-
     try {
-      const res = await fetch(`/api/financial-aid/${familyId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ karins_notes: karinsNote, contract_sent: contractSent })
-      });
-      if (!res.ok) throw new Error('Save failed');
-      feedback.textContent = 'Saved ✓';
-      setTimeout(() => { feedback.textContent = ''; }, 3000);
-
-      // Update local data
-      const fam = allFamilies.find(f => f.id === familyId);
-      if (fam) {
-        fam.contract_sent = contractSent;
-        fam.students.forEach(s => { s.karins_notes = karinsNote; });
-      }
+      const res = await fetch(`/api/financial-aid/${familyId}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({karins_notes:note,contract_sent:contract})});
+      if (!res.ok) throw new Error();
+      feedback.textContent='Saved ✓'; feedback.style.color='var(--green)';
+      setTimeout(()=>{feedback.textContent='';},3000);
+      const fam=allFamilies.find(f=>f.id===familyId);
+      if(fam){fam.contract_sent=contract;fam.students.forEach(s=>s.karins_notes=note);}
       updateSummary();
-    } catch (e) {
-      feedback.textContent = 'Error saving';
-      feedback.style.color = 'var(--red)';
-      console.error(e);
-    } finally {
-      btn.textContent = 'Save Notes';
-      btn.classList.remove('saving');
-    }
+    } catch(e) { feedback.textContent='Error'; feedback.style.color='var(--red)'; }
   }
 
+  // ─── Edit modal ────────────────────────────────────────────────────────────
+  const SCHOOLS    = ['Kindergarten','Lower School','Middle School','Eighth Grade'];
+  const TUITION_JS = {'Kindergarten':19338,'Lower School':24200,'Middle School':26299,'Eighth Grade':27017};
+
+  function openEditModal(familyId) {
+    const fam = allFamilies.find(f=>f.id===familyId);
+    if (!fam) return;
+    editingFamilyId = familyId;
+    editStudents    = fam.students.map(s=>({...s}));
+    document.getElementById('editModalTitle').textContent = `Edit — ${fam.family_name}`;
+    const btn = document.getElementById('editModalStatusBtn');
+    if (fam.status==='inactive') { btn.textContent='Mark Active'; btn.className='btn btn-outline btn-sm'; }
+    else { btn.textContent='Mark Inactive'; btn.className='btn btn-danger btn-sm'; }
+    renderEditBody(fam);
+    document.getElementById('editModal').classList.add('open');
+  }
+
+  function renderEditBody(fam) {
+    const karinNote  = fam.students.find(s=>s.karins_notes)?.karins_notes||'';
+    const schoolNote = fam.students.find(s=>s.school_notes)?.school_notes||'';
+    const parentNote = fam.students.find(s=>s.parent_notes)?.parent_notes||'';
+    document.getElementById('editModalBody').innerHTML = `
+      <div class="form-grid">
+        <div class="form-group">
+          <label class="form-label">Contract Sent</label>
+          <select class="form-select" id="editContractSent">
+            <option value="true" ${fam.contract_sent?'selected':''}>Yes</option>
+            <option value="false" ${!fam.contract_sent?'selected':''}>No</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-section-title" style="margin-top:20px;">Students</div>
+      <div class="student-edit-list" id="studentEditList">${editStudents.map((s,i)=>renderStudentCard(s,i)).join('')}</div>
+      <button class="add-student-btn" onclick="addStudentToEdit()">+ Add Student</button>
+      <div class="form-section-title" style="margin-top:20px;">Notes</div>
+      <div class="form-grid">
+        <div class="form-group full"><label class="form-label">Parent Statement</label><textarea class="form-textarea" id="editParentNotes">${esc(parentNote)}</textarea></div>
+        <div class="form-group full"><label class="form-label">School Notes (for Karin)</label><textarea class="form-textarea" id="editSchoolNotes">${esc(schoolNote)}</textarea></div>
+        <div class="form-group full"><label class="form-label">Karin's Notes</label><textarea class="form-textarea" id="editKarinsNotes">${esc(karinNote)}</textarea></div>
+      </div>`;
+  }
+
+  function renderStudentCard(s, i) {
+    const schoolOpts = SCHOOLS.map(sc=>`<option value="${sc}" ${s.school===sc?'selected':''}>${sc}</option>`).join('');
+    const f = (v) => v!=null?v:'';
+    return `
+    <div class="student-edit-card" id="sedit-${i}">
+      <div class="student-edit-card-header">
+        <span class="student-edit-card-title">Student ${i+1}</span>
+        <button class="btn-icon" title="Remove" onclick="removeStudent(${i})" style="color:var(--red)">🗑</button>
+      </div>
+      <div class="form-grid cols3">
+        <div class="form-group full">
+          <label class="form-label">Division</label>
+          <select class="form-select" onchange="updateStu(${i},'school',this.value);autoTuition(${i},this.value)">${schoolOpts}</select>
+        </div>
+        <div class="form-group"><label class="form-label">Tuition</label><input type="number" class="form-input" id="stu-tuition-${i}" value="${f(s.tuition)}" onchange="updateStu(${i},'tuition',this.value)" placeholder="0"></div>
+        <div class="form-group"><label class="form-label">FAST Aid Rec</label><input type="number" class="form-input" value="${f(s.fast_aid_rec)}" onchange="updateStu(${i},'fast_aid_rec',this.value)" placeholder="0"></div>
+        <div class="form-group">
+          <label class="form-label">Appeal Letter</label>
+          <select class="form-select" onchange="updateStu(${i},'appeal_letter',this.value)">
+            <option value="" ${!s.appeal_letter?'selected':''}>—</option>
+            <option value="Y" ${s.appeal_letter==='Y'?'selected':''}>Y</option>
+            <option value="N" ${s.appeal_letter==='N'?'selected':''}>N</option>
+            <option value="Y, plus additional letter" ${s.appeal_letter==='Y, plus additional letter'?'selected':''}>Y + extra letter</option>
+          </select>
+        </div>
+        <div class="form-group"><label class="form-label">Family Can Pay</label><input type="number" class="form-input" value="${f(s.family_can_pay)}" onchange="updateStu(${i},'family_can_pay',this.value)" placeholder="0"></div>
+        <div class="form-group"><label class="form-label">MDS Aid Amount</label><input type="number" class="form-input" value="${f(s.mds_aid_amount)}" onchange="updateStu(${i},'mds_aid_amount',this.value)" placeholder="0"></div>
+        <div class="form-group"><label class="form-label">Net Tuition</label><input type="number" class="form-input" value="${f(s.net_tuition)}" onchange="updateStu(${i},'net_tuition',this.value)" placeholder="0"></div>
+        <div class="form-group"><label class="form-label">Prior Year Tuition</label><input type="number" class="form-input" value="${f(s.prior_year_tuition)}" onchange="updateStu(${i},'prior_year_tuition',this.value)" placeholder="0"></div>
+        <div class="form-group"><label class="form-label">Family Total</label><input type="number" class="form-input" value="${f(s.family_total)}" onchange="updateStu(${i},'family_total',this.value)" placeholder="0"></div>
+      </div>
+    </div>`;
+  }
+
+  function updateStu(i, field, value) {
+    editStudents[i][field] = value===''?null:(isNaN(+value)?value:+value);
+  }
+  function autoTuition(i, school) {
+    const t = TUITION_JS[school];
+    if (t) { document.getElementById(`stu-tuition-${i}`).value=t; updateStu(i,'tuition',t); }
+  }
+  function addStudentToEdit() {
+    const i = editStudents.length;
+    editStudents.push({school:'Lower School', tuition:TUITION_JS['Lower School']});
+    const div = document.createElement('div');
+    div.innerHTML = renderStudentCard(editStudents[i], i);
+    document.getElementById('studentEditList').appendChild(div.firstElementChild);
+  }
+  function removeStudent(i) {
+    if (!confirm('Remove this student?')) return;
+    editStudents.splice(i,1);
+    document.getElementById('studentEditList').innerHTML = editStudents.map((s,idx)=>renderStudentCard(s,idx)).join('');
+  }
+
+  async function saveEditModal() {
+    const fam = allFamilies.find(f=>f.id===editingFamilyId);
+    if (!fam) return;
+    const contractSent = document.getElementById('editContractSent').value==='true';
+    const karinsNotes  = document.getElementById('editKarinsNotes').value;
+    const schoolNotes  = document.getElementById('editSchoolNotes').value;
+    const parentNotes  = document.getElementById('editParentNotes').value;
+    try {
+      await fetch(`/api/financial-aid/${editingFamilyId}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({contract_sent:contractSent,karins_notes:karinsNotes})});
+      for (const s of editStudents) {
+        const payload = {...s, parent_notes:parentNotes, school_notes:schoolNotes, karins_notes:karinsNotes};
+        if (s.id) {
+          await fetch(`/api/financial-aid/students/${s.id}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+        } else {
+          await fetch(`/api/financial-aid/${editingFamilyId}/students`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+        }
+      }
+      const keepIds = new Set(editStudents.filter(s=>s.id).map(s=>s.id));
+      for (const orig of fam.students) {
+        if (!keepIds.has(orig.id)) await fetch(`/api/financial-aid/students/${orig.id}`,{method:'DELETE'});
+      }
+      showToast('Saved successfully','success');
+      closeModal('editModal');
+      await loadData();
+    } catch(e) { showToast('Error saving','error'); console.error(e); }
+  }
+
+  async function toggleFamilyActive() {
+    const fam = allFamilies.find(f=>f.id===editingFamilyId);
+    if (!fam) return;
+    const newStatus = fam.status==='inactive'?'active':'inactive';
+    if (newStatus==='inactive'&&!confirm(`Mark ${fam.family_name} as inactive?`)) return;
+    try {
+      await fetch(`/api/financial-aid/${editingFamilyId}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({status:newStatus})});
+      showToast(`Marked ${newStatus}`,'success');
+      closeModal('editModal');
+      await loadData();
+    } catch(e) { showToast('Error updating status','error'); }
+  }
+
+  // ─── Add family ────────────────────────────────────────────────────────────
+  function openAddFamilyModal() {
+    document.getElementById('addFamilyName').value='';
+    document.getElementById('addFamilyFastId').value='';
+    document.getElementById('addFamilyModal').classList.add('open');
+  }
+  async function submitAddFamily() {
+    const name   = document.getElementById('addFamilyName').value.trim();
+    const fastId = document.getElementById('addFamilyFastId').value.trim();
+    if (!name) { showToast('Family name required','error'); return; }
+    try {
+      const res = await fetch('/api/financial-aid/families',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({family_name:name,fast_id:fastId||null,school_year:currentYear})});
+      const data = await res.json();
+      if (!res.ok) { showToast(data.error||'Error','error'); return; }
+      showToast('Family created','success');
+      closeModal('addFamilyModal');
+      await loadData();
+    } catch(e) { showToast('Error creating family','error'); }
+  }
+
+  // ─── Bulk upload ───────────────────────────────────────────────────────────
+  function openUploadModal() {
+    selectedUploadFile=null;
+    document.getElementById('uploadFileName').textContent='';
+    document.getElementById('uploadResult').style.display='none';
+    document.getElementById('uploadSubmitBtn').disabled=true;
+    document.getElementById('uploadYearLabel').textContent=currentYear;
+    document.getElementById('uploadModal').classList.add('open');
+  }
+  function handleFileSelect(input) {
+    const file=input.files[0]; if(!file) return;
+    selectedUploadFile=file;
+    document.getElementById('uploadFileName').textContent=file.name;
+    document.getElementById('uploadSubmitBtn').disabled=false;
+    document.getElementById('uploadResult').style.display='none';
+  }
+  const uploadZone = document.getElementById('uploadZone');
+  if(uploadZone){
+    uploadZone.addEventListener('dragover',e=>{e.preventDefault();uploadZone.classList.add('drag');});
+    uploadZone.addEventListener('dragleave',()=>uploadZone.classList.remove('drag'));
+    uploadZone.addEventListener('drop',e=>{
+      e.preventDefault();uploadZone.classList.remove('drag');
+      const file=e.dataTransfer.files[0];
+      if(file){selectedUploadFile=file;document.getElementById('uploadFileName').textContent=file.name;document.getElementById('uploadSubmitBtn').disabled=false;}
+    });
+  }
+  async function submitUpload() {
+    if (!selectedUploadFile) return;
+    const btn=document.getElementById('uploadSubmitBtn');
+    btn.disabled=true; btn.textContent='Uploading...';
+    const fd=new FormData();
+    fd.append('file',selectedUploadFile); fd.append('school_year',currentYear);
+    try {
+      const res=await fetch('/api/financial-aid/upload',{method:'POST',body:fd});
+      const data=await res.json();
+      const el=document.getElementById('uploadResult');
+      if(res.ok&&data.ok){
+        el.className='upload-result success';
+        el.textContent=`Done! ${data.added} families added, ${data.skipped} already existed and were skipped.`+(data.errors?` ${data.errors} row errors.`:'');
+      } else {
+        el.className='upload-result error';
+        el.textContent=data.error||'Upload failed.';
+      }
+      el.style.display='block';
+      if(data.ok) await loadData();
+    } catch(e) {
+      const el=document.getElementById('uploadResult');
+      el.className='upload-result error'; el.textContent='Upload failed.'; el.style.display='block';
+    } finally { btn.disabled=false; btn.textContent='Upload'; }
+  }
+  function downloadTemplate() { window.location.href='/api/financial-aid/template'; }
+
+  // ─── New season ────────────────────────────────────────────────────────────
+  function openNewSeasonModal() {
+    document.getElementById('seasonFromYear').innerHTML=allYears.map(y=>`<option value="${y}">${y}</option>`).join('');
+    document.getElementById('seasonToYear').value='';
+    document.getElementById('newSeasonModal').classList.add('open');
+  }
+  async function submitNewSeason() {
+    const fromYear=document.getElementById('seasonFromYear').value;
+    const toYear=document.getElementById('seasonToYear').value.trim();
+    if (!toYear) { showToast('Enter the new year (e.g. 2026-27)','error'); return; }
+    if (!confirm(`Create ${toYear} by copying active families from ${fromYear}?`)) return;
+    try {
+      const res=await fetch('/api/financial-aid/new-season',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({from_year:fromYear,to_year:toYear})});
+      const data=await res.json();
+      if (!res.ok) { showToast(data.error||'Error','error'); return; }
+      showToast(`${toYear} created with ${data.families_carried} families`,'success');
+      closeModal('newSeasonModal');
+      await loadYears();
+      await switchYear(toYear);
+    } catch(e) { showToast('Error creating season','error'); }
+  }
+
+  // ─── Export CSV ────────────────────────────────────────────────────────────
   function exportCSV() {
-    const rows = [['Family', 'FAST ID', 'Division', 'Tuition', 'FAST Rec', 'Aid Requested', 'Net Tuition', 'Prior Year', 'Contract Sent', 'Karin Notes']];
-    allFamilies.forEach(f => {
-      f.students.forEach(s => {
-        rows.push([
-          f.family_name,
-          f.fast_id || '',
-          s.school || '',
-          s.tuition || '',
-          s.fast_aid_rec || '',
-          s.mds_aid_amount || '',
-          s.net_tuition_2526 || '',
-          s.prior_year_tuition || '',
-          f.contract_sent ? 'Yes' : 'No',
-          (s.karins_notes || '').replace(/\n/g, ' ')
-        ]);
+    const rows=[['Family','FAST ID','Division','Tuition','FAST Rec','Aid Requested','Net Tuition','Prior Year','Contract Sent','Status','Karin Notes']];
+    allFamilies.forEach(f=>{
+      f.students.forEach(s=>{
+        rows.push([f.family_name,f.fast_id||'',s.school||'',s.tuition||'',s.fast_aid_rec||'',s.mds_aid_amount||'',s.net_tuition||'',s.prior_year_tuition||'',f.contract_sent?'Yes':'No',f.status,(s.karins_notes||'').replace(/\n/g,' ')]);
       });
     });
-    const csv = rows.map(r => r.map(c => `"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n');
-    const blob = new Blob([csv], { type: 'text/csv' });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = 'financial_aid_2025-26.csv';
+    const csv=rows.map(r=>r.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n');
+    const a=document.createElement('a');
+    a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
+    a.download=`financial_aid_${currentYear}.csv`;
     a.click();
   }
 
-  function escHtml(str) {
-    return String(str)
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;');
+  // ─── Modals ────────────────────────────────────────────────────────────────
+  function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+  document.querySelectorAll('.modal-overlay').forEach(o=>{
+    o.addEventListener('click',e=>{ if(e.target===o) closeModal(o.id); });
+  });
+
+  // ─── Toast ─────────────────────────────────────────────────────────────────
+  function showToast(msg,type='') {
+    const t=document.getElementById('toast');
+    t.textContent=msg; t.className='toast show'+(type?' '+type:'');
+    setTimeout(()=>{t.className='toast';},3500);
   }
 
-  function showToast(msg, isError=false) {
-    const t = document.getElementById('toast');
-    t.textContent = msg;
-    t.className = 'toast show' + (isError ? ' error' : '');
-    setTimeout(() => { t.className = 'toast'; }, 3000);
-  }
-
-  // Boot
-  loadData();
+  boot();
 </script>
 </body>
 </html>
