@@ -714,7 +714,7 @@
       const el=document.getElementById('uploadResult');
       if(res.ok&&data.ok){
         el.className='upload-result success';
-        el.textContent=`Done! ${data.added} families added, ${data.skipped} already existed and were skipped.`+(data.errors?` ${data.errors} row errors.`:'');
+        el.textContent=`Done! ${data.added} new families added, ${data.activated} existing families activated, ${data.skipped} already active (skipped).`+(data.errors?` ${data.errors} row errors.`:'');
       } else {
         el.className='upload-result error';
         el.textContent=data.error||'Upload failed.';

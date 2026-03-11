@@ -2361,13 +2361,13 @@ def api_financial_aid_upload():
             except: return None
 
         conn = get_db_connection()
-        added = skipped = errors_count = 0
+        added = skipped = activated = errors_count = 0
         error_names = []
         try:
             with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
-                # Fetch existing FAST IDs for this year
-                cur.execute("SELECT fast_id FROM financial_aid_families WHERE school_year=%s AND fast_id IS NOT NULL", (school_year,))
-                existing_fast_ids = {r['fast_id'] for r in cur.fetchall()}
+                # Fetch existing families for this year: fast_id -> {id, status}
+                cur.execute("SELECT id, fast_id, status FROM financial_aid_families WHERE school_year=%s AND fast_id IS NOT NULL", (school_year,))
+                existing = {r['fast_id']: {'id': r['id'], 'status': r['status']} for r in cur.fetchall()}
 
                 # Normalize row keys
                 for raw_row in reader:
@@ -2377,37 +2377,90 @@ def api_financial_aid_upload():
                     school      = col(row, 'school', 'division', 'grade level')
                     if not family_name:
                         continue
-                    if fast_id and fast_id in existing_fast_ids:
-                        skipped += 1
-                        continue
-                    try:
-                        cur.execute("""
-                            INSERT INTO financial_aid_families (family_name, fast_id, school_year, contract_sent, status)
-                            VALUES (%s,%s,%s,false,'active') RETURNING id
-                        """, (family_name, fast_id or None, school_year))
-                        fam_id = cur.fetchone()['id']
-                        if fast_id:
-                            existing_fast_ids.add(fast_id)
 
-                        # Add student row if school info present
-                        if school:
-                            tuition_val = TUITION_MAP.get(school) or money(col(row, 'tuition'))
+                    try:
+                        if fast_id and fast_id in existing:
+                            fam_rec = existing[fast_id]
+                            if fam_rec['status'] == 'active':
+                                # Already active — skip to protect mid-season edits
+                                skipped += 1
+                                continue
+                            else:
+                                # Inactive (carried over) — activate and populate financials
+                                fam_id = fam_rec['id']
+                                cur.execute("""
+                                    UPDATE financial_aid_families
+                                    SET status='active', updated_at=NOW()
+                                    WHERE id=%s
+                                """, (fam_id,))
+                                existing[fast_id]['status'] = 'active'
+                                if school:
+                                    tuition_val = TUITION_MAP.get(school) or money(col(row, 'tuition'))
+                                    # Update existing student row if present, else insert
+                                    cur.execute("SELECT id FROM financial_aid_students WHERE family_id=%s LIMIT 1", (fam_id,))
+                                    stu = cur.fetchone()
+                                    if stu:
+                                        cur.execute("""
+                                            UPDATE financial_aid_students SET
+                                                school=%s, tuition=%s, fast_aid_rec=%s, appeal_letter=%s,
+                                                family_can_pay=%s, mds_aid_amount=%s, net_tuition=%s,
+                                                prior_year_tuition=COALESCE(prior_year_tuition, %s),
+                                                parent_notes=%s, school_notes=%s, updated_at=NOW()
+                                            WHERE id=%s
+                                        """, (school, tuition_val,
+                                              money(col(row, 'fast aid rec', 'fast_aid_rec', 'fast rec')),
+                                              col(row, 'appeal letter', 'appeal'),
+                                              money(col(row, 'family can pay', 'family_can_pay')),
+                                              money(col(row, 'mds aid amount', 'mds_aid_amount', 'aid amount')),
+                                              money(col(row, 'net tuition', 'net_tuition')),
+                                              money(col(row, 'prior year tuition', 'prior_year_tuition', 'prior tuition')),
+                                              col(row, 'parent notes', 'parent_notes'),
+                                              col(row, 'school notes', 'school_notes'),
+                                              stu['id']))
+                                    else:
+                                        cur.execute("""
+                                            INSERT INTO financial_aid_students
+                                            (family_id, school, tuition, fast_aid_rec, appeal_letter,
+                                             family_can_pay, mds_aid_amount, net_tuition,
+                                             prior_year_tuition, parent_notes, school_notes)
+                                            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                                        """, (fam_id, school, tuition_val,
+                                              money(col(row, 'fast aid rec', 'fast_aid_rec', 'fast rec')),
+                                              col(row, 'appeal letter', 'appeal'),
+                                              money(col(row, 'family can pay', 'family_can_pay')),
+                                              money(col(row, 'mds aid amount', 'mds_aid_amount', 'aid amount')),
+                                              money(col(row, 'net tuition', 'net_tuition')),
+                                              money(col(row, 'prior year tuition', 'prior_year_tuition', 'prior tuition')),
+                                              col(row, 'parent notes', 'parent_notes'),
+                                              col(row, 'school notes', 'school_notes')))
+                                activated += 1
+                        else:
+                            # Brand new family — create as active
                             cur.execute("""
-                                INSERT INTO financial_aid_students
-                                (family_id, school, tuition, fast_aid_rec, appeal_letter,
-                                 family_can_pay, mds_aid_amount, net_tuition,
-                                 prior_year_tuition, parent_notes, school_notes)
-                                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
-                            """, (fam_id, school, tuition_val,
-                                  money(col(row, 'fast aid rec', 'fast_aid_rec', 'fast rec')),
-                                  col(row, 'appeal letter', 'appeal'),
-                                  money(col(row, 'family can pay', 'family_can_pay')),
-                                  money(col(row, 'mds aid amount', 'mds_aid_amount', 'aid amount')),
-                                  money(col(row, 'net tuition', 'net_tuition')),
-                                  money(col(row, 'prior year tuition', 'prior_year_tuition', 'prior tuition')),
-                                  col(row, 'parent notes', 'parent_notes'),
-                                  col(row, 'school notes', 'school_notes')))
-                        added += 1
+                                INSERT INTO financial_aid_families (family_name, fast_id, school_year, contract_sent, status)
+                                VALUES (%s,%s,%s,false,'active') RETURNING id
+                            """, (family_name, fast_id or None, school_year))
+                            fam_id = cur.fetchone()['id']
+                            if fast_id:
+                                existing[fast_id] = {'id': fam_id, 'status': 'active'}
+                            if school:
+                                tuition_val = TUITION_MAP.get(school) or money(col(row, 'tuition'))
+                                cur.execute("""
+                                    INSERT INTO financial_aid_students
+                                    (family_id, school, tuition, fast_aid_rec, appeal_letter,
+                                     family_can_pay, mds_aid_amount, net_tuition,
+                                     prior_year_tuition, parent_notes, school_notes)
+                                    VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                                """, (fam_id, school, tuition_val,
+                                      money(col(row, 'fast aid rec', 'fast_aid_rec', 'fast rec')),
+                                      col(row, 'appeal letter', 'appeal'),
+                                      money(col(row, 'family can pay', 'family_can_pay')),
+                                      money(col(row, 'mds aid amount', 'mds_aid_amount', 'aid amount')),
+                                      money(col(row, 'net tuition', 'net_tuition')),
+                                      money(col(row, 'prior year tuition', 'prior_year_tuition', 'prior tuition')),
+                                      col(row, 'parent notes', 'parent_notes'),
+                                      col(row, 'school notes', 'school_notes')))
+                            added += 1
                     except Exception as row_err:
                         errors_count += 1
                         error_names.append(family_name)
@@ -2419,6 +2472,7 @@ def api_financial_aid_upload():
         return jsonify({
             'ok': True,
             'added': added,
+            'activated': activated,
             'skipped': skipped,
             'errors': errors_count,
             'error_names': error_names
@@ -2510,7 +2564,7 @@ def api_financial_aid_new_season():
                 f = fam_map[fid]
                 cur.execute("""
                     INSERT INTO financial_aid_families (family_name, fast_id, school_year, contract_sent, status)
-                    VALUES (%s,%s,%s,false,'active') RETURNING id
+                    VALUES (%s,%s,%s,false,'inactive') RETURNING id
                 """, (f['family_name'], f['fast_id'], to_year))
                 new_fam_id = cur.fetchone()['id']
                 for s in f['students']:
