@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Email Signature Generator — Mizzentop</title>
+  <link rel="icon" type="image/svg+xml" href="/logo.svg">
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --navy: #1a2a4a;
+      --burgundy: #8B1A1A;
+      --gold: #C9993A;
+      --cream: #f5f1ea;
+      --light: #faf8f4;
+    }
+
+    body {
+      background: #f0ece4;
+      min-height: 100vh;
+      font-family: 'DM Sans', sans-serif;
+      color: var(--navy);
+    }
+
+    /* Top nav bar matching app */
+    .topbar {
+      background: var(--navy);
+      padding: 12px 28px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+    }
+    .topbar img { width: 36px; height: 36px; }
+    .topbar-title {
+      font-family: 'Playfair Display', serif;
+      font-size: 17px;
+      color: #fff;
+      letter-spacing: 0.02em;
+    }
+    .topbar-sub {
+      font-size: 12px;
+      color: var(--gold);
+      margin-left: auto;
+      letter-spacing: 0.04em;
+    }
+
+    /* Page layout */
+    .page {
+      max-width: 620px;
+      margin: 40px auto;
+      padding: 0 20px 60px;
+    }
+
+    .page-heading {
+      margin-bottom: 28px;
+    }
+    .page-heading h1 {
+      font-family: 'Playfair Display', serif;
+      font-size: 24px;
+      color: var(--navy);
+      margin-bottom: 6px;
+    }
+    .page-heading p {
+      font-size: 13.5px;
+      color: #666;
+      line-height: 1.6;
+    }
+
+    /* Form card */
+    .card {
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+      overflow: hidden;
+      margin-bottom: 24px;
+    }
+    .card-header {
+      background: var(--navy);
+      padding: 14px 24px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .card-header h2 {
+      font-family: 'Playfair Display', serif;
+      font-size: 15px;
+      color: #fff;
+      font-weight: 600;
+    }
+    .card-header .dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: var(--gold);
+      flex-shrink: 0;
+    }
+    .card-body { padding: 24px; }
+
+    .form-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-bottom: 16px;
+    }
+    .form-group { margin-bottom: 16px; }
+    .form-group:last-child { margin-bottom: 0; }
+
+    label {
+      display: block;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--burgundy);
+      margin-bottom: 7px;
+    }
+    input {
+      width: 100%;
+      padding: 10px 13px;
+      border: 1.5px solid #ddd6cc;
+      border-radius: 7px;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 14px;
+      color: var(--navy);
+      background: #fff;
+      transition: border-color 0.2s, box-shadow 0.2s;
+      outline: none;
+    }
+    input:focus {
+      border-color: var(--gold);
+      box-shadow: 0 0 0 3px rgba(201,153,58,0.15);
+    }
+    input::placeholder { color: #bbb; }
+
+    /* Preview card */
+    #preview-wrapper {
+      border: 1.5px solid #ddd6cc;
+      border-radius: 8px;
+      overflow: hidden;
+      margin-bottom: 20px;
+      background: #fff;
+    }
+
+    /* Signature styles */
+    .sig-personal {
+      background: #f5f2ec;
+      padding: 14px 20px;
+      border-left: 4px solid var(--navy);
+      font-family: Arial, Helvetica, sans-serif;
+    }
+    .sig-name {
+      font-size: 16px;
+      font-weight: bold;
+      color: var(--navy);
+      font-family: Georgia, serif;
+      margin: 0 0 3px 0;
+    }
+    .sig-title {
+      font-size: 11px;
+      color: var(--burgundy);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin: 0 0 5px 0;
+    }
+    .sig-direct-phone { font-size: 12px; color: #555; margin: 0; }
+    .sig-school {
+      background: var(--navy);
+      padding: 14px 20px;
+      font-family: Arial, Helvetica, sans-serif;
+    }
+    .sig-school-inner { display: flex; align-items: center; }
+    .sig-logo-cell { padding-right: 16px; flex-shrink: 0; }
+    .sig-logo-cell img { width: 64px; height: 64px; display: block; }
+    .sig-divider { width: 1px; height: 52px; background: var(--gold); margin-right: 16px; flex-shrink: 0; }
+    .sig-info { flex: 1; }
+    .sig-school-name { font-size: 14px; font-weight: bold; color: var(--gold); font-family: Georgia, serif; margin: 0 0 3px 0; }
+    .sig-tagline { font-size: 9.5px; color: var(--gold); letter-spacing: 0.1em; text-transform: uppercase; opacity: 0.85; margin: 0 0 6px 0; }
+    .sig-address { font-size: 11px; color: #fff; margin: 0 0 3px 0; }
+    .sig-contact { font-size: 11px; color: #fff; margin: 0; }
+    .sig-contact a { color: #fff; text-decoration: none; }
+    .sig-contact .gold-link { color: var(--gold); text-decoration: none; }
+    .sig-gold-bar { height: 4px; background: var(--gold); }
+
+    .placeholder-state {
+      text-align: center;
+      padding: 32px 20px;
+      color: #aaa;
+      font-size: 13px;
+    }
+    .placeholder-state .icon { font-size: 36px; margin-bottom: 10px; }
+
+    /* Buttons */
+    .btn-row { display: flex; gap: 12px; }
+
+    .copy-btn {
+      flex: 1;
+      padding: 13px;
+      background: var(--gold);
+      color: var(--navy);
+      border: none;
+      border-radius: 8px;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: background 0.2s, transform 0.1s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+    .copy-btn:hover { background: #d4a840; }
+    .copy-btn:active { transform: scale(0.98); }
+    .copy-btn.copied { background: #2e7d4f; color: #fff; }
+
+    /* Instructions */
+    .instructions-box {
+      background: #fffbf0;
+      border: 1.5px solid #f0ddb0;
+      border-radius: 8px;
+      padding: 18px 20px;
+      font-size: 13px;
+      color: #555;
+      line-height: 1.75;
+    }
+    .instructions-box strong { color: var(--navy); }
+    .instructions-box ol { padding-left: 18px; margin-top: 10px; }
+    .instructions-box li { margin-bottom: 5px; }
+
+    .back-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 13px;
+      color: var(--burgundy);
+      text-decoration: none;
+      margin-bottom: 20px;
+      font-weight: 500;
+    }
+    .back-link:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+
+  <div class="topbar">
+    <img src="/logo.svg" alt="Mizzentop" />
+    <span class="topbar-title">Mizzentop Day School</span>
+    <span class="topbar-sub">Staff Tools</span>
+  </div>
+
+  <div class="page">
+
+    <a href="/" class="back-link">&#8592; Back to Home</a>
+
+    <div class="page-heading">
+      <h1>Email Signature Generator</h1>
+      <p>Enter your information below to generate your personalized email signature. Once generated, copy it and paste it directly into Gmail.</p>
+    </div>
+
+    <!-- Step 1: Your info -->
+    <div class="card">
+      <div class="card-header">
+        <div class="dot"></div>
+        <h2>Step 1 — Enter Your Information</h2>
+      </div>
+      <div class="card-body">
+        <div class="form-row">
+          <div class="form-group">
+            <label>Full Name</label>
+            <input type="text" id="inp-name" placeholder="e.g. Karin Shultz" oninput="updatePreview()" />
+          </div>
+          <div class="form-group">
+            <label>Title</label>
+            <input type="text" id="inp-title" placeholder="e.g. Head of School" oninput="updatePreview()" />
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Direct Phone <span style="font-weight:400; text-transform:none; letter-spacing:0; color:#999;">(optional)</span></label>
+          <input type="text" id="inp-phone" placeholder="e.g. (845) 555-1234" oninput="updatePreview()" />
+        </div>
+      </div>
+    </div>
+
+    <!-- Step 2: Preview + copy -->
+    <div class="card">
+      <div class="card-header">
+        <div class="dot"></div>
+        <h2>Step 2 — Copy Your Signature</h2>
+      </div>
+      <div class="card-body">
+
+        <div id="preview-wrapper">
+          <div id="sig-preview">
+            <div class="placeholder-state">
+              <div class="icon">✍️</div>
+              Your signature will appear here as you type
+            </div>
+          </div>
+        </div>
+
+        <div class="btn-row">
+          <button class="copy-btn" id="copy-btn" onclick="copySignature()">
+            <span>📋</span> Copy Signature
+          </button>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Step 3: Instructions -->
+    <div class="card">
+      <div class="card-header">
+        <div class="dot"></div>
+        <h2>Step 3 — Add to Gmail</h2>
+      </div>
+      <div class="card-body">
+        <div class="instructions-box">
+          <strong>After clicking Copy Signature above:</strong>
+          <ol>
+            <li>Open <strong>Gmail</strong> and click the <strong>gear icon</strong> (top right) → <strong>See all settings</strong></li>
+            <li>Go to the <strong>General</strong> tab and scroll down to <strong>Signature</strong></li>
+            <li>Click <strong>Create new</strong> and name it "Mizzentop"</li>
+            <li>Click inside the signature box and <strong>paste</strong> (Ctrl+V on Windows, Cmd+V on Mac)</li>
+            <li>Under <em>Signature defaults</em>, set it as default for <strong>New emails</strong> and <strong>Replies</strong></li>
+            <li>Scroll to the bottom and click <strong>Save Changes</strong></li>
+          </ol>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    function updatePreview() {
+      const name = document.getElementById('inp-name').value.trim();
+      const title = document.getElementById('inp-title').value.trim();
+      const phone = document.getElementById('inp-phone').value.trim();
+      const preview = document.getElementById('sig-preview');
+
+      if (!name && !title) {
+        preview.innerHTML = `
+          <div class="placeholder-state">
+            <div class="icon">✍️</div>
+            Your signature will appear here as you type
+          </div>`;
+        return;
+      }
+
+      const phoneHTML = phone ? `<p class="sig-direct-phone">${esc(phone)}</p>` : '';
+
+      preview.innerHTML = `
+        <div class="sig-personal">
+          <p class="sig-name">${esc(name) || '&nbsp;'}</p>
+          <p class="sig-title">${esc(title) || '&nbsp;'}</p>
+          ${phoneHTML}
+        </div>
+        <div class="sig-school">
+          <div class="sig-school-inner">
+            <div class="sig-logo-cell">
+              <img src="/logo.svg" width="64" height="64" alt="Mizzentop Day School" />
+            </div>
+            <div class="sig-divider"></div>
+            <div class="sig-info">
+              <p class="sig-school-name">Mizzentop Day School</p>
+              <p class="sig-tagline">Explore &bull; Experience &bull; Discover</p>
+              <p class="sig-address">64 E Main Street, Pawling, NY 12564</p>
+              <p class="sig-contact">
+                <a href="tel:8458557338">(845) 855-7338</a>
+                &nbsp;<span style="color:#C9993A;">&bull;</span>&nbsp;
+                <a href="https://www.mizzentopdayschool.org" class="gold-link">www.mizzentopdayschool.org</a>
+              </p>
+            </div>
+          </div>
+        </div>
+        <div class="sig-gold-bar"></div>`;
+    }
+
+    async function copySignature() {
+      const name = document.getElementById('inp-name').value.trim();
+      const title = document.getElementById('inp-title').value.trim();
+      const phone = document.getElementById('inp-phone').value.trim();
+
+      if (!name && !title) {
+        alert('Please enter at least your name and title first.');
+        return;
+      }
+
+      const phoneRow = phone
+        ? `<p style="margin:0; font-size:12px; color:#555555;">${esc(phone)}</p>`
+        : '';
+
+      const sigHTML = `<table cellpadding="0" cellspacing="0" border="0" style="font-family:Arial,Helvetica,sans-serif; min-width:400px;">
+<tr><td style="background:#f5f2ec; padding:14px 20px; border-left:4px solid #1a2a4a;">
+<p style="margin:0 0 3px 0; font-size:16px; font-weight:bold; color:#1a2a4a; font-family:Georgia,serif;">${esc(name)}</p>
+<p style="margin:0 0 5px 0; font-size:11px; color:#8B1A1A; text-transform:uppercase; letter-spacing:0.08em;">${esc(title)}</p>
+${phoneRow}</td></tr>
+<tr><td style="background:#1a2a4a; padding:14px 20px;">
+<table cellpadding="0" cellspacing="0" border="0"><tr>
+<td valign="middle" style="padding-right:16px;">
+<img src="https://admin.mizzentopdayschool.org/logo.svg" width="64" height="64" alt="Mizzentop Day School" style="display:block;" /></td>
+<td valign="middle" style="padding-right:16px;">
+<div style="width:1px; height:52px; background:#C9993A;"></div></td>
+<td valign="middle">
+<p style="margin:0 0 3px 0; font-size:14px; font-weight:bold; color:#C9993A; font-family:Georgia,serif;">Mizzentop Day School</p>
+<p style="margin:0 0 5px 0; font-size:9.5px; color:#C9993A; letter-spacing:0.1em; text-transform:uppercase;">Explore &bull; Experience &bull; Discover</p>
+<p style="margin:0 0 3px 0; font-size:11px; color:#ffffff;">64 E Main Street, Pawling, NY 12564</p>
+<p style="margin:0; font-size:11px; color:#ffffff;">
+<a href="tel:8458557338" style="color:#ffffff; text-decoration:none;">(845) 855-7338</a>
+&nbsp;<span style="color:#C9993A;">&bull;</span>&nbsp;
+<a href="https://www.mizzentopdayschool.org" style="color:#C9993A; text-decoration:none;">www.mizzentopdayschool.org</a>
+</p></td></tr></table></td></tr>
+<tr><td style="height:4px; background:#C9993A; font-size:0; line-height:0;">&nbsp;</td></tr>
+</table>`;
+
+      try {
+        const blob = new Blob([sigHTML], { type: 'text/html' });
+        const plainBlob = new Blob(
+          [`${name}\n${title}${phone ? '\n' + phone : ''}\n\nMizzentop Day School\n64 E Main Street, Pawling, NY 12564\n(845) 855-7338 | www.mizzentopdayschool.org`],
+          { type: 'text/plain' }
+        );
+        await navigator.clipboard.write([new ClipboardItem({ 'text/html': blob, 'text/plain': plainBlob })]);
+
+        const btn = document.getElementById('copy-btn');
+        btn.classList.add('copied');
+        btn.innerHTML = '<span>✓</span> Copied! Now paste into Gmail';
+        setTimeout(() => {
+          btn.classList.remove('copied');
+          btn.innerHTML = '<span>📋</span> Copy Signature';
+        }, 3000);
+      } catch (err) {
+        alert('Copy failed. Please select the signature above and copy manually with Ctrl+C.');
+      }
+    }
+
+    function esc(str) {
+      return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+  </script>
+
+</body>
+</html>

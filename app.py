@@ -2711,6 +2711,16 @@ def migrate_financial_aid():
         conn.close()
 
 
+
+# ============================================
+# SIGNATURE GENERATOR
+# ============================================
+
+@app.route('/signature')
+@login_required
+def signature_generator():
+    return send_from_directory('.', 'signature_generator.html')
+
 # ============================================
 # STARTUP + RUN
 # ============================================
