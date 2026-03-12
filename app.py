@@ -1449,13 +1449,14 @@ def delete_billing_rate(rate_id):
 # ============================================
 
 BACKUP_PASSWORD = "school2026"
+BACKUP_RECIPIENTS = ["ccuneo@mizzentop.org", "ecuneo@mizzentop.org", "kshultz@mizzentop.org"]
+BACKUP_SENDER    = "noreply@mizzentopdayschool.org"
 
-@app.route("/backup/download")
-def download_backup():
-    """Export all key tables as a JSON backup file."""
-    if request.args.get("key", "") != BACKUP_PASSWORD:
-        return jsonify({"error": "Unauthorized"}), 401
 
+def _build_backup_json():
+    """Build the backup dict from all key tables and return (json_str, filename)."""
+    import json
+    from decimal import Decimal
     conn = get_db_connection()
     try:
         backup = {}
@@ -1469,24 +1470,97 @@ def download_backup():
             for table in tables:
                 cur.execute(f"SELECT * FROM {table}")
                 rows = fa(cur)
-                # Convert any non-serializable types
                 for row in rows:
                     for k, v in row.items():
                         if hasattr(v, 'isoformat'):
                             row[k] = v.isoformat()
+                        elif isinstance(v, Decimal):
+                            row[k] = float(v)
                 backup[table] = rows
     finally:
         conn.close()
 
-    from flask import Response
-    import json
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    filename = f"mizzentop_backup_{timestamp}.json"
+    filename  = f"mizzentop_backup_{timestamp}.json"
+    return json.dumps(backup, indent=2), filename
+
+
+@app.route("/backup/download")
+def download_backup():
+    """Export all key tables as a JSON backup file."""
+    if request.args.get("key", "") != BACKUP_PASSWORD:
+        return jsonify({"error": "Unauthorized"}), 401
+
+    from flask import Response
+    json_str, filename = _build_backup_json()
     return Response(
-        json.dumps(backup, indent=2),
+        json_str,
         mimetype="application/json",
         headers={"Content-Disposition": f"attachment; filename={filename}"}
     )
+
+
+@app.route("/backup/send-email")
+def send_backup_email():
+    """Generate backup and email it via Resend. Called by Render Cron Job."""
+    import os, json, base64, urllib.request
+
+    cron_secret = os.environ.get("BACKUP_CRON_SECRET", "")
+    if request.args.get("key", "") != cron_secret:
+        return jsonify({"error": "Unauthorized"}), 401
+
+    resend_api_key = os.environ.get("RESEND_API_KEY", "")
+    if not resend_api_key:
+        return jsonify({"error": "RESEND_API_KEY not configured"}), 500
+
+    try:
+        json_str, filename = _build_backup_json()
+    except Exception as e:
+        return jsonify({"error": f"Backup generation failed: {e}"}), 500
+
+    # Base64-encode the attachment for Resend API
+    attachment_b64 = base64.b64encode(json_str.encode("utf-8")).decode("utf-8")
+
+    today = datetime.now().strftime("%B %d, %Y")
+    payload = {
+        "from": f"Mizzentop Admin <{BACKUP_SENDER}>",
+        "to": BACKUP_RECIPIENTS,
+        "subject": f"Mizzentop Database Backup - {today}",
+        "html": f"""
+            <p>Hello,</p>
+            <p>Please find attached the weekly database backup for the Mizzentop Day School Admin Portal,
+            generated on <strong>{today}</strong>.</p>
+            <p>This backup includes all student records, attendance, dismissal, billing, and program data.</p>
+            <p>This is an automated message. To download a backup manually, visit:<br>
+            <a href="https://admin.mizzentopdayschool.org/backup/download?key={BACKUP_PASSWORD}">
+            admin.mizzentopdayschool.org/backup/download</a></p>
+            <p>Mizzentop Day School Admin Portal</p>
+        """,
+        "attachments": [
+            {
+                "filename": filename,
+                "content":  attachment_b64
+            }
+        ]
+    }
+
+    req = urllib.request.Request(
+        "https://api.resend.com/emails",
+        data=json.dumps(payload).encode("utf-8"),
+        headers={
+            "Authorization": f"Bearer {resend_api_key}",
+            "Content-Type":  "application/json"
+        },
+        method="POST"
+    )
+
+    try:
+        with urllib.request.urlopen(req) as resp:
+            result = json.loads(resp.read().decode("utf-8"))
+            return jsonify({"success": True, "resend_id": result.get("id")}), 200
+    except urllib.error.HTTPError as e:
+        error_body = e.read().decode("utf-8")
+        return jsonify({"error": f"Resend API error: {error_body}"}), 500
 
 
 # ============================================
