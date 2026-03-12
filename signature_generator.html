@@ -180,9 +180,9 @@
     .sig-info { flex: 1; }
     .sig-school-name { font-size: 14px; font-weight: bold; color: var(--gold); font-family: Georgia, serif; margin: 0 0 3px 0; }
     .sig-tagline { font-size: 9.5px; color: var(--gold); letter-spacing: 0.1em; text-transform: uppercase; opacity: 0.85; margin: 0 0 6px 0; }
-    .sig-address { font-size: 11px; color: #fff; margin: 0 0 3px 0; }
-    .sig-contact { font-size: 11px; color: #fff; margin: 0; }
-    .sig-contact a { color: #fff; text-decoration: none; }
+    .sig-address { font-size: 11px; color: #f9f9f9; margin: 0 0 3px 0; }
+    .sig-contact { font-size: 11px; color: #f9f9f9; margin: 0; }
+    .sig-contact a { color: #f9f9f9; text-decoration: none; }
     .sig-contact .gold-link { color: var(--gold); text-decoration: none; }
     .sig-gold-bar { height: 0; }
     .sig-social {
@@ -367,7 +367,7 @@
 
       preview.innerHTML = `
         <div class="sig-outer">
-          <div class="sig-yellow-bar"></div>
+          <div style="height:4px; background:#1a2a4a;"></div>
           <div class="sig-personal">
             <p class="sig-name">${esc(name) || '&nbsp;'}</p>
             <p class="sig-title">${esc(title) || '&nbsp;'}</p>
@@ -408,7 +408,7 @@
               </div>
             </div>
           </div>
-          <div class="sig-yellow-bar"></div>
+          <div style="height:4px; background:#1a2a4a;"></div>
         </div>`;
     }
 
@@ -427,7 +427,7 @@
         : '';
 
       const sigHTML = `<table cellpadding="0" cellspacing="0" border="0" style="font-family:Arial,Helvetica,sans-serif; min-width:400px; border-left:4px solid #1a2a4a; border-right:4px solid #1a2a4a;">
-<tr><td style="height:4px; background:#fbdb04; font-size:0; line-height:0;">&nbsp;</td></tr>
+<tr><td style="height:4px; background:#1a2a4a; font-size:0; line-height:0;">&nbsp;</td></tr>
 <tr><td style="background:#f9f9f9; padding:14px 20px;">
 <p style="margin:0 0 3px 0; font-size:16px; font-weight:bold; color:#1a2a4a; font-family:Georgia,serif;">${esc(name)}</p>
 <p style="margin:0 0 5px 0; font-size:11px; color:#8B1A1A; text-transform:uppercase; letter-spacing:0.08em;">${esc(title)}</p>
@@ -441,9 +441,9 @@ ${phoneRow}</td></tr>
 <td valign="middle">
 <p style="margin:0 0 3px 0; font-size:14px; font-weight:bold; color:#fbdb04; font-family:Georgia,serif;">Mizzentop Day School</p>
 <p style="margin:0 0 5px 0; font-size:9.5px; color:#fbdb04; letter-spacing:0.1em; text-transform:uppercase;">Explore &bull; Experience &bull; Discover</p>
-<p style="margin:0 0 3px 0; font-size:11px; color:#ffffff;">64 E Main Street, Pawling, NY 12564</p>
-<p style="margin:0; font-size:11px; color:#ffffff;">
-<a href="tel:8458557338" style="color:#ffffff; text-decoration:none;">(845) 855-7338</a>
+<p style="margin:0 0 3px 0; font-size:11px; color:#f9f9f9;">64 E Main Street, Pawling, NY 12564</p>
+<p style="margin:0; font-size:11px; color:#f9f9f9;">
+<a href="tel:8458557338" style="color:#f9f9f9; text-decoration:none;">(845) 855-7338</a>
 &nbsp;<span style="color:#fbdb04;">&bull;</span>&nbsp;
 <a href="https://www.mizzentopdayschool.org" style="color:#fbdb04; text-decoration:none;">www.mizzentopdayschool.org</a>
 </p></td>
@@ -454,7 +454,7 @@ ${phoneRow}</td></tr>
 <img src="https://admin.mizzentopdayschool.org/icon-linkedin.svg" width="20" height="20" alt="LinkedIn" style="display:block;" /></a>
 </td>
 </tr></table></td></tr>
-<tr><td style="height:4px; background:#fbdb04; font-size:0; line-height:0;">&nbsp;</td></tr>
+<tr><td style="height:4px; background:#1a2a4a; font-size:0; line-height:0;">&nbsp;</td></tr>
 </table>`;
 
       try {
