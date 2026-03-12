@@ -1450,7 +1450,7 @@ def delete_billing_rate(rate_id):
 
 BACKUP_PASSWORD = "school2026"
 BACKUP_RECIPIENTS = ["ccuneo@mizzentop.org", "ecuneo@mizzentop.org", "kshultz@mizzentop.org"]
-BACKUP_SENDER    = "noreply@send.mizzentopdayschool.org"
+BACKUP_SENDER    = "noreply@mizzentopdayschool.org"
 
 
 def _build_backup_json():
