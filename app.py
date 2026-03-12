@@ -1474,6 +1474,8 @@ def download_backup():
                     for k, v in row.items():
                         if hasattr(v, 'isoformat'):
                             row[k] = v.isoformat()
+                        elif isinstance(v, __import__('decimal').Decimal):
+                            row[k] = float(v)
                 backup[table] = rows
     finally:
         conn.close()
