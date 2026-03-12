@@ -1549,7 +1549,8 @@ def send_backup_email():
         data=json.dumps(payload).encode("utf-8"),
         headers={
             "Authorization": f"Bearer {resend_api_key}",
-            "Content-Type":  "application/json"
+            "Content-Type":  "application/json",
+            "User-Agent":    "MizzentopAdminPortal/1.0"
         },
         method="POST"
     )
