@@ -1474,8 +1474,6 @@ def download_backup():
                     for k, v in row.items():
                         if hasattr(v, 'isoformat'):
                             row[k] = v.isoformat()
-                        elif isinstance(v, __import__('decimal').Decimal):
-                            row[k] = float(v)
                 backup[table] = rows
     finally:
         conn.close()
@@ -2714,9 +2712,17 @@ def migrate_financial_aid():
 
 
 
-# ============================================
-# SIGNATURE GENERATOR
-# ============================================
+@app.route('/icon-facebook.svg')
+def icon_facebook():
+    return send_from_directory('.', 'icon-facebook.svg', mimetype='image/svg+xml')
+
+@app.route('/icon-instagram.svg')
+def icon_instagram():
+    return send_from_directory('.', 'icon-instagram.svg', mimetype='image/svg+xml')
+
+@app.route('/icon-linkedin.svg')
+def icon_linkedin():
+    return send_from_directory('.', 'icon-linkedin.svg', mimetype='image/svg+xml')
 
 @app.route('/signature')
 @login_required
