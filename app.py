@@ -2304,38 +2304,29 @@ def api_financial_aid_update(family_id):
                 cur.execute(f"UPDATE financial_aid_families SET {', '.join(fam_fields)}, updated_at=NOW() WHERE id=%s", fam_vals)
 
             # When setting a prior_family_id, back-fill prior_year_tuition on existing student rows
-            backfill_debug = {}
             if 'prior_family_id' in data and data['prior_family_id']:
                 prior_fam_id = data['prior_family_id']
-                # Fetch net_tuition by division from the prior family (include zeros, exclude NULL)
                 cur.execute("""
                     SELECT school, net_tuition FROM financial_aid_students
-                    WHERE family_id=%s
+                    WHERE family_id=%s AND net_tuition IS NOT NULL
                 """, (prior_fam_id,))
-                prior_rows = cur.fetchall()
-                prior_map = {r['school']: float(r['net_tuition']) for r in prior_rows if r['net_tuition'] is not None}
-                backfill_debug['prior_fam_id'] = prior_fam_id
-                backfill_debug['prior_rows'] = [dict(r) for r in prior_rows]
-                backfill_debug['prior_map'] = prior_map
+                prior_map = {r['school']: float(r['net_tuition']) for r in cur.fetchall()}
                 if prior_map:
                     cur.execute("SELECT id, school FROM financial_aid_students WHERE family_id=%s", (family_id,))
-                    current_rows = cur.fetchall()
-                    backfill_debug['current_rows'] = [dict(r) for r in current_rows]
-                    for stu in current_rows:
+                    for stu in cur.fetchall():
                         if stu['school'] in prior_map:
                             cur.execute("""
                                 UPDATE financial_aid_students
                                 SET prior_year_tuition=%s, updated_at=NOW()
                                 WHERE id=%s
                             """, (prior_map[stu['school']], stu['id']))
-                            backfill_debug.setdefault('updated', []).append({'id': stu['id'], 'school': stu['school'], 'value': prior_map[stu['school']]})
 
             # Karin's notes — stored per student but edited at family level
             if 'karins_notes' in data:
                 cur.execute("UPDATE financial_aid_students SET karins_notes=%s, updated_at=NOW() WHERE family_id=%s",
                             (data['karins_notes'], family_id))
         conn.commit()
-        return jsonify({'ok': True, 'backfill_debug': backfill_debug})
+        return jsonify({'ok': True})
     except Exception as e:
         conn.rollback()
         return jsonify({'error': str(e)}), 500
