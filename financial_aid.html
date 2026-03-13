@@ -676,6 +676,8 @@
   document.addEventListener('click', e=>{
     if (!e.target.closest('#priorFamilySearch') && !e.target.closest('#priorFamilyResults')) hidePriorResults();
   });
+
+  function updateStu(i, field, value) {
     editStudents[i][field] = value===''?null:(isNaN(+value)?value:+value);
   }
   function autoTuition(i, school) {
