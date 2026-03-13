@@ -368,13 +368,15 @@
     await loadData();
   }
 
-  async function loadData() {
+  async function loadData(preserveScroll = false) {
+    const scrollY = preserveScroll ? window.scrollY : 0;
     document.getElementById('familyList').innerHTML = '<div class="loading">Loading applications...</div>';
     try {
       const res = await fetch(`/api/financial-aid?year=${encodeURIComponent(currentYear)}`);
       if (!res.ok) throw new Error('Server error');
       allFamilies = await res.json();
       renderAll();
+      if (preserveScroll) requestAnimationFrame(() => window.scrollTo(0, scrollY));
     } catch(e) {
       document.getElementById('familyList').innerHTML = '<div class="loading">Failed to load data. Check console.</div>';
       console.error(e);
@@ -753,7 +755,7 @@
       }
       showToast('Saved successfully','success');
       closeModal('editModal');
-      await loadData();
+      await loadData(true);
     } catch(e) { showToast('Error saving','error'); console.error(e); }
   }
 
@@ -766,7 +768,7 @@
       await fetch(`/api/financial-aid/${editingFamilyId}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({status:newStatus})});
       showToast(`Marked ${newStatus}`,'success');
       closeModal('editModal');
-      await loadData();
+      await loadData(true);
     } catch(e) { showToast('Error updating status','error'); }
   }
 
@@ -779,7 +781,7 @@
       if (!res.ok) { showToast('Error deleting family','error'); return; }
       showToast(`${fam.family_name} deleted`,'success');
       closeModal('editModal');
-      await loadData();
+      await loadData(true);
     } catch(e) { showToast('Error deleting family','error'); }
   }
 
