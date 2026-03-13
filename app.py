@@ -1915,6 +1915,8 @@ CREATE TABLE IF NOT EXISTS financial_aid_families (
 CREATE TABLE IF NOT EXISTS financial_aid_students (
     id                  SERIAL PRIMARY KEY,
     family_id           INTEGER NOT NULL REFERENCES financial_aid_families(id) ON DELETE CASCADE,
+    first_name          TEXT,
+    grade               TEXT,
     school              TEXT,
     tuition             NUMERIC(10,2),
     max_discount        NUMERIC(10,2),
@@ -2187,6 +2189,8 @@ def _fa_rows_to_families(rows):
                 return float(v) if v is not None else None
             families[fid]['students'].append({
                 'id': row["student_id"],
+                'first_name': row["first_name"],
+                'grade': row["grade"],
                 'school': row["school"],
                 'tuition': _f(row["tuition"]),
                 'max_discount': _f(row["max_discount"]),
@@ -2234,7 +2238,7 @@ def api_financial_aid_list():
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
             cur.execute("""
                 SELECT f.id, f.family_name, f.fast_id, f.contract_sent, f.status, f.school_year,
-                       s.id as student_id, s.school, s.tuition, s.max_discount,
+                       s.id as student_id, s.first_name, s.grade, s.school, s.tuition, s.max_discount,
                        s.fast_aid_rec, s.appeal_letter, s.family_can_pay,
                        s.mds_aid_amount, s.net_tuition, s.prior_year_tuition,
                        s.family_total, s.family_total_prior,
@@ -2367,6 +2371,25 @@ def api_financial_aid_delete_student(student_id):
         conn.close()
 
 
+@app.route('/api/financial-aid/families/<int:family_id>', methods=['DELETE'])
+@login_required
+def api_financial_aid_delete_family(family_id):
+    """Delete a family and all its students (cascade)."""
+    conn = get_db_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM financial_aid_families WHERE id=%s", (family_id,))
+            if cur.rowcount == 0:
+                return jsonify({'error': 'Family not found'}), 404
+        conn.commit()
+        return jsonify({'ok': True})
+    except Exception as e:
+        conn.rollback()
+        return jsonify({'error': str(e)}), 500
+    finally:
+        conn.close()
+
+
 @app.route('/api/financial-aid/families', methods=['POST'])
 @login_required
 def api_financial_aid_add_family():
@@ -2432,19 +2455,25 @@ def api_financial_aid_upload():
         'eighth grade':  'Eighth Grade',
     }
 
-    def parse_grades(grade_str):
-        """Parse comma-separated ISMFast grades into unique Mizzentop divisions."""
+    def parse_students(grade_str, first_str):
+        """
+        Parse comma-separated ISMFast grades and first names into
+        a list of (first_name, grade_label, division) tuples, deduped by division.
+        """
         if not grade_str:
             return []
-        parts = [g.strip().lower() for g in grade_str.split(',')]
-        divisions = []
-        seen = set()
-        for p in parts:
-            div = GRADE_TO_DIVISION.get(p)
-            if div and div not in seen:
-                divisions.append(div)
-                seen.add(div)
-        return divisions
+        grades  = [g.strip() for g in grade_str.split(',')]
+        firsts  = [f.strip().title() for f in first_str.split(',')] if first_str else []
+        seen_div = set()
+        result = []
+        for i, g in enumerate(grades):
+            div = GRADE_TO_DIVISION.get(g.lower())
+            if not div or div in seen_div:
+                continue
+            seen_div.add(div)
+            fname = firsts[i] if i < len(firsts) else None
+            result.append((fname, g.title(), div))
+        return result
 
     def clean_family_name(name):
         """Strip duplicate last names like 'Welch, Welch' -> 'Welch'. Title-case result."""
@@ -2479,16 +2508,17 @@ def api_financial_aid_upload():
                 for raw_row in reader:
                     row = {k.strip(): (v.strip() if v else '') for k, v in raw_row.items() if k and k.strip()}
 
-                    raw_name  = row.get('ApplicantLastNames', '').strip()
-                    fast_id   = row.get('AnonymousIdentifier', '').strip() or None
-                    grade_str = row.get('Grade', '').strip()
-                    award_raw = row.get('TotalRecommendedAward', '').strip()
+                    raw_name   = row.get('ApplicantLastNames', '').strip()
+                    first_str  = row.get('ApplicantFirstNames', '').strip()
+                    fast_id    = row.get('AnonymousIdentifier', '').strip() or None
+                    grade_str  = row.get('Grade', '').strip()
+                    award_raw  = row.get('TotalRecommendedAward', '').strip()
 
                     if not raw_name:
                         continue
 
                     family_name = clean_family_name(raw_name)
-                    divisions   = parse_grades(grade_str)
+                    students    = parse_students(grade_str, first_str)
                     fast_aid    = money(award_raw)  # family-level total from ISMFast
 
                     try:
@@ -2510,13 +2540,13 @@ def api_financial_aid_upload():
 
                             # Replace placeholder student rows with fresh data
                             cur.execute("DELETE FROM financial_aid_students WHERE family_id=%s", (fam_id,))
-                            for div in divisions:
+                            for fname, grade_label, div in students:
                                 cur.execute("""
                                     INSERT INTO financial_aid_students
-                                    (family_id, school, tuition, fast_aid_rec)
-                                    VALUES (%s,%s,%s,%s)
-                                """, (fam_id, div, TUITION_MAP.get(div), fast_aid))
-                            if not divisions:
+                                    (family_id, first_name, grade, school, tuition, fast_aid_rec)
+                                    VALUES (%s,%s,%s,%s,%s,%s)
+                                """, (fam_id, fname, grade_label, div, TUITION_MAP.get(div), fast_aid))
+                            if not students:
                                 cur.execute("""
                                     INSERT INTO financial_aid_students (family_id, fast_aid_rec)
                                     VALUES (%s,%s)
@@ -2534,13 +2564,13 @@ def api_financial_aid_upload():
                             if fast_id:
                                 existing[fast_id] = {'id': fam_id, 'status': 'active'}
 
-                            for div in divisions:
+                            for fname, grade_label, div in students:
                                 cur.execute("""
                                     INSERT INTO financial_aid_students
-                                    (family_id, school, tuition, fast_aid_rec)
-                                    VALUES (%s,%s,%s,%s)
-                                """, (fam_id, div, TUITION_MAP.get(div), fast_aid))
-                            if not divisions:
+                                    (family_id, first_name, grade, school, tuition, fast_aid_rec)
+                                    VALUES (%s,%s,%s,%s,%s,%s)
+                                """, (fam_id, fname, grade_label, div, TUITION_MAP.get(div), fast_aid))
+                            if not students:
                                 cur.execute("""
                                     INSERT INTO financial_aid_students (family_id, fast_aid_rec)
                                     VALUES (%s,%s)
@@ -2577,11 +2607,11 @@ def api_financial_aid_template():
     """Download a CSV template matching ISMFast export format."""
     from flask import Response
     import csv, io
-    headers = ['ApplicantLastNames', 'AnonymousIdentifier', 'Grade', 'TotalRecommendedAward']
+    headers = ['ApplicantLastNames', 'ApplicantFirstNames', 'AnonymousIdentifier', 'Grade', 'TotalRecommendedAward']
     examples = [
-        ['Smith', '123456', 'Third Grade', '8500'],
-        ['Jones, Jones', '123457', 'First Grade, Sixth Grade', '12000'],
-        ['Garcia', '123458', 'Kindergarten', '0'],
+        ['Smith', 'Emma', '123456', 'Third Grade', '8500'],
+        ['Jones, Jones', 'Olivia, Liam', '123457', 'First Grade, Sixth Grade', '12000'],
+        ['Garcia', 'Sofia', '123458', 'Kindergarten', '0'],
     ]
     buf = io.StringIO()
     w = csv.writer(buf)
@@ -2593,6 +2623,27 @@ def api_financial_aid_template():
         mimetype='text/csv',
         headers={'Content-Disposition': 'attachment; filename=financial_aid_upload_template.csv'}
     )
+
+
+@app.route('/api/financial-aid/clear-year', methods=['DELETE'])
+@login_required
+def api_financial_aid_clear_year():
+    """Delete all families (and their students via cascade) for a given school year."""
+    school_year = request.args.get('year', '').strip()
+    if not school_year:
+        return jsonify({'error': 'year parameter required'}), 400
+    conn = get_db_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM financial_aid_families WHERE school_year=%s", (school_year,))
+            deleted = cur.rowcount
+        conn.commit()
+        return jsonify({'ok': True, 'deleted': deleted, 'year': school_year})
+    except Exception as e:
+        conn.rollback()
+        return jsonify({'error': str(e)}), 500
+    finally:
+        conn.close()
 
 
 @app.route('/api/financial-aid/new-season', methods=['POST'])
@@ -2786,6 +2837,28 @@ def migrate_financial_aid():
                 results.append("Added status column to financial_aid_families")
             else:
                 results.append("status column already exists (skipped)")
+
+            # Add first_name to students if missing
+            cur.execute("""
+                SELECT column_name FROM information_schema.columns
+                WHERE table_name='financial_aid_students' AND column_name='first_name'
+            """)
+            if not cur.fetchone():
+                cur.execute("ALTER TABLE financial_aid_students ADD COLUMN first_name TEXT")
+                results.append("Added first_name column to financial_aid_students")
+            else:
+                results.append("first_name column already exists (skipped)")
+
+            # Add grade to students if missing
+            cur.execute("""
+                SELECT column_name FROM information_schema.columns
+                WHERE table_name='financial_aid_students' AND column_name='grade'
+            """)
+            if not cur.fetchone():
+                cur.execute("ALTER TABLE financial_aid_students ADD COLUMN grade TEXT")
+                results.append("Added grade column to financial_aid_students")
+            else:
+                results.append("grade column already exists (skipped)")
 
         conn.commit()
         return jsonify({'ok': True, 'results': results})

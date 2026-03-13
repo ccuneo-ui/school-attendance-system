@@ -71,7 +71,7 @@
     .chevron { font-size: 16px; color: var(--muted); transition: transform 0.2s; }
     .family-card.expanded .chevron { transform: rotate(180deg); }
     .student-section { padding: 16px 20px; border-bottom: 1px solid var(--border); }
-    .student-header, .student-row { display: grid; grid-template-columns: 1.2fr 100px 110px 110px 110px 120px; gap: 8px; align-items: center; }
+    .student-header, .student-row { display: grid; grid-template-columns: 1.6fr 1fr 100px 110px 110px 110px 120px; gap: 8px; align-items: center; }
     .student-header { font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; padding-bottom: 10px; border-bottom: 1px solid var(--border); margin-bottom: 10px; }
     .student-row { padding: 8px 0; border-bottom: 1px solid var(--border); }
     .student-row:last-child { border-bottom: none; }
@@ -144,8 +144,8 @@
     .loading { text-align: center; padding: 40px; color: var(--muted); font-size: 14px; }
     .empty-state { text-align: center; padding: 60px 20px; color: var(--muted); }
     @media (max-width: 700px) {
-      .student-header, .student-row { grid-template-columns: 1fr 90px 100px; }
-      .student-header > *:nth-child(n+4), .student-row > *:nth-child(n+4) { display: none; }
+      .student-header, .student-row { grid-template-columns: 1fr 1fr 90px 100px; }
+      .student-header > *:nth-child(n+5), .student-row > *:nth-child(n+5) { display: none; }
       .form-grid, .form-grid.cols3 { grid-template-columns: 1fr; }
     }
   </style>
@@ -181,6 +181,7 @@
     <span class="year-label">School Year:</span>
     <div class="year-tabs" id="yearTabs"></div>
     <button class="btn-new-season" onclick="openNewSeasonModal()">+ Start New Season</button>
+    <button class="btn btn-danger btn-sm" onclick="clearCurrentYear()" id="clearYearBtn" title="Delete all families for this year">🗑 Clear Year</button>
   </div>
 
   <div class="summary-bar">
@@ -231,6 +232,7 @@
     <div class="modal-body" id="editModalBody"></div>
     <div class="modal-footer">
       <button class="btn btn-sm" id="editModalStatusBtn" onclick="toggleFamilyActive()"></button>
+      <button class="btn btn-danger btn-sm" id="editModalDeleteBtn" onclick="deleteFamily()">🗑 Delete Family</button>
       <button class="btn btn-outline" onclick="closeModal('editModal')">Cancel</button>
       <button class="btn btn-primary" onclick="saveEditModal()">Save Changes</button>
     </div>
@@ -447,6 +449,7 @@
     const studentRows   = f.students.map(s=>`
       <div class="student-row">
         <div style="font-size:13px;font-weight:600;">${esc(s.school||'Unknown')}</div>
+        <div style="font-size:13px;color:var(--muted);">${esc(s.first_name||'')}${s.grade?` <span style="font-size:11px;opacity:0.7;">(${esc(s.grade)})</span>`:''}</div>
         <div class="money fast">${fmt(s.tuition)}</div>
         <div class="money fast">${fmt(s.fast_aid_rec)}</div>
         <div class="money requested">${fmt(s.mds_aid_amount)}</div>
@@ -473,7 +476,7 @@
       </div>
       <div class="family-card-body" style="display:none;">
         <div class="student-section">
-          <div class="student-header"><div>Division</div><div>Tuition</div><div>FAST Rec</div><div>Aid Req</div><div>Net Tuition</div><div>Prior Year</div></div>
+          <div class="student-header"><div>Division</div><div>Student</div><div>Tuition</div><div>FAST Rec</div><div>Aid Req</div><div>Net Tuition</div><div>Prior Year</div></div>
           ${studentRows}
         </div>
         <div class="notes-panel">
@@ -654,6 +657,32 @@
       closeModal('editModal');
       await loadData();
     } catch(e) { showToast('Error updating status','error'); }
+  }
+
+  async function deleteFamily() {
+    const fam = allFamilies.find(f=>f.id===editingFamilyId);
+    if (!fam) return;
+    if (!confirm(`Permanently delete ${fam.family_name} and all their records? This cannot be undone.`)) return;
+    try {
+      const res = await fetch(`/api/financial-aid/families/${editingFamilyId}`,{method:'DELETE'});
+      if (!res.ok) { showToast('Error deleting family','error'); return; }
+      showToast(`${fam.family_name} deleted`,'success');
+      closeModal('editModal');
+      await loadData();
+    } catch(e) { showToast('Error deleting family','error'); }
+  }
+
+  async function clearCurrentYear() {
+    if (!currentYear) return;
+    if (!confirm(`Delete ALL families and students for ${currentYear}? This cannot be undone.`)) return;
+    if (!confirm(`Are you sure? Every family record for ${currentYear} will be permanently removed.`)) return;
+    try {
+      const res = await fetch(`/api/financial-aid/clear-year?year=${encodeURIComponent(currentYear)}`,{method:'DELETE'});
+      const data = await res.json();
+      if (!res.ok) { showToast(data.error||'Error','error'); return; }
+      showToast(`Cleared ${data.deleted} families from ${currentYear}`,'success');
+      await loadData();
+    } catch(e) { showToast('Error clearing year','error'); }
   }
 
   // ─── Add family ────────────────────────────────────────────────────────────
