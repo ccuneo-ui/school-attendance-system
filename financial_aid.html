@@ -708,6 +708,9 @@
       const famPatch = {contract_sent: contractSent, karins_notes: karinsNotes};
       if (selectedPriorFamilyId !== null) {
         famPatch.prior_family_id = selectedPriorFamilyId === 0 ? null : selectedPriorFamilyId;
+      } else if (fam.prior_family_id) {
+        // Already linked — send it anyway to trigger back-fill
+        famPatch.prior_family_id = fam.prior_family_id;
       }
       await fetch(`/api/financial-aid/${editingFamilyId}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify(famPatch)});
       for (const s of editStudents) {
