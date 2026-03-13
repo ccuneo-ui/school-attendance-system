@@ -2388,6 +2388,7 @@ def api_financial_aid_update_student(student_id):
         with conn.cursor() as cur:
             cur.execute("""
                 UPDATE financial_aid_students SET
+                    first_name=%s, grade=%s,
                     school=%s, tuition=%s, max_discount=%s, fast_aid_rec=%s,
                     appeal_letter=%s, family_can_pay=%s, mds_aid_amount=%s,
                     net_tuition=%s, prior_year_tuition=%s,
@@ -2395,7 +2396,8 @@ def api_financial_aid_update_student(student_id):
                     parent_notes=%s, school_notes=%s, karins_notes=%s,
                     updated_at=NOW()
                 WHERE id=%s
-            """, (data.get('school'), data.get('tuition'), data.get('max_discount'),
+            """, (data.get('first_name'), data.get('grade'),
+                  data.get('school'), data.get('tuition'), data.get('max_discount'),
                   data.get('fast_aid_rec'), data.get('appeal_letter'),
                   data.get('family_can_pay'), data.get('mds_aid_amount'),
                   data.get('net_tuition'), data.get('prior_year_tuition'),

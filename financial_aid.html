@@ -616,6 +616,14 @@
         <button class="btn-icon" title="Remove" onclick="removeStudent(${i})" style="color:var(--red)">🗑</button>
       </div>
       <div class="form-grid cols3">
+        <div class="form-group">
+          <label class="form-label">First Name</label>
+          <input type="text" class="form-input" value="${esc(f(s.first_name))}" onchange="updateStu(${i},'first_name',this.value)" placeholder="First name">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Grade</label>
+          <input type="text" class="form-input" value="${esc(f(s.grade))}" onchange="updateStu(${i},'grade',this.value)" placeholder="e.g. Fifth Grade">
+        </div>
         <div class="form-group full">
           <label class="form-label">Division</label>
           <select class="form-select" onchange="updateStu(${i},'school',this.value);autoTuition(${i},this.value)">${schoolOpts}</select>
