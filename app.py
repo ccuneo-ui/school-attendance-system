@@ -2291,7 +2291,7 @@ def api_financial_aid_update(family_id):
     data = request.json or {}
     conn = get_db_connection()
     try:
-        with conn.cursor() as cur:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
             # Build dynamic update for family table
             fam_fields = []
             fam_vals = []
