@@ -2303,6 +2303,26 @@ def api_financial_aid_update(family_id):
                 fam_vals.append(family_id)
                 cur.execute(f"UPDATE financial_aid_families SET {', '.join(fam_fields)}, updated_at=NOW() WHERE id=%s", fam_vals)
 
+            # When setting a prior_family_id, back-fill prior_year_tuition on existing student rows
+            if 'prior_family_id' in data and data['prior_family_id']:
+                prior_fam_id = data['prior_family_id']
+                # Fetch net_tuition by division from the prior family
+                cur.execute("""
+                    SELECT school, net_tuition FROM financial_aid_students
+                    WHERE family_id=%s AND net_tuition IS NOT NULL
+                """, (prior_fam_id,))
+                prior_map = {r['school']: float(r['net_tuition']) for r in cur.fetchall()}
+                if prior_map:
+                    # Update each current student row where division matches
+                    cur.execute("SELECT id, school FROM financial_aid_students WHERE family_id=%s", (family_id,))
+                    for stu in cur.fetchall():
+                        if stu['school'] in prior_map:
+                            cur.execute("""
+                                UPDATE financial_aid_students
+                                SET prior_year_tuition=%s, updated_at=NOW()
+                                WHERE id=%s
+                            """, (prior_map[stu['school']], stu['id']))
+
             # Karin's notes — stored per student but edited at family level
             if 'karins_notes' in data:
                 cur.execute("UPDATE financial_aid_students SET karins_notes=%s, updated_at=NOW() WHERE family_id=%s",
