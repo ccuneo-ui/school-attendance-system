@@ -2477,7 +2477,7 @@ def api_financial_aid_upload():
                 existing = {r['fast_id']: {'id': r['id'], 'status': r['status']} for r in cur.fetchall()}
 
                 for raw_row in reader:
-                    row = {k.strip(): v.strip() for k, v in raw_row.items() if k}
+                    row = {k.strip(): v.strip() for k, v in raw_row.items() if k and k.strip()}
 
                     raw_name  = row.get('ApplicantLastNames', '').strip()
                     fast_id   = row.get('AnonymousIdentifier', '').strip() or None
