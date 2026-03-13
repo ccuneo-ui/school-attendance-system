@@ -2505,6 +2505,26 @@ def api_financial_aid_upload():
                 """, (school_year,))
                 existing = {r['fast_id']: {'id': r['id'], 'status': r['status']} for r in cur.fetchall()}
 
+                # Fetch prior year net_tuition per student by fast_id for prior_year_tuition carry-over
+                # Use the most recent year before the current one that has data
+                cur.execute("""
+                    SELECT f.fast_id, s.school, s.net_tuition
+                    FROM financial_aid_families f
+                    JOIN financial_aid_students s ON s.family_id = f.id
+                    WHERE f.fast_id IS NOT NULL
+                      AND f.school_year < %s
+                      AND s.net_tuition IS NOT NULL
+                    ORDER BY f.school_year DESC
+                """, (school_year,))
+                # Build: fast_id -> {division -> net_tuition}
+                prior_net = {}
+                for pr in cur.fetchall():
+                    fid = pr['fast_id']
+                    if fid not in prior_net:
+                        prior_net[fid] = {}
+                    if pr['school'] and pr['school'] not in prior_net[fid]:
+                        prior_net[fid][pr['school']] = float(pr['net_tuition'])
+
                 for raw_row in reader:
                     row = {k.strip(): (v.strip() if v else '') for k, v in raw_row.items() if k and k.strip()}
 
@@ -2541,11 +2561,12 @@ def api_financial_aid_upload():
                             # Replace placeholder student rows with fresh data
                             cur.execute("DELETE FROM financial_aid_students WHERE family_id=%s", (fam_id,))
                             for fname, grade_label, div in students:
+                                prior = (prior_net.get(fast_id) or {}).get(div)
                                 cur.execute("""
                                     INSERT INTO financial_aid_students
-                                    (family_id, first_name, grade, school, tuition, fast_aid_rec)
-                                    VALUES (%s,%s,%s,%s,%s,%s)
-                                """, (fam_id, fname, grade_label, div, TUITION_MAP.get(div), fast_aid))
+                                    (family_id, first_name, grade, school, tuition, fast_aid_rec, prior_year_tuition)
+                                    VALUES (%s,%s,%s,%s,%s,%s,%s)
+                                """, (fam_id, fname, grade_label, div, TUITION_MAP.get(div), fast_aid, prior))
                             if not students:
                                 cur.execute("""
                                     INSERT INTO financial_aid_students (family_id, fast_aid_rec)
@@ -2565,11 +2586,12 @@ def api_financial_aid_upload():
                                 existing[fast_id] = {'id': fam_id, 'status': 'active'}
 
                             for fname, grade_label, div in students:
+                                prior = (prior_net.get(fast_id) or {}).get(div)
                                 cur.execute("""
                                     INSERT INTO financial_aid_students
-                                    (family_id, first_name, grade, school, tuition, fast_aid_rec)
-                                    VALUES (%s,%s,%s,%s,%s,%s)
-                                """, (fam_id, fname, grade_label, div, TUITION_MAP.get(div), fast_aid))
+                                    (family_id, first_name, grade, school, tuition, fast_aid_rec, prior_year_tuition)
+                                    VALUES (%s,%s,%s,%s,%s,%s,%s)
+                                """, (fam_id, fname, grade_label, div, TUITION_MAP.get(div), fast_aid, prior))
                             if not students:
                                 cur.execute("""
                                     INSERT INTO financial_aid_students (family_id, fast_aid_rec)
