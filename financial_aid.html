@@ -915,7 +915,9 @@
   // ─── Modals ────────────────────────────────────────────────────────────────
   function closeModal(id) { document.getElementById(id).classList.remove('open'); }
   document.querySelectorAll('.modal-overlay').forEach(o=>{
-    o.addEventListener('click',e=>{ if(e.target===o) closeModal(o.id); });
+    let mousedownOnOverlay = false;
+    o.addEventListener('mousedown', e=>{ mousedownOnOverlay = e.target === o; });
+    o.addEventListener('click', e=>{ if(e.target===o && mousedownOnOverlay) closeModal(o.id); });
   });
 
   // ─── Toast ─────────────────────────────────────────────────────────────────
