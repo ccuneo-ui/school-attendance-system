@@ -633,8 +633,8 @@
           <label class="form-label">Division</label>
           <select class="form-select" onchange="updateStu(${i},'school',this.value);autoTuition(${i},this.value)">${schoolOpts}</select>
         </div>
-        <div class="form-group"><label class="form-label">Tuition</label><input type="number" class="form-input" id="stu-tuition-${i}" value="${f(s.tuition)}" onchange="updateStu(${i},'tuition',this.value)" placeholder="0"></div>
-        <div class="form-group"><label class="form-label">FAST Aid Rec</label><input type="number" class="form-input" value="${f(s.fast_aid_rec)}" onchange="updateStu(${i},'fast_aid_rec',this.value)" placeholder="0"></div>
+        <div class="form-group"><label class="form-label">Tuition</label><input type="text" class="form-input" inputmode="decimal" id="stu-tuition-${i}" value="${f(s.tuition)}" onchange="updateStu(${i},'tuition',this.value)" placeholder="0"></div>
+        <div class="form-group"><label class="form-label">FAST Aid Rec</label><input type="text" class="form-input" inputmode="decimal" value="${f(s.fast_aid_rec)}" onchange="updateStu(${i},'fast_aid_rec',this.value)" placeholder="0"></div>
         <div class="form-group">
           <label class="form-label">Appeal Letter</label>
           <select class="form-select" onchange="updateStu(${i},'appeal_letter',this.value)">
@@ -644,11 +644,11 @@
             <option value="Y, plus additional letter" ${s.appeal_letter==='Y, plus additional letter'?'selected':''}>Y + extra letter</option>
           </select>
         </div>
-        <div class="form-group"><label class="form-label">Family Can Pay</label><input type="number" class="form-input" value="${f(s.family_can_pay)}" onchange="updateStu(${i},'family_can_pay',this.value)" placeholder="0"></div>
-        <div class="form-group"><label class="form-label">MDS Aid Amount</label><input type="number" class="form-input" value="${f(s.mds_aid_amount)}" onchange="updateStu(${i},'mds_aid_amount',this.value)" placeholder="0"></div>
-        <div class="form-group"><label class="form-label">Net Tuition</label><input type="number" class="form-input" value="${f(s.net_tuition)}" onchange="updateStu(${i},'net_tuition',this.value)" placeholder="0"></div>
-        <div class="form-group"><label class="form-label">Prior Year Tuition</label><input type="number" class="form-input" value="${f(s.prior_year_tuition)}" onchange="updateStu(${i},'prior_year_tuition',this.value)" placeholder="0"></div>
-        <div class="form-group"><label class="form-label">Family Total</label><input type="number" class="form-input" value="${f(s.family_total)}" onchange="updateStu(${i},'family_total',this.value)" placeholder="0"></div>
+        <div class="form-group"><label class="form-label">Family Can Pay</label><input type="text" class="form-input" inputmode="decimal" value="${f(s.family_can_pay)}" onchange="updateStu(${i},'family_can_pay',this.value)" placeholder="0"></div>
+        <div class="form-group"><label class="form-label">MDS Aid Amount</label><input type="text" class="form-input" inputmode="decimal" value="${f(s.mds_aid_amount)}" onchange="updateStu(${i},'mds_aid_amount',this.value)" placeholder="0"></div>
+        <div class="form-group"><label class="form-label">Net Tuition</label><input type="text" class="form-input" inputmode="decimal" value="${f(s.net_tuition)}" onchange="updateStu(${i},'net_tuition',this.value)" placeholder="0"></div>
+        <div class="form-group"><label class="form-label">Prior Year Tuition</label><input type="text" class="form-input" inputmode="decimal" value="${f(s.prior_year_tuition)}" onchange="updateStu(${i},'prior_year_tuition',this.value)" placeholder="0"></div>
+        <div class="form-group"><label class="form-label">Family Total</label><input type="text" class="form-input" inputmode="decimal" value="${f(s.family_total)}" onchange="updateStu(${i},'family_total',this.value)" placeholder="0"></div>
       </div>
     </div>`;
   }
@@ -726,6 +726,7 @@
   }
 
   async function saveEditModal() {
+    const savedScroll = window.scrollY;
     const fam = allFamilies.find(f=>f.id===editingFamilyId);
     if (!fam) return;
     const contractSent = document.getElementById('editContractSent').value==='true';
@@ -737,7 +738,6 @@
       if (selectedPriorFamilyId !== null) {
         famPatch.prior_family_id = selectedPriorFamilyId === 0 ? null : selectedPriorFamilyId;
       } else if (fam.prior_family_id) {
-        // Already linked — send it anyway to trigger back-fill
         famPatch.prior_family_id = fam.prior_family_id;
       }
       await fetch(`/api/financial-aid/${editingFamilyId}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify(famPatch)});
@@ -755,11 +755,13 @@
       }
       showToast('Saved successfully','success');
       closeModal('editModal');
-      await loadData(true);
+      await loadData();
+      window.scrollTo(0, savedScroll);
     } catch(e) { showToast('Error saving','error'); console.error(e); }
   }
 
   async function toggleFamilyActive() {
+    const savedScroll = window.scrollY;
     const fam = allFamilies.find(f=>f.id===editingFamilyId);
     if (!fam) return;
     const newStatus = fam.status==='inactive'?'active':'inactive';
@@ -768,11 +770,13 @@
       await fetch(`/api/financial-aid/${editingFamilyId}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({status:newStatus})});
       showToast(`Marked ${newStatus}`,'success');
       closeModal('editModal');
-      await loadData(true);
+      await loadData();
+      window.scrollTo(0, savedScroll);
     } catch(e) { showToast('Error updating status','error'); }
   }
 
   async function deleteFamily() {
+    const savedScroll = window.scrollY;
     const fam = allFamilies.find(f=>f.id===editingFamilyId);
     if (!fam) return;
     if (!confirm(`Permanently delete ${fam.family_name} and all their records? This cannot be undone.`)) return;
@@ -781,7 +785,8 @@
       if (!res.ok) { showToast('Error deleting family','error'); return; }
       showToast(`${fam.family_name} deleted`,'success');
       closeModal('editModal');
-      await loadData(true);
+      await loadData();
+      window.scrollTo(0, savedScroll);
     } catch(e) { showToast('Error deleting family','error'); }
   }
 
