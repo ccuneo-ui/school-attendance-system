@@ -532,6 +532,7 @@
     if (!fam) return;
     editingFamilyId = familyId;
     editStudents    = fam.students.map(s=>({...s}));
+    selectedPriorFamilyId = null; // reset — null means no change
     document.getElementById('editModalTitle').textContent = `Edit — ${fam.family_name}`;
     const btn = document.getElementById('editModalStatusBtn');
     if (fam.status==='inactive') { btn.textContent='Mark Active'; btn.className='btn btn-outline btn-sm'; }
@@ -554,6 +555,20 @@
           </select>
         </div>
       </div>
+      <div class="form-section-title" style="margin-top:20px;">Link to Prior Year Record</div>
+      <div style="margin-bottom:16px;">
+        <div style="font-size:12px;color:var(--muted);margin-bottom:8px;">Links this family to a previous year's entry so prior year tuition carries over on re-upload.</div>
+        <div style="position:relative;">
+          <input type="text" class="form-input" id="priorFamilySearch" placeholder="Search by family name…"
+            oninput="searchPriorFamilies(this.value)"
+            value="${fam.prior_family_id ? (fam._prior_label||'') : ''}"
+            autocomplete="off">
+          <div id="priorFamilyResults" style="display:none;position:absolute;top:100%;left:0;right:0;background:var(--white);border:1px solid var(--border);border-radius:6px;box-shadow:0 4px 12px rgba(0,0,0,0.1);z-index:200;max-height:200px;overflow-y:auto;"></div>
+        </div>
+        <div id="priorFamilySelected" style="margin-top:6px;font-size:13px;color:var(--muted);">
+          ${fam.prior_family_id ? `Linked to family #${fam.prior_family_id} — <a href="#" onclick="clearPriorLink();return false;" style="color:var(--red);text-decoration:none;">Clear</a>` : 'No prior year link set.'}
+        </div>
+      </div>
       <div class="form-section-title" style="margin-top:20px;">Students</div>
       <div class="student-edit-list" id="studentEditList">${editStudents.map((s,i)=>renderStudentCard(s,i)).join('')}</div>
       <button class="add-student-btn" onclick="addStudentToEdit()">+ Add Student</button>
@@ -563,6 +578,17 @@
         <div class="form-group full"><label class="form-label">School Notes (for Karin)</label><textarea class="form-textarea" id="editSchoolNotes">${esc(schoolNote)}</textarea></div>
         <div class="form-group full"><label class="form-label">Karin's Notes</label><textarea class="form-textarea" id="editKarinsNotes">${esc(karinNote)}</textarea></div>
       </div>`;
+
+    // Load prior label if linked
+    if (fam.prior_family_id) {
+      fetch(`/api/financial-aid/search-families?exclude_year=`)
+        .then(r=>r.json()).then(all=>{
+          const match = all.find(f=>f.id===fam.prior_family_id);
+          if (match) {
+            document.getElementById('priorFamilySearch').value = `${match.family_name} (${match.school_year})`;
+          }
+        }).catch(()=>{});
+    }
   }
 
   function renderStudentCard(s, i) {
@@ -599,7 +625,57 @@
     </div>`;
   }
 
-  function updateStu(i, field, value) {
+  // ─── Prior year family linking ──────────────────────────────────────────────
+  let selectedPriorFamilyId = null;
+  let priorSearchTimer = null;
+
+  function searchPriorFamilies(q) {
+    clearTimeout(priorSearchTimer);
+    const fam = allFamilies.find(f=>f.id===editingFamilyId);
+    const excludeYear = fam ? fam.school_year : '';
+    if (!q.trim()) { hidePriorResults(); return; }
+    priorSearchTimer = setTimeout(async ()=>{
+      const res = await fetch(`/api/financial-aid/search-families?q=${encodeURIComponent(q)}&exclude_year=${encodeURIComponent(excludeYear)}`);
+      const results = await res.json();
+      const container = document.getElementById('priorFamilyResults');
+      if (!results.length) {
+        container.innerHTML = '<div style="padding:10px 14px;color:var(--muted);font-size:13px;">No matches</div>';
+      } else {
+        container.innerHTML = results.map(f=>`
+          <div onclick="selectPriorFamily(${f.id},'${esc(f.family_name)} (${f.school_year})')"
+               style="padding:9px 14px;font-size:13px;cursor:pointer;border-bottom:1px solid var(--border);"
+               onmouseover="this.style.background='var(--bg)'" onmouseout="this.style.background=''">
+            <strong>${esc(f.family_name)}</strong>
+            <span style="color:var(--muted);margin-left:8px;">${f.school_year}${f.fast_id?' · FAST #'+f.fast_id:''}</span>
+          </div>`).join('');
+      }
+      container.style.display = 'block';
+    }, 250);
+  }
+
+  function selectPriorFamily(id, label) {
+    selectedPriorFamilyId = id;
+    document.getElementById('priorFamilySearch').value = label;
+    document.getElementById('priorFamilyResults').style.display = 'none';
+    document.getElementById('priorFamilySelected').innerHTML =
+      `Will link to: <strong>${label}</strong> — <a href="#" onclick="clearPriorLink();return false;" style="color:var(--red);text-decoration:none;">Clear</a>`;
+  }
+
+  function clearPriorLink() {
+    selectedPriorFamilyId = 0; // 0 = explicitly clear
+    document.getElementById('priorFamilySearch').value = '';
+    document.getElementById('priorFamilySelected').innerHTML = 'No prior year link set.';
+  }
+
+  function hidePriorResults() {
+    const el = document.getElementById('priorFamilyResults');
+    if (el) el.style.display = 'none';
+  }
+
+  // Close dropdown when clicking outside
+  document.addEventListener('click', e=>{
+    if (!e.target.closest('#priorFamilySearch') && !e.target.closest('#priorFamilyResults')) hidePriorResults();
+  });
     editStudents[i][field] = value===''?null:(isNaN(+value)?value:+value);
   }
   function autoTuition(i, school) {
@@ -627,7 +703,11 @@
     const schoolNotes  = document.getElementById('editSchoolNotes').value;
     const parentNotes  = document.getElementById('editParentNotes').value;
     try {
-      await fetch(`/api/financial-aid/${editingFamilyId}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({contract_sent:contractSent,karins_notes:karinsNotes})});
+      const famPatch = {contract_sent: contractSent, karins_notes: karinsNotes};
+      if (selectedPriorFamilyId !== null) {
+        famPatch.prior_family_id = selectedPriorFamilyId === 0 ? null : selectedPriorFamilyId;
+      }
+      await fetch(`/api/financial-aid/${editingFamilyId}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify(famPatch)});
       for (const s of editStudents) {
         const payload = {...s, parent_notes:parentNotes, school_notes:schoolNotes, karins_notes:karinsNotes};
         if (s.id) {

@@ -2182,6 +2182,7 @@ def _fa_rows_to_families(rows):
                 'contract_sent': row["contract_sent"],
                 'status': row["status"],
                 'school_year': row["school_year"],
+                'prior_family_id': row["prior_family_id"],
                 'students': []
             }
         if row["student_id"]:
@@ -2228,6 +2229,31 @@ def api_financial_aid_years():
         conn.close()
 
 
+@app.route('/api/financial-aid/search-families')
+@login_required
+def api_financial_aid_search_families():
+    """Search families across all years except the given one, for prior year linking."""
+    q          = request.args.get('q', '').strip()
+    exclude_yr = request.args.get('exclude_year', '').strip()
+    conn = get_db_connection()
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute("""
+                SELECT id, family_name, fast_id, school_year
+                FROM financial_aid_families
+                WHERE (%s = '' OR family_name ILIKE %s)
+                  AND (%s = '' OR school_year != %s)
+                ORDER BY school_year DESC, family_name
+                LIMIT 30
+            """, (q, f'%{q}%', exclude_yr, exclude_yr))
+            results = [dict(r) for r in cur.fetchall()]
+        return jsonify(results)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    finally:
+        conn.close()
+
+
 @app.route('/api/financial-aid')
 @login_required
 def api_financial_aid_list():
@@ -2238,6 +2264,7 @@ def api_financial_aid_list():
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
             cur.execute("""
                 SELECT f.id, f.family_name, f.fast_id, f.contract_sent, f.status, f.school_year,
+                       f.prior_family_id,
                        s.id as student_id, s.first_name, s.grade, s.school, s.tuition, s.max_discount,
                        s.fast_aid_rec, s.appeal_letter, s.family_can_pay,
                        s.mds_aid_amount, s.net_tuition, s.prior_year_tuition,
@@ -2268,7 +2295,7 @@ def api_financial_aid_update(family_id):
             # Build dynamic update for family table
             fam_fields = []
             fam_vals = []
-            for col in ['contract_sent', 'status']:
+            for col in ['contract_sent', 'status', 'prior_family_id']:
                 if col in data:
                     fam_fields.append(f"{col} = %s")
                     fam_vals.append(data[col])
@@ -2505,25 +2532,37 @@ def api_financial_aid_upload():
                 """, (school_year,))
                 existing = {r['fast_id']: {'id': r['id'], 'status': r['status']} for r in cur.fetchall()}
 
-                # Fetch prior year net_tuition per student by fast_id for prior_year_tuition carry-over
-                # Use the most recent year before the current one that has data
+                # Fetch prior year net_tuition: keyed by fast_id AND by family id (for prior_family_id links)
                 cur.execute("""
-                    SELECT f.fast_id, s.school, s.net_tuition
+                    SELECT f.id, f.fast_id, s.school, s.net_tuition
                     FROM financial_aid_families f
                     JOIN financial_aid_students s ON s.family_id = f.id
-                    WHERE f.fast_id IS NOT NULL
-                      AND f.school_year < %s
+                    WHERE f.school_year < %s
                       AND s.net_tuition IS NOT NULL
                     ORDER BY f.school_year DESC
                 """, (school_year,))
-                # Build: fast_id -> {division -> net_tuition}
-                prior_net = {}
+                # Build: fast_id -> {division -> net_tuition}  AND  family_id -> {division -> net_tuition}
+                prior_net_by_fastid = {}
+                prior_net_by_id     = {}
                 for pr in cur.fetchall():
-                    fid = pr['fast_id']
-                    if fid not in prior_net:
-                        prior_net[fid] = {}
-                    if pr['school'] and pr['school'] not in prior_net[fid]:
-                        prior_net[fid][pr['school']] = float(pr['net_tuition'])
+                    fid_key = pr['fast_id']
+                    if fid_key and fid_key not in prior_net_by_fastid:
+                        prior_net_by_fastid[fid_key] = {}
+                    if fid_key and pr['school'] and pr['school'] not in prior_net_by_fastid[fid_key]:
+                        prior_net_by_fastid[fid_key][pr['school']] = float(pr['net_tuition'])
+                    id_key = pr['id']
+                    if id_key not in prior_net_by_id:
+                        prior_net_by_id[id_key] = {}
+                    if pr['school'] and pr['school'] not in prior_net_by_id[id_key]:
+                        prior_net_by_id[id_key][pr['school']] = float(pr['net_tuition'])
+
+                # Also fetch prior_family_id links for current year families
+                cur.execute("""
+                    SELECT id, fast_id, prior_family_id
+                    FROM financial_aid_families
+                    WHERE school_year=%s AND prior_family_id IS NOT NULL
+                """, (school_year,))
+                prior_family_links = {r['fast_id']: r['prior_family_id'] for r in cur.fetchall() if r['fast_id']}
 
                 for raw_row in reader:
                     row = {k.strip(): (v.strip() if v else '') for k, v in raw_row.items() if k and k.strip()}
@@ -2561,7 +2600,10 @@ def api_financial_aid_upload():
                             # Replace placeholder student rows with fresh data
                             cur.execute("DELETE FROM financial_aid_students WHERE family_id=%s", (fam_id,))
                             for fname, grade_label, div in students:
-                                prior = (prior_net.get(fast_id) or {}).get(div)
+                                linked_id = prior_family_links.get(fast_id)
+                                prior = (prior_net_by_id.get(linked_id) or {}).get(div) if linked_id else None
+                                if prior is None:
+                                    prior = (prior_net_by_fastid.get(fast_id) or {}).get(div)
                                 cur.execute("""
                                     INSERT INTO financial_aid_students
                                     (family_id, first_name, grade, school, tuition, fast_aid_rec, prior_year_tuition)
@@ -2586,7 +2628,10 @@ def api_financial_aid_upload():
                                 existing[fast_id] = {'id': fam_id, 'status': 'active'}
 
                             for fname, grade_label, div in students:
-                                prior = (prior_net.get(fast_id) or {}).get(div)
+                                linked_id = prior_family_links.get(fast_id)
+                                prior = (prior_net_by_id.get(linked_id) or {}).get(div) if linked_id else None
+                                if prior is None:
+                                    prior = (prior_net_by_fastid.get(fast_id) or {}).get(div)
                                 cur.execute("""
                                     INSERT INTO financial_aid_students
                                     (family_id, first_name, grade, school, tuition, fast_aid_rec, prior_year_tuition)
@@ -2881,6 +2926,17 @@ def migrate_financial_aid():
                 results.append("Added grade column to financial_aid_students")
             else:
                 results.append("grade column already exists (skipped)")
+
+            # Add prior_family_id to families if missing
+            cur.execute("""
+                SELECT column_name FROM information_schema.columns
+                WHERE table_name='financial_aid_families' AND column_name='prior_family_id'
+            """)
+            if not cur.fetchone():
+                cur.execute("ALTER TABLE financial_aid_families ADD COLUMN prior_family_id INTEGER REFERENCES financial_aid_families(id) ON DELETE SET NULL")
+                results.append("Added prior_family_id column to financial_aid_families")
+            else:
+                results.append("prior_family_id column already exists (skipped)")
 
         conn.commit()
         return jsonify({'ok': True, 'results': results})
