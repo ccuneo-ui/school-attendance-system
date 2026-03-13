@@ -75,6 +75,10 @@
     .student-header { font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; padding-bottom: 10px; border-bottom: 1px solid var(--border); margin-bottom: 10px; }
     .student-row { padding: 8px 0; border-bottom: 1px solid var(--border); }
     .student-row:last-child { border-bottom: none; }
+    .student-detail-row { display: flex; flex-wrap: wrap; gap: 6px 20px; padding: 6px 0 10px 0; border-bottom: 1px solid var(--border); background: #fafaf8; margin: 0 -20px; padding-left: 20px; padding-right: 20px; }
+    .detail-field { display: flex; flex-direction: column; font-size: 11px; }
+    .detail-label { color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; font-weight: 600; margin-bottom: 1px; }
+    .detail-value { font-size: 13px; color: var(--navy); font-weight: 500; }
     .money { font-size: 13px; font-weight: 500; }
     .money.fast { color: var(--navy); }
     .money.requested { color: var(--gold); font-weight: 600; }
@@ -446,7 +450,10 @@
     const appealBadge   = hasAppeal ? `<span class="badge badge-appeal">Appeal</span>` : '';
     const inactiveBadge = inactive  ? `<span class="badge badge-inactive">Inactive</span>` : '';
     const schoolBadges  = [...new Set(f.students.map(s=>s.school).filter(Boolean))].map(s=>`<span class="badge badge-school">${s}</span>`).join('');
-    const studentRows   = f.students.map(s=>`
+    const studentRows   = f.students.map(s=>{
+      const f2 = (v,label) => v!=null && v!==0 ? `<div class="detail-field"><span class="detail-label">${label}</span><span class="detail-value">${fmt(v)}</span></div>` : '';
+      const hasDetail = s.family_can_pay!=null || s.mds_aid_amount!=null || s.max_discount!=null || s.family_total!=null || s.family_total_prior!=null;
+      return `
       <div class="student-row">
         <div style="font-size:13px;font-weight:600;">${esc(s.school||'Unknown')}</div>
         <div style="font-size:13px;color:var(--muted);">${esc(s.first_name||'')}${s.grade?` <span style="font-size:11px;opacity:0.7;">(${esc(s.grade)})</span>`:''}</div>
@@ -455,7 +462,15 @@
         <div class="money requested">${fmt(s.mds_aid_amount)}</div>
         <div class="money net">${fmt(s.net_tuition)}</div>
         <div class="money prior">${fmt(s.prior_year_tuition)}</div>
-      </div>`).join('');
+      </div>
+      ${hasDetail ? `<div class="student-detail-row">
+        ${f2(s.family_can_pay,'Family Can Pay')}
+        ${f2(s.max_discount,'Max Discount')}
+        ${f2(s.family_total,'Family Total')}
+        ${f2(s.family_total_prior,'Family Total Prior')}
+        ${s.appeal_letter ? `<div class="detail-field"><span class="detail-label">Appeal Letter</span><span class="detail-value">${esc(s.appeal_letter)}</span></div>` : ''}
+      </div>` : ''}`
+    }).join('');
     const parentNote = f.students.find(s=>s.parent_notes)?.parent_notes||'';
     const schoolNote = f.students.find(s=>s.school_notes)?.school_notes||'';
     const karinNote  = f.students.find(s=>s.karins_notes)?.karins_notes||'';
