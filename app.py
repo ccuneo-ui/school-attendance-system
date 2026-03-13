@@ -2351,6 +2351,13 @@ def api_financial_aid_update(family_id):
 def api_financial_aid_add_student(family_id):
     """Add a student to a family."""
     data = request.json or {}
+
+    def n(key):
+        v = data.get(key)
+        if v is None or v == '': return None
+        try: return float(str(v).replace(',', '').replace('$', '').strip())
+        except: return None
+
     conn = get_db_connection()
     try:
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
@@ -2362,11 +2369,11 @@ def api_financial_aid_add_student(family_id):
                 VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
                 RETURNING id
             """, (family_id,
-                  data.get('school'), data.get('tuition'), data.get('max_discount'),
-                  data.get('fast_aid_rec'), data.get('appeal_letter'),
-                  data.get('family_can_pay'), data.get('mds_aid_amount'),
-                  data.get('net_tuition'), data.get('prior_year_tuition'),
-                  data.get('family_total'), data.get('family_total_prior'),
+                  data.get('school'), n('tuition'), n('max_discount'),
+                  n('fast_aid_rec'), data.get('appeal_letter'),
+                  n('family_can_pay'), n('mds_aid_amount'),
+                  n('net_tuition'), n('prior_year_tuition'),
+                  n('family_total'), n('family_total_prior'),
                   data.get('parent_notes'), data.get('school_notes'), data.get('karins_notes')))
             new_id = cur.fetchone()['id']
         conn.commit()
@@ -2383,6 +2390,14 @@ def api_financial_aid_add_student(family_id):
 def api_financial_aid_update_student(student_id):
     """Update all editable fields on a student row."""
     data = request.json or {}
+
+    def n(key):
+        """Parse numeric field, stripping commas and dollar signs."""
+        v = data.get(key)
+        if v is None or v == '': return None
+        try: return float(str(v).replace(',', '').replace('$', '').strip())
+        except: return None
+
     conn = get_db_connection()
     try:
         with conn.cursor() as cur:
@@ -2397,11 +2412,11 @@ def api_financial_aid_update_student(student_id):
                     updated_at=NOW()
                 WHERE id=%s
             """, (data.get('first_name'), data.get('grade'),
-                  data.get('school'), data.get('tuition'), data.get('max_discount'),
-                  data.get('fast_aid_rec'), data.get('appeal_letter'),
-                  data.get('family_can_pay'), data.get('mds_aid_amount'),
-                  data.get('net_tuition'), data.get('prior_year_tuition'),
-                  data.get('family_total'), data.get('family_total_prior'),
+                  data.get('school'), n('tuition'), n('max_discount'),
+                  n('fast_aid_rec'), data.get('appeal_letter'),
+                  n('family_can_pay'), n('mds_aid_amount'),
+                  n('net_tuition'), n('prior_year_tuition'),
+                  n('family_total'), n('family_total_prior'),
                   data.get('parent_notes'), data.get('school_notes'),
                   data.get('karins_notes'), student_id))
         conn.commit()
