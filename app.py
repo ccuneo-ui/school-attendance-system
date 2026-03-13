@@ -2405,12 +2405,13 @@ def api_financial_aid_add_family():
 def api_financial_aid_upload():
     """
     Bulk upload families from ISMFast CSV export.
-    Expected columns (case-insensitive):
-      Family Name, FAST ID, School, FAST Aid Rec, Appeal Letter,
-      Family Can Pay, MDS Aid Amount, Net Tuition, Prior Year Tuition,
-      Parent Notes, School Notes
-    school_year passed as form field.
-    Skips rows where FAST ID already exists for that year.
+    Expected ISMFast columns:
+      ApplicantLastNames, AnonymousIdentifier, Grade, TotalRecommendedAward
+
+    Logic:
+      - New FAST ID -> create family as active, create student row(s)
+      - Existing FAST ID + inactive -> activate, populate financials
+      - Existing FAST ID + active -> skip (protect mid-season edits)
     """
     import csv, io
     school_year = request.form.get('school_year', '2025-26')
@@ -2418,40 +2419,77 @@ def api_financial_aid_upload():
     if not file:
         return jsonify({'error': 'No file uploaded'}), 400
 
+    # Grade -> Mizzentop division mapping
+    GRADE_TO_DIVISION = {
+        'kindergarten':  'Kindergarten',
+        'first grade':   'Lower School',
+        'second grade':  'Lower School',
+        'third grade':   'Lower School',
+        'fourth grade':  'Lower School',
+        'fifth grade':   'Middle School',
+        'sixth grade':   'Middle School',
+        'seventh grade': 'Middle School',
+        'eighth grade':  'Eighth Grade',
+    }
+
+    def parse_grades(grade_str):
+        """Parse comma-separated ISMFast grades into unique Mizzentop divisions."""
+        if not grade_str:
+            return []
+        parts = [g.strip().lower() for g in grade_str.split(',')]
+        divisions = []
+        seen = set()
+        for p in parts:
+            div = GRADE_TO_DIVISION.get(p)
+            if div and div not in seen:
+                divisions.append(div)
+                seen.add(div)
+        return divisions
+
+    def clean_family_name(name):
+        """Strip duplicate last names like 'Welch, Welch' -> 'Welch'. Title-case result."""
+        if not name:
+            return name
+        parts = [p.strip().title() for p in name.split(',')]
+        unique = list(dict.fromkeys(parts))
+        return unique[0] if len(unique) == 1 else ', '.join(unique)
+
+    def money(v):
+        if v is None: return None
+        try: return float(str(v).replace('$','').replace(',','').strip())
+        except: return None
+
     try:
-        content = file.read().decode('utf-8-sig')  # strip BOM if present
+        content = file.read().decode('utf-8-sig')
         reader = csv.DictReader(io.StringIO(content))
-        # Normalize headers to lowercase stripped
-        headers = [h.strip().lower() for h in (reader.fieldnames or [])]
-
-        def col(row, *names):
-            for n in names:
-                v = row.get(n, '').strip()
-                if v: return v
-            return None
-
-        def money(v):
-            if not v: return None
-            try: return float(str(v).replace('$','').replace(',','').strip())
-            except: return None
 
         conn = get_db_connection()
         added = skipped = activated = errors_count = 0
         error_names = []
         try:
             with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
-                # Fetch existing families for this year: fast_id -> {id, status}
-                cur.execute("SELECT id, fast_id, status FROM financial_aid_families WHERE school_year=%s AND fast_id IS NOT NULL", (school_year,))
+                # Fetch existing families: fast_id -> {id, status}
+                cur.execute("""
+                    SELECT id, fast_id, status
+                    FROM financial_aid_families
+                    WHERE school_year=%s AND fast_id IS NOT NULL
+                """, (school_year,))
                 existing = {r['fast_id']: {'id': r['id'], 'status': r['status']} for r in cur.fetchall()}
 
-                # Normalize row keys
                 for raw_row in reader:
-                    row = {k.strip().lower(): v.strip() for k, v in raw_row.items()}
-                    family_name = col(row, 'family name', 'family_name', 'last name', 'name')
-                    fast_id     = col(row, 'fast id', 'fast_id', 'ismfast id', 'id')
-                    school      = col(row, 'school', 'division', 'grade level')
-                    if not family_name:
+                    row = {k.strip(): v.strip() for k, v in raw_row.items() if k}
+
+                    raw_name  = row.get('ApplicantLastNames', '').strip()
+                    fast_id   = row.get('AnonymousIdentifier', '').strip() or None
+                    grade_str = row.get('Grade', '').strip()
+                    award_raw = row.get('TotalRecommendedAward', '').strip()
+
+                    if not raw_name:
                         continue
+
+                    family_name = clean_family_name(raw_name)
+                    divisions   = parse_grades(grade_str)
+                    fast_aid    = money(award_raw)  # family-level total from ISMFast
 
                     try:
                         if fast_id and fast_id in existing:
@@ -2460,86 +2498,61 @@ def api_financial_aid_upload():
                                 # Already active — skip to protect mid-season edits
                                 skipped += 1
                                 continue
-                            else:
-                                # Inactive (carried over) — activate and populate financials
-                                fam_id = fam_rec['id']
+
+                            # Inactive (carried over) — activate and populate
+                            fam_id = fam_rec['id']
+                            cur.execute("""
+                                UPDATE financial_aid_families
+                                SET status='active', updated_at=NOW()
+                                WHERE id=%s
+                            """, (fam_id,))
+                            existing[fast_id]['status'] = 'active'
+
+                            # Replace placeholder student rows with fresh data
+                            cur.execute("DELETE FROM financial_aid_students WHERE family_id=%s", (fam_id,))
+                            for div in divisions:
                                 cur.execute("""
-                                    UPDATE financial_aid_families
-                                    SET status='active', updated_at=NOW()
-                                    WHERE id=%s
-                                """, (fam_id,))
-                                existing[fast_id]['status'] = 'active'
-                                if school:
-                                    tuition_val = TUITION_MAP.get(school) or money(col(row, 'tuition'))
-                                    # Update existing student row if present, else insert
-                                    cur.execute("SELECT id FROM financial_aid_students WHERE family_id=%s LIMIT 1", (fam_id,))
-                                    stu = cur.fetchone()
-                                    if stu:
-                                        cur.execute("""
-                                            UPDATE financial_aid_students SET
-                                                school=%s, tuition=%s, fast_aid_rec=%s, appeal_letter=%s,
-                                                family_can_pay=%s, mds_aid_amount=%s, net_tuition=%s,
-                                                prior_year_tuition=COALESCE(prior_year_tuition, %s),
-                                                parent_notes=%s, school_notes=%s, updated_at=NOW()
-                                            WHERE id=%s
-                                        """, (school, tuition_val,
-                                              money(col(row, 'fast aid rec', 'fast_aid_rec', 'fast rec')),
-                                              col(row, 'appeal letter', 'appeal'),
-                                              money(col(row, 'family can pay', 'family_can_pay')),
-                                              money(col(row, 'mds aid amount', 'mds_aid_amount', 'aid amount')),
-                                              money(col(row, 'net tuition', 'net_tuition')),
-                                              money(col(row, 'prior year tuition', 'prior_year_tuition', 'prior tuition')),
-                                              col(row, 'parent notes', 'parent_notes'),
-                                              col(row, 'school notes', 'school_notes'),
-                                              stu['id']))
-                                    else:
-                                        cur.execute("""
-                                            INSERT INTO financial_aid_students
-                                            (family_id, school, tuition, fast_aid_rec, appeal_letter,
-                                             family_can_pay, mds_aid_amount, net_tuition,
-                                             prior_year_tuition, parent_notes, school_notes)
-                                            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
-                                        """, (fam_id, school, tuition_val,
-                                              money(col(row, 'fast aid rec', 'fast_aid_rec', 'fast rec')),
-                                              col(row, 'appeal letter', 'appeal'),
-                                              money(col(row, 'family can pay', 'family_can_pay')),
-                                              money(col(row, 'mds aid amount', 'mds_aid_amount', 'aid amount')),
-                                              money(col(row, 'net tuition', 'net_tuition')),
-                                              money(col(row, 'prior year tuition', 'prior_year_tuition', 'prior tuition')),
-                                              col(row, 'parent notes', 'parent_notes'),
-                                              col(row, 'school notes', 'school_notes')))
-                                activated += 1
+                                    INSERT INTO financial_aid_students
+                                    (family_id, school, tuition, fast_aid_rec)
+                                    VALUES (%s,%s,%s,%s)
+                                """, (fam_id, div, TUITION_MAP.get(div), fast_aid))
+                            if not divisions:
+                                cur.execute("""
+                                    INSERT INTO financial_aid_students (family_id, fast_aid_rec)
+                                    VALUES (%s,%s)
+                                """, (fam_id, fast_aid))
+                            activated += 1
+
                         else:
                             # Brand new family — create as active
                             cur.execute("""
-                                INSERT INTO financial_aid_families (family_name, fast_id, school_year, contract_sent, status)
+                                INSERT INTO financial_aid_families
+                                (family_name, fast_id, school_year, contract_sent, status)
                                 VALUES (%s,%s,%s,false,'active') RETURNING id
-                            """, (family_name, fast_id or None, school_year))
+                            """, (family_name, fast_id, school_year))
                             fam_id = cur.fetchone()['id']
                             if fast_id:
                                 existing[fast_id] = {'id': fam_id, 'status': 'active'}
-                            if school:
-                                tuition_val = TUITION_MAP.get(school) or money(col(row, 'tuition'))
+
+                            for div in divisions:
                                 cur.execute("""
                                     INSERT INTO financial_aid_students
-                                    (family_id, school, tuition, fast_aid_rec, appeal_letter,
-                                     family_can_pay, mds_aid_amount, net_tuition,
-                                     prior_year_tuition, parent_notes, school_notes)
-                                    VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
-                                """, (fam_id, school, tuition_val,
-                                      money(col(row, 'fast aid rec', 'fast_aid_rec', 'fast rec')),
-                                      col(row, 'appeal letter', 'appeal'),
-                                      money(col(row, 'family can pay', 'family_can_pay')),
-                                      money(col(row, 'mds aid amount', 'mds_aid_amount', 'aid amount')),
-                                      money(col(row, 'net tuition', 'net_tuition')),
-                                      money(col(row, 'prior year tuition', 'prior_year_tuition', 'prior tuition')),
-                                      col(row, 'parent notes', 'parent_notes'),
-                                      col(row, 'school notes', 'school_notes')))
+                                    (family_id, school, tuition, fast_aid_rec)
+                                    VALUES (%s,%s,%s,%s)
+                                """, (fam_id, div, TUITION_MAP.get(div), fast_aid))
+                            if not divisions:
+                                cur.execute("""
+                                    INSERT INTO financial_aid_students (family_id, fast_aid_rec)
+                                    VALUES (%s,%s)
+                                """, (fam_id, fast_aid))
                             added += 1
+
                     except Exception as row_err:
                         errors_count += 1
                         error_names.append(family_name)
+                        import traceback; traceback.print_exc()
                         print(f"Upload row error for {family_name}: {row_err}")
+
             conn.commit()
         finally:
             conn.close()
@@ -2561,22 +2574,20 @@ def api_financial_aid_upload():
 @app.route('/api/financial-aid/template')
 @login_required
 def api_financial_aid_template():
-    """Download a blank CSV template for ISMFast bulk upload."""
+    """Download a CSV template matching ISMFast export format."""
     from flask import Response
-    headers = [
-        'Family Name', 'FAST ID', 'School', 'FAST Aid Rec', 'Appeal Letter',
-        'Family Can Pay', 'MDS Aid Amount', 'Net Tuition', 'Prior Year Tuition',
-        'Parent Notes', 'School Notes'
-    ]
-    example = [
-        'Smith', '123456', 'Lower School', '5000', 'Y',
-        '18000', '6200', '18000', '17000', 'We love Mizzentop.', ''
-    ]
     import csv, io
+    headers = ['ApplicantLastNames', 'AnonymousIdentifier', 'Grade', 'TotalRecommendedAward']
+    examples = [
+        ['Smith', '123456', 'Third Grade', '8500'],
+        ['Jones, Jones', '123457', 'First Grade, Sixth Grade', '12000'],
+        ['Garcia', '123458', 'Kindergarten', '0'],
+    ]
     buf = io.StringIO()
     w = csv.writer(buf)
     w.writerow(headers)
-    w.writerow(example)
+    for ex in examples:
+        w.writerow(ex)
     return Response(
         buf.getvalue(),
         mimetype='text/csv',
