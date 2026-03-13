@@ -622,7 +622,10 @@
         </div>
         <div class="form-group">
           <label class="form-label">Grade</label>
-          <input type="text" class="form-input" value="${esc(f(s.grade))}" onchange="updateStu(${i},'grade',this.value)" placeholder="e.g. Fifth Grade">
+          <select class="form-select" onchange="updateStu(${i},'grade',this.value)">
+            <option value="">—</option>
+            ${['Kindergarten','First Grade','Second Grade','Third Grade','Fourth Grade','Fifth Grade','Sixth Grade','Seventh Grade','Eighth Grade'].map(g=>`<option value="${g}" ${s.grade===g?'selected':''}>${g}</option>`).join('')}
+          </select>
         </div>
         <div class="form-group full">
           <label class="form-label">Division</label>
