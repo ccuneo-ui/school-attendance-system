@@ -2307,19 +2307,31 @@ def api_financial_aid_update(family_id):
             if 'prior_family_id' in data and data['prior_family_id']:
                 prior_fam_id = data['prior_family_id']
                 cur.execute("""
-                    SELECT school, net_tuition FROM financial_aid_students
+                    SELECT first_name, school, net_tuition FROM financial_aid_students
                     WHERE family_id=%s AND net_tuition IS NOT NULL
                 """, (prior_fam_id,))
-                prior_map = {r['school']: float(r['net_tuition']) for r in cur.fetchall()}
-                if prior_map:
-                    cur.execute("SELECT id, school FROM financial_aid_students WHERE family_id=%s", (family_id,))
+                prior_rows = cur.fetchall()
+                # Build lookup: by name (preferred) and by division (fallback)
+                prior_by_name = {r['first_name'].strip().lower(): float(r['net_tuition'])
+                                 for r in prior_rows if r['first_name']}
+                prior_by_div  = {}
+                for r in prior_rows:
+                    if r['school'] and r['school'] not in prior_by_div:
+                        prior_by_div[r['school']] = float(r['net_tuition'])
+
+                if prior_by_name or prior_by_div:
+                    cur.execute("SELECT id, first_name, school FROM financial_aid_students WHERE family_id=%s", (family_id,))
                     for stu in cur.fetchall():
-                        if stu['school'] in prior_map:
+                        name_key = (stu['first_name'] or '').strip().lower()
+                        prior = prior_by_name.get(name_key)
+                        if prior is None:
+                            prior = prior_by_div.get(stu['school'])
+                        if prior is not None:
                             cur.execute("""
                                 UPDATE financial_aid_students
                                 SET prior_year_tuition=%s, updated_at=NOW()
                                 WHERE id=%s
-                            """, (prior_map[stu['school']], stu['id']))
+                            """, (prior, stu['id']))
 
             # Karin's notes — stored per student but edited at family level
             if 'karins_notes' in data:
