@@ -633,14 +633,14 @@
         </div>
         <div class="form-group">
           <label class="form-label">Grade</label>
-          <select class="form-select" onchange="updateStu(${i},'grade',this.value)">
+          <select class="form-select" id="stu-grade-${i}" onchange="updateStu(${i},'grade',this.value);autoDivision(${i},this.value)">
             <option value="">—</option>
             ${['Kindergarten','First Grade','Second Grade','Third Grade','Fourth Grade','Fifth Grade','Sixth Grade','Seventh Grade','Eighth Grade'].map(g=>`<option value="${g}" ${s.grade===g?'selected':''}>${g}</option>`).join('')}
           </select>
         </div>
         <div class="form-group full">
           <label class="form-label">Division</label>
-          <select class="form-select" onchange="updateStu(${i},'school',this.value);autoTuition(${i},this.value)">${schoolOpts}</select>
+          <select class="form-select" id="stu-division-${i}" onchange="updateStu(${i},'school',this.value);autoTuition(${i},this.value)">${schoolOpts}</select>
         </div>
         <div class="form-group"><label class="form-label">Tuition</label><input type="text" class="form-input" inputmode="decimal" id="stu-tuition-${i}" value="${f(s.tuition)}" onchange="updateStu(${i},'tuition',this.value);renderAidAmountField(${i});calcNetTuition(${i})" placeholder="0"></div>
         <div class="form-group"><label class="form-label">FAST Aid Rec</label><input type="text" class="form-input" inputmode="decimal" value="${f(s.fast_aid_rec)}" onchange="updateStu(${i},'fast_aid_rec',this.value)" placeholder="0"></div>
@@ -802,6 +802,21 @@
   function autoTuition(i, school) {
     const t = TUITION_JS[school];
     if (t) { document.getElementById(`stu-tuition-${i}`).value=t; updateStu(i,'tuition',t); }
+  }
+
+  const GRADE_TO_DIV = {
+    'Kindergarten':'Kindergarten',
+    'First Grade':'Lower School','Second Grade':'Lower School',
+    'Third Grade':'Lower School','Fourth Grade':'Lower School',
+    'Fifth Grade':'Middle School','Sixth Grade':'Middle School','Seventh Grade':'Middle School',
+    'Eighth Grade':'Eighth Grade'
+  };
+
+  function autoDivision(i, grade) {
+    const div = GRADE_TO_DIV[grade];
+    if (!div) return;
+    const divSelect = document.getElementById(`stu-division-${i}`);
+    if (divSelect) { divSelect.value = div; updateStu(i,'school',div); autoTuition(i,div); renderAidAmountField(i); calcNetTuition(i); }
   }
   function addStudentToEdit() {
     const i = editStudents.length;
