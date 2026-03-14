@@ -468,7 +468,7 @@
       ${hasDetail ? `<div class="student-detail-row">
         ${f2(s.family_can_pay,'Family Can Pay')}
         ${f2(s.max_discount,'Max Discount')}
-        ${f2(s.family_total,'Family Total')}
+        ${f2(s.family_total,'Family Tuition Total')}
         ${f2(s.family_total_prior,'Family Total Prior')}
         ${s.appeal_letter ? `<div class="detail-field"><span class="detail-label">Appeal Letter</span><span class="detail-value">${esc(s.appeal_letter)}</span></div>` : ''}
       </div>` : ''}`
@@ -648,7 +648,7 @@
         <div class="form-group"><label class="form-label">MDS Aid Amount</label><input type="text" class="form-input" inputmode="decimal" value="${f(s.mds_aid_amount)}" onchange="updateStu(${i},'mds_aid_amount',this.value)" placeholder="0"></div>
         <div class="form-group"><label class="form-label">Net Tuition</label><input type="text" class="form-input" inputmode="decimal" value="${f(s.net_tuition)}" onchange="updateStu(${i},'net_tuition',this.value)" placeholder="0"></div>
         <div class="form-group"><label class="form-label">Prior Year Tuition</label><input type="text" class="form-input" inputmode="decimal" value="${f(s.prior_year_tuition)}" onchange="updateStu(${i},'prior_year_tuition',this.value)" placeholder="0"></div>
-        <div class="form-group"><label class="form-label">Family Total</label><input type="text" class="form-input" inputmode="decimal" value="${f(s.family_total)}" onchange="updateStu(${i},'family_total',this.value)" placeholder="0"></div>
+        <div class="form-group"><label class="form-label">Family Tuition Total</label><input type="text" class="form-input" inputmode="decimal" value="${f(s.family_total)}" onchange="updateStu(${i},'family_total',this.value)" placeholder="0"></div>
       </div>
     </div>`;
   }
