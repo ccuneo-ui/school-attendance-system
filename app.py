@@ -2199,6 +2199,7 @@ def _fa_rows_to_families(rows):
                 'appeal_letter': row["appeal_letter"],
                 'family_can_pay': _f(row["family_can_pay"]),
                 'mds_aid_amount': _f(row["mds_aid_amount"]),
+                'aid_type': row["aid_type"],
                 'net_tuition': _f(row["net_tuition"]),
                 'prior_year_tuition': _f(row["prior_year_tuition"]),
                 'family_total': _f(row["family_total"]),
@@ -2267,7 +2268,7 @@ def api_financial_aid_list():
                        f.prior_family_id,
                        s.id as student_id, s.first_name, s.grade, s.school, s.tuition, s.max_discount,
                        s.fast_aid_rec, s.appeal_letter, s.family_can_pay,
-                       s.mds_aid_amount, s.net_tuition, s.prior_year_tuition,
+                       s.mds_aid_amount, s.aid_type, s.net_tuition, s.prior_year_tuition,
                        s.family_total, s.family_total_prior,
                        s.parent_notes, s.school_notes, s.karins_notes
                 FROM financial_aid_families f
@@ -2364,14 +2365,14 @@ def api_financial_aid_add_student(family_id):
             cur.execute("""
                 INSERT INTO financial_aid_students
                 (family_id, school, tuition, max_discount, fast_aid_rec, appeal_letter,
-                 family_can_pay, mds_aid_amount, net_tuition, prior_year_tuition,
+                 family_can_pay, aid_type, mds_aid_amount, net_tuition, prior_year_tuition,
                  family_total, family_total_prior, parent_notes, school_notes, karins_notes)
-                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
                 RETURNING id
             """, (family_id,
                   data.get('school'), n('tuition'), n('max_discount'),
                   n('fast_aid_rec'), data.get('appeal_letter'),
-                  n('family_can_pay'), n('mds_aid_amount'),
+                  n('family_can_pay'), data.get('aid_type'), n('mds_aid_amount'),
                   n('net_tuition'), n('prior_year_tuition'),
                   n('family_total'), n('family_total_prior'),
                   data.get('parent_notes'), data.get('school_notes'), data.get('karins_notes')))
@@ -2405,7 +2406,7 @@ def api_financial_aid_update_student(student_id):
                 UPDATE financial_aid_students SET
                     first_name=%s, grade=%s,
                     school=%s, tuition=%s, max_discount=%s, fast_aid_rec=%s,
-                    appeal_letter=%s, family_can_pay=%s, mds_aid_amount=%s,
+                    appeal_letter=%s, family_can_pay=%s, aid_type=%s, mds_aid_amount=%s,
                     net_tuition=%s, prior_year_tuition=%s,
                     family_total=%s, family_total_prior=%s,
                     parent_notes=%s, school_notes=%s, karins_notes=%s,
@@ -2414,7 +2415,7 @@ def api_financial_aid_update_student(student_id):
             """, (data.get('first_name'), data.get('grade'),
                   data.get('school'), n('tuition'), n('max_discount'),
                   n('fast_aid_rec'), data.get('appeal_letter'),
-                  n('family_can_pay'), n('mds_aid_amount'),
+                  n('family_can_pay'), data.get('aid_type'), n('mds_aid_amount'),
                   n('net_tuition'), n('prior_year_tuition'),
                   n('family_total'), n('family_total_prior'),
                   data.get('parent_notes'), data.get('school_notes'),
@@ -2984,6 +2985,17 @@ def migrate_financial_aid():
                 results.append("Added prior_family_id column to financial_aid_families")
             else:
                 results.append("prior_family_id column already exists (skipped)")
+
+            # Add aid_type to students if missing
+            cur.execute("""
+                SELECT column_name FROM information_schema.columns
+                WHERE table_name='financial_aid_students' AND column_name='aid_type'
+            """)
+            if not cur.fetchone():
+                cur.execute("ALTER TABLE financial_aid_students ADD COLUMN aid_type TEXT")
+                results.append("Added aid_type column to financial_aid_students")
+            else:
+                results.append("aid_type column already exists (skipped)")
 
         conn.commit()
         return jsonify({'ok': True, 'results': results})

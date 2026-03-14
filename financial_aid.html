@@ -455,19 +455,21 @@
     const studentRows   = f.students.map(s=>{
       const f2 = (v,label) => v!=null && v!==0 ? `<div class="detail-field"><span class="detail-label">${label}</span><span class="detail-value">${fmt(v)}</span></div>` : '';
       const hasDetail = s.family_can_pay!=null || s.mds_aid_amount!=null || s.max_discount!=null || s.family_total!=null || s.family_total_prior!=null;
+      const aidTypeLabel = {mds:'MDS Aid', remission_mizzentop:'Remission 70%', remission_affiliate:'Remission 50%', sibling:'Sibling Discount'}[s.aid_type] || 'Aid Req';
       return `
       <div class="student-row">
         <div style="font-size:13px;font-weight:600;">${esc(s.school||'Unknown')}</div>
         <div style="font-size:13px;color:var(--muted);">${esc(s.first_name||'')}${s.grade?` <span style="font-size:11px;opacity:0.7;">(${esc(s.grade)})</span>`:''}</div>
         <div class="money fast">${fmt(s.tuition)}</div>
         <div class="money fast">${fmt(s.fast_aid_rec)}</div>
-        <div class="money requested">${fmt(s.mds_aid_amount)}</div>
+        <div class="money requested" title="${aidTypeLabel}">${fmt(s.mds_aid_amount)}</div>
         <div class="money net">${fmt(s.net_tuition)}</div>
         <div class="money prior">${fmt(s.prior_year_tuition)}</div>
       </div>
       ${hasDetail ? `<div class="student-detail-row">
         ${f2(s.family_can_pay,'Family Can Pay')}
         ${f2(s.max_discount,'Max Discount')}
+        ${s.aid_type && s.mds_aid_amount ? `<div class="detail-field"><span class="detail-label">${aidTypeLabel}</span><span class="detail-value">${fmt(s.mds_aid_amount)}</span></div>` : ''}
         ${f2(s.family_total,'Family Tuition Total')}
         ${f2(s.family_total_prior,'Family Total Prior')}
         ${s.appeal_letter ? `<div class="detail-field"><span class="detail-label">Appeal Letter</span><span class="detail-value">${esc(s.appeal_letter)}</span></div>` : ''}
@@ -606,6 +608,7 @@
           }
         }).catch(()=>{});
     }
+    initAidFields();
   }
 
   function renderStudentCard(s, i) {
@@ -633,7 +636,7 @@
           <label class="form-label">Division</label>
           <select class="form-select" onchange="updateStu(${i},'school',this.value);autoTuition(${i},this.value)">${schoolOpts}</select>
         </div>
-        <div class="form-group"><label class="form-label">Tuition</label><input type="text" class="form-input" inputmode="decimal" id="stu-tuition-${i}" value="${f(s.tuition)}" onchange="updateStu(${i},'tuition',this.value)" placeholder="0"></div>
+        <div class="form-group"><label class="form-label">Tuition</label><input type="text" class="form-input" inputmode="decimal" id="stu-tuition-${i}" value="${f(s.tuition)}" onchange="updateStu(${i},'tuition',this.value);renderAidAmountField(${i});calcNetTuition(${i})" placeholder="0"></div>
         <div class="form-group"><label class="form-label">FAST Aid Rec</label><input type="text" class="form-input" inputmode="decimal" value="${f(s.fast_aid_rec)}" onchange="updateStu(${i},'fast_aid_rec',this.value)" placeholder="0"></div>
         <div class="form-group">
           <label class="form-label">Appeal Letter</label>
@@ -645,8 +648,21 @@
           </select>
         </div>
         <div class="form-group"><label class="form-label">Family Can Pay</label><input type="text" class="form-input" inputmode="decimal" value="${f(s.family_can_pay)}" onchange="updateStu(${i},'family_can_pay',this.value)" placeholder="0"></div>
-        <div class="form-group"><label class="form-label">MDS Aid Amount</label><input type="text" class="form-input" inputmode="decimal" value="${f(s.mds_aid_amount)}" onchange="updateStu(${i},'mds_aid_amount',this.value)" placeholder="0"></div>
-        <div class="form-group"><label class="form-label">Net Tuition</label><input type="text" class="form-input" inputmode="decimal" value="${f(s.net_tuition)}" onchange="updateStu(${i},'net_tuition',this.value)" placeholder="0"></div>
+        <div class="form-group">
+          <label class="form-label">Aid Type</label>
+          <select class="form-select" id="stu-aid-type-${i}" onchange="onAidTypeChange(${i})">
+            <option value="">— None —</option>
+            <option value="mds" ${s.aid_type==='mds'?'selected':''}>MDS Aid</option>
+            <option value="remission_mizzentop" ${s.aid_type==='remission_mizzentop'?'selected':''}>Remission – Mizzentop (70%)</option>
+            <option value="remission_affiliate" ${s.aid_type==='remission_affiliate'?'selected':''}>Remission – Affiliate (50%)</option>
+            <option value="sibling" ${s.aid_type==='sibling'?'selected':''}>Sibling Discount</option>
+          </select>
+        </div>
+        <div class="form-group" id="stu-aid-amount-wrap-${i}">
+          <label class="form-label" id="stu-aid-amount-label-${i}">Aid Amount</label>
+          <div id="stu-aid-amount-input-${i}"></div>
+        </div>
+        <div class="form-group"><label class="form-label">Net Tuition</label><input type="text" class="form-input" inputmode="decimal" id="stu-net-tuition-${i}" value="${f(s.net_tuition)}" onchange="updateStu(${i},'net_tuition',this.value)" placeholder="0"></div>
         <div class="form-group"><label class="form-label">Prior Year Tuition</label><input type="text" class="form-input" inputmode="decimal" value="${f(s.prior_year_tuition)}" onchange="updateStu(${i},'prior_year_tuition',this.value)" placeholder="0"></div>
         <div class="form-group"><label class="form-label">Family Tuition Total</label><input type="text" class="form-input" inputmode="decimal" value="${f(s.family_total)}" onchange="updateStu(${i},'family_total',this.value)" placeholder="0"></div>
       </div>
@@ -707,6 +723,69 @@
 
   function updateStu(i, field, value) {
     editStudents[i][field] = value===''?null:(isNaN(+value)?value:+value);
+  }
+
+  function onAidTypeChange(i) {
+    const type = document.getElementById(`stu-aid-type-${i}`).value;
+    updateStu(i, 'aid_type', type || null);
+    renderAidAmountField(i);
+    calcNetTuition(i);
+  }
+
+  function renderAidAmountField(i) {
+    const s = editStudents[i];
+    const type = s.aid_type || document.getElementById(`stu-aid-type-${i}`)?.value || '';
+    const wrap = document.getElementById(`stu-aid-amount-wrap-${i}`);
+    const label = document.getElementById(`stu-aid-amount-label-${i}`);
+    const inputDiv = document.getElementById(`stu-aid-amount-input-${i}`);
+    if (!wrap) return;
+
+    if (!type) {
+      wrap.style.display = 'none';
+      return;
+    }
+    wrap.style.display = '';
+
+    if (type === 'mds') {
+      label.textContent = 'MDS Aid Amount';
+      inputDiv.innerHTML = `<input type="text" class="form-input" inputmode="decimal"
+        value="${s.mds_aid_amount!=null?s.mds_aid_amount:''}"
+        placeholder="0"
+        onchange="updateStu(${i},'mds_aid_amount',this.value);calcNetTuition(${i})">`;
+    } else if (type === 'remission_mizzentop' || type === 'remission_affiliate') {
+      const pct = type === 'remission_mizzentop' ? 0.70 : 0.50;
+      const tuition = parseFloat(s.tuition) || 0;
+      const discount = Math.round(tuition * pct);
+      label.textContent = type === 'remission_mizzentop' ? 'Remission (70% of tuition)' : 'Remission (50% of tuition)';
+      inputDiv.innerHTML = `<input type="text" class="form-input" value="$${discount.toLocaleString()}" readonly style="background:var(--bg);color:var(--muted);">`;
+      updateStu(i, 'mds_aid_amount', discount);
+    } else if (type === 'sibling') {
+      label.textContent = 'Sibling Discount';
+      const cur = s.mds_aid_amount;
+      inputDiv.innerHTML = `<select class="form-select" onchange="updateStu(${i},'mds_aid_amount',this.value);calcNetTuition(${i})">
+        <option value="">—</option>
+        ${[1000,2000,3000,4000,5000].map(v=>`<option value="${v}" ${cur==v?'selected':''}>$${v.toLocaleString()}</option>`).join('')}
+      </select>`;
+    }
+  }
+
+  function calcNetTuition(i) {
+    const s = editStudents[i];
+    const tuition = parseFloat(s.tuition) || 0;
+    const aid = parseFloat(s.mds_aid_amount) || 0;
+    if (tuition > 0 && aid > 0) {
+      const net = tuition - aid;
+      updateStu(i, 'net_tuition', net);
+      const el = document.getElementById(`stu-net-tuition-${i}`);
+      if (el) el.value = net;
+    }
+  }
+
+  // Initialize aid fields after rendering student cards
+  function initAidFields() {
+    editStudents.forEach((s, i) => {
+      renderAidAmountField(i);
+    });
   }
   function autoTuition(i, school) {
     const t = TUITION_JS[school];
