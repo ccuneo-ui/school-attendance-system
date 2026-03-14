@@ -728,7 +728,11 @@
   });
 
   function updateStu(i, field, value) {
-    editStudents[i][field] = value===''?null:(isNaN(+value)?value:+value);
+    if (value === null || value === undefined) {
+      editStudents[i][field] = null;
+    } else {
+      editStudents[i][field] = value===''?null:(isNaN(+value)?value:+value);
+    }
   }
 
   function onAidTypeChange(i) {
