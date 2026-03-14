@@ -193,6 +193,7 @@
     <div class="summary-card"><div class="label">Students</div><div class="value" id="sumStudents">—</div></div>
     <div class="summary-card"><div class="label">Total Aid Requested</div><div class="value gold" id="sumRequested">—</div></div>
     <div class="summary-card"><div class="label">FAST Recommended</div><div class="value" id="sumFast">—</div></div>
+    <div class="summary-card"><div class="label">Total Aid Awarded</div><div class="value green" id="sumAwarded">—</div></div>
     <div class="summary-card"><div class="label">Contracts Sent</div><div class="value green" id="sumContracts">—</div></div>
     <div class="summary-card"><div class="label">Pending</div><div class="value gold" id="sumPending">—</div></div>
   </div>
@@ -397,10 +398,15 @@
   function renderAll() { updateSummary(); applyFilters(); }
 
   function updateSummary() {
-    let fams=0,studs=0,req=0,fast=0,contracts=0,pending=0;
+    let fams=0,studs=0,req=0,fast=0,contracts=0,pending=0,awarded=0;
     allFamilies.filter(f=>f.status!=='inactive').forEach(f=>{
       fams++;
-      f.students.forEach(s=>{ studs++; req+=parseFloat(s.mds_aid_amount)||0; fast+=parseFloat(s.fast_aid_rec)||0; });
+      f.students.forEach(s=>{
+        studs++;
+        req+=parseFloat(s.mds_aid_amount)||0;
+        fast+=parseFloat(s.fast_aid_rec)||0;
+        if (s.aid_type) awarded+=parseFloat(s.mds_aid_amount)||0;
+      });
       if (f.contract_sent) contracts++; else pending++;
     });
     document.getElementById('sumFamilies').textContent  = fams;
@@ -409,6 +415,7 @@
     document.getElementById('sumFast').textContent      = '$'+Math.round(fast).toLocaleString();
     document.getElementById('sumContracts').textContent = contracts;
     document.getElementById('sumPending').textContent   = pending;
+    document.getElementById('sumAwarded').textContent   = '$'+Math.round(awarded).toLocaleString();
   }
 
   function setFilter(type, val, btn) {
