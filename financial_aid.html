@@ -191,7 +191,7 @@
   <div class="summary-bar">
     <div class="summary-card"><div class="label">Families</div><div class="value" id="sumFamilies">—</div></div>
     <div class="summary-card"><div class="label">Students</div><div class="value" id="sumStudents">—</div></div>
-    <div class="summary-card"><div class="label">Total Aid Requested</div><div class="value gold" id="sumRequested">—</div></div>
+    <div class="summary-card"><div class="label">Total Aid</div><div class="value gold" id="sumRequested">—</div></div>
     <div class="summary-card"><div class="label">FAST Recommended</div><div class="value" id="sumFast">—</div></div>
     <div class="summary-card"><div class="label">Total Aid Awarded</div><div class="value green" id="sumAwarded">—</div></div>
     <div class="summary-card"><div class="label">Contracts Sent</div><div class="value green" id="sumContracts">—</div></div>
@@ -452,6 +452,7 @@
 
   function renderFamilyCard(f) {
     const inactive = f.status==='inactive';
+    const totalAwarded = f.students.reduce((s,st)=>s+(st.aid_type?(parseFloat(st.mds_aid_amount)||0):0),0);
     const totalReq = f.students.reduce((s,st)=>s+(parseFloat(st.mds_aid_amount)||0),0);
     const totalNet = f.students.reduce((s,st)=>s+(parseFloat(st.net_tuition)||0),0);
     const hasAppeal = f.students.some(s=>s.appeal_letter&&s.appeal_letter.toLowerCase().startsWith('y'));
@@ -494,7 +495,7 @@
         </div>
         <div class="family-header-right">
           <div class="aid-summary">
-            <div class="requested">${fmt(totalReq)} requested</div>
+            <div class="requested">${totalAwarded>0?fmt(totalReq)+' awarded':fmt(totalReq)+' aid'}</div>
             <div class="net">Net tuition: ${fmt(totalNet)}</div>
           </div>
           <span class="chevron">▼</span>
@@ -502,7 +503,7 @@
       </div>
       <div class="family-card-body" style="display:none;">
         <div class="student-section">
-          <div class="student-header"><div>Division</div><div>Student</div><div>Tuition</div><div>FAST Rec</div><div>Aid Req</div><div>Net Tuition</div><div>Prior Year</div></div>
+          <div class="student-header"><div>Division</div><div>Student</div><div>Tuition</div><div>FAST Rec</div><div>Aid Awarded</div><div>Net Tuition</div><div>Prior Year</div></div>
           ${studentRows}
         </div>
         <div class="notes-panel">
@@ -735,6 +736,9 @@
   function onAidTypeChange(i) {
     const type = document.getElementById(`stu-aid-type-${i}`).value;
     updateStu(i, 'aid_type', type || null);
+    if (!type) {
+      updateStu(i, 'mds_aid_amount', null);
+    }
     renderAidAmountField(i);
     calcNetTuition(i);
   }
