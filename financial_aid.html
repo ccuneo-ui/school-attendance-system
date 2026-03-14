@@ -191,7 +191,6 @@
   <div class="summary-bar">
     <div class="summary-card"><div class="label">Families</div><div class="value" id="sumFamilies">—</div></div>
     <div class="summary-card"><div class="label">Students</div><div class="value" id="sumStudents">—</div></div>
-    <div class="summary-card"><div class="label">Total Aid</div><div class="value gold" id="sumRequested">—</div></div>
     <div class="summary-card"><div class="label">FAST Recommended</div><div class="value" id="sumFast">—</div></div>
     <div class="summary-card"><div class="label">Total Aid Awarded</div><div class="value green" id="sumAwarded">—</div></div>
     <div class="summary-card"><div class="label">Contracts Sent</div><div class="value green" id="sumContracts">—</div></div>
@@ -403,7 +402,7 @@
       fams++;
       f.students.forEach(s=>{
         studs++;
-        req+=parseFloat(s.mds_aid_amount)||0;
+        if (s.aid_type) req+=parseFloat(s.mds_aid_amount)||0;
         fast+=parseFloat(s.fast_aid_rec)||0;
         if (s.aid_type) awarded+=parseFloat(s.mds_aid_amount)||0;
       });
@@ -453,7 +452,7 @@
   function renderFamilyCard(f) {
     const inactive = f.status==='inactive';
     const totalAwarded = f.students.reduce((s,st)=>s+(st.aid_type?(parseFloat(st.mds_aid_amount)||0):0),0);
-    const totalReq = f.students.reduce((s,st)=>s+(parseFloat(st.mds_aid_amount)||0),0);
+    const totalReq = totalAwarded;
     const totalNet = f.students.reduce((s,st)=>s+(parseFloat(st.net_tuition)||0),0);
     const hasAppeal = f.students.some(s=>s.appeal_letter&&s.appeal_letter.toLowerCase().startsWith('y'));
     const contractBadge = f.contract_sent ? `<span class="badge badge-contract">Contract Sent</span>` : `<span class="badge badge-no-contract">Pending</span>`;
@@ -470,7 +469,7 @@
         <div style="font-size:13px;color:var(--muted);">${esc(s.first_name||'')}${s.grade?` <span style="font-size:11px;opacity:0.7;">(${esc(s.grade)})</span>`:''}</div>
         <div class="money fast">${fmt(s.tuition)}</div>
         <div class="money fast">${fmt(s.fast_aid_rec)}</div>
-        <div class="money requested" title="${aidTypeLabel}">${fmt(s.mds_aid_amount)}</div>
+        <div class="money requested" title="${aidTypeLabel}">${s.aid_type ? fmt(s.mds_aid_amount) : '—'}</div>
         <div class="money net">${fmt(s.net_tuition)}</div>
         <div class="money prior">${fmt(s.prior_year_tuition)}</div>
       </div>
@@ -738,6 +737,9 @@
     updateStu(i, 'aid_type', type || null);
     if (!type) {
       updateStu(i, 'mds_aid_amount', null);
+      updateStu(i, 'net_tuition', null);
+      const netEl = document.getElementById(`stu-net-tuition-${i}`);
+      if (netEl) netEl.value = '';
     }
     renderAidAmountField(i);
     calcNetTuition(i);
