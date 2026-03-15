@@ -71,7 +71,7 @@
     .chevron { font-size: 16px; color: var(--muted); transition: transform 0.2s; }
     .family-card.expanded .chevron { transform: rotate(180deg); }
     .student-section { padding: 16px 20px; border-bottom: 1px solid var(--border); }
-    .student-header, .student-row { display: grid; grid-template-columns: 1.6fr 1fr 100px 110px 110px 110px 120px; gap: 8px; align-items: center; }
+    .student-header, .student-row { display: grid; grid-template-columns: 1.6fr 1fr 100px 110px 110px 120px; gap: 8px; align-items: center; }
     .student-header { font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; padding-bottom: 10px; border-bottom: 1px solid var(--border); margin-bottom: 10px; }
     .student-row { padding: 8px 0; border-bottom: 1px solid var(--border); }
     .student-row:last-child { border-bottom: none; }
@@ -469,8 +469,11 @@
         <div class="money fast">${fmt(s.tuition)}</div>
         <div class="money fast">${fmt(s.fast_aid_rec)}</div>
         <div class="money requested" title="${aidTypeLabel}">${s.aid_type ? fmt(s.mds_aid_amount) : '—'}</div>
-        <div class="money net">${fmt(s.net_tuition)}</div>
-        <div class="money prior">${fmt(s.prior_year_tuition)}</div>
+        <div class="money net">
+          ${fmt(s.net_tuition)}
+          ${s.prior_year_tuition!=null ? `<div style="font-size:11px;color:var(--muted);font-weight:400;margin-top:2px;">Prior: ${fmt(s.prior_year_tuition)}</div>` : ''}
+        </div>
+        <div class="money prior" style="display:none;">${fmt(s.prior_year_tuition)}</div>
       </div>
       ${hasDetail ? `<div class="student-detail-row">
         ${f2(s.family_can_pay,'Family Can Pay')}
@@ -501,7 +504,7 @@
       </div>
       <div class="family-card-body" style="display:none;">
         <div class="student-section">
-          <div class="student-header"><div>Division</div><div>Student</div><div>Tuition</div><div>FAST Rec</div><div>Aid Awarded</div><div>Net Tuition</div><div>Prior Year</div></div>
+          <div class="student-header"><div>Division</div><div>Student</div><div>Tuition</div><div>FAST Rec</div><div>Aid Awarded</div><div>Net Tuition</div></div>
           ${studentRows}
         </div>
         <div class="notes-panel">
