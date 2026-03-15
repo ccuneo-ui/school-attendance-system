@@ -453,6 +453,7 @@
     const totalAwarded = f.students.reduce((s,st)=>s+(st.aid_type?(parseFloat(st.mds_aid_amount)||0):0),0);
     const totalReq = totalAwarded;
     const totalNet = f.students.reduce((s,st)=>s+(parseFloat(st.net_tuition)||0),0);
+    const totalPrior = f.students.reduce((s,st)=>s+(parseFloat(st.prior_year_tuition)||0),0);
     const hasAppeal = f.students.some(s=>s.appeal_letter&&s.appeal_letter.toLowerCase().startsWith('y'));
     const contractBadge = f.contract_sent ? `<span class="badge badge-contract">Contract Sent</span>` : `<span class="badge badge-no-contract">Pending</span>`;
     const appealBadge   = hasAppeal ? `<span class="badge badge-appeal">Appeal</span>` : '';
@@ -498,6 +499,7 @@
           <div class="aid-summary">
             <div class="requested">${totalAwarded>0?fmt(totalReq)+' awarded':fmt(totalReq)+' aid'}</div>
             <div class="net">Net tuition: ${fmt(totalNet)}</div>
+            ${totalPrior>0?`<div class="net">Prior year: ${fmt(totalPrior)}</div>`:''}
           </div>
           <span class="chevron">▼</span>
         </div>
