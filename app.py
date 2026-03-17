@@ -1901,6 +1901,14 @@ def api_billing_student_detail():
 # ============================================
 
 FINANCIAL_AID_MIGRATION = """
+CREATE TABLE IF NOT EXISTS fa_tuition_rates (
+    id          SERIAL PRIMARY KEY,
+    school_year TEXT NOT NULL,
+    division    TEXT NOT NULL,
+    tuition     NUMERIC(10,2) NOT NULL,
+    UNIQUE(school_year, division)
+);
+
 CREATE TABLE IF NOT EXISTS financial_aid_families (
     id               SERIAL PRIMARY KEY,
     family_name      TEXT NOT NULL,
@@ -1942,6 +1950,28 @@ TUITION_MAP = {
     'Middle School': 26299,
     'Eighth Grade': 27017,
 }
+
+def get_tuition_map(school_year=None):
+    """Return tuition map for a given school year from DB, falling back to hardcoded defaults."""
+    try:
+        conn = get_db_connection()
+        try:
+            with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+                if school_year:
+                    cur.execute("SELECT division, tuition FROM fa_tuition_rates WHERE school_year=%s", (school_year,))
+                else:
+                    cur.execute("""
+                        SELECT DISTINCT ON (division) division, tuition
+                        FROM fa_tuition_rates ORDER BY division, school_year DESC
+                    """)
+                rows = cur.fetchall()
+                if rows:
+                    return {r['division']: float(r['tuition']) for r in rows}
+        finally:
+            conn.close()
+    except Exception:
+        pass
+    return dict(TUITION_MAP)
 
 SEED_DATA = [
     ("Anderson", "951677", True, [
@@ -2517,6 +2547,8 @@ def api_financial_aid_upload():
     if not file:
         return jsonify({'error': 'No file uploaded'}), 400
 
+    tuition_map = get_tuition_map(school_year)
+
     # Grade -> Mizzentop division mapping
     GRADE_TO_DIVISION = {
         'kindergarten':  'Kindergarten',
@@ -2656,7 +2688,7 @@ def api_financial_aid_upload():
                                     INSERT INTO financial_aid_students
                                     (family_id, first_name, grade, school, tuition, fast_aid_rec, prior_year_tuition)
                                     VALUES (%s,%s,%s,%s,%s,%s,%s)
-                                """, (fam_id, fname, grade_label, div, TUITION_MAP.get(div), fast_aid, prior))
+                                """, (fam_id, fname, grade_label, div, tuition_map.get(div), fast_aid, prior))
                             if not students:
                                 cur.execute("""
                                     INSERT INTO financial_aid_students (family_id, fast_aid_rec)
@@ -2684,7 +2716,7 @@ def api_financial_aid_upload():
                                     INSERT INTO financial_aid_students
                                     (family_id, first_name, grade, school, tuition, fast_aid_rec, prior_year_tuition)
                                     VALUES (%s,%s,%s,%s,%s,%s,%s)
-                                """, (fam_id, fname, grade_label, div, TUITION_MAP.get(div), fast_aid, prior))
+                                """, (fam_id, fname, grade_label, div, tuition_map.get(div), fast_aid, prior))
                             if not students:
                                 cur.execute("""
                                     INSERT INTO financial_aid_students (family_id, fast_aid_rec)
@@ -2820,7 +2852,7 @@ def api_financial_aid_new_season():
                 """, (f['family_name'], f['fast_id'], to_year))
                 new_fam_id = cur.fetchone()['id']
                 for s in f['students']:
-                    tuition = TUITION_MAP.get(s['school'])
+                    tuition = get_tuition_map(to_year).get(s['school'])
                     cur.execute("""
                         INSERT INTO financial_aid_students
                         (family_id, school, tuition, prior_year_tuition)
@@ -2885,7 +2917,7 @@ def seed_financial_aid():
                 fam_id = cur.fetchone()[0]
                 for s in students:
                     school = s[0]
-                    tuition = TUITION_MAP.get(school)
+                    tuition = get_tuition_map('2025-26').get(school)
                     cur.execute("""
                         INSERT INTO financial_aid_students
                         (family_id, school, tuition, fast_aid_rec, appeal_letter,
@@ -2997,6 +3029,44 @@ def migrate_financial_aid():
             else:
                 results.append("aid_type column already exists (skipped)")
 
+            # Create fa_tuition_rates table if missing
+            cur.execute("SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_name='fa_tuition_rates')")
+            if not cur.fetchone()[0]:
+                cur.execute("""
+                    CREATE TABLE fa_tuition_rates (
+                        id          SERIAL PRIMARY KEY,
+                        school_year TEXT NOT NULL,
+                        division    TEXT NOT NULL,
+                        tuition     NUMERIC(10,2) NOT NULL,
+                        UNIQUE(school_year, division)
+                    )
+                """)
+                results.append("Created fa_tuition_rates table")
+            else:
+                results.append("fa_tuition_rates table already exists (skipped)")
+
+            # Seed tuition rates if table is empty
+            cur.execute("SELECT COUNT(*) FROM fa_tuition_rates")
+            if cur.fetchone()[0] == 0:
+                rates = [
+                    ('2025-26', 'Kindergarten', 19338),
+                    ('2025-26', 'Lower School', 24200),
+                    ('2025-26', 'Middle School', 26299),
+                    ('2025-26', 'Eighth Grade', 27017),
+                    ('2026-27', 'Kindergarten', 20498),
+                    ('2026-27', 'Lower School', 25651),
+                    ('2026-27', 'Middle School', 27877),
+                    ('2026-27', 'Eighth Grade', 28638),
+                ]
+                for yr, div, amt in rates:
+                    cur.execute("""
+                        INSERT INTO fa_tuition_rates (school_year, division, tuition)
+                        VALUES (%s,%s,%s) ON CONFLICT DO NOTHING
+                    """, (yr, div, amt))
+                results.append("Seeded tuition rates for 2025-26 and 2026-27")
+            else:
+                results.append("Tuition rates already seeded (skipped)")
+
         conn.commit()
         return jsonify({'ok': True, 'results': results})
     except Exception as e:
@@ -3006,6 +3076,72 @@ def migrate_financial_aid():
     finally:
         conn.close()
 
+
+
+@app.route('/financial-aid/tuition-rates')
+@login_required
+def fa_tuition_rates_page():
+    return send_from_directory('.', 'fa_tuition_rates.html')
+
+@app.route('/api/fa-tuition-rates')
+@login_required
+def api_fa_tuition_rates_get():
+    conn = get_db_connection()
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute("SELECT school_year, division, tuition FROM fa_tuition_rates ORDER BY school_year DESC, division")
+            rows = cur.fetchall()
+        years = {}
+        for r in rows:
+            yr = r['school_year']
+            if yr not in years: years[yr] = {}
+            years[yr][r['division']] = float(r['tuition'])
+        return jsonify(years)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    finally:
+        conn.close()
+
+@app.route('/api/fa-tuition-rates', methods=['POST'])
+@login_required
+def api_fa_tuition_rates_set():
+    data = request.json or {}
+    school_year = data.get('school_year', '').strip()
+    rates = data.get('rates', {})
+    if not school_year or not rates:
+        return jsonify({'error': 'school_year and rates required'}), 400
+    conn = get_db_connection()
+    try:
+        with conn.cursor() as cur:
+            for division, tuition in rates.items():
+                try: tuition_val = float(str(tuition).replace(',','').replace('$','').strip())
+                except: continue
+                cur.execute("""
+                    INSERT INTO fa_tuition_rates (school_year, division, tuition)
+                    VALUES (%s,%s,%s) ON CONFLICT (school_year, division) DO UPDATE SET tuition=EXCLUDED.tuition
+                """, (school_year, division, tuition_val))
+        conn.commit()
+        return jsonify({'ok': True})
+    except Exception as e:
+        conn.rollback()
+        return jsonify({'error': str(e)}), 500
+    finally:
+        conn.close()
+
+@app.route('/api/fa-tuition-rates/<year>', methods=['DELETE'])
+@login_required
+def api_fa_tuition_rates_delete_year(year):
+    conn = get_db_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM fa_tuition_rates WHERE school_year=%s", (year,))
+        conn.commit()
+        return jsonify({'ok': True})
+    except Exception as e:
+        conn.rollback()
+        return jsonify({'error': str(e)}), 500
+    finally:
+        conn.close()
 
 
 @app.route('/icon-facebook.svg')

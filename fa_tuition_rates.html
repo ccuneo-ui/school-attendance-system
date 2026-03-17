@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FA Tuition Rates — Mizzentop Admin</title>
+  <link rel="icon" type="image/svg+xml" href="/logo.svg">
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --navy: #1a2744; --burgundy: #4a1a2c; --cream: #f7f3ec;
+      --muted: #6b7280; --white: #ffffff; --border: #e5e1da;
+      --bg: #f0ece4; --gold: #c8992a; --green: #1a6b3c;
+      --green-bg: #eaf5ee; --red: #c0392b; --red-bg: #fdf1f0;
+      --shadow: 0 2px 8px rgba(26,39,68,0.08);
+    }
+    html, body { min-height: 100vh; font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(--navy); }
+    .topbar { display: flex; align-items: center; justify-content: space-between; padding: 14px 28px; background: var(--burgundy); color: var(--white); }
+    .topbar a { color: rgba(255,255,255,0.75); text-decoration: none; font-size: 13px; font-weight: 500; }
+    .topbar a:hover { color: var(--white); }
+    .topbar-title { font-family: 'Playfair Display', serif; font-size: 18px; font-weight: 700; }
+    .topbar-right { display: flex; align-items: center; gap: 20px; }
+    .container { max-width: 900px; margin: 0 auto; padding: 32px 24px 80px; }
+    .page-header { margin-bottom: 28px; }
+    .page-header h1 { font-family: 'Playfair Display', serif; font-size: 28px; font-weight: 700; margin-bottom: 4px; }
+    .page-header p { color: var(--muted); font-size: 14px; }
+    .btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px; border-radius: 7px; font-size: 13px; font-weight: 600; cursor: pointer; border: none; font-family: inherit; transition: opacity 0.15s; }
+    .btn:hover { opacity: 0.85; }
+    .btn-primary { background: var(--navy); color: var(--white); }
+    .btn-outline { background: var(--white); color: var(--navy); border: 1px solid var(--border); }
+    .btn-danger { background: var(--white); color: var(--red); border: 1px solid var(--red); }
+    .btn-sm { padding: 6px 12px; font-size: 12px; }
+    .card { background: var(--white); border: 1px solid var(--border); border-radius: 12px; box-shadow: var(--shadow); margin-bottom: 20px; }
+    .card-header { padding: 16px 20px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+    .card-title { font-weight: 700; font-size: 15px; }
+    .card-year { font-size: 12px; color: var(--muted); font-weight: 500; background: var(--bg); padding: 3px 10px; border-radius: 20px; }
+    .card-body { padding: 20px; }
+    .rates-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .rate-row { display: flex; align-items: center; gap: 12px; }
+    .rate-label { font-size: 13px; font-weight: 600; min-width: 130px; }
+    .rate-input { flex: 1; padding: 8px 12px; border: 1px solid var(--border); border-radius: 7px; font-size: 14px; font-family: inherit; color: var(--navy); background: var(--white); }
+    .rate-input:focus { outline: none; border-color: var(--navy); }
+    .card-footer { padding: 14px 20px; border-top: 1px solid var(--border); display: flex; gap: 10px; align-items: center; justify-content: space-between; }
+    .add-year-card { border: 2px dashed var(--border); background: transparent; box-shadow: none; }
+    .add-year-card .card-body { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+    .form-input { padding: 8px 12px; border: 1px solid var(--border); border-radius: 7px; font-size: 14px; font-family: inherit; }
+    .form-input:focus { outline: none; border-color: var(--navy); }
+    .toast { position: fixed; bottom: 24px; right: 24px; background: var(--navy); color: var(--white); padding: 12px 20px; border-radius: 8px; font-size: 13px; font-weight: 500; opacity: 0; transition: opacity 0.3s; z-index: 999; pointer-events: none; }
+    .toast.show { opacity: 1; }
+    .toast.success { background: var(--green); }
+    .toast.error { background: var(--red); }
+    .save-feedback { font-size: 12px; color: var(--green); font-weight: 600; }
+  </style>
+</head>
+<body>
+  <div class="topbar">
+    <div style="display:flex;align-items:center;gap:16px;">
+      <a href="/home">← Home</a>
+      <span class="topbar-title">FA Tuition Rates</span>
+    </div>
+    <div class="topbar-right">
+      <a href="/financial-aid">Financial Aid</a>
+      <a href="/billing-report">Billing Reports</a>
+      <a href="/billing-rates">Billing Rates</a>
+    </div>
+  </div>
+
+  <div class="container">
+    <div class="page-header">
+      <h1>Financial Aid Tuition Rates</h1>
+      <p>Rates used to auto-fill tuition when uploading ISMFast data or adding students manually. Set rates per school year.</p>
+    </div>
+
+    <div id="rateCards">
+      <div style="color:var(--muted);font-size:14px;padding:20px 0;">Loading rates...</div>
+    </div>
+
+    <!-- Add New Year -->
+    <div class="card add-year-card">
+      <div class="card-body">
+        <strong style="font-size:14px;">Add New Year</strong>
+        <input type="text" class="form-input" id="newYear" placeholder="e.g. 2027-28" style="width:130px;">
+        <button class="btn btn-outline" onclick="copyFromYear()">Copy from existing year</button>
+        <select class="form-input" id="copyFromSelect" style="width:130px;">
+          <option value="">— select year —</option>
+        </select>
+        <button class="btn btn-primary" onclick="addNewYear()">Add Year</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script>
+    const DIVISIONS = ['Kindergarten', 'Lower School', 'Middle School', 'Eighth Grade'];
+    let allRates = {};
+
+    async function loadRates() {
+      const res = await fetch('/api/fa-tuition-rates');
+      allRates = await res.json();
+      renderCards();
+    }
+
+    function renderCards() {
+      const container = document.getElementById('rateCards');
+      const years = Object.keys(allRates).sort().reverse();
+
+      // Populate copy-from dropdown
+      const sel = document.getElementById('copyFromSelect');
+      sel.innerHTML = '<option value="">— select year —</option>' +
+        years.map(y => `<option value="${y}">${y}</option>`).join('');
+
+      if (!years.length) {
+        container.innerHTML = '<div style="color:var(--muted);font-size:14px;padding:20px 0;">No rates configured yet. Add a year below.</div>';
+        return;
+      }
+
+      container.innerHTML = years.map(year => {
+        const rates = allRates[year] || {};
+        return `
+        <div class="card" id="card-${year.replace('-','_')}">
+          <div class="card-header">
+            <span class="card-title">School Year</span>
+            <span class="card-year">${year}</span>
+          </div>
+          <div class="card-body">
+            <div class="rates-grid">
+              ${DIVISIONS.map(div => `
+                <div class="rate-row">
+                  <span class="rate-label">${div}</span>
+                  <input type="text" inputmode="decimal" class="rate-input" id="rate-${year}-${div.replace(/ /g,'_')}"
+                    value="${rates[div] != null ? rates[div].toLocaleString('en-US', {minimumFractionDigits:0, maximumFractionDigits:0}) : ''}"
+                    placeholder="0">
+                </div>`).join('')}
+            </div>
+          </div>
+          <div class="card-footer">
+            <button class="btn btn-danger btn-sm" onclick="deleteYear('${year}')">Delete ${year}</button>
+            <div style="display:flex;align-items:center;gap:10px;">
+              <span class="save-feedback" id="feedback-${year.replace('-','_')}"></span>
+              <button class="btn btn-primary btn-sm" onclick="saveYear('${year}')">Save ${year} Rates</button>
+            </div>
+          </div>
+        </div>`;
+      }).join('');
+    }
+
+    async function saveYear(year) {
+      const rates = {};
+      for (const div of DIVISIONS) {
+        const el = document.getElementById(`rate-${year}-${div.replace(/ /g,'_')}`);
+        if (el) {
+          const val = el.value.replace(/,/g,'').replace(/\$/g,'').trim();
+          if (val) rates[div] = parseFloat(val);
+        }
+      }
+      const res = await fetch('/api/fa-tuition-rates', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({school_year: year, rates})
+      });
+      const data = await res.json();
+      if (res.ok) {
+        showToast(`${year} rates saved`, 'success');
+        const fb = document.getElementById(`feedback-${year.replace('-','_')}`);
+        if (fb) { fb.textContent = 'Saved ✓'; setTimeout(()=>fb.textContent='', 3000); }
+        allRates[year] = rates;
+      } else {
+        showToast(data.error || 'Error saving', 'error');
+      }
+    }
+
+    async function deleteYear(year) {
+      if (!confirm(`Delete all tuition rates for ${year}?`)) return;
+      const res = await fetch(`/api/fa-tuition-rates/${encodeURIComponent(year)}`, {method: 'DELETE'});
+      if (res.ok) {
+        showToast(`${year} rates deleted`, 'success');
+        delete allRates[year];
+        renderCards();
+      } else {
+        showToast('Error deleting', 'error');
+      }
+    }
+
+    function addNewYear() {
+      const year = document.getElementById('newYear').value.trim();
+      if (!year || !/^\d{4}-\d{2}$/.test(year)) {
+        showToast('Enter year in format YYYY-YY (e.g. 2027-28)', 'error');
+        return;
+      }
+      if (allRates[year]) {
+        showToast(`${year} already exists`, 'error');
+        return;
+      }
+      const copyFrom = document.getElementById('copyFromSelect').value;
+      allRates[year] = copyFrom && allRates[copyFrom] ? {...allRates[copyFrom]} : {};
+      renderCards();
+      document.getElementById('newYear').value = '';
+      // Scroll to new card
+      setTimeout(() => {
+        const card = document.getElementById(`card-${year.replace('-','_')}`);
+        if (card) card.scrollIntoView({behavior:'smooth', block:'center'});
+      }, 100);
+      showToast(`${year} added — fill in rates and save`, 'success');
+    }
+
+    function copyFromYear() {
+      const year = document.getElementById('newYear').value.trim();
+      const copyFrom = document.getElementById('copyFromSelect').value;
+      if (!year || !copyFrom || !allRates[copyFrom]) return;
+      // Pre-fill inputs if card already rendered
+      for (const div of DIVISIONS) {
+        const el = document.getElementById(`rate-${year}-${div.replace(/ /g,'_')}`);
+        if (el && allRates[copyFrom][div]) {
+          el.value = allRates[copyFrom][div].toLocaleString('en-US', {minimumFractionDigits:0});
+        }
+      }
+    }
+
+    function showToast(msg, type='') {
+      const t = document.getElementById('toast');
+      t.textContent = msg; t.className = 'toast show' + (type ? ' '+type : '');
+      setTimeout(() => t.className='toast', 3500);
+    }
+
+    loadRates();
+  </script>
+</body>
+</html>

@@ -164,6 +164,7 @@
   <div class="topbar-right">
     <a href="/billing-report">Billing Reports</a>
     <a href="/billing-rates">Billing Rates</a>
+    <a href="/financial-aid/tuition-rates">Tuition Rates</a>
   </div>
 </div>
 
@@ -342,6 +343,7 @@
   // ─── Boot ──────────────────────────────────────────────────────────────────
   async function boot() {
     await loadYears();
+    await loadTuitionRates(currentYear);
     await loadData();
   }
 
@@ -365,6 +367,7 @@
   async function switchYear(year) {
     currentYear = year;
     renderYearTabs();
+    await loadTuitionRates(year);
     await loadData();
   }
 
@@ -557,7 +560,15 @@
 
   // ─── Edit modal ────────────────────────────────────────────────────────────
   const SCHOOLS    = ['Kindergarten','Lower School','Middle School','Eighth Grade'];
-  const TUITION_JS = {'Kindergarten':19338,'Lower School':24200,'Middle School':26299,'Eighth Grade':27017};
+  let TUITION_JS = {'Kindergarten':19338,'Lower School':24200,'Middle School':26299,'Eighth Grade':27017};
+
+  async function loadTuitionRates(year) {
+    try {
+      const res = await fetch('/api/fa-tuition-rates');
+      const all = await res.json();
+      if (all[year]) TUITION_JS = all[year];
+    } catch(e) { /* keep defaults */ }
+  }
 
   function openEditModal(familyId) {
     const fam = allFamilies.find(f=>f.id===familyId);
