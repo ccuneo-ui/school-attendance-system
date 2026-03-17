@@ -2941,6 +2941,41 @@ def seed_financial_aid():
 # ONE-TIME MIGRATIONS
 # ============================================
 
+@app.route('/admin/update-tuition-from-rates', methods=['POST'])
+@login_required
+def update_tuition_from_rates():
+    """
+    Update all student tuition values for a given school year
+    based on current fa_tuition_rates entries.
+    """
+    data = request.json or {}
+    school_year = data.get('school_year', '2026-27').strip()
+    tuition_map = get_tuition_map(school_year)
+    if not tuition_map:
+        return jsonify({'error': f'No tuition rates found for {school_year}'}), 400
+    conn = get_db_connection()
+    try:
+        updated = 0
+        with conn.cursor() as cur:
+            for division, tuition in tuition_map.items():
+                cur.execute("""
+                    UPDATE financial_aid_students s
+                    SET tuition=%s, updated_at=NOW()
+                    FROM financial_aid_families f
+                    WHERE s.family_id=f.id
+                      AND f.school_year=%s
+                      AND s.school=%s
+                """, (tuition, school_year, division))
+                updated += cur.rowcount
+        conn.commit()
+        return jsonify({'ok': True, 'updated': updated, 'school_year': school_year, 'rates': tuition_map})
+    except Exception as e:
+        conn.rollback()
+        return jsonify({'error': str(e)}), 500
+    finally:
+        conn.close()
+
+
 @app.route('/admin/migrate-financial-aid', methods=['POST'])
 @login_required
 def migrate_financial_aid():
