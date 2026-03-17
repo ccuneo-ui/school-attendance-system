@@ -29,10 +29,8 @@
     .page-header-right { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
     .year-bar { display: flex; align-items: center; gap: 10px; margin-bottom: 24px; flex-wrap: wrap; }
     .year-label { font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
-    .year-tabs { display: flex; gap: 4px; }
-    .year-tab { padding: 6px 16px; border-radius: 6px; font-size: 13px; font-weight: 500; cursor: pointer; border: 1px solid var(--border); background: var(--white); color: var(--muted); font-family: 'DM Sans', sans-serif; transition: all 0.15s; }
-    .year-tab.active { background: var(--burgundy); color: var(--white); border-color: var(--burgundy); }
-    .year-tab:hover:not(.active) { background: var(--light-bg); }
+    .year-select { padding: 7px 14px; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer; border: 1px solid var(--border); background: var(--white); color: var(--navy); font-family: 'DM Sans', sans-serif; appearance: none; -webkit-appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%236b7280' d='M6 8L1 3h10z'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 10px center; padding-right: 28px; }
+    .year-select:focus { outline: none; border-color: var(--navy); }
     .btn-new-season { padding: 6px 14px; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; border: 1px solid var(--gold); background: var(--white); color: var(--gold); font-family: 'DM Sans', sans-serif; transition: all 0.15s; }
     .btn-new-season:hover { background: var(--yellow-bg); }
     .summary-bar { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-bottom: 24px; }
@@ -184,7 +182,7 @@
 
   <div class="year-bar">
     <span class="year-label">School Year:</span>
-    <div class="year-tabs" id="yearTabs"></div>
+    <select class="year-select" id="yearSelect" onchange="switchYear(this.value)"></select>
     <button class="btn-new-season" onclick="openNewSeasonModal()">+ Start New Season</button>
     <button class="btn btn-danger btn-sm" onclick="clearCurrentYear()" id="clearYearBtn" title="Delete all families for this year">🗑 Clear Year</button>
   </div>
@@ -358,8 +356,9 @@
   }
 
   function renderYearTabs() {
-    document.getElementById('yearTabs').innerHTML = allYears.map(y =>
-      `<button class="year-tab ${y===currentYear?'active':''}" onclick="switchYear('${y}')">${y}</button>`
+    const sel = document.getElementById('yearSelect');
+    sel.innerHTML = allYears.map(y =>
+      `<option value="${y}" ${y===currentYear?'selected':''}>${y}</option>`
     ).join('');
     document.getElementById('pageSubtitle').textContent = `${currentYear} School Year · Admin only`;
   }

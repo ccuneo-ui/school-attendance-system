@@ -97,9 +97,18 @@
     let allRates = {};
 
     async function loadRates() {
-      const res = await fetch('/api/fa-tuition-rates');
-      allRates = await res.json();
-      renderCards();
+      try {
+        const res = await fetch('/api/fa-tuition-rates');
+        const data = await res.json();
+        if (data.error) {
+          document.getElementById('rateCards').innerHTML = `<div style="color:var(--red);padding:20px 0;">Error loading rates: ${data.error}<br><br>Try running the migration: open the browser console and run:<br><code>fetch('/admin/migrate-financial-aid',{method:'POST'}).then(r=>r.json()).then(console.log)</code></div>`;
+          return;
+        }
+        allRates = data;
+        renderCards();
+      } catch(e) {
+        document.getElementById('rateCards').innerHTML = `<div style="color:var(--red);padding:20px 0;">Failed to load rates. Check console.</div>`;
+      }
     }
 
     function renderCards() {
@@ -186,18 +195,17 @@
     function addNewYear() {
       const year = document.getElementById('newYear').value.trim();
       if (!year || !/^\d{4}-\d{2}$/.test(year)) {
-        showToast('Enter year in format YYYY-YY (e.g. 2027-28)', 'error');
+        showToast('Enter year in format YYYY-YY (e.g. 2026-27)', 'error');
         return;
       }
       if (allRates[year]) {
-        showToast(`${year} already exists`, 'error');
+        showToast(`${year} already exists — edit it directly`, 'error');
         return;
       }
       const copyFrom = document.getElementById('copyFromSelect').value;
       allRates[year] = copyFrom && allRates[copyFrom] ? {...allRates[copyFrom]} : {};
       renderCards();
       document.getElementById('newYear').value = '';
-      // Scroll to new card
       setTimeout(() => {
         const card = document.getElementById(`card-${year.replace('-','_')}`);
         if (card) card.scrollIntoView({behavior:'smooth', block:'center'});
