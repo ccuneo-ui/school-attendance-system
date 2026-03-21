@@ -218,6 +218,76 @@ def init_db():
                         "INSERT INTO billing_rates (rate_key, rate_value, label, unit, effective_from) VALUES (%s,%s,%s,%s,%s) ON CONFLICT DO NOTHING",
                         (key, val, label, unit, '2025-09-01')
                     )
+            # ── Households, Parents, and linking tables ──
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS households (
+                    household_id   SERIAL PRIMARY KEY,
+                    family_name    TEXT NOT NULL,
+                    address_line_1 TEXT,
+                    address_line_2 TEXT,
+                    city           TEXT,
+                    state          TEXT,
+                    zip            TEXT,
+                    primary_phone  TEXT,
+                    primary_email  TEXT,
+                    status         TEXT NOT NULL DEFAULT 'active',
+                    billing_notes  TEXT,
+                    created_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS parents (
+                    parent_id         SERIAL PRIMARY KEY,
+                    first_name        TEXT NOT NULL,
+                    last_name         TEXT NOT NULL,
+                    email             TEXT,
+                    phone             TEXT,
+                    relationship_type TEXT,
+                    can_pickup        BOOLEAN DEFAULT TRUE,
+                    portal_status     TEXT NOT NULL DEFAULT 'inactive',
+                    password_hash     TEXT,
+                    email_verified    BOOLEAN DEFAULT FALSE,
+                    last_login        TIMESTAMP,
+                    notes             TEXT,
+                    created_at        TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at        TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS household_members (
+                    household_id INTEGER NOT NULL REFERENCES households(household_id) ON DELETE CASCADE,
+                    parent_id    INTEGER NOT NULL REFERENCES parents(parent_id) ON DELETE CASCADE,
+                    role         TEXT NOT NULL DEFAULT 'primary',
+                    PRIMARY KEY (household_id, parent_id)
+                )
+            """)
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS student_households (
+                    student_id   INTEGER NOT NULL REFERENCES students(student_id) ON DELETE CASCADE,
+                    household_id INTEGER NOT NULL REFERENCES households(household_id) ON DELETE CASCADE,
+                    is_primary   BOOLEAN DEFAULT TRUE,
+                    custody_notes TEXT,
+                    PRIMARY KEY (student_id, household_id)
+                )
+            """)
+            # Migrate: add parent_id to staff if missing (for staff who are also parents)
+            cur.execute("""
+                SELECT column_name FROM information_schema.columns
+                WHERE table_name='staff' AND column_name='parent_id'
+            """)
+            if not cur.fetchone():
+                cur.execute("ALTER TABLE staff ADD COLUMN parent_id INTEGER REFERENCES parents(parent_id) ON DELETE SET NULL")
+            # Migrate: add household_id to financial_aid_families if missing
+            cur.execute("""
+                SELECT column_name FROM information_schema.columns
+                WHERE table_name='financial_aid_families' AND column_name='household_id'
+            """)
+            if not cur.fetchone():
+                cur.execute("""
+                    ALTER TABLE financial_aid_families ADD COLUMN household_id INTEGER
+                    REFERENCES households(household_id) ON DELETE SET NULL
+                """)
         conn.commit()
         print("DB init OK")
     except Exception as e:
@@ -1464,7 +1534,9 @@ def _build_backup_json():
             "students", "staff", "programs", "enrollments",
             "attendance_records", "mcard_charges", "electives",
             "daily_dismissal", "dismissal_today", "program_attendance",
-            "aftercare_attendance", "billing_rates"
+            "aftercare_attendance", "billing_rates",
+            "households", "parents", "household_members",
+            "student_households"
         ]
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
             for table in tables:
