@@ -2017,6 +2017,15 @@ CREATE TABLE IF NOT EXISTS financial_aid_students (
 """
 
 TUITION_MAP = {
+    'PreK - 3 Half Days': 7980,
+    'PreK - 4 Half Days': 10320,
+    'PreK - 5 Half Days': 11580,
+    'PreK - 3 Extended': 9900,
+    'PreK - 4 Extended': 12780,
+    'PreK - 5 Extended': 14340,
+    'PreK - 3 Full': 11760,
+    'PreK - 4 Full': 15240,
+    'PreK - 5 Full': 17460,
     'Kindergarten': 19338,
     'Lower School': 24200,
     'Middle School': 26299,
@@ -2622,7 +2631,15 @@ def api_financial_aid_upload():
     tuition_map = get_tuition_map(school_year)
 
     # Grade -> Mizzentop division mapping
+    # Note: PreK students (JPK/SPK) map to 'PreK - 5 Full' as default;
+    # actual schedule should be set per-student in financial aid.
     GRADE_TO_DIVISION = {
+        'pre-k':         'PreK - 5 Full',
+        'prek':          'PreK - 5 Full',
+        'junior pre-k':  'PreK - 5 Full',
+        'senior pre-k':  'PreK - 5 Full',
+        'jpk':           'PreK - 5 Full',
+        'spk':           'PreK - 5 Full',
         'kindergarten':  'Kindergarten',
         'first grade':   'Lower School',
         'second grade':  'Lower School',
@@ -3637,10 +3654,28 @@ def migrate_financial_aid():
             cur.execute("SELECT COUNT(*) FROM fa_tuition_rates")
             if cur.fetchone()[0] == 0:
                 rates = [
+                    ('2025-26', 'PreK - 3 Half Days', 7980),
+                    ('2025-26', 'PreK - 4 Half Days', 10320),
+                    ('2025-26', 'PreK - 5 Half Days', 11580),
+                    ('2025-26', 'PreK - 3 Extended', 9900),
+                    ('2025-26', 'PreK - 4 Extended', 12780),
+                    ('2025-26', 'PreK - 5 Extended', 14340),
+                    ('2025-26', 'PreK - 3 Full', 11760),
+                    ('2025-26', 'PreK - 4 Full', 15240),
+                    ('2025-26', 'PreK - 5 Full', 17460),
                     ('2025-26', 'Kindergarten', 19338),
                     ('2025-26', 'Lower School', 24200),
                     ('2025-26', 'Middle School', 26299),
                     ('2025-26', 'Eighth Grade', 27017),
+                    ('2026-27', 'PreK - 3 Half Days', 8459),
+                    ('2026-27', 'PreK - 4 Half Days', 10939),
+                    ('2026-27', 'PreK - 5 Half Days', 12275),
+                    ('2026-27', 'PreK - 3 Extended', 10494),
+                    ('2026-27', 'PreK - 4 Extended', 13547),
+                    ('2026-27', 'PreK - 5 Extended', 15200),
+                    ('2026-27', 'PreK - 3 Full', 12466),
+                    ('2026-27', 'PreK - 4 Full', 16154),
+                    ('2026-27', 'PreK - 5 Full', 18508),
                     ('2026-27', 'Kindergarten', 20498),
                     ('2026-27', 'Lower School', 25651),
                     ('2026-27', 'Middle School', 27877),
