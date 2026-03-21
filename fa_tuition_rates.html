@@ -37,8 +37,10 @@
     .card-year { font-size: 12px; color: var(--muted); font-weight: 500; background: var(--bg); padding: 3px 10px; border-radius: 20px; }
     .card-body { padding: 20px; }
     .rates-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .rates-section-label { grid-column: 1 / -1; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--muted); padding: 8px 0 2px; border-bottom: 1px solid var(--border); margin-top: 4px; }
+    .rates-section-label:first-child { margin-top: 0; }
     .rate-row { display: flex; align-items: center; gap: 12px; }
-    .rate-label { font-size: 13px; font-weight: 600; min-width: 130px; }
+    .rate-label { font-size: 13px; font-weight: 600; min-width: 160px; }
     .rate-input { flex: 1; padding: 8px 12px; border: 1px solid var(--border); border-radius: 7px; font-size: 14px; font-family: inherit; color: var(--navy); background: var(--white); }
     .rate-input:focus { outline: none; border-color: var(--navy); }
     .card-footer { padding: 14px 20px; border-top: 1px solid var(--border); display: flex; gap: 10px; align-items: center; justify-content: space-between; }
@@ -93,7 +95,12 @@
   <div class="toast" id="toast"></div>
 
   <script>
-    const DIVISIONS = ['Kindergarten', 'Lower School', 'Middle School', 'Eighth Grade'];
+    const DIVISIONS = [
+      'PreK - 3 Half Days', 'PreK - 4 Half Days', 'PreK - 5 Half Days',
+      'PreK - 3 Extended', 'PreK - 4 Extended', 'PreK - 5 Extended',
+      'PreK - 3 Full', 'PreK - 4 Full', 'PreK - 5 Full',
+      'Kindergarten', 'Lower School', 'Middle School', 'Eighth Grade'
+    ];
     let allRates = {};
 
     async function loadRates() {
@@ -135,13 +142,7 @@
           </div>
           <div class="card-body">
             <div class="rates-grid">
-              ${DIVISIONS.map(div => `
-                <div class="rate-row">
-                  <span class="rate-label">${div}</span>
-                  <input type="text" inputmode="decimal" class="rate-input" id="rate-${year}-${div.replace(/ /g,'_')}"
-                    value="${rates[div] != null ? rates[div].toLocaleString('en-US', {minimumFractionDigits:0, maximumFractionDigits:0}) : ''}"
-                    placeholder="0">
-                </div>`).join('')}
+              ${buildRatesHTML(year, rates)}
             </div>
           </div>
           <div class="card-footer">
@@ -224,6 +225,30 @@
           el.value = allRates[copyFrom][div].toLocaleString('en-US', {minimumFractionDigits:0});
         }
       }
+    }
+
+    function buildRatesHTML(year, rates) {
+      let html = '<div class="rates-section-label">PreK (JPK / SPK)</div>';
+      const prekDivs = DIVISIONS.filter(d => d.startsWith('PreK'));
+      const otherDivs = DIVISIONS.filter(d => !d.startsWith('PreK'));
+      for (const div of prekDivs) {
+        const val = rates[div] != null ? rates[div].toLocaleString('en-US', {minimumFractionDigits:0, maximumFractionDigits:0}) : '';
+        html += `<div class="rate-row">
+          <span class="rate-label">${div.replace('PreK - ','')}</span>
+          <input type="text" inputmode="decimal" class="rate-input" id="rate-${year}-${div.replace(/ /g,'_')}"
+            value="${val}" placeholder="0">
+        </div>`;
+      }
+      html += '<div class="rates-section-label">K – 8</div>';
+      for (const div of otherDivs) {
+        const val = rates[div] != null ? rates[div].toLocaleString('en-US', {minimumFractionDigits:0, maximumFractionDigits:0}) : '';
+        html += `<div class="rate-row">
+          <span class="rate-label">${div}</span>
+          <input type="text" inputmode="decimal" class="rate-input" id="rate-${year}-${div.replace(/ /g,'_')}"
+            value="${val}" placeholder="0">
+        </div>`;
+      }
+      return html;
     }
 
     function showToast(msg, type='') {
