@@ -39,6 +39,9 @@
     .summary-card .value { font-size: 20px; font-weight: 700; color: var(--navy); }
     .summary-card .value.green { color: var(--green); }
     .summary-card .value.gold { color: var(--gold); }
+    .aid-breakdown { margin-top: 8px; display: flex; flex-direction: column; gap: 3px; }
+    .breakdown-item { display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); }
+    .breakdown-label { font-weight: 500; }
     .filters-row { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }
     .filter-input { padding: 8px 12px; border: 1px solid var(--border); border-radius: 8px; font-family: 'DM Sans', sans-serif; font-size: 13px; color: var(--navy); background: var(--white); outline: none; }
     .filter-input:focus { border-color: var(--navy); }
@@ -191,7 +194,7 @@
     <div class="summary-card"><div class="label">Families</div><div class="value" id="sumFamilies">—</div></div>
     <div class="summary-card"><div class="label">Students</div><div class="value" id="sumStudents">—</div></div>
     <div class="summary-card"><div class="label">FAST Recommended</div><div class="value" id="sumFast">—</div></div>
-    <div class="summary-card"><div class="label">Total Aid Awarded</div><div class="value green" id="sumAwarded">—</div></div>
+    <div class="summary-card"><div class="label">Total Aid Awarded</div><div class="value green" id="sumAwarded">—</div><div class="aid-breakdown" id="sumBreakdown"></div></div>
     <div class="summary-card"><div class="label">Contracts Sent</div><div class="value green" id="sumContracts">—</div></div>
     <div class="summary-card"><div class="label">Pending</div><div class="value gold" id="sumPending">—</div></div>
   </div>
@@ -401,13 +404,14 @@
 
   function updateSummary() {
     let fams=0,studs=0,req=0,fast=0,contracts=0,pending=0,awarded=0;
+    const byType = {mds:0, remission_mizzentop:0, remission_affiliate:0, sibling:0};
     allFamilies.filter(f=>f.status!=='inactive').forEach(f=>{
       fams++;
       f.students.forEach(s=>{
         studs++;
-        if (s.aid_type) req+=parseFloat(s.mds_aid_amount)||0;
+        const amt = parseFloat(s.mds_aid_amount)||0;
+        if (s.aid_type) { req+=amt; awarded+=amt; byType[s.aid_type]=(byType[s.aid_type]||0)+amt; }
         fast+=parseFloat(s.fast_aid_rec)||0;
-        if (s.aid_type) awarded+=parseFloat(s.mds_aid_amount)||0;
       });
       if (f.contract_sent) contracts++; else pending++;
     });
@@ -417,6 +421,12 @@
     document.getElementById('sumContracts').textContent = contracts;
     document.getElementById('sumPending').textContent   = pending;
     document.getElementById('sumAwarded').textContent   = '$'+Math.round(awarded).toLocaleString();
+    const typeLabels = {mds:'MDS Aid', remission_mizzentop:'Remission 70%', remission_affiliate:'Remission 50%', sibling:'Sibling Discount'};
+    const breakdownHtml = Object.entries(byType)
+      .filter(([,v])=>v>0)
+      .map(([k,v])=>`<span class="breakdown-item"><span class="breakdown-label">${typeLabels[k]}</span> $${Math.round(v).toLocaleString()}</span>`)
+      .join('');
+    document.getElementById('sumBreakdown').innerHTML = breakdownHtml;
   }
 
   function setFilter(type, val, btn) {
