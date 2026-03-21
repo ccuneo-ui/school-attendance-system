@@ -2654,19 +2654,18 @@ def api_financial_aid_upload():
     def parse_students(grade_str, first_str):
         """
         Parse comma-separated ISMFast grades and first names into
-        a list of (first_name, grade_label, division) tuples, deduped by division.
+        a list of (first_name, grade_label, division) tuples.
+        Each student gets their own entry regardless of shared division.
         """
         if not grade_str:
             return []
         grades  = [g.strip() for g in grade_str.split(',')]
         firsts  = [f.strip().title() for f in first_str.split(',')] if first_str else []
-        seen_div = set()
         result = []
         for i, g in enumerate(grades):
             div = GRADE_TO_DIVISION.get(g.lower())
-            if not div or div in seen_div:
+            if not div:
                 continue
-            seen_div.add(div)
             fname = firsts[i] if i < len(firsts) else None
             result.append((fname, g.title(), div))
         return result
