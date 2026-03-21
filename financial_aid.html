@@ -201,6 +201,7 @@
     <span class="filter-label">Division:</span>
     <div class="filter-toggle">
       <button class="active" onclick="setFilter('division','all',this)">All</button>
+      <button onclick="setFilter('division','PreK',this)">PreK</button>
       <button onclick="setFilter('division','Kindergarten',this)">K</button>
       <button onclick="setFilter('division','Lower School',this)">Lower</button>
       <button onclick="setFilter('division','Middle School',this)">Middle</button>
@@ -433,7 +434,13 @@
       if (filters.status==='pending'  &&  f.contract_sent) return false;
       if (filters.activeFilter==='active'   && f.status==='inactive') return false;
       if (filters.activeFilter==='inactive' && f.status!=='inactive') return false;
-      if (filters.division!=='all' && !f.students.some(s=>s.school===filters.division)) return false;
+      if (filters.division!=='all') {
+        if (filters.division==='PreK') {
+          if (!f.students.some(s=>s.school && s.school.startsWith('PreK'))) return false;
+        } else {
+          if (!f.students.some(s=>s.school===filters.division)) return false;
+        }
+      }
       return true;
     });
     filtered.sort((a,b) => {
@@ -558,8 +565,19 @@
   }
 
   // ─── Edit modal ────────────────────────────────────────────────────────────
-  const SCHOOLS    = ['Kindergarten','Lower School','Middle School','Eighth Grade'];
-  let TUITION_JS = {'Kindergarten':19338,'Lower School':24200,'Middle School':26299,'Eighth Grade':27017};
+  const PREK_SCHEDULES = [
+    'PreK - 3 Half Days','PreK - 4 Half Days','PreK - 5 Half Days',
+    'PreK - 3 Extended','PreK - 4 Extended','PreK - 5 Extended',
+    'PreK - 3 Full','PreK - 4 Full','PreK - 5 Full'
+  ];
+  const SCHOOLS_K8  = ['Kindergarten','Lower School','Middle School','Eighth Grade'];
+  const SCHOOLS     = [...PREK_SCHEDULES, ...SCHOOLS_K8];
+  let TUITION_JS = {
+    'PreK - 3 Half Days':7980,'PreK - 4 Half Days':10320,'PreK - 5 Half Days':11580,
+    'PreK - 3 Extended':9900,'PreK - 4 Extended':12780,'PreK - 5 Extended':14340,
+    'PreK - 3 Full':11760,'PreK - 4 Full':15240,'PreK - 5 Full':17460,
+    'Kindergarten':19338,'Lower School':24200,'Middle School':26299,'Eighth Grade':27017
+  };
 
   async function loadTuitionRates(year) {
     try {
@@ -635,7 +653,12 @@
   }
 
   function renderStudentCard(s, i) {
-    const schoolOpts = SCHOOLS.map(sc=>`<option value="${sc}" ${s.school===sc?'selected':''}>${sc}</option>`).join('');
+    const isPreK = isPreKGrade(s.grade) || (s.school && s.school.startsWith('PreK'));
+    const divChoices = isPreK ? PREK_SCHEDULES : SCHOOLS_K8;
+    const schoolOpts = divChoices.map(sc=>{
+      const label = isPreK ? sc.replace('PreK - ','') : sc;
+      return `<option value="${sc}" ${s.school===sc?'selected':''}>${label}</option>`;
+    }).join('');
     const f = (v) => v!=null?v:'';
     return `
     <div class="student-edit-card" id="sedit-${i}">
@@ -652,7 +675,7 @@
           <label class="form-label">Grade</label>
           <select class="form-select" id="stu-grade-${i}" onchange="updateStu(${i},'grade',this.value);autoDivision(${i},this.value)">
             <option value="">—</option>
-            ${['Kindergarten','First Grade','Second Grade','Third Grade','Fourth Grade','Fifth Grade','Sixth Grade','Seventh Grade','Eighth Grade'].map(g=>`<option value="${g}" ${s.grade===g?'selected':''}>${g}</option>`).join('')}
+            ${['JPK','SPK','Kindergarten','First Grade','Second Grade','Third Grade','Fourth Grade','Fifth Grade','Sixth Grade','Seventh Grade','Eighth Grade'].map(g=>`<option value="${g}" ${s.grade===g?'selected':''}>${g}</option>`).join('')}
           </select>
         </div>
         <div class="form-group full">
@@ -826,6 +849,8 @@
   }
 
   const GRADE_TO_DIV = {
+    'JPK':'PreK - 5 Full',
+    'SPK':'PreK - 5 Full',
     'Kindergarten':'Kindergarten',
     'First Grade':'Lower School','Second Grade':'Lower School',
     'Third Grade':'Lower School','Fourth Grade':'Lower School',
@@ -833,9 +858,26 @@
     'Eighth Grade':'Eighth Grade'
   };
 
+  function isPreKGrade(grade) {
+    return grade === 'JPK' || grade === 'SPK';
+  }
+
+  function rebuildDivisionDropdown(i, grade, currentSchool) {
+    const divSelect = document.getElementById(`stu-division-${i}`);
+    if (!divSelect) return;
+    let options;
+    if (isPreKGrade(grade)) {
+      options = PREK_SCHEDULES.map(sc => `<option value="${sc}" ${currentSchool===sc?'selected':''}>${sc.replace('PreK - ','')}</option>`).join('');
+    } else {
+      options = SCHOOLS_K8.map(sc => `<option value="${sc}" ${currentSchool===sc?'selected':''}>${sc}</option>`).join('');
+    }
+    divSelect.innerHTML = options;
+  }
+
   function autoDivision(i, grade) {
     const div = GRADE_TO_DIV[grade];
     if (!div) return;
+    rebuildDivisionDropdown(i, grade, div);
     const divSelect = document.getElementById(`stu-division-${i}`);
     if (divSelect) { divSelect.value = div; updateStu(i,'school',div); autoTuition(i,div); renderAidAmountField(i); calcNetTuition(i); }
   }
