@@ -3010,6 +3010,487 @@ def seed_financial_aid():
 
 
 # ============================================
+# HOUSEHOLDS API
+# ============================================
+
+@app.route("/api/households")
+@login_required
+def get_households():
+    status = request.args.get("status", "")
+    conn = get_db_connection()
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            if status:
+                cur.execute("SELECT * FROM households WHERE status = %s ORDER BY family_name", (status,))
+            else:
+                cur.execute("SELECT * FROM households ORDER BY family_name")
+            households = fa(cur)
+            # Attach students and parents for each household
+            for h in households:
+                cur.execute("""
+                    SELECT s.student_id, s.first_name, s.last_name, s.grade, s.status,
+                           sh.is_primary, sh.custody_notes
+                    FROM student_households sh
+                    JOIN students s ON s.student_id = sh.student_id
+                    WHERE sh.household_id = %s
+                    ORDER BY s.last_name, s.first_name
+                """, (h["household_id"],))
+                h["students"] = fa(cur)
+                cur.execute("""
+                    SELECT p.parent_id, p.first_name, p.last_name, p.email, p.phone,
+                           p.relationship_type, p.can_pickup, hm.role
+                    FROM household_members hm
+                    JOIN parents p ON p.parent_id = hm.parent_id
+                    WHERE hm.household_id = %s
+                    ORDER BY hm.role, p.last_name
+                """, (h["household_id"],))
+                h["parents"] = fa(cur)
+        return jsonify(households)
+    finally:
+        conn.close()
+
+
+@app.route("/api/households/<int:household_id>")
+@login_required
+def get_household(household_id):
+    conn = get_db_connection()
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute("SELECT * FROM households WHERE household_id = %s", (household_id,))
+            h = fo(cur)
+            if not h:
+                return jsonify({"error": "Household not found"}), 404
+            cur.execute("""
+                SELECT s.student_id, s.first_name, s.last_name, s.grade, s.status,
+                       sh.is_primary, sh.custody_notes
+                FROM student_households sh
+                JOIN students s ON s.student_id = sh.student_id
+                WHERE sh.household_id = %s
+                ORDER BY s.last_name, s.first_name
+            """, (household_id,))
+            h["students"] = fa(cur)
+            cur.execute("""
+                SELECT p.parent_id, p.first_name, p.last_name, p.email, p.phone,
+                       p.relationship_type, p.can_pickup, hm.role
+                FROM household_members hm
+                JOIN parents p ON p.parent_id = hm.parent_id
+                WHERE hm.household_id = %s
+                ORDER BY hm.role, p.last_name
+            """, (household_id,))
+            h["parents"] = fa(cur)
+        return jsonify(h)
+    finally:
+        conn.close()
+
+
+@app.route("/api/households", methods=["POST"])
+@login_required
+def create_household():
+    data = request.json or {}
+    if not data.get("family_name"):
+        return jsonify({"error": "family_name is required"}), 400
+    conn = get_db_connection()
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute("""
+                INSERT INTO households (family_name, address_line_1, address_line_2,
+                    city, state, zip, primary_phone, primary_email, status, billing_notes)
+                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                RETURNING *
+            """, (
+                data["family_name"],
+                data.get("address_line_1", ""),
+                data.get("address_line_2", ""),
+                data.get("city", ""),
+                data.get("state", ""),
+                data.get("zip", ""),
+                data.get("primary_phone", ""),
+                data.get("primary_email", ""),
+                data.get("status", "active"),
+                data.get("billing_notes", ""),
+            ))
+            household = fo(cur)
+        conn.commit()
+        return jsonify(household), 201
+    except Exception as e:
+        conn.rollback()
+        return jsonify({"error": str(e)}), 500
+    finally:
+        conn.close()
+
+
+@app.route("/api/households/<int:household_id>", methods=["PUT"])
+@login_required
+def update_household(household_id):
+    data = request.json or {}
+    conn = get_db_connection()
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute("""
+                UPDATE households SET
+                    family_name    = COALESCE(%s, family_name),
+                    address_line_1 = COALESCE(%s, address_line_1),
+                    address_line_2 = COALESCE(%s, address_line_2),
+                    city           = COALESCE(%s, city),
+                    state          = COALESCE(%s, state),
+                    zip            = COALESCE(%s, zip),
+                    primary_phone  = COALESCE(%s, primary_phone),
+                    primary_email  = COALESCE(%s, primary_email),
+                    status         = COALESCE(%s, status),
+                    billing_notes  = COALESCE(%s, billing_notes),
+                    updated_at     = CURRENT_TIMESTAMP
+                WHERE household_id = %s
+                RETURNING *
+            """, (
+                data.get("family_name"),
+                data.get("address_line_1"),
+                data.get("address_line_2"),
+                data.get("city"),
+                data.get("state"),
+                data.get("zip"),
+                data.get("primary_phone"),
+                data.get("primary_email"),
+                data.get("status"),
+                data.get("billing_notes"),
+                household_id,
+            ))
+            household = fo(cur)
+            if not household:
+                return jsonify({"error": "Household not found"}), 404
+        conn.commit()
+        return jsonify(household)
+    except Exception as e:
+        conn.rollback()
+        return jsonify({"error": str(e)}), 500
+    finally:
+        conn.close()
+
+
+@app.route("/api/households/<int:household_id>", methods=["DELETE"])
+@superadmin_required
+def delete_household(household_id):
+    conn = get_db_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM households WHERE household_id = %s", (household_id,))
+            if cur.rowcount == 0:
+                return jsonify({"error": "Household not found"}), 404
+        conn.commit()
+        return jsonify({"success": True})
+    except Exception as e:
+        conn.rollback()
+        return jsonify({"error": str(e)}), 500
+    finally:
+        conn.close()
+
+
+# ============================================
+# PARENTS API
+# ============================================
+
+@app.route("/api/parents")
+@login_required
+def get_parents():
+    conn = get_db_connection()
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute("""
+                SELECT p.*,
+                    COALESCE(json_agg(json_build_object(
+                        'household_id', h.household_id,
+                        'family_name', h.family_name,
+                        'role', hm.role
+                    )) FILTER (WHERE h.household_id IS NOT NULL), '[]') AS households
+                FROM parents p
+                LEFT JOIN household_members hm ON hm.parent_id = p.parent_id
+                LEFT JOIN households h ON h.household_id = hm.household_id
+                GROUP BY p.parent_id
+                ORDER BY p.last_name, p.first_name
+            """)
+            parents = fa(cur)
+        return jsonify(parents)
+    finally:
+        conn.close()
+
+
+@app.route("/api/parents/<int:parent_id>")
+@login_required
+def get_parent(parent_id):
+    conn = get_db_connection()
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute("SELECT * FROM parents WHERE parent_id = %s", (parent_id,))
+            parent = fo(cur)
+            if not parent:
+                return jsonify({"error": "Parent not found"}), 404
+            cur.execute("""
+                SELECT h.household_id, h.family_name, h.status, hm.role
+                FROM household_members hm
+                JOIN households h ON h.household_id = hm.household_id
+                WHERE hm.parent_id = %s
+            """, (parent_id,))
+            parent["households"] = fa(cur)
+        return jsonify(parent)
+    finally:
+        conn.close()
+
+
+@app.route("/api/parents", methods=["POST"])
+@login_required
+def create_parent():
+    data = request.json or {}
+    if not data.get("first_name") or not data.get("last_name"):
+        return jsonify({"error": "first_name and last_name are required"}), 400
+    conn = get_db_connection()
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute("""
+                INSERT INTO parents (first_name, last_name, email, phone,
+                    relationship_type, can_pickup, notes)
+                VALUES (%s,%s,%s,%s,%s,%s,%s)
+                RETURNING *
+            """, (
+                data["first_name"],
+                data["last_name"],
+                data.get("email", ""),
+                data.get("phone", ""),
+                data.get("relationship_type", ""),
+                data.get("can_pickup", True),
+                data.get("notes", ""),
+            ))
+            parent = fo(cur)
+        conn.commit()
+        return jsonify(parent), 201
+    except Exception as e:
+        conn.rollback()
+        return jsonify({"error": str(e)}), 500
+    finally:
+        conn.close()
+
+
+@app.route("/api/parents/<int:parent_id>", methods=["PUT"])
+@login_required
+def update_parent(parent_id):
+    data = request.json or {}
+    conn = get_db_connection()
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute("""
+                UPDATE parents SET
+                    first_name        = COALESCE(%s, first_name),
+                    last_name         = COALESCE(%s, last_name),
+                    email             = COALESCE(%s, email),
+                    phone             = COALESCE(%s, phone),
+                    relationship_type = COALESCE(%s, relationship_type),
+                    can_pickup        = COALESCE(%s, can_pickup),
+                    notes             = COALESCE(%s, notes),
+                    updated_at        = CURRENT_TIMESTAMP
+                WHERE parent_id = %s
+                RETURNING *
+            """, (
+                data.get("first_name"),
+                data.get("last_name"),
+                data.get("email"),
+                data.get("phone"),
+                data.get("relationship_type"),
+                data.get("can_pickup"),
+                data.get("notes"),
+                parent_id,
+            ))
+            parent = fo(cur)
+            if not parent:
+                return jsonify({"error": "Parent not found"}), 404
+        conn.commit()
+        return jsonify(parent)
+    except Exception as e:
+        conn.rollback()
+        return jsonify({"error": str(e)}), 500
+    finally:
+        conn.close()
+
+
+@app.route("/api/parents/<int:parent_id>", methods=["DELETE"])
+@superadmin_required
+def delete_parent(parent_id):
+    conn = get_db_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM parents WHERE parent_id = %s", (parent_id,))
+            if cur.rowcount == 0:
+                return jsonify({"error": "Parent not found"}), 404
+        conn.commit()
+        return jsonify({"success": True})
+    except Exception as e:
+        conn.rollback()
+        return jsonify({"error": str(e)}), 500
+    finally:
+        conn.close()
+
+
+# ============================================
+# HOUSEHOLD LINKING API (students & parents)
+# ============================================
+
+@app.route("/api/households/<int:household_id>/students", methods=["POST"])
+@login_required
+def link_student_to_household(household_id):
+    """Add a student to a household"""
+    data = request.json or {}
+    student_id = data.get("student_id")
+    if not student_id:
+        return jsonify({"error": "student_id is required"}), 400
+    conn = get_db_connection()
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute("""
+                INSERT INTO student_households (student_id, household_id, is_primary, custody_notes)
+                VALUES (%s, %s, %s, %s)
+                ON CONFLICT (student_id, household_id) DO UPDATE
+                    SET is_primary = EXCLUDED.is_primary, custody_notes = EXCLUDED.custody_notes
+                RETURNING *
+            """, (
+                student_id,
+                household_id,
+                data.get("is_primary", True),
+                data.get("custody_notes", ""),
+            ))
+            link = fo(cur)
+        conn.commit()
+        return jsonify(link), 201
+    except Exception as e:
+        conn.rollback()
+        return jsonify({"error": str(e)}), 500
+    finally:
+        conn.close()
+
+
+@app.route("/api/households/<int:household_id>/students/<int:student_id>", methods=["DELETE"])
+@login_required
+def unlink_student_from_household(household_id, student_id):
+    """Remove a student from a household"""
+    conn = get_db_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                DELETE FROM student_households
+                WHERE student_id = %s AND household_id = %s
+            """, (student_id, household_id))
+            if cur.rowcount == 0:
+                return jsonify({"error": "Link not found"}), 404
+        conn.commit()
+        return jsonify({"success": True})
+    except Exception as e:
+        conn.rollback()
+        return jsonify({"error": str(e)}), 500
+    finally:
+        conn.close()
+
+
+@app.route("/api/households/<int:household_id>/parents", methods=["POST"])
+@login_required
+def link_parent_to_household(household_id):
+    """Add a parent to a household"""
+    data = request.json or {}
+    parent_id = data.get("parent_id")
+    if not parent_id:
+        return jsonify({"error": "parent_id is required"}), 400
+    conn = get_db_connection()
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute("""
+                INSERT INTO household_members (household_id, parent_id, role)
+                VALUES (%s, %s, %s)
+                ON CONFLICT (household_id, parent_id) DO UPDATE SET role = EXCLUDED.role
+                RETURNING *
+            """, (
+                household_id,
+                parent_id,
+                data.get("role", "primary"),
+            ))
+            link = fo(cur)
+        conn.commit()
+        return jsonify(link), 201
+    except Exception as e:
+        conn.rollback()
+        return jsonify({"error": str(e)}), 500
+    finally:
+        conn.close()
+
+
+@app.route("/api/households/<int:household_id>/parents/<int:parent_id>", methods=["DELETE"])
+@login_required
+def unlink_parent_from_household(household_id, parent_id):
+    """Remove a parent from a household"""
+    conn = get_db_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                DELETE FROM household_members
+                WHERE household_id = %s AND parent_id = %s
+            """, (household_id, parent_id))
+            if cur.rowcount == 0:
+                return jsonify({"error": "Link not found"}), 404
+        conn.commit()
+        return jsonify({"success": True})
+    except Exception as e:
+        conn.rollback()
+        return jsonify({"error": str(e)}), 500
+    finally:
+        conn.close()
+
+
+@app.route("/api/households/seed-from-students", methods=["POST"])
+@superadmin_required
+def seed_households_from_students():
+    """One-time utility: auto-create households from student last names and link them"""
+    conn = get_db_connection()
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            # Get all active students not yet in a household
+            cur.execute("""
+                SELECT s.student_id, s.first_name, s.last_name
+                FROM students s
+                LEFT JOIN student_households sh ON sh.student_id = s.student_id
+                WHERE s.status = 'active' AND sh.student_id IS NULL
+                ORDER BY s.last_name, s.first_name
+            """)
+            unlinked = fa(cur)
+            if not unlinked:
+                return jsonify({"message": "All active students already linked", "created": 0})
+
+            # Group by last name
+            families = {}
+            for s in unlinked:
+                families.setdefault(s["last_name"], []).append(s)
+
+            created = 0
+            for last_name, students in families.items():
+                # Create household
+                cur.execute("""
+                    INSERT INTO households (family_name, status)
+                    VALUES (%s, 'active')
+                    RETURNING household_id
+                """, (last_name,))
+                hid = cur.fetchone()["household_id"]
+                # Link students
+                for s in students:
+                    cur.execute("""
+                        INSERT INTO student_households (student_id, household_id, is_primary)
+                        VALUES (%s, %s, TRUE)
+                        ON CONFLICT DO NOTHING
+                    """, (s["student_id"], hid))
+                created += 1
+
+        conn.commit()
+        return jsonify({"message": f"Created {created} households", "created": created})
+    except Exception as e:
+        conn.rollback()
+        return jsonify({"error": str(e)}), 500
+    finally:
+        conn.close()
+
+
+# ============================================
 # ONE-TIME MIGRATIONS
 # ============================================
 
