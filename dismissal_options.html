@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Activities & Bus Routes — Mizzentop Day School</title>
+  <link rel="icon" type="image/svg+xml" href="/logo.svg">
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet"/>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --navy:    #1a2744;
+      --green:   #2d5016;
+      --gold:    #c8992a;
+      --cream:   #f7f3ec;
+      --muted:   #6b7280;
+      --light:   #e8e2d9;
+      --danger:  #9b1c1c;
+      --white:   #ffffff;
+    }
+    html, body { min-height: 100%; font-family: 'DM Sans', sans-serif; background-color: var(--cream); color: var(--navy); }
+    .topnav { background: var(--navy); display: flex; align-items: center; gap: 16px; padding: 0 28px; height: 56px; }
+    .topnav-title { color: #fff; font-size: 14px; font-weight: 500; }
+    .topnav a.home { display: flex; align-items: center; gap: 6px; padding: 7px 14px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.25); color: rgba(255,255,255,0.85); text-decoration: none; font-size: 13px; font-weight: 500; margin-left: auto; }
+    .topnav a.home:hover { background: rgba(255,255,255,0.1); }
+
+    .page { max-width: 1100px; margin: 0 auto; padding: 40px 24px 80px; }
+    .page-header { margin-bottom: 32px; }
+    .page-header h1 { font-family: 'Playfair Display', serif; font-size: 32px; font-weight: 700; color: var(--navy); margin-bottom: 4px; }
+    .page-header p { font-size: 14px; color: var(--muted); }
+
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+    @media (max-width: 700px) { .grid-2 { grid-template-columns: 1fr; } }
+
+    .card { background: var(--white); border: 1px solid var(--light); border-radius: 12px; overflow: hidden; }
+    .card-header { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; border-bottom: 1px solid var(--light); background: #f9f7f4; }
+    .card-header h2 { font-family: 'Playfair Display', serif; font-size: 18px; font-weight: 700; color: var(--navy); }
+    .card-count { font-size: 12px; color: var(--muted); margin-left: 8px; }
+
+    .btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px; border-radius: 8px; font-size: 13px; font-weight: 500; font-family: 'DM Sans', sans-serif; cursor: pointer; border: none; transition: all 0.15s; }
+    .btn-primary { background: var(--navy); color: #fff; }
+    .btn-primary:hover { background: #243560; }
+    .btn-sm { padding: 5px 11px; font-size: 12px; }
+    .btn-ghost { background: transparent; color: var(--muted); border: 1px solid var(--light); }
+    .btn-ghost:hover { border-color: var(--navy); color: var(--navy); }
+
+    .option-list { list-style: none; padding: 0; }
+    .option-item { display: flex; align-items: center; gap: 12px; padding: 12px 20px; border-bottom: 1px solid #f3f0eb; transition: background 0.1s; }
+    .option-item:last-child { border-bottom: none; }
+    .option-item:hover { background: #faf8f5; }
+    .option-item.inactive { opacity: 0.45; }
+    .option-item.dragging { background: #eef0f4; opacity: 0.7; }
+
+    .drag-handle { cursor: grab; color: var(--muted); font-size: 16px; line-height: 1; user-select: none; }
+    .drag-handle:active { cursor: grabbing; }
+    .option-name { flex: 1; font-size: 14px; font-weight: 500; }
+    .inactive-badge { font-size: 11px; color: var(--muted); font-weight: 400; font-style: italic; }
+
+    /* Toggle switch */
+    .toggle { position: relative; display: inline-block; width: 36px; height: 20px; flex-shrink: 0; }
+    .toggle input { opacity: 0; width: 0; height: 0; }
+    .toggle-slider { position: absolute; cursor: pointer; inset: 0; background: var(--light); border-radius: 20px; transition: 0.2s; }
+    .toggle-slider::before { content: ''; position: absolute; height: 14px; width: 14px; left: 3px; bottom: 3px; background: white; border-radius: 50%; transition: 0.2s; }
+    .toggle input:checked + .toggle-slider { background: var(--green); }
+    .toggle input:checked + .toggle-slider::before { transform: translateX(16px); }
+
+    /* Add form */
+    .add-form { display: none; padding: 14px 20px; border-top: 1px solid var(--light); background: #faf8f5; }
+    .add-form.open { display: flex; gap: 10px; align-items: center; }
+    .add-form input { flex: 1; padding: 8px 12px; border: 1px solid var(--light); border-radius: 8px; font-size: 13px; font-family: 'DM Sans', sans-serif; color: var(--navy); outline: none; }
+    .add-form input:focus { border-color: var(--navy); }
+
+    .toast { position: fixed; bottom: 24px; right: 24px; background: var(--navy); color: #fff; padding: 12px 20px; border-radius: 10px; font-size: 13px; font-weight: 500; z-index: 200; transform: translateY(80px); opacity: 0; transition: all 0.3s ease; pointer-events: none; }
+    .toast.show { transform: translateY(0); opacity: 1; }
+    .toast.success { background: #166534; }
+    .toast.error { background: var(--danger); }
+
+    .empty-state { text-align: center; padding: 40px 20px; color: var(--muted); font-size: 14px; }
+  </style>
+</head>
+<body>
+
+<nav class="topnav">
+  <span class="topnav-title">Activities & Bus Routes</span>
+  <a class="home" href="/">← Home</a>
+</nav>
+
+<div class="page">
+  <div class="page-header">
+    <h1>Activities & Bus Routes</h1>
+    <p>Manage dismissal options. Toggle activities on or off as terms change. Drag to reorder.</p>
+  </div>
+
+  <div class="grid-2">
+    <!-- Bus Routes -->
+    <div class="card">
+      <div class="card-header">
+        <div style="display:flex;align-items:baseline;gap:4px;">
+          <h2>Bus Routes</h2>
+          <span class="card-count" id="bus-count"></span>
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="showAddForm('bus')">+ Add Route</button>
+      </div>
+      <ul class="option-list" id="bus-list"></ul>
+      <div class="add-form" id="add-form-bus">
+        <input type="text" id="add-input-bus" placeholder="Route name..." onkeydown="if(event.key==='Enter')saveNew('bus')">
+        <button class="btn btn-primary btn-sm" onclick="saveNew('bus')">Add</button>
+        <button class="btn btn-ghost btn-sm" onclick="hideAddForm('bus')">Cancel</button>
+      </div>
+    </div>
+
+    <!-- Activities -->
+    <div class="card">
+      <div class="card-header">
+        <div style="display:flex;align-items:baseline;gap:4px;">
+          <h2>Activities</h2>
+          <span class="card-count" id="activity-count"></span>
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="showAddForm('activity')">+ Add Activity</button>
+      </div>
+      <ul class="option-list" id="activity-list"></ul>
+      <div class="add-form" id="add-form-activity">
+        <input type="text" id="add-input-activity" placeholder="Activity name..." onkeydown="if(event.key==='Enter')saveNew('activity')">
+        <button class="btn btn-primary btn-sm" onclick="saveNew('activity')">Add</button>
+        <button class="btn btn-ghost btn-sm" onclick="hideAddForm('activity')">Cancel</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+  let allOptions = [];
+  let dragItem = null;
+  let dragType = null;
+
+  async function loadOptions() {
+    const res = await fetch('/api/dismissal-options');
+    allOptions = await res.json();
+    render();
+  }
+
+  function render() {
+    const buses = allOptions.filter(o => o.type === 'bus').sort((a,b) => a.display_order - b.display_order);
+    const acts  = allOptions.filter(o => o.type === 'activity').sort((a,b) => a.display_order - b.display_order);
+
+    document.getElementById('bus-count').textContent = `(${buses.filter(b=>b.active).length} active)`;
+    document.getElementById('activity-count').textContent = `(${acts.filter(a=>a.active).length} active)`;
+
+    renderList('bus-list', buses);
+    renderList('activity-list', acts);
+  }
+
+  function renderList(containerId, items) {
+    const ul = document.getElementById(containerId);
+    if (!items.length) {
+      ul.innerHTML = '<li class="empty-state">No items yet</li>';
+      return;
+    }
+    ul.innerHTML = items.map(item => `
+      <li class="option-item ${item.active ? '' : 'inactive'}"
+          draggable="true"
+          data-id="${item.option_id}"
+          data-type="${item.type}"
+          ondragstart="onDragStart(event, ${item.option_id}, '${item.type}')"
+          ondragover="onDragOver(event)"
+          ondrop="onDrop(event, ${item.option_id})"
+          ondragend="onDragEnd()">
+        <span class="drag-handle" title="Drag to reorder">⠿</span>
+        <span class="option-name">
+          ${esc(item.name)}
+          ${item.active ? '' : '<span class="inactive-badge">(inactive)</span>'}
+        </span>
+        <label class="toggle" title="${item.active ? 'Active' : 'Inactive'}">
+          <input type="checkbox" ${item.active ? 'checked' : ''} onchange="toggleActive(${item.option_id}, this.checked)">
+          <span class="toggle-slider"></span>
+        </label>
+      </li>
+    `).join('');
+  }
+
+  function esc(s) {
+    const d = document.createElement('div');
+    d.textContent = s || '';
+    return d.innerHTML;
+  }
+
+  // ─── Toggle active ────────────────────────────────────
+  async function toggleActive(id, active) {
+    try {
+      await fetch(`/api/dismissal-options/${id}`, {
+        method: 'PUT',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ active })
+      });
+      const opt = allOptions.find(o => o.option_id === id);
+      if (opt) opt.active = active;
+      render();
+      toast(active ? 'Activated' : 'Deactivated', 'success');
+    } catch(e) {
+      toast('Failed to update', 'error');
+    }
+  }
+
+  // ─── Add new ──────────────────────────────────────────
+  function showAddForm(type) {
+    document.getElementById(`add-form-${type}`).classList.add('open');
+    document.getElementById(`add-input-${type}`).focus();
+  }
+  function hideAddForm(type) {
+    document.getElementById(`add-form-${type}`).classList.remove('open');
+    document.getElementById(`add-input-${type}`).value = '';
+  }
+
+  async function saveNew(type) {
+    const input = document.getElementById(`add-input-${type}`);
+    const name = input.value.trim();
+    if (!name) return;
+
+    try {
+      const res = await fetch('/api/dismissal-options', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ name, type })
+      });
+      if (!res.ok) throw new Error();
+      hideAddForm(type);
+      await loadOptions();
+      toast(`Added "${name}"`, 'success');
+    } catch(e) {
+      toast('Failed to add — name may already exist', 'error');
+    }
+  }
+
+  // ─── Drag & drop reorder ──────────────────────────────
+  function onDragStart(e, id, type) {
+    dragItem = id;
+    dragType = type;
+    e.target.closest('.option-item').classList.add('dragging');
+    e.dataTransfer.effectAllowed = 'move';
+  }
+
+  function onDragOver(e) {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+  }
+
+  function onDrop(e, targetId) {
+    e.preventDefault();
+    if (dragItem === null || dragItem === targetId) return;
+    const target = allOptions.find(o => o.option_id === targetId);
+    if (!target || target.type !== dragType) return;
+
+    // Reorder within same type
+    const items = allOptions.filter(o => o.type === dragType).sort((a,b) => a.display_order - b.display_order);
+    const fromIdx = items.findIndex(o => o.option_id === dragItem);
+    const toIdx = items.findIndex(o => o.option_id === targetId);
+    if (fromIdx < 0 || toIdx < 0) return;
+
+    const [moved] = items.splice(fromIdx, 1);
+    items.splice(toIdx, 0, moved);
+
+    // Update display_order locally
+    items.forEach((item, i) => item.display_order = i);
+    render();
+    saveOrder(items);
+  }
+
+  function onDragEnd() {
+    dragItem = null;
+    dragType = null;
+    document.querySelectorAll('.dragging').forEach(el => el.classList.remove('dragging'));
+  }
+
+  async function saveOrder(items) {
+    try {
+      await fetch('/api/dismissal-options/reorder', {
+        method: 'PUT',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ orders: items.map(o => ({ option_id: o.option_id, display_order: o.display_order })) })
+      });
+    } catch(e) {
+      toast('Failed to save order', 'error');
+    }
+  }
+
+  // ─── Toast ────────────────────────────────────────────
+  function toast(msg, type) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.className = 'toast show ' + (type || '');
+    setTimeout(() => t.className = 'toast', 2500);
+  }
+
+  // ─── Init ─────────────────────────────────────────────
+  loadOptions();
+</script>
+</body>
+</html>
