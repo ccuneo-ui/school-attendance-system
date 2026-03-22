@@ -275,32 +275,7 @@
         <select id="modal-dismissal">
           <option value="">— Not set —</option>
           <option value="pickup|Pick Up">Pick Up</option>
-          <optgroup label="Bus Routes">
-            <option value="bus|Arlington">Arlington</option>
-            <option value="bus|Brewster">Brewster</option>
-            <option value="bus|Carmel">Carmel</option>
-            <option value="bus|Dover">Dover</option>
-            <option value="bus|HOPE">HOPE</option>
-            <option value="bus|Minivan">Minivan</option>
-            <option value="bus|Pawling">Pawling</option>
-            <option value="bus|POK">POK</option>
-            <option value="bus|Wappingers">Wappingers</option>
-          </optgroup>
-          <optgroup label="Activities">
-            <option value="activity|Aftercare">Aftercare</option>
-            <option value="activity|Piano Lessons">Piano Lessons</option>
-            <option value="activity|LS HW Club">LS HW Club</option>
-            <option value="activity|LS MiST">LS MiST</option>
-            <option value="activity|MS HW Club">MS HW Club</option>
-            <option value="activity|MS MiST">MS MiST</option>
-            <option value="activity|JV Soccer">JV Soccer</option>
-            <option value="activity|V Soccer">V Soccer</option>
-            <option value="activity|Basketball">Basketball</option>
-            <option value="activity|Tutoring">Tutoring</option>
-            <option value="activity|KABARET">KABARET</option>
-            <option value="activity|Book Club">Book Club</option>
-            <option value="activity|Other">Other</option>
-          </optgroup>
+          <!-- Bus routes and activities loaded dynamically -->
         </select>
       </div>
     </div>
@@ -323,32 +298,7 @@
     <select id="bulk-destination">
       <option value="">— Select —</option>
       <option value="pickup|Pick Up">Pick Up</option>
-      <optgroup label="Bus Routes">
-        <option value="bus|Arlington">Arlington</option>
-        <option value="bus|Brewster">Brewster</option>
-        <option value="bus|Carmel">Carmel</option>
-        <option value="bus|Dover">Dover</option>
-        <option value="bus|HOPE">HOPE</option>
-        <option value="bus|Minivan">Minivan</option>
-        <option value="bus|Pawling">Pawling</option>
-        <option value="bus|POK">POK</option>
-        <option value="bus|Wappingers">Wappingers</option>
-      </optgroup>
-      <optgroup label="Activities">
-        <option value="activity|Aftercare">Aftercare</option>
-        <option value="activity|Piano Lessons">Piano Lessons</option>
-        <option value="activity|LS HW Club">LS HW Club</option>
-        <option value="activity|LS MiST">LS MiST</option>
-        <option value="activity|MS HW Club">MS HW Club</option>
-        <option value="activity|MS MiST">MS MiST</option>
-        <option value="activity|JV Soccer">JV Soccer</option>
-        <option value="activity|V Soccer">V Soccer</option>
-        <option value="activity|Basketball">Basketball</option>
-        <option value="activity|Tutoring">Tutoring</option>
-        <option value="activity|KABARET">KABARET</option>
-        <option value="activity|Book Club">Book Club</option>
-        <option value="activity|Other">Other</option>
-      </optgroup>
+      <!-- Bus routes and activities loaded dynamically -->
     </select>
     <div class="modal-actions">
       <button class="btn btn-secondary" onclick="closeBulkModal()">Cancel</button>
@@ -448,10 +398,46 @@ async function loadDefaultsAPI() {
   });
 }
 
+// ── Load dismissal options from API ──
+async function loadDismissalOptions() {
+  try {
+    const res = await fetch('/api/dismissal-options?active=true');
+    const opts = await res.json();
+    const buses = opts.filter(o => o.type === 'bus');
+    const activities = opts.filter(o => o.type === 'activity');
+
+    ['modal-dismissal', 'bulk-destination'].forEach(selId => {
+      const sel = document.getElementById(selId);
+      sel.querySelectorAll('optgroup').forEach(g => g.remove());
+
+      const busGroup = document.createElement('optgroup');
+      busGroup.label = 'Bus Routes';
+      buses.forEach(b => {
+        const opt = document.createElement('option');
+        opt.value = `bus|${b.name}`;
+        opt.textContent = b.name;
+        busGroup.appendChild(opt);
+      });
+      sel.appendChild(busGroup);
+
+      const actGroup = document.createElement('optgroup');
+      actGroup.label = 'Activities';
+      activities.forEach(a => {
+        const opt = document.createElement('option');
+        opt.value = `activity|${a.name}`;
+        opt.textContent = a.name;
+        actGroup.appendChild(opt);
+      });
+      sel.appendChild(actGroup);
+    });
+  } catch(e) { console.error('Failed to load dismissal options', e); }
+}
+
 // ── Init & Load ──
 async function init() {
   updateDateDisplay();
   try {
+    await loadDismissalOptions();
     allStudents = await fetchStudents();
     await loadAll();
   } catch(e) { showToast('Error loading data', 'error'); }
