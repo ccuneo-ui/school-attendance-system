@@ -635,9 +635,9 @@
 // ── CONFIG ────────────────────────────────────────────────────────────────────
 const API_URL = '/api';
 
-// Bus routes, activities, etc.
-const BUS_ROUTES  = ['Arlington','Brewster','Carmel','Dover','HOPE','Minivan','Pawling','POK','Wappingers'];
-const ACTIVITIES  = ['Aftercare','Piano Lessons','LS HW Club','LS MiST','MS HW Club','MS MiST','JV Soccer','V Soccer','Basketball','Other','Tutoring','KABARET','Book Club'];
+// Bus routes, activities — loaded from API
+let BUS_ROUTES  = [];
+let ACTIVITIES  = [];
 const ELECTIVE_SUBJECTS = ['Art','Music','PE','Library','Technology','Drama','Spanish','French','Mandarin'];
 
 // ── STATE ─────────────────────────────────────────────────────────────────────
@@ -653,6 +653,13 @@ let dataSource      = 'today'; // 'today' | 'default'
 async function init() {
   updateClock();
   setInterval(updateClock, 1000);
+  // Load dismissal options from API
+  try {
+    const res = await fetch('/api/dismissal-options?active=true');
+    const opts = await res.json();
+    BUS_ROUTES = opts.filter(o => o.type === 'bus').map(o => o.name);
+    ACTIVITIES = opts.filter(o => o.type === 'activity').map(o => o.name);
+  } catch(e) { console.error('Failed to load dismissal options', e); }
   // Restore saved view toggle button state
   document.querySelectorAll('.view-btn').forEach(b => {
     b.classList.toggle('active', b.textContent.trim().toLowerCase() === currentView);
