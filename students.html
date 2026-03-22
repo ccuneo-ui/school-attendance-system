@@ -310,7 +310,7 @@ async function init() {
   try {
     const res = await fetch('/api/dismissal-options?active=true');
     const opts = await res.json();
-    opts.forEach(o => DISMISSAL_OPTIONS.push({ value: o.name, label: o.name }));
+    opts.sort((a,b) => a.name.localeCompare(b.name)).forEach(o => DISMISSAL_OPTIONS.push({ value: o.name, label: o.name }));
   } catch(e) { console.error('Failed to load dismissal options', e); }
   populateDismissalDropdowns();
   try {
