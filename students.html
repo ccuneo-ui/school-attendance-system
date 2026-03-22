@@ -293,19 +293,9 @@
 
 <script>
 const API = '/api';
-const DISMISSAL_OPTIONS = [
+let DISMISSAL_OPTIONS = [
   { value: '', label: '— Not set —' },
   { value: 'Pick Up', label: 'Pick Up' },
-  { value: 'Arlington', label: 'Arlington' },
-  { value: 'Brewster', label: 'Brewster' },
-  { value: 'Carmel', label: 'Carmel' },
-  { value: 'Dover', label: 'Dover' },
-  { value: 'HOPE', label: 'HOPE' },
-  { value: 'Minivan', label: 'Minivan' },
-  { value: 'Pawling', label: 'Pawling' },
-  { value: 'POK', label: 'POK' },
-  { value: 'Wappingers', label: 'Wappingers' },
-  { value: 'Aftercare', label: 'Aftercare' },
 ];
 
 let allStudents = [];
@@ -316,6 +306,12 @@ let editingId = null;
 
 // ── Init ──
 async function init() {
+  // Load dismissal options from API
+  try {
+    const res = await fetch('/api/dismissal-options?active=true');
+    const opts = await res.json();
+    opts.forEach(o => DISMISSAL_OPTIONS.push({ value: o.name, label: o.name }));
+  } catch(e) { console.error('Failed to load dismissal options', e); }
   populateDismissalDropdowns();
   try {
     const r = await fetch(`${API}/students`);
