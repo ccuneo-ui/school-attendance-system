@@ -125,6 +125,30 @@ def init_db():
                 for name in ["Art","Music","PE","Library","Technology",
                              "Drama","Spanish","French","Mandarin","STEM"]:
                     cur.execute("INSERT INTO electives (name) VALUES (%s) ON CONFLICT DO NOTHING", (name,))
+
+            # Dismissal options (bus routes & activities) managed by admins
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS dismissal_options (
+                    option_id      SERIAL PRIMARY KEY,
+                    name           TEXT NOT NULL,
+                    type           TEXT NOT NULL,
+                    active         BOOLEAN NOT NULL DEFAULT TRUE,
+                    display_order  INTEGER NOT NULL DEFAULT 0,
+                    created_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    UNIQUE(name, type)
+                )
+            """)
+            cur.execute("SELECT COUNT(*) FROM dismissal_options")
+            if cur.fetchone()[0] == 0:
+                bus_routes = ['Arlington','Brewster','Carmel','Dover','HOPE','Minivan','Pawling','POK','Wappingers']
+                activities = ['Aftercare','Piano Lessons','LS HW Club','LS MiST','MS HW Club','MS MiST',
+                              'JV Soccer','V Soccer','Basketball','Tutoring','KABARET','Book Club','Other']
+                for i, name in enumerate(bus_routes):
+                    cur.execute("INSERT INTO dismissal_options (name, type, display_order) VALUES (%s, 'bus', %s) ON CONFLICT DO NOTHING", (name, i))
+                for i, name in enumerate(activities):
+                    cur.execute("INSERT INTO dismissal_options (name, type, display_order) VALUES (%s, 'activity', %s) ON CONFLICT DO NOTHING", (name, i))
+
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS daily_dismissal (
                     dismissal_id   SERIAL PRIMARY KEY,
@@ -411,6 +435,11 @@ def students():
 def people():
     return send_from_directory(".", "people.html")
 
+@app.route("/dismissal-options")
+@people_required
+def dismissal_options_page():
+    return send_from_directory(".", "dismissal_options.html")
+
 @app.route("/program-attendance")
 @login_required
 def program_attendance():
@@ -638,6 +667,85 @@ def get_electives():
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
             cur.execute("SELECT elective_id, name FROM electives WHERE active=1 ORDER BY name")
             return jsonify(fa(cur))
+    finally:
+        conn.close()
+
+
+# ============================================
+# DISMISSAL OPTIONS (activities & bus routes)
+# ============================================
+
+@app.route("/api/dismissal-options")
+@login_required
+def get_dismissal_options():
+    conn = get_db_connection()
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            if request.args.get("active") == "true":
+                cur.execute("SELECT * FROM dismissal_options WHERE active=TRUE ORDER BY type, display_order, name")
+            else:
+                cur.execute("SELECT * FROM dismissal_options ORDER BY type, display_order, name")
+            return jsonify(fa(cur))
+    finally:
+        conn.close()
+
+@app.route("/api/dismissal-options", methods=["POST"])
+@people_required
+def create_dismissal_option():
+    d = request.json
+    conn = get_db_connection()
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute("""
+                SELECT COALESCE(MAX(display_order),0)+1 FROM dismissal_options WHERE type=%s
+            """, (d['type'],))
+            next_order = cur.fetchone()['coalesce']
+            cur.execute("""
+                INSERT INTO dismissal_options (name, type, display_order)
+                VALUES (%s, %s, %s) RETURNING option_id
+            """, (d['name'], d['type'], next_order))
+            option_id = cur.fetchone()['option_id']
+            conn.commit()
+            return jsonify({"success": True, "option_id": option_id}), 201
+    finally:
+        conn.close()
+
+@app.route("/api/dismissal-options/<int:option_id>", methods=["PUT"])
+@people_required
+def update_dismissal_option(option_id):
+    d = request.json
+    conn = get_db_connection()
+    try:
+        with conn.cursor() as cur:
+            allowed = {'name', 'type', 'active', 'display_order'}
+            fields = []
+            vals = []
+            for k, v in d.items():
+                if k in allowed:
+                    fields.append(f"{k}=%s")
+                    vals.append(v)
+            if not fields:
+                return jsonify({"error": "No valid fields"}), 400
+            fields.append("updated_at=CURRENT_TIMESTAMP")
+            vals.append(option_id)
+            cur.execute(f"UPDATE dismissal_options SET {','.join(fields)} WHERE option_id=%s", vals)
+            conn.commit()
+            return jsonify({"success": True})
+    finally:
+        conn.close()
+
+@app.route("/api/dismissal-options/reorder", methods=["PUT"])
+@people_required
+def reorder_dismissal_options():
+    d = request.json
+    conn = get_db_connection()
+    try:
+        with conn.cursor() as cur:
+            for item in d.get('orders', []):
+                cur.execute("UPDATE dismissal_options SET display_order=%s, updated_at=CURRENT_TIMESTAMP WHERE option_id=%s",
+                            (item['display_order'], item['option_id']))
+            conn.commit()
+            return jsonify({"success": True})
     finally:
         conn.close()
 
