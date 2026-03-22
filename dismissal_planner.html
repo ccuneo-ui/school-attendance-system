@@ -403,8 +403,8 @@ async function loadDismissalOptions() {
   try {
     const res = await fetch('/api/dismissal-options?active=true');
     const opts = await res.json();
-    const buses = opts.filter(o => o.type === 'bus');
-    const activities = opts.filter(o => o.type === 'activity');
+    const buses = opts.filter(o => o.type === 'bus').sort((a,b) => a.name.localeCompare(b.name));
+    const activities = opts.filter(o => o.type === 'activity').sort((a,b) => a.name.localeCompare(b.name));
 
     ['modal-dismissal', 'bulk-destination'].forEach(selId => {
       const sel = document.getElementById(selId);
