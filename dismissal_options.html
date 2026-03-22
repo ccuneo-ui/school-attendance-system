@@ -49,10 +49,7 @@
     .option-item:last-child { border-bottom: none; }
     .option-item:hover { background: #faf8f5; }
     .option-item.inactive { opacity: 0.45; }
-    .option-item.dragging { background: #eef0f4; opacity: 0.7; }
 
-    .drag-handle { cursor: grab; color: var(--muted); font-size: 16px; line-height: 1; user-select: none; }
-    .drag-handle:active { cursor: grabbing; }
     .option-name { flex: 1; font-size: 14px; font-weight: 500; }
     .inactive-badge { font-size: 11px; color: var(--muted); font-weight: 400; font-style: italic; }
 
@@ -90,7 +87,7 @@
 <div class="page">
   <div class="page-header">
     <h1>Activities & Bus Routes</h1>
-    <p>Manage dismissal options. Toggle activities on or off as terms change. Drag to reorder.</p>
+    <p>Manage dismissal options. Toggle activities on or off as terms change. Sorted alphabetically.</p>
   </div>
 
   <div class="grid-2">
@@ -134,8 +131,6 @@
 
 <script>
   let allOptions = [];
-  let dragItem = null;
-  let dragType = null;
 
   async function loadOptions() {
     const res = await fetch('/api/dismissal-options');
@@ -166,14 +161,8 @@
     }
     ul.innerHTML = items.map(item => `
       <li class="option-item ${item.active ? '' : 'inactive'}"
-          draggable="true"
           data-id="${item.option_id}"
-          data-type="${item.type}"
-          ondragstart="onDragStart(event, ${item.option_id}, '${item.type}')"
-          ondragover="onDragOver(event)"
-          ondrop="onDrop(event, ${item.option_id})"
-          ondragend="onDragEnd()">
-        <span class="drag-handle" title="Drag to reorder">⠿</span>
+          data-type="${item.type}">
         <span class="option-name">
           ${esc(item.name)}
           ${item.active ? '' : '<span class="inactive-badge">(inactive)</span>'}
@@ -251,58 +240,6 @@
       toast(`Added "${name}"`, 'success');
     } catch(e) {
       toast('Failed to add — name may already exist', 'error');
-    }
-  }
-
-  // ─── Drag & drop reorder ──────────────────────────────
-  function onDragStart(e, id, type) {
-    dragItem = id;
-    dragType = type;
-    e.target.closest('.option-item').classList.add('dragging');
-    e.dataTransfer.effectAllowed = 'move';
-  }
-
-  function onDragOver(e) {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
-  }
-
-  function onDrop(e, targetId) {
-    e.preventDefault();
-    if (dragItem === null || dragItem === targetId) return;
-    const target = allOptions.find(o => o.option_id === targetId);
-    if (!target || target.type !== dragType) return;
-
-    // Reorder within same type
-    const items = allOptions.filter(o => o.type === dragType).sort((a,b) => a.display_order - b.display_order);
-    const fromIdx = items.findIndex(o => o.option_id === dragItem);
-    const toIdx = items.findIndex(o => o.option_id === targetId);
-    if (fromIdx < 0 || toIdx < 0) return;
-
-    const [moved] = items.splice(fromIdx, 1);
-    items.splice(toIdx, 0, moved);
-
-    // Update display_order locally
-    items.forEach((item, i) => item.display_order = i);
-    render();
-    saveOrder(items);
-  }
-
-  function onDragEnd() {
-    dragItem = null;
-    dragType = null;
-    document.querySelectorAll('.dragging').forEach(el => el.classList.remove('dragging'));
-  }
-
-  async function saveOrder(items) {
-    try {
-      await fetch('/api/dismissal-options/reorder', {
-        method: 'PUT',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({ orders: items.map(o => ({ option_id: o.option_id, display_order: o.display_order })) })
-      });
-    } catch(e) {
-      toast('Failed to save order', 'error');
     }
   }
 
