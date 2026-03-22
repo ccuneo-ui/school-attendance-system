@@ -697,9 +697,9 @@ def create_dismissal_option():
     try:
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
             cur.execute("""
-                SELECT COALESCE(MAX(display_order),0)+1 FROM dismissal_options WHERE type=%s
+                SELECT COALESCE(MAX(display_order),0)+1 AS next_order FROM dismissal_options WHERE type=%s
             """, (d['type'],))
-            next_order = cur.fetchone()['coalesce']
+            next_order = cur.fetchone()['next_order']
             cur.execute("""
                 INSERT INTO dismissal_options (name, type, display_order)
                 VALUES (%s, %s, %s) RETURNING option_id
