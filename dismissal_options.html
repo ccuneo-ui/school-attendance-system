@@ -142,8 +142,12 @@
   }
 
   function render() {
-    const buses = allOptions.filter(o => o.type === 'bus').sort((a,b) => a.display_order - b.display_order);
-    const acts  = allOptions.filter(o => o.type === 'activity').sort((a,b) => a.display_order - b.display_order);
+    const sortActiveFirst = (a,b) => {
+      if (a.active !== b.active) return a.active ? -1 : 1;
+      return a.display_order - b.display_order;
+    };
+    const buses = allOptions.filter(o => o.type === 'bus').sort(sortActiveFirst);
+    const acts  = allOptions.filter(o => o.type === 'activity').sort(sortActiveFirst);
 
     document.getElementById('bus-count').textContent = `(${buses.filter(b=>b.active).length} active)`;
     document.getElementById('activity-count').textContent = `(${acts.filter(a=>a.active).length} active)`;
