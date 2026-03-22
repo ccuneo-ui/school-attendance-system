@@ -749,6 +749,18 @@ def reorder_dismissal_options():
     finally:
         conn.close()
 
+@app.route("/api/dismissal-options/<int:option_id>", methods=["DELETE"])
+@people_required
+def delete_dismissal_option(option_id):
+    conn = get_db_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM dismissal_options WHERE option_id=%s", (option_id,))
+            conn.commit()
+            return jsonify({"success": True})
+    finally:
+        conn.close()
+
 
 # ============================================
 # DISMISSAL TODAY (staff view)
