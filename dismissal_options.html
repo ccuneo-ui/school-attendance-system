@@ -75,6 +75,8 @@
     .toast.success { background: #166534; }
     .toast.error { background: var(--danger); }
 
+    .btn-delete { background: none; border: none; color: var(--light); cursor: pointer; font-size: 14px; padding: 4px 6px; border-radius: 4px; line-height: 1; transition: all 0.15s; }
+    .btn-delete:hover { color: var(--danger); background: #fee2e2; }
     .empty-state { text-align: center; padding: 40px 20px; color: var(--muted); font-size: 14px; }
   </style>
 </head>
@@ -144,7 +146,7 @@
   function render() {
     const sortActiveFirst = (a,b) => {
       if (a.active !== b.active) return a.active ? -1 : 1;
-      return a.display_order - b.display_order;
+      return a.name.localeCompare(b.name);
     };
     const buses = allOptions.filter(o => o.type === 'bus').sort(sortActiveFirst);
     const acts  = allOptions.filter(o => o.type === 'activity').sort(sortActiveFirst);
@@ -180,6 +182,7 @@
           <input type="checkbox" ${item.active ? 'checked' : ''} onchange="toggleActive(${item.option_id}, this.checked)">
           <span class="toggle-slider"></span>
         </label>
+        <button class="btn-delete" title="Delete" onclick="deleteOption(${item.option_id}, '${esc(item.name)}')">&#x2715;</button>
       </li>
     `).join('');
   }
@@ -204,6 +207,20 @@
       toast(active ? 'Activated' : 'Deactivated', 'success');
     } catch(e) {
       toast('Failed to update', 'error');
+    }
+  }
+
+  // ─── Delete ────────────────────────────────────────────
+  async function deleteOption(id, name) {
+    if (!confirm(`Delete "${name}"? This cannot be undone.`)) return;
+    try {
+      const res = await fetch(`/api/dismissal-options/${id}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error();
+      allOptions = allOptions.filter(o => o.option_id !== id);
+      render();
+      toast(`Deleted "${name}"`, 'success');
+    } catch(e) {
+      toast('Failed to delete', 'error');
     }
   }
 
