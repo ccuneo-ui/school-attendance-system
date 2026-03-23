@@ -49,6 +49,35 @@ def fo(cursor):
     return dict(row) if row else None
 
 
+# ── Refresh permissions from DB on every request ──
+
+@app.before_request
+def refresh_session_permissions():
+    email = session.get("user_email")
+    if not email:
+        return
+    if email == SUPERADMIN_EMAIL:
+        session["is_superadmin"] = True
+        session["can_record_attendance"] = True
+        session["can_manage_billing"] = True
+        session["can_manage_people"] = True
+        return
+    try:
+        conn = get_db_connection()
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute("SELECT can_record_attendance, can_manage_billing, can_manage_people, role FROM staff WHERE email=%s AND status='active'", (email,))
+            staff = fo(cur)
+        conn.close()
+        if staff:
+            session["can_record_attendance"] = bool(staff.get("can_record_attendance"))
+            session["can_manage_billing"] = bool(staff.get("can_manage_billing"))
+            session["can_manage_people"] = bool(staff.get("can_manage_people"))
+            session["user_role"] = staff.get("role")
+        else:
+            session.clear()
+    except Exception:
+        pass
+
 # ── Auth decorators ──
 
 def login_required(f):
