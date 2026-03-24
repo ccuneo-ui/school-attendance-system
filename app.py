@@ -341,6 +341,14 @@ def init_db():
                     ALTER TABLE financial_aid_families ADD COLUMN household_id INTEGER
                     REFERENCES households(household_id) ON DELETE SET NULL
                 """)
+            # Add homeroom_teacher_id to students if missing
+            cur.execute("""
+                SELECT column_name FROM information_schema.columns
+                WHERE table_name='students' AND column_name='homeroom_teacher_id'
+            """)
+            if not cur.fetchone():
+                cur.execute("ALTER TABLE students ADD COLUMN homeroom_teacher_id INTEGER")
+
         conn.commit()
         print("DB init OK")
     except Exception as e:
@@ -1118,8 +1126,10 @@ def get_bus_dashboard():
             source = "today" if filled > 0 else "default"
             if source == "today":
                 cur.execute("""
-                    SELECT s.student_id,s.first_name,s.last_name,s.grade,d.destination AS bus_route
+                    SELECT s.student_id,s.first_name,s.last_name,s.grade,d.destination AS bus_route,
+                           st.first_name AS hr_first, st.last_name AS hr_last
                     FROM students s JOIN daily_dismissal d ON d.student_id=s.student_id AND d.dismissal_date=%s
+                    LEFT JOIN staff st ON st.staff_id = s.homeroom_teacher_id
                     WHERE s.status='active' AND d.dismissal_type='bus'
                       AND d.destination IS NOT NULL AND d.destination!=''
                     ORDER BY d.destination, s.last_name, s.first_name
@@ -1129,11 +1139,15 @@ def get_bus_dashboard():
                 day_col_map = {"Monday":"dismissal_mon","Tuesday":"dismissal_tue",
                                "Wednesday":"dismissal_wed","Thursday":"dismissal_thu","Friday":"dismissal_fri"}
                 col = day_col_map.get(dt_date.fromisoformat(date_param).strftime("%A"),"dismissal_mon")
-                cur.execute(f"SELECT student_id,first_name,last_name,grade,{col} AS bus_route FROM students WHERE status='active' AND {col}='bus' ORDER BY last_name,first_name")
+                cur.execute(f"""SELECT s.student_id,s.first_name,s.last_name,s.grade,s.{col} AS bus_route,
+                           st.first_name AS hr_first, st.last_name AS hr_last
+                    FROM students s LEFT JOIN staff st ON st.staff_id = s.homeroom_teacher_id
+                    WHERE s.status='active' AND s.{col}='bus' ORDER BY s.last_name,s.first_name""")
             rows = fa(cur)
     finally:
         conn.close()
 
+    # Fallback map for students without an assigned homeroom teacher
     homeroom_map = {"JPK":"Wipperman","SPK":"Vorolieff","K":"Olsen","1":"Alfonso",
                     "2":"Szeghy","3":"Vales","4":"Oxer / Donnelly","5":"Tucci",
                     "6":"Poon","7":"Ballard","8":"Duthie","--":"—"}
@@ -1141,9 +1155,14 @@ def get_bus_dashboard():
     for r in rows:
         route = r["bus_route"] if source=="today" else "Default Bus"
         if route not in grouped: grouped[route] = []
+        # Use assigned teacher if set, otherwise fall back to grade map
+        if r.get("hr_last"):
+            teacher = r["hr_last"]
+        else:
+            teacher = homeroom_map.get(r["grade"],"—")
         grouped[route].append({"student_id":r["student_id"],"first_name":r["first_name"],
             "last_name":r["last_name"],"grade":r["grade"],"bus_route":route,
-            "homeroom_teacher":homeroom_map.get(r["grade"],"—")})
+            "homeroom_teacher":teacher})
     buses = [{"route":k,"students":v,"count":len(v)} for k,v in sorted(grouped.items())]
     return jsonify({"buses":buses,"source":source,"date":date_param})
 
@@ -1177,6 +1196,8 @@ def update_student(student_id):
     conn = get_db_connection()
     try:
         with conn.cursor() as cur:
+            hr_id = data.get("homeroom_teacher_id")
+            hr_id = int(hr_id) if hr_id else None
             cur.execute("""
                 UPDATE students SET
                     first_name=%s, last_name=%s, grade=%s, status=%s,
@@ -1185,6 +1206,7 @@ def update_student(student_id):
                     enrollment_date=%s, notes=%s, before_care=%s,
                     dismissal_mon=%s, dismissal_tue=%s, dismissal_wed=%s,
                     dismissal_thu=%s, dismissal_fri=%s,
+                    homeroom_teacher_id=%s,
                     updated_at=CURRENT_TIMESTAMP
                 WHERE student_id=%s
             """, (data.get("first_name"),data.get("last_name"),data.get("grade"),data.get("status"),
@@ -1193,7 +1215,7 @@ def update_student(student_id):
                   data.get("enrollment_date"),data.get("notes"),
                   1 if data.get("before_care") else 0,
                   data.get("dismissal_mon"),data.get("dismissal_tue"),data.get("dismissal_wed"),
-                  data.get("dismissal_thu"),data.get("dismissal_fri"),student_id))
+                  data.get("dismissal_thu"),data.get("dismissal_fri"),hr_id,student_id))
         conn.commit()
         return jsonify({"success":True})
     except Exception as e:
