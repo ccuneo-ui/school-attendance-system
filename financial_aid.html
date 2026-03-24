@@ -839,7 +839,7 @@
     const s = editStudents[i];
     const tuition = parseFloat(s.tuition) || 0;
     const aid = parseFloat(s.mds_aid_amount) || 0;
-    if (tuition > 0 && aid > 0) {
+    if (tuition > 0) {
       const net = tuition - aid;
       updateStu(i, 'net_tuition', net);
       const el = document.getElementById(`stu-net-tuition-${i}`);
