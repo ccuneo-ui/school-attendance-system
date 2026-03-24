@@ -477,6 +477,11 @@ def people():
 def dismissal_options_page():
     return send_from_directory(".", "dismissal_options.html")
 
+@app.route("/homeroom-attendance")
+@login_required
+def homeroom_attendance_page():
+    return send_from_directory(".", "homeroom_attendance.html")
+
 @app.route("/program-attendance")
 @login_required
 def program_attendance():
@@ -984,6 +989,117 @@ def save_dismissal_attendance():
     except Exception as e:
         conn.rollback()
         return jsonify({"error":str(e)}),500
+    finally:
+        conn.close()
+
+# ============================================
+# HOMEROOM ATTENDANCE API
+# ============================================
+
+@app.route("/api/homeroom-attendance/teachers")
+@login_required
+def get_homeroom_teachers():
+    """Return staff who have at least one active student assigned as homeroom."""
+    conn = get_db_connection()
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute("""
+                SELECT DISTINCT st.staff_id, st.first_name, st.last_name, st.email
+                FROM staff st
+                JOIN students s ON s.homeroom_teacher_id = st.staff_id
+                WHERE s.status = 'active'
+                ORDER BY st.last_name, st.first_name
+            """)
+            return jsonify(fa(cur))
+    finally:
+        conn.close()
+
+@app.route("/api/homeroom-attendance/students")
+@login_required
+def get_homeroom_students():
+    teacher_id = request.args.get("teacher_id")
+    if not teacher_id:
+        return jsonify({"error": "teacher_id required"}), 400
+    conn = get_db_connection()
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute("""
+                SELECT student_id, first_name, last_name, grade
+                FROM students
+                WHERE homeroom_teacher_id = %s AND status = 'active'
+                ORDER BY last_name, first_name
+            """, (teacher_id,))
+            return jsonify(fa(cur))
+    finally:
+        conn.close()
+
+@app.route("/api/homeroom-attendance/<date>")
+@login_required
+def get_homeroom_attendance(date):
+    teacher_id = request.args.get("teacher_id")
+    if not teacher_id:
+        return jsonify({"error": "teacher_id required"}), 400
+    conn = get_db_connection()
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute("SELECT program_id FROM programs WHERE program_name='General Attendance' AND status='active' LIMIT 1")
+            program = fo(cur)
+            if not program:
+                return jsonify([])
+            cur.execute("""
+                SELECT s.student_id, a.status, a.notes
+                FROM attendance_records a
+                JOIN enrollments e ON a.enrollment_id = e.enrollment_id
+                JOIN students s ON e.student_id = s.student_id
+                WHERE e.program_id = %s AND a.attendance_date = %s
+                  AND s.homeroom_teacher_id = %s AND s.status = 'active'
+            """, (program["program_id"], date, teacher_id))
+            return jsonify(fa(cur))
+    finally:
+        conn.close()
+
+@app.route("/api/homeroom-attendance", methods=["POST"])
+@login_required
+def save_homeroom_attendance():
+    data = request.json
+    date = data.get("date")
+    staff_id = data.get("staff_id")
+    attendance_data = data.get("attendance", {})
+    if not date or not staff_id or not attendance_data:
+        return jsonify({"error": "Missing required fields"}), 400
+    conn = get_db_connection()
+    saved_count = 0
+    errors = []
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute("SELECT program_id FROM programs WHERE program_name='General Attendance' AND status='active' LIMIT 1")
+            program = fo(cur)
+            if not program:
+                return jsonify({"error": "General Attendance program not found"}), 404
+            program_id = program["program_id"]
+            for student_id, record in attendance_data.items():
+                status = record.get("status", "")
+                note = record.get("note", "")
+                if not status:
+                    continue
+                cur.execute("SELECT enrollment_id FROM enrollments WHERE student_id=%s AND program_id=%s AND status='active'", (student_id, program_id))
+                enrollment = fo(cur)
+                if not enrollment:
+                    errors.append(f"No enrollment for student {student_id}")
+                    continue
+                cur.execute("""
+                    INSERT INTO attendance_records (enrollment_id, attendance_date, status, recorded_by, notes)
+                    VALUES (%s, %s, %s, %s, %s)
+                    ON CONFLICT (enrollment_id, attendance_date) DO UPDATE SET
+                        status = EXCLUDED.status, notes = EXCLUDED.notes,
+                        recorded_by = EXCLUDED.recorded_by, recorded_at = CURRENT_TIMESTAMP
+                """, (enrollment["enrollment_id"], date, status, staff_id, note))
+                saved_count += 1
+        conn.commit()
+        return jsonify({"success": True, "saved_count": saved_count, "errors": errors})
+    except Exception as e:
+        conn.rollback()
+        return jsonify({"error": str(e)}), 500
     finally:
         conn.close()
 

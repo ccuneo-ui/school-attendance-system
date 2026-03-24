@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Homeroom Attendance — Mizzentop</title>
+  <link rel="icon" type="image/svg+xml" href="/logo.svg">
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --navy: #1a2744;
+      --cream: #f7f3ec;
+      --muted: #6b7280;
+      --white: #ffffff;
+      --border: #e5e1da;
+      --light-bg: #f0ece4;
+      --green: #2e7d32;
+      --red: #c0392b;
+      --gold: #b8860b;
+      --blue: #2563eb;
+    }
+    html, body { min-height: 100vh; font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(--navy); }
+
+    .topbar {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 14px 28px; background: var(--navy); color: var(--white);
+    }
+    .topbar a { color: rgba(255,255,255,0.75); text-decoration: none; font-size: 13px; font-weight: 500; }
+    .topbar a:hover { color: var(--white); }
+    .topbar-title { font-family: 'Playfair Display', serif; font-size: 18px; font-weight: 700; }
+
+    .container { max-width: 720px; margin: 0 auto; padding: 32px 24px 80px; }
+
+    .page-header { margin-bottom: 28px; }
+    .page-header h1 { font-family: 'Playfair Display', serif; font-size: 30px; font-weight: 700; margin-bottom: 6px; }
+    .page-header p { color: var(--muted); font-size: 14px; }
+
+    /* ── Controls ── */
+    .controls {
+      display: flex; gap: 12px; align-items: end; flex-wrap: wrap;
+      margin-bottom: 24px;
+    }
+    .control-group { display: flex; flex-direction: column; gap: 4px; }
+    .control-group label {
+      font-size: 11px; font-weight: 600; text-transform: uppercase;
+      letter-spacing: 0.5px; color: var(--muted);
+    }
+    .control-group select, .control-group input[type="date"] {
+      padding: 10px 14px; border: 1px solid var(--border); border-radius: 8px;
+      font-family: 'DM Sans', sans-serif; font-size: 14px; background: var(--white);
+      color: var(--navy); min-width: 180px;
+    }
+
+    /* ── Summary bar ── */
+    .summary-bar {
+      display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 20px;
+      padding: 14px 18px; background: var(--white); border-radius: 10px;
+      border: 1px solid var(--border); align-items: center;
+    }
+    .summary-item {
+      font-size: 13px; font-weight: 500; display: flex; align-items: center; gap: 6px;
+    }
+    .summary-dot {
+      width: 10px; height: 10px; border-radius: 50%; display: inline-block;
+    }
+    .dot-present { background: var(--green); }
+    .dot-absent { background: var(--red); }
+    .dot-tardy { background: var(--gold); }
+    .dot-ed { background: var(--blue); }
+    .dot-unmarked { background: var(--border); }
+
+    .summary-spacer { flex: 1; }
+
+    /* ── Action buttons ── */
+    .actions { display: flex; gap: 8px; margin-bottom: 20px; flex-wrap: wrap; }
+    .btn {
+      padding: 10px 20px; border: none; border-radius: 8px;
+      font-family: 'DM Sans', sans-serif; font-size: 14px; font-weight: 600;
+      cursor: pointer; transition: all 0.15s ease;
+    }
+    .btn-primary { background: var(--navy); color: var(--white); }
+    .btn-primary:hover { opacity: 0.9; }
+    .btn-secondary { background: var(--white); color: var(--navy); border: 1px solid var(--border); }
+    .btn-secondary:hover { background: var(--light-bg); }
+    .btn-green { background: var(--green); color: var(--white); }
+    .btn-green:hover { opacity: 0.9; }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    /* ── Student list ── */
+    .student-list { display: flex; flex-direction: column; gap: 6px; }
+
+    .student-row {
+      display: flex; align-items: center; gap: 12px;
+      padding: 12px 16px; background: var(--white); border-radius: 10px;
+      border: 1px solid var(--border); transition: border-color 0.15s;
+    }
+    .student-row.has-status { border-color: transparent; }
+
+    .student-name {
+      min-width: 160px; font-weight: 500; font-size: 15px;
+      flex-shrink: 0;
+    }
+    .student-grade {
+      font-size: 12px; color: var(--muted); font-weight: 500;
+      min-width: 32px; flex-shrink: 0;
+    }
+
+    .status-buttons { display: flex; gap: 4px; flex: 1; justify-content: flex-end; }
+    .status-btn {
+      padding: 7px 14px; border: 1px solid var(--border); border-radius: 6px;
+      font-family: 'DM Sans', sans-serif; font-size: 12px; font-weight: 600;
+      cursor: pointer; background: var(--white); color: var(--muted);
+      transition: all 0.15s ease; white-space: nowrap;
+    }
+    .status-btn:hover { border-color: var(--navy); color: var(--navy); }
+    .status-btn.active-present { background: var(--green); color: var(--white); border-color: var(--green); }
+    .status-btn.active-absent { background: var(--red); color: var(--white); border-color: var(--red); }
+    .status-btn.active-tardy { background: var(--gold); color: var(--white); border-color: var(--gold); }
+    .status-btn.active-ed { background: var(--blue); color: var(--white); border-color: var(--blue); }
+
+    /* Admin-set statuses shown as read-only badges */
+    .admin-badge {
+      padding: 7px 14px; border-radius: 6px; font-size: 12px; font-weight: 600;
+      white-space: nowrap;
+    }
+    .admin-badge.excused { background: #f3e8ff; color: #7c3aed; }
+    .admin-badge.field_trip { background: #ecfdf5; color: #059669; }
+    .admin-badge.nsd { background: #f1f5f9; color: #64748b; }
+
+    /* ── Notes ── */
+    .note-row {
+      padding: 0 16px 12px 16px; background: var(--white);
+      border-radius: 0 0 10px 10px; margin-top: -6px;
+      border: 1px solid var(--border); border-top: none;
+    }
+    .note-row input {
+      width: 100%; padding: 8px 12px; border: 1px solid var(--border);
+      border-radius: 6px; font-family: 'DM Sans', sans-serif; font-size: 13px;
+      background: var(--light-bg); color: var(--navy);
+    }
+    .note-row input::placeholder { color: var(--muted); }
+
+    /* ── Toast ── */
+    .toast {
+      position: fixed; bottom: 32px; left: 50%; transform: translateX(-50%);
+      padding: 14px 28px; border-radius: 10px; font-size: 14px; font-weight: 600;
+      color: var(--white); z-index: 1000; opacity: 0;
+      transition: opacity 0.3s ease; pointer-events: none;
+    }
+    .toast.show { opacity: 1; }
+    .toast.success { background: var(--green); }
+    .toast.error { background: var(--red); }
+
+    .empty-state {
+      text-align: center; padding: 48px 24px; color: var(--muted);
+      font-size: 15px;
+    }
+
+    /* ── Responsive ── */
+    @media (max-width: 640px) {
+      .controls { flex-direction: column; }
+      .control-group select, .control-group input[type="date"] { min-width: unset; width: 100%; }
+      .student-row { flex-wrap: wrap; gap: 8px; }
+      .student-name { min-width: unset; flex: 1 1 100%; }
+      .status-buttons { justify-content: flex-start; flex: 1 1 100%; }
+      .status-btn { padding: 7px 10px; font-size: 11px; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="topbar">
+  <a href="/">← Home</a>
+  <span class="topbar-title">Homeroom Attendance</span>
+  <span></span>
+</div>
+
+<div class="container">
+  <div class="page-header">
+    <h1>Homeroom Attendance</h1>
+    <p>Record daily attendance for your homeroom students.</p>
+  </div>
+
+  <div class="controls">
+    <div class="control-group">
+      <label>Date</label>
+      <input type="date" id="date-picker">
+    </div>
+    <div class="control-group">
+      <label>Homeroom Teacher</label>
+      <select id="teacher-select">
+        <option value="">— Select —</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="summary-bar" id="summary-bar" style="display:none;">
+    <span class="summary-item"><span class="summary-dot dot-present"></span> <span id="cnt-present">0</span> Present</span>
+    <span class="summary-item"><span class="summary-dot dot-absent"></span> <span id="cnt-absent">0</span> Absent</span>
+    <span class="summary-item"><span class="summary-dot dot-tardy"></span> <span id="cnt-tardy">0</span> Tardy</span>
+    <span class="summary-item"><span class="summary-dot dot-ed"></span> <span id="cnt-ed">0</span> ED</span>
+    <span class="summary-item"><span class="summary-dot dot-unmarked"></span> <span id="cnt-unmarked">0</span> Not Marked</span>
+    <span class="summary-spacer"></span>
+  </div>
+
+  <div class="actions" id="actions-bar" style="display:none;">
+    <button class="btn btn-green" onclick="markAllPresent()">✓ Mark All Present</button>
+    <button class="btn btn-secondary" onclick="clearAll()">Clear All</button>
+    <span style="flex:1;"></span>
+    <button class="btn btn-primary" id="submit-btn" onclick="submitAttendance()">Submit Attendance</button>
+  </div>
+
+  <div class="student-list" id="student-list">
+    <div class="empty-state">Select a homeroom teacher to load students.</div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const API = '';
+const ADMIN_STATUSES = ['excused', 'field_trip', 'nsd'];
+const ADMIN_LABELS = { excused: 'Excused Absence', field_trip: 'Field Trip', nsd: 'NSD' };
+
+let students = [];
+let attendance = {};  // student_id -> { status, note }
+let currentTeacherId = null;
+let currentUserEmail = null;
+let staffList = [];
+
+// ── Init ──
+document.addEventListener('DOMContentLoaded', async () => {
+  const today = new Date().toISOString().split('T')[0];
+  document.getElementById('date-picker').value = today;
+
+  document.getElementById('date-picker').addEventListener('change', loadStudents);
+  document.getElementById('teacher-select').addEventListener('change', onTeacherChange);
+
+  // Load session + teachers in parallel
+  const [sessionRes, teachersRes] = await Promise.all([
+    fetch('/api/session').then(r => r.json()),
+    fetch('/api/homeroom-attendance/teachers').then(r => r.json())
+  ]);
+
+  currentUserEmail = sessionRes.email || '';
+  staffList = teachersRes;
+
+  const sel = document.getElementById('teacher-select');
+  teachersRes.forEach(t => {
+    const opt = document.createElement('option');
+    opt.value = t.staff_id;
+    opt.textContent = `${t.first_name} ${t.last_name}`;
+    sel.appendChild(opt);
+  });
+
+  // Auto-select if logged-in user is a homeroom teacher
+  const match = teachersRes.find(t => t.email === currentUserEmail);
+  if (match) {
+    sel.value = match.staff_id;
+    onTeacherChange();
+  }
+});
+
+function onTeacherChange() {
+  currentTeacherId = document.getElementById('teacher-select').value;
+  if (currentTeacherId) {
+    loadStudents();
+  } else {
+    students = [];
+    attendance = {};
+    renderStudents();
+  }
+}
+
+async function loadStudents() {
+  if (!currentTeacherId) return;
+  const date = document.getElementById('date-picker').value;
+
+  const [studentsRes, attRes] = await Promise.all([
+    fetch(`${API}/api/homeroom-attendance/students?teacher_id=${currentTeacherId}`).then(r => r.json()),
+    fetch(`${API}/api/homeroom-attendance/${date}?teacher_id=${currentTeacherId}`).then(r => r.json())
+  ]);
+
+  students = studentsRes;
+  attendance = {};
+  attRes.forEach(a => {
+    attendance[a.student_id] = { status: a.status, note: a.notes || '' };
+  });
+
+  renderStudents();
+}
+
+function renderStudents() {
+  const list = document.getElementById('student-list');
+  const summaryBar = document.getElementById('summary-bar');
+  const actionsBar = document.getElementById('actions-bar');
+
+  if (!students.length) {
+    list.innerHTML = '<div class="empty-state">No students found for this homeroom.</div>';
+    summaryBar.style.display = 'none';
+    actionsBar.style.display = 'none';
+    if (!currentTeacherId) {
+      list.innerHTML = '<div class="empty-state">Select a homeroom teacher to load students.</div>';
+    }
+    return;
+  }
+
+  summaryBar.style.display = 'flex';
+  actionsBar.style.display = 'flex';
+
+  let html = '';
+  students.forEach(s => {
+    const att = attendance[s.student_id] || {};
+    const status = att.status || '';
+    const note = att.note || '';
+    const isAdmin = ADMIN_STATUSES.includes(status);
+    const hasStatus = status ? ' has-status' : '';
+
+    html += `<div class="student-row${hasStatus}" id="row-${s.student_id}">`;
+    html += `  <span class="student-name">${s.last_name}, ${s.first_name}</span>`;
+    html += `  <span class="student-grade">${s.grade}</span>`;
+    html += `  <div class="status-buttons">`;
+
+    if (isAdmin) {
+      // Admin-set status — show as read-only badge
+      html += `<span class="admin-badge ${status}">${ADMIN_LABELS[status]}</span>`;
+      html += `<button class="status-btn" style="font-size:11px; color:var(--muted);" onclick="overrideAdmin(${s.student_id})" title="Override admin status">✕</button>`;
+    } else {
+      html += `<button class="status-btn ${status==='present'?'active-present':''}" onclick="setStatus(${s.student_id},'present')">Present</button>`;
+      html += `<button class="status-btn ${status==='absent'?'active-absent':''}" onclick="setStatus(${s.student_id},'absent')">Absent</button>`;
+      html += `<button class="status-btn ${status==='tardy'?'active-tardy':''}" onclick="setStatus(${s.student_id},'tardy')">Tardy</button>`;
+      html += `<button class="status-btn ${status==='ed'?'active-ed':''}" onclick="setStatus(${s.student_id},'ed')">Early Dismissal</button>`;
+    }
+
+    html += `  </div>`;
+    html += `</div>`;
+
+    // Show note row for non-present statuses
+    if (status && status !== 'present' && !isAdmin) {
+      html += `<div class="note-row">`;
+      html += `  <input type="text" placeholder="Optional note..." value="${escapeHtml(note)}" onchange="setNote(${s.student_id}, this.value)">`;
+      html += `</div>`;
+    }
+  });
+
+  list.innerHTML = html;
+  updateSummary();
+}
+
+function setStatus(studentId, status) {
+  const current = attendance[studentId];
+  if (current && current.status === status) {
+    // Toggle off
+    delete attendance[studentId];
+  } else {
+    attendance[studentId] = { status, note: (current?.note) || '' };
+  }
+  renderStudents();
+}
+
+function overrideAdmin(studentId) {
+  // Clear the admin-set status so teacher can re-enter
+  delete attendance[studentId];
+  renderStudents();
+}
+
+function setNote(studentId, note) {
+  if (attendance[studentId]) {
+    attendance[studentId].note = note;
+  }
+}
+
+function markAllPresent() {
+  students.forEach(s => {
+    const current = attendance[s.student_id];
+    // Don't override admin-set statuses
+    if (current && ADMIN_STATUSES.includes(current.status)) return;
+    attendance[s.student_id] = { status: 'present', note: '' };
+  });
+  renderStudents();
+}
+
+function clearAll() {
+  students.forEach(s => {
+    const current = attendance[s.student_id];
+    // Don't clear admin-set statuses
+    if (current && ADMIN_STATUSES.includes(current.status)) return;
+    delete attendance[s.student_id];
+  });
+  renderStudents();
+}
+
+function updateSummary() {
+  let present = 0, absent = 0, tardy = 0, ed = 0, unmarked = 0;
+  students.forEach(s => {
+    const att = attendance[s.student_id];
+    if (!att || !att.status) { unmarked++; return; }
+    switch (att.status) {
+      case 'present': present++; break;
+      case 'absent': absent++; break;
+      case 'tardy': tardy++; break;
+      case 'ed': ed++; break;
+      default: present++; break; // admin statuses count as accounted for
+    }
+  });
+  document.getElementById('cnt-present').textContent = present;
+  document.getElementById('cnt-absent').textContent = absent;
+  document.getElementById('cnt-tardy').textContent = tardy;
+  document.getElementById('cnt-ed').textContent = ed;
+  document.getElementById('cnt-unmarked').textContent = unmarked;
+}
+
+async function submitAttendance() {
+  const date = document.getElementById('date-picker').value;
+  if (!currentTeacherId) return showToast('Select a homeroom teacher', 'error');
+  if (!date) return showToast('Select a date', 'error');
+
+  // Build payload — only include students with a status set
+  const payload = {};
+  students.forEach(s => {
+    const att = attendance[s.student_id];
+    if (att && att.status) {
+      payload[s.student_id] = { status: att.status, note: att.note || '' };
+    }
+  });
+
+  if (Object.keys(payload).length === 0) {
+    return showToast('No attendance marked yet', 'error');
+  }
+
+  const btn = document.getElementById('submit-btn');
+  btn.disabled = true;
+  btn.textContent = 'Saving...';
+
+  try {
+    const res = await fetch(`${API}/api/homeroom-attendance`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        date,
+        staff_id: currentTeacherId,
+        attendance: payload
+      })
+    });
+    const data = await res.json();
+    if (data.success) {
+      showToast(`Saved attendance for ${data.saved_count} students`, 'success');
+    } else {
+      showToast(data.error || 'Error saving', 'error');
+    }
+  } catch (e) {
+    showToast('Network error', 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Submit Attendance';
+  }
+}
+
+function showToast(msg, type) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = `toast ${type} show`;
+  setTimeout(() => t.classList.remove('show'), 3000);
+}
+
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+</script>
+</body>
+</html>
