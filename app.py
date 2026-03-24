@@ -1182,10 +1182,46 @@ def get_students_list():
                        date_of_birth,email,phone,address,
                        emergency_contact_name,emergency_contact_phone,
                        enrollment_date,notes,before_care,
-                       dismissal_mon,dismissal_tue,dismissal_wed,dismissal_thu,dismissal_fri
+                       dismissal_mon,dismissal_tue,dismissal_wed,dismissal_thu,dismissal_fri,
+                       homeroom_teacher_id
                 FROM students ORDER BY last_name, first_name
             """)
             return jsonify(fa(cur))
+    finally:
+        conn.close()
+
+@app.route("/api/students", methods=["POST"])
+@people_required
+def create_student():
+    data = request.json
+    conn = get_db_connection()
+    try:
+        with conn.cursor() as cur:
+            hr_id = data.get("homeroom_teacher_id")
+            hr_id = int(hr_id) if hr_id else None
+            cur.execute("""
+                INSERT INTO students (first_name, last_name, grade, status,
+                    date_of_birth, email, phone, address,
+                    emergency_contact_name, emergency_contact_phone,
+                    enrollment_date, notes, before_care,
+                    dismissal_mon, dismissal_tue, dismissal_wed,
+                    dismissal_thu, dismissal_fri, homeroom_teacher_id)
+                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                RETURNING student_id
+            """, (data.get("first_name"),data.get("last_name"),data.get("grade"),
+                  data.get("status","active"),
+                  data.get("date_of_birth"),data.get("email"),data.get("phone"),data.get("address"),
+                  data.get("emergency_contact_name"),data.get("emergency_contact_phone"),
+                  data.get("enrollment_date"),data.get("notes"),
+                  1 if data.get("before_care") else 0,
+                  data.get("dismissal_mon"),data.get("dismissal_tue"),data.get("dismissal_wed"),
+                  data.get("dismissal_thu"),data.get("dismissal_fri"),hr_id))
+            new_id = cur.fetchone()[0]
+        conn.commit()
+        return jsonify({"success":True,"student_id":new_id}),201
+    except Exception as e:
+        conn.rollback()
+        return jsonify({"error":str(e)}),500
     finally:
         conn.close()
 

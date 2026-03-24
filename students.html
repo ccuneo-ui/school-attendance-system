@@ -134,6 +134,7 @@
       <h1>Student Directory</h1>
       <p>View and edit student profiles, status, and dismissal defaults</p>
     </div>
+    <button class="btn btn-primary" onclick="openAddModal()">+ Add Student</button>
   </div>
 
   <div class="stats">
@@ -433,10 +434,13 @@ function render() {
 }
 
 // ── Modal ──
+let isAddMode = false;
+
 function openModal(studentId) {
   const s = allStudents.find(x => x.student_id === studentId);
   if (!s) return;
   editingId = studentId;
+  isAddMode = false;
 
   document.getElementById('modal-title').textContent = `${s.first_name} ${s.last_name}`;
   document.getElementById('modal-subtitle').textContent = `Grade ${s.grade || '—'} · Student ID ${s.student_id}`;
@@ -461,23 +465,63 @@ function openModal(studentId) {
   document.getElementById('f-thu').value = s.dismissal_thu || '';
   document.getElementById('f-fri').value = s.dismissal_fri || '';
 
+  document.getElementById('save-btn').textContent = 'Save Changes';
+  document.getElementById('edit-modal').classList.add('open');
+}
+
+function openAddModal() {
+  editingId = null;
+  isAddMode = true;
+
+  document.getElementById('modal-title').textContent = 'Add Student';
+  document.getElementById('modal-subtitle').textContent = 'Create a new student record';
+
+  document.getElementById('f-status').value = 'active';
+  document.getElementById('f-grade').value = '';
+  document.getElementById('f-first-name').value = '';
+  document.getElementById('f-last-name').value = '';
+  document.getElementById('f-dob').value = '';
+  document.getElementById('f-email').value = '';
+  document.getElementById('f-phone').value = '';
+  document.getElementById('f-address').value = '';
+  document.getElementById('f-ec-name').value = '';
+  document.getElementById('f-ec-phone').value = '';
+  document.getElementById('f-enrollment-date').value = new Date().toISOString().split('T')[0];
+  document.getElementById('f-homeroom-teacher').value = '';
+  document.getElementById('f-notes').value = '';
+  document.getElementById('f-before-care').checked = false;
+  document.getElementById('f-mon').value = '';
+  document.getElementById('f-tue').value = '';
+  document.getElementById('f-wed').value = '';
+  document.getElementById('f-thu').value = '';
+  document.getElementById('f-fri').value = '';
+
+  document.getElementById('save-btn').textContent = 'Add Student';
   document.getElementById('edit-modal').classList.add('open');
 }
 
 function closeModal() {
   document.getElementById('edit-modal').classList.remove('open');
   editingId = null;
+  isAddMode = false;
 }
 
 async function saveStudent() {
-  if (!editingId) return;
   const btn = document.getElementById('save-btn');
+  const firstName = document.getElementById('f-first-name').value.trim();
+  const lastName = document.getElementById('f-last-name').value.trim();
+
+  if (!firstName || !lastName) {
+    showToast('First name and last name are required', true);
+    return;
+  }
+
   btn.disabled = true;
-  btn.textContent = 'Saving…';
+  btn.textContent = isAddMode ? 'Adding…' : 'Saving…';
 
   const payload = {
-    first_name: document.getElementById('f-first-name').value.trim(),
-    last_name: document.getElementById('f-last-name').value.trim(),
+    first_name: firstName,
+    last_name: lastName,
     grade: document.getElementById('f-grade').value,
     status: document.getElementById('f-status').value,
     date_of_birth: document.getElementById('f-dob').value,
@@ -498,27 +542,37 @@ async function saveStudent() {
   };
 
   try {
-    const r = await fetch(`${API}/students/${editingId}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    });
-    if (!r.ok) throw new Error();
-
-    // Update local data
-    const idx = allStudents.findIndex(s => s.student_id === editingId);
-    if (idx !== -1) allStudents[idx] = { ...allStudents[idx], ...payload };
+    if (isAddMode) {
+      const r = await fetch(`${API}/students`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      if (!r.ok) throw new Error();
+      const result = await r.json();
+      allStudents.push({ ...payload, student_id: result.student_id });
+      showToast('Student added successfully');
+    } else {
+      const r = await fetch(`${API}/students/${editingId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      if (!r.ok) throw new Error();
+      const idx = allStudents.findIndex(s => s.student_id === editingId);
+      if (idx !== -1) allStudents[idx] = { ...allStudents[idx], ...payload };
+      showToast('Student saved successfully');
+    }
 
     updateStats();
     render();
     closeModal();
-    showToast('Student saved successfully');
   } catch(e) {
-    showToast('Error saving student', true);
+    showToast(isAddMode ? 'Error adding student' : 'Error saving student', true);
   }
 
   btn.disabled = false;
-  btn.textContent = 'Save Changes';
+  btn.textContent = isAddMode ? 'Add Student' : 'Save Changes';
 }
 
 // ── Toast ──
