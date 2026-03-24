@@ -219,6 +219,12 @@
           <label>Enrollment Date</label>
           <input type="date" id="f-enrollment-date">
         </div>
+        <div class="field" style="grid-column:1/-1">
+          <label>Homeroom Teacher</label>
+          <select id="f-homeroom-teacher">
+            <option value="">— Not Assigned —</option>
+          </select>
+        </div>
       </div>
 
       <div class="section-title">Personal Information</div>
@@ -299,6 +305,7 @@ let DISMISSAL_OPTIONS = [
 ];
 
 let allStudents = [];
+let allStaff = [];
 let currentFilter = 'all';
 let sortKey = 'last_name';
 let sortAsc = true;
@@ -313,6 +320,19 @@ async function init() {
     opts.sort((a,b) => a.name.localeCompare(b.name)).forEach(o => DISMISSAL_OPTIONS.push({ value: o.name, label: o.name }));
   } catch(e) { console.error('Failed to load dismissal options', e); }
   populateDismissalDropdowns();
+  // Load staff for homeroom dropdown
+  try {
+    const sr = await fetch('/api/people/staff');
+    const staffData = await sr.json();
+    allStaff = (staffData.staff || staffData).filter(s => s.status === 'active').sort((a,b) => a.last_name.localeCompare(b.last_name));
+    const sel = document.getElementById('f-homeroom-teacher');
+    allStaff.forEach(s => {
+      const opt = document.createElement('option');
+      opt.value = s.staff_id;
+      opt.textContent = `${s.last_name}, ${s.first_name}${s.title ? ' (' + s.title + ')' : ''}`;
+      sel.appendChild(opt);
+    });
+  } catch(e) { console.error('Failed to load staff', e); }
   try {
     const r = await fetch(`${API}/students`);
     allStudents = await r.json();
@@ -432,6 +452,7 @@ function openModal(studentId) {
   document.getElementById('f-ec-name').value = s.emergency_contact_name || '';
   document.getElementById('f-ec-phone').value = s.emergency_contact_phone || '';
   document.getElementById('f-enrollment-date').value = s.enrollment_date || '';
+  document.getElementById('f-homeroom-teacher').value = s.homeroom_teacher_id || '';
   document.getElementById('f-notes').value = s.notes || '';
   document.getElementById('f-before-care').checked = !!s.before_care;
   document.getElementById('f-mon').value = s.dismissal_mon || '';
@@ -473,6 +494,7 @@ async function saveStudent() {
     dismissal_wed: document.getElementById('f-wed').value,
     dismissal_thu: document.getElementById('f-thu').value,
     dismissal_fri: document.getElementById('f-fri').value,
+    homeroom_teacher_id: document.getElementById('f-homeroom-teacher').value || null,
   };
 
   try {
