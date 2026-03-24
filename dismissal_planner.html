@@ -27,6 +27,8 @@
     --absent-light: #fde8e8;
     --ed: #7a4a00;
     --ed-light: #fdf0dc;
+    --tardy: #b8860b;
+    --tardy-light: #fdf6e3;
     --excused: #1a4a8a;
     --excused-light: #e6edf8;
     --fieldtrip: #5a1a6a;
@@ -132,6 +134,7 @@
   .badge-present   { background: var(--present-light); color: var(--present); }
   .badge-absent    { background: var(--absent-light); color: var(--absent); }
   .badge-ed        { background: var(--ed-light); color: var(--ed); }
+  .badge-tardy     { background: var(--tardy-light); color: var(--tardy); }
   .badge-excused   { background: var(--excused-light); color: var(--excused); }
   .badge-fieldtrip { background: var(--fieldtrip-light); color: var(--fieldtrip); }
   .badge-nsd       { background: var(--nsd-light); color: var(--nsd); }
@@ -264,7 +267,8 @@
           <option value="">— Not set —</option>
           <option value="present">Present</option>
           <option value="absent">Absent</option>
-          <option value="ed">ED</option>
+          <option value="tardy">Tardy</option>
+          <option value="ed">Early Dismissal</option>
           <option value="excused">Excused Absence</option>
           <option value="field_trip">Field Trip</option>
           <option value="nsd">NSD</option>
@@ -313,8 +317,8 @@
 const API = '/api';
 const DAYS = ['sun','mon','tue','wed','thu','fri','sat'];
 const DAY_NAMES = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
-const ATTENDANCE_LABELS = { present:'Present', absent:'Absent', ed:'ED', excused:'Excused Absence', field_trip:'Field Trip', nsd:'NSD' };
-const ATTENDANCE_CLASSES = { present:'badge-present', absent:'badge-absent', ed:'badge-ed', excused:'badge-excused', field_trip:'badge-fieldtrip', nsd:'badge-nsd' };
+const ATTENDANCE_LABELS = { present:'Present', absent:'Absent', tardy:'Tardy', ed:'Early Dismissal', excused:'Excused Absence', field_trip:'Field Trip', nsd:'NSD' };
+const ATTENDANCE_CLASSES = { present:'badge-present', absent:'badge-absent', tardy:'badge-tardy', ed:'badge-ed', excused:'badge-excused', field_trip:'badge-fieldtrip', nsd:'badge-nsd' };
 
 let currentDate = new Date();
 let allStudents = [];
