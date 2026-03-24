@@ -375,8 +375,7 @@ def login():
 
 @app.route("/auth/google")
 def auth_google():
-    redirect_uri = f"https://{request.host}/auth/callback"
-    return google.authorize_redirect(redirect_uri)
+    return google.authorize_redirect("https://admin.mizzentopdayschool.org/auth/callback")
 
 @app.route("/auth/callback")
 def auth_callback():
