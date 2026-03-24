@@ -501,7 +501,6 @@
         ${f2(s.family_can_pay,'Family Can Pay')}
         ${f2(s.max_discount,'Max Discount')}
         ${s.aid_type && s.mds_aid_amount ? `<div class="detail-field"><span class="detail-label">${aidTypeLabel}</span><span class="detail-value">${fmt(s.mds_aid_amount)}</span></div>` : ''}
-        ${f2(s.family_total,'Family Tuition Total')}
         ${f2(s.family_total_prior,'Family Total Prior')}
         ${s.appeal_letter ? `<div class="detail-field"><span class="detail-label">Appeal Letter</span><span class="detail-value">${esc(s.appeal_letter)}</span></div>` : ''}
       </div>` : ''}`
@@ -640,6 +639,10 @@
         </div>
       </div>
       <div class="form-section-title" style="margin-top:20px;">Students</div>
+      <div id="familyTuitionTotalBar" style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:var(--navy);color:#fff;border-radius:8px;margin-bottom:12px;font-size:14px;font-weight:600;">
+        <span>Family Net Tuition Total</span>
+        <span id="familyTuitionTotalValue">$0</span>
+      </div>
       <div class="student-edit-list" id="studentEditList">${editStudents.map((s,i)=>renderStudentCard(s,i)).join('')}</div>
       <button class="add-student-btn" onclick="addStudentToEdit()">+ Add Student</button>
       <div class="form-section-title" style="margin-top:20px;">Notes</div>
@@ -718,9 +721,8 @@
           <label class="form-label" id="stu-aid-amount-label-${i}">Aid Amount</label>
           <div id="stu-aid-amount-input-${i}"></div>
         </div>
-        <div class="form-group"><label class="form-label">Net Tuition</label><input type="text" class="form-input" inputmode="decimal" id="stu-net-tuition-${i}" value="${f(s.net_tuition)}" onchange="updateStu(${i},'net_tuition',this.value);calcAidFromNet(${i})" placeholder="0"></div>
+        <div class="form-group"><label class="form-label">Net Tuition</label><input type="text" class="form-input" inputmode="decimal" id="stu-net-tuition-${i}" value="${f(s.net_tuition)}" onchange="updateStu(${i},'net_tuition',this.value);calcAidFromNet(${i});updateFamilyTuitionTotal()" placeholder="0"></div>
         <div class="form-group"><label class="form-label">Prior Year Tuition</label><input type="text" class="form-input" inputmode="decimal" value="${f(s.prior_year_tuition)}" onchange="updateStu(${i},'prior_year_tuition',this.value)" placeholder="0"></div>
-        <div class="form-group"><label class="form-label">Family Tuition Total</label><input type="text" class="form-input" inputmode="decimal" value="${f(s.family_total)}" onchange="updateStu(${i},'family_total',this.value)" placeholder="0"></div>
       </div>
     </div>`;
   }
@@ -844,6 +846,7 @@
       updateStu(i, 'net_tuition', net);
       const el = document.getElementById(`stu-net-tuition-${i}`);
       if (el) el.value = net;
+      updateFamilyTuitionTotal();
     }
   }
 
@@ -863,11 +866,18 @@
     }
   }
 
+  function updateFamilyTuitionTotal() {
+    const total = editStudents.reduce((sum, s) => sum + (parseFloat(s.net_tuition) || 0), 0);
+    const el = document.getElementById('familyTuitionTotalValue');
+    if (el) el.textContent = '$' + total.toLocaleString();
+  }
+
   // Initialize aid fields after rendering student cards
   function initAidFields() {
     editStudents.forEach((s, i) => {
       renderAidAmountField(i);
     });
+    updateFamilyTuitionTotal();
   }
   function autoTuition(i, school) {
     const t = TUITION_JS[school];
