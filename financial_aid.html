@@ -222,6 +222,14 @@
       <button onclick="setFilter('activeFilter','active',this)">Active</button>
       <button onclick="setFilter('activeFilter','inactive',this)">Inactive</button>
     </div>
+    <span class="filter-label">Aid Type:</span>
+    <div class="filter-toggle">
+      <button class="active" onclick="setFilter('aidType','all',this)">All</button>
+      <button onclick="setFilter('aidType','mds',this)">MDS Aid</button>
+      <button onclick="setFilter('aidType','remission_mizzentop',this)">Remission 70%</button>
+      <button onclick="setFilter('aidType','remission_affiliate',this)">Remission 50%</button>
+      <button onclick="setFilter('aidType','sibling',this)">Sibling Discount</button>
+    </div>
   </div>
 
   <div class="family-list" id="familyList">
@@ -337,7 +345,7 @@
   let allFamilies = [];
   let currentYear = '';
   let allYears    = [];
-  let filters     = { division:'all', status:'all', activeFilter:'all', search:'' };
+  let filters     = { division:'all', status:'all', activeFilter:'all', aidType:'all', search:'' };
   let editingFamilyId = null;
   let editStudents    = [];
   let selectedUploadFile = null;
@@ -444,6 +452,9 @@
       if (filters.status==='pending'  &&  f.contract_sent) return false;
       if (filters.activeFilter==='active'   && f.status==='inactive') return false;
       if (filters.activeFilter==='inactive' && f.status!=='inactive') return false;
+      if (filters.aidType!=='all') {
+        if (!f.students.some(s => s.aid_type === filters.aidType)) return false;
+      }
       if (filters.division!=='all') {
         if (filters.division==='PreK') {
           if (!f.students.some(s=>s.school && s.school.startsWith('PreK'))) return false;
