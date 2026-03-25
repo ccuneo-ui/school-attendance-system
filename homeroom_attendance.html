@@ -71,6 +71,12 @@
     .dot-unmarked { background: var(--border); }
 
     .summary-spacer { flex: 1; }
+    .submitted-badge {
+      display: none; font-size: 12px; font-weight: 600; padding: 5px 12px;
+      border-radius: 6px; background: #e8f0e7; color: #2d5a27;
+      white-space: nowrap;
+    }
+    .submitted-badge.show { display: inline-flex; align-items: center; gap: 5px; }
 
     /* ── Action buttons ── */
     .actions { display: flex; gap: 8px; margin-bottom: 20px; flex-wrap: wrap; }
@@ -202,6 +208,7 @@
     <span class="summary-item"><span class="summary-dot dot-ed"></span> <span id="cnt-ed">0</span> ED</span>
     <span class="summary-item"><span class="summary-dot dot-unmarked"></span> <span id="cnt-unmarked">0</span> Not Marked</span>
     <span class="summary-spacer"></span>
+    <span class="submitted-badge" id="submitted-badge">✓ Submitted</span>
   </div>
 
   <div class="actions" id="actions-bar" style="display:none;">
@@ -275,6 +282,7 @@ function onTeacherChange() {
 
 async function loadStudents() {
   if (!currentTeacherId) return;
+  document.getElementById('submitted-badge').classList.remove('show');
   const date = document.getElementById('date-picker').value;
 
   const [studentsRes, attRes] = await Promise.all([
@@ -289,6 +297,11 @@ async function loadStudents() {
   });
 
   renderStudents();
+
+  // Show submitted badge if all students already have a status (previously submitted)
+  if (students.length > 0 && students.every(s => attendance[s.student_id] && attendance[s.student_id].status)) {
+    document.getElementById('submitted-badge').classList.add('show');
+  }
 }
 
 function renderStudents() {
@@ -446,6 +459,7 @@ async function submitAttendance() {
     const data = await res.json();
     if (data.success) {
       showToast(`Saved attendance for ${data.saved_count} students`, 'success');
+      document.getElementById('submitted-badge').classList.add('show');
     } else {
       showToast(data.error || 'Error saving', 'error');
     }
