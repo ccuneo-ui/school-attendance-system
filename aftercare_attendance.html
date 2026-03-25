@@ -390,11 +390,11 @@
   let checkoutRecordId = null;
   let checkoutSelectedTime = null;
 
-  // Check-in time slots: 3:30 PM to 5:00 PM
+  // Check-in time slots: 3:30 PM to 5:30 PM
   const CHECKIN_SLOTS = [];
   (function() {
     let h = 15, m = 30; // 3:30 PM
-    while (h < 17 || (h === 17 && m === 0)) {
+    while (h < 17 || (h === 17 && m <= 30)) {
       const h12 = h > 12 ? h - 12 : h;
       CHECKIN_SLOTS.push(`${h12}:${String(m).padStart(2,'0')} PM`);
       m += 15;
