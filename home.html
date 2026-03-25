@@ -117,7 +117,7 @@
 
 
     <!-- PEOPLE -->
-    <div class="card" style="background-color:#3a5a7a;">
+    <div class="card" id="card-people" style="background-color:#3a5a7a; display:none;">
       <span class="card-badge">Records</span>
       <svg class="card-icon" viewBox="0 0 24 24" fill="none">
         <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" stroke="white" stroke-width="1.5" stroke-linecap="round"/>
@@ -139,7 +139,7 @@
     </div>
 
     <!-- BILLING -->
-    <div class="card card-billing">
+    <div class="card card-billing" id="card-billing" style="display:none;">
       <span class="card-badge">Finance Access</span>
       <svg class="card-icon" viewBox="0 0 24 24" fill="none">
         <path d="M12 2v20M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
@@ -168,5 +168,11 @@
     <a href="/auth/logout" style="color:var(--muted);text-decoration:none;font-weight:500;" onmouseover="this.style.color='var(--navy)'" onmouseout="this.style.color='var(--muted)'">Sign Out</a>
   </footer>
 </div>
+<script>
+fetch('/api/session').then(r=>r.json()).then(s=>{
+  if(s.can_manage_people||s.is_superadmin) document.getElementById('card-people').style.display='';
+  if(s.can_manage_billing||s.is_superadmin) document.getElementById('card-billing').style.display='';
+});
+</script>
 </body>
 </html>
