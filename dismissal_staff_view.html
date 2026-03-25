@@ -582,11 +582,9 @@
   <div class="divider-v"></div>
 
   <div class="filter-group">
-    <span class="filter-label">Ends In</span>
-    <div class="filter-pills" id="locationPills">
-      <div class="pill active" data-loc="all" onclick="setLocation(this)">All</div>
-      <div class="pill" data-loc="homeroom" onclick="setLocation(this)">Homeroom</div>
-      <div class="pill" data-loc="elective" onclick="setLocation(this)">Elective</div>
+    <span class="filter-label">Homeroom</span>
+    <div class="filter-pills" id="homeroomPills">
+      <div class="pill active" data-homeroom="all" onclick="setHomeroom(this)">All</div>
     </div>
   </div>
 
@@ -644,7 +642,7 @@ const ELECTIVE_SUBJECTS = ['Art','Music','PE','Library','Technology','Drama','Sp
 let allStudents = [];
 let filteredStudents = [];
 let currentGrade    = localStorage.getItem('dismissal_grade') || 'all';
-let currentLocation = 'all';
+let currentHomeroom = 'all';
 let currentView     = localStorage.getItem('dismissal_view') || 'grouped';
 let groupBy         = 'grade'; // used in grouped view
 let dataSource      = 'today'; // 'today' | 'default'
@@ -702,6 +700,7 @@ async function loadData() {
     (dataSource === 'default') ? 'flex' : 'none';
 
   buildGradePills();
+  buildHomeroomPills();
   applyFilters();
 }
 
@@ -795,6 +794,22 @@ function buildGradePills() {
   });
 }
 
+function buildHomeroomPills() {
+  const teachers = [...new Set(allStudents.map(s => s.homeroomTeacher).filter(Boolean))].sort();
+  const container = document.getElementById('homeroomPills');
+  container.innerHTML = `<div class="pill ${currentHomeroom==='all'?'active':''}" data-homeroom="all" onclick="setHomeroom(this)">All</div>`;
+  teachers.forEach(t => {
+    const div = document.createElement('div');
+    div.className = `pill${currentHomeroom===t?' active':''}`;
+    div.dataset.homeroom = t;
+    // Show last name only for brevity
+    div.textContent = t.split(' ').pop();
+    div.title = t;
+    div.onclick = () => setHomeroom(div);
+    container.appendChild(div);
+  });
+}
+
 function setGrade(el) {
   document.querySelectorAll('#gradePills .pill').forEach(p => p.classList.remove('active'));
   el.classList.add('active');
@@ -803,10 +818,10 @@ function setGrade(el) {
   applyFilters();
 }
 
-function setLocation(el) {
-  document.querySelectorAll('#locationPills .pill').forEach(p => p.classList.remove('active'));
+function setHomeroom(el) {
+  document.querySelectorAll('#homeroomPills .pill').forEach(p => p.classList.remove('active'));
   el.classList.add('active');
-  currentLocation = el.dataset.loc;
+  currentHomeroom = el.dataset.homeroom;
   applyFilters();
 }
 
@@ -824,11 +839,7 @@ function applyFilters() {
 
   filteredStudents = allStudents.filter(s => {
     if (currentGrade !== 'all' && s.grade !== currentGrade) return false;
-    if (currentLocation !== 'all') {
-      const loc = (s.endsIn || 'homeroom').toLowerCase();
-      if (currentLocation === 'elective'  && loc !== 'elective')  return false;
-      if (currentLocation === 'homeroom'  && loc !== 'homeroom')  return false;
-    }
+    if (currentHomeroom !== 'all' && (s.homeroomTeacher || '') !== currentHomeroom) return false;
     if (q && !s.name.toLowerCase().includes(q) && !(s.grade||'').toLowerCase().includes(q) &&
         !(s.dismissal||'').toLowerCase().includes(q) && !(s.activity||'').toLowerCase().includes(q) &&
         !(s.elective||'').toLowerCase().includes(q)) return false;
@@ -881,7 +892,6 @@ function renderTable() {
       <td><span class="student-name">${esc(s.lastName)}, ${esc(s.firstName)}</span>${attBadge(s)}</td>
       <td><span class="grade-badge">${esc(s.grade)}</span></td>
       <td>${dismissalTag(s)}</td>
-      <td>${locationTag(s)}</td>
     </tr>
   `).join('');
 
@@ -893,7 +903,6 @@ function renderTable() {
             <th>Student</th>
             <th>Grade</th>
             <th>Dismissal</th>
-            <th>Ends Day In</th>
           </tr>
         </thead>
         <tbody>${rows}</tbody>
@@ -940,7 +949,6 @@ function renderGrouped() {
         <span class="gsrow-name">${esc(s.lastName)}, ${esc(s.firstName)}</span>${attBadge(s)}
         <div class="gsrow-meta">
           ${groupByField === 'grade' ? dismissalTag(s) : `<span class="grade-badge">${esc(s.grade)}</span>`}
-          ${locationTag(s)}
         </div>
       </div>
     `).join('');
