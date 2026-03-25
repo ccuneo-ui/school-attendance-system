@@ -453,7 +453,7 @@
       if (filters.activeFilter==='active'   && f.status==='inactive') return false;
       if (filters.activeFilter==='inactive' && f.status!=='inactive') return false;
       if (filters.aidType!=='all') {
-        if (!f.students.some(s => s.aid_type === filters.aidType)) return false;
+        if (!f.students.some(s => s.aid_type === filters.aidType && parseFloat(s.mds_aid_amount) > 0)) return false;
       }
       if (filters.division!=='all') {
         if (filters.division==='PreK') {
