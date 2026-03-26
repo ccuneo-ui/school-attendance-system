@@ -592,7 +592,7 @@ function renderSubGroups(subGroups) {
   return Object.keys(subGroups).sort().map(key => {
     const students = subGroups[key];
     return `<div class="sub-group">
-      <div class="sub-label">${key}</div>
+      <div class="sub-label">${key} <span style="font-weight:500; color:var(--text); opacity:0.5;">${students.length}</span></div>
       ${students.map(s => renderStudentRow(s, false)).join('')}
     </div>`;
   }).join('');
