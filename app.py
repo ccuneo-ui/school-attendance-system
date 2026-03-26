@@ -846,6 +846,7 @@ def get_dismissal_today():
                        s.last_name AS "lastName", s.grade,
                        COALESCE(d.dismissal_type, s.{col}) AS dismissal,
                        d.destination AS activity,
+                       CASE WHEN d.dismissal_id IS NOT NULL THEN TRUE ELSE FALSE END AS confirmed,
                        'homeroom' AS "endsIn", NULL AS elective, d.notes,
                        att.att_status AS "attStatus",
                        COALESCE(st.first_name || ' ' || st.last_name, '') AS "homeroomTeacher"

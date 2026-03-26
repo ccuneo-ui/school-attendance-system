@@ -359,6 +359,9 @@
   .tag-aftercare { background: var(--teal-lt); color: var(--teal);  }
   .tag-activity  { background: var(--purple-lt); color: var(--purple); }
   .tag-none   { background: #f2f2f2;          color: var(--muted);  }
+  .confirm-label { font-size: 10px; font-weight: 500; padding: 2px 6px; border-radius: 4px; white-space: nowrap; }
+  .confirm-label.default { background: #f5f0e0; color: #9a8040; }
+  .confirm-label.confirmed { background: #e8f0e7; color: #2d5a27; }
 
   .location-badge {
     display: inline-flex;
@@ -950,40 +953,39 @@ function dismissalTag(s) {
   const d = (s.dismissal || '').toLowerCase();
   const act = s.activity || '';
   const actLower = act.toLowerCase();
+  const label = s.confirmed
+    ? '<span class="confirm-label confirmed">confirmed</span>'
+    : '<span class="confirm-label default">default</span>';
 
   // When plan is filled, activity has the specific destination name
   if (act) {
-    // Pick Up
     if (actLower === 'pick up' || actLower === 'pickup') {
-      return `<span class="dismissal-tag tag-pickup">${pickupIcon()} Pick Up</span>`;
+      return `<span class="dismissal-tag tag-pickup">${pickupIcon()} Pick Up</span> ${label}`;
     }
-    // Bus route — check if it's a known bus route or dismissal type is bus
     if (d === 'bus' || BUS_ROUTES.includes(act)) {
-      return `<span class="dismissal-tag tag-bus">${busIcon()} ${esc(act)}</span>`;
+      return `<span class="dismissal-tag tag-bus">${busIcon()} ${esc(act)}</span> ${label}`;
     }
-    // Aftercare
     if (actLower.includes('aftercare')) {
-      return `<span class="dismissal-tag tag-aftercare">${actIcon()} ${esc(act)}</span>`;
+      return `<span class="dismissal-tag tag-aftercare">${actIcon()} ${esc(act)}</span> ${label}`;
     }
-    // Other activity (HOPE, Book Club, etc.)
-    return `<span class="dismissal-tag tag-activity">${actIcon()} ${esc(act)}</span>`;
+    return `<span class="dismissal-tag tag-activity">${actIcon()} ${esc(act)}</span> ${label}`;
   }
 
   // Defaults mode — no specific destination, just generic type
   if (d === 'pickup') {
-    return `<span class="dismissal-tag tag-pickup">${pickupIcon()} Pick Up</span>`;
+    return `<span class="dismissal-tag tag-pickup">${pickupIcon()} Pick Up</span> ${label}`;
   }
   if (d === 'bus') {
-    return `<span class="dismissal-tag tag-bus">${busIcon()} Bus</span>`;
+    return `<span class="dismissal-tag tag-bus">${busIcon()} Bus</span> ${label}`;
   }
   if (d === 'activity') {
-    return `<span class="dismissal-tag tag-activity">${actIcon()} Activity</span>`;
+    return `<span class="dismissal-tag tag-activity">${actIcon()} Activity</span> ${label}`;
   }
   if (d === 'aftercare') {
-    return `<span class="dismissal-tag tag-aftercare">${actIcon()} Aftercare</span>`;
+    return `<span class="dismissal-tag tag-aftercare">${actIcon()} Aftercare</span> ${label}`;
   }
   if (s.dismissal) {
-    return `<span class="dismissal-tag tag-bus">${busIcon()} ${esc(s.dismissal)}</span>`;
+    return `<span class="dismissal-tag tag-bus">${busIcon()} ${esc(s.dismissal)}</span> ${label}`;
   }
   return `<span class="dismissal-tag tag-none">—</span>`;
 }
