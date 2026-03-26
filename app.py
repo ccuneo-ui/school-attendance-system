@@ -818,8 +818,7 @@ def get_dismissal_today():
             cur.execute("SELECT COUNT(*) AS c FROM daily_dismissal WHERE dismissal_date=%s",(date_param,))
             filled = cur.fetchone()["c"]
             source = "today" if filled > 0 else "default"
-            # Subquery: pull today's General Attendance status per student
-            # Used in both branches so the dismissal board can show Present/Absent/Excused next to each name
+
             att_join = """
                 LEFT JOIN (
                     SELECT e.student_id, a.status AS att_status
@@ -837,41 +836,26 @@ def get_dismissal_today():
             day_name = dt_date.fromisoformat(date_param).strftime("%A")
             col = day_col_map.get(day_name,"dismissal_mon")
 
-            if source == "today":
-                grade_clause = "AND s.grade=%s" if grade_filter else ""
-                # params order: dismissal date, attendance date, [grade]
-                params = [date_param, date_param] + ([grade_filter] if grade_filter else [])
-                cur.execute(f"""
-                    SELECT s.student_id AS id, s.first_name AS "firstName",
-                           s.last_name AS "lastName", s.grade,
-                           COALESCE(d.dismissal_type, s.{col}) AS dismissal,
-                           d.destination AS activity,
-                           'homeroom' AS "endsIn", NULL AS elective, d.notes,
-                           att.att_status AS "attStatus",
-                           COALESCE(st.first_name || ' ' || st.last_name, '') AS "homeroomTeacher"
-                    FROM students s
-                    LEFT JOIN daily_dismissal d ON d.student_id=s.student_id AND d.dismissal_date=%s
-                    LEFT JOIN staff st ON st.staff_id = s.homeroom_teacher_id
-                    {att_join}
-                    WHERE s.status='active' {grade_clause}
-                    ORDER BY s.last_name, s.first_name
-                """, [date_param] + [date_param] + ([grade_filter] if grade_filter else []))
-            else:
-                grade_clause = "AND s.grade=%s" if grade_filter else ""
-                params = [date_param] + ([grade_filter] if grade_filter else [])
-                cur.execute(f"""
-                    SELECT s.student_id AS id, s.first_name AS "firstName",
-                           s.last_name AS "lastName", s.grade,
-                           s.{col} AS dismissal, NULL AS activity,
-                           'homeroom' AS "endsIn", NULL AS elective, NULL AS notes,
-                           att.att_status AS "attStatus",
-                           COALESCE(st.first_name || ' ' || st.last_name, '') AS "homeroomTeacher"
-                    FROM students s
-                    LEFT JOIN staff st ON st.staff_id = s.homeroom_teacher_id
-                    {att_join}
-                    WHERE s.status='active' {grade_clause}
-                    ORDER BY s.last_name, s.first_name
-                """, params)
+            # Single query: always LEFT JOIN daily_dismissal.
+            # If a student has a daily record, use it. Otherwise fall back to student defaults.
+            grade_clause = "AND s.grade=%s" if grade_filter else ""
+            # Params: 1) daily_dismissal date, 2) attendance date, 3) optional grade
+            query_params = [date_param, date_param] + ([grade_filter] if grade_filter else [])
+            cur.execute(f"""
+                SELECT s.student_id AS id, s.first_name AS "firstName",
+                       s.last_name AS "lastName", s.grade,
+                       COALESCE(d.dismissal_type, s.{col}) AS dismissal,
+                       d.destination AS activity,
+                       'homeroom' AS "endsIn", NULL AS elective, d.notes,
+                       att.att_status AS "attStatus",
+                       COALESCE(st.first_name || ' ' || st.last_name, '') AS "homeroomTeacher"
+                FROM students s
+                LEFT JOIN daily_dismissal d ON d.student_id=s.student_id AND d.dismissal_date=%s
+                LEFT JOIN staff st ON st.staff_id = s.homeroom_teacher_id
+                {att_join}
+                WHERE s.status='active' {grade_clause}
+                ORDER BY s.last_name, s.first_name
+            """, query_params)
             rows = fa(cur)
     finally:
         conn.close()
