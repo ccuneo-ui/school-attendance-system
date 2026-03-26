@@ -831,6 +831,12 @@ def get_dismissal_today():
                 ) att ON att.student_id = s.student_id
             """
 
+            from datetime import date as dt_date
+            day_col_map = {"Monday":"dismissal_mon","Tuesday":"dismissal_tue",
+                           "Wednesday":"dismissal_wed","Thursday":"dismissal_thu","Friday":"dismissal_fri"}
+            day_name = dt_date.fromisoformat(date_param).strftime("%A")
+            col = day_col_map.get(day_name,"dismissal_mon")
+
             if source == "today":
                 grade_clause = "AND s.grade=%s" if grade_filter else ""
                 # params order: dismissal date, attendance date, [grade]
@@ -838,7 +844,8 @@ def get_dismissal_today():
                 cur.execute(f"""
                     SELECT s.student_id AS id, s.first_name AS "firstName",
                            s.last_name AS "lastName", s.grade,
-                           d.dismissal_type AS dismissal, d.destination AS activity,
+                           COALESCE(d.dismissal_type, s.{col}) AS dismissal,
+                           d.destination AS activity,
                            'homeroom' AS "endsIn", NULL AS elective, d.notes,
                            att.att_status AS "attStatus",
                            COALESCE(st.first_name || ' ' || st.last_name, '') AS "homeroomTeacher"
@@ -850,11 +857,6 @@ def get_dismissal_today():
                     ORDER BY s.last_name, s.first_name
                 """, [date_param] + [date_param] + ([grade_filter] if grade_filter else []))
             else:
-                from datetime import date as dt_date
-                day_col_map = {"Monday":"dismissal_mon","Tuesday":"dismissal_tue",
-                               "Wednesday":"dismissal_wed","Thursday":"dismissal_thu","Friday":"dismissal_fri"}
-                day_name = dt_date.fromisoformat(date_param).strftime("%A")
-                col = day_col_map.get(day_name,"dismissal_mon")
                 grade_clause = "AND s.grade=%s" if grade_filter else ""
                 params = [date_param] + ([grade_filter] if grade_filter else [])
                 cur.execute(f"""
@@ -874,8 +876,6 @@ def get_dismissal_today():
     finally:
         conn.close()
 
-    from datetime import date as dt_date
-    day_name = dt_date.fromisoformat(date_param).strftime("%A")
     LOWER  = {"1","2","3","4"}
     MIDDLE = {"5","6","7","8"}
     def calc_ends_in(grade):
