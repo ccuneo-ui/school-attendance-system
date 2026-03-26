@@ -947,12 +947,25 @@ function renderGrouped(mode) {
 
 // ── HELPERS ───────────────────────────────────────────────────────────────────
 function dismissalTag(s) {
+  const d = (s.dismissal || '').toLowerCase();
   if (s.activity) {
     const cls = s.activity.toLowerCase().includes('aftercare') ? 'tag-aftercare' : 'tag-activity';
     return `<span class="dismissal-tag ${cls}">${actIcon()} ${esc(s.activity)}</span>`;
   }
-  if (s.dismissal === 'Pick Up') {
-    return `<span class="dismissal-tag tag-pickup">${pickupIcon()} Parent Pickup</span>`;
+  if (d === 'pickup' || s.dismissal === 'Pick Up') {
+    return `<span class="dismissal-tag tag-pickup">${pickupIcon()} Pick Up</span>`;
+  }
+  if (d === 'activity') {
+    return `<span class="dismissal-tag tag-activity">${actIcon()} Activity</span>`;
+  }
+  if (d === 'aftercare') {
+    return `<span class="dismissal-tag tag-aftercare">${actIcon()} Aftercare</span>`;
+  }
+  if (d === 'bus') {
+    return `<span class="dismissal-tag tag-bus">${busIcon()} Bus</span>`;
+  }
+  if (s.dismissal && BUS_ROUTES.includes(s.dismissal)) {
+    return `<span class="dismissal-tag tag-bus">${busIcon()} ${esc(s.dismissal)}</span>`;
   }
   if (s.dismissal) {
     return `<span class="dismissal-tag tag-bus">${busIcon()} ${esc(s.dismissal)}</span>`;
