@@ -142,6 +142,10 @@
     .upload-result.success { background: var(--green-bg); color: var(--green); }
     .upload-result.error { background: var(--red-bg); color: var(--red); }
     .season-info { background: var(--yellow-bg); border: 1px solid #f0d070; border-radius: 8px; padding: 14px 16px; font-size: 13px; color: #7a6000; line-height: 1.6; margin-bottom: 16px; }
+    .privacy-toggle { display: flex; align-items: center; gap: 6px; padding: 5px 12px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.25); background: rgba(255,255,255,0.1); color: rgba(255,255,255,0.85); font-family: 'DM Sans', sans-serif; font-size: 12px; font-weight: 500; cursor: pointer; transition: all 0.15s; white-space: nowrap; }
+    .privacy-toggle:hover { background: rgba(255,255,255,0.2); color: var(--white); }
+    .privacy-toggle.active { background: rgba(255,255,255,0.2); border-color: rgba(255,255,255,0.4); color: var(--white); }
+    .privacy-toggle svg { width: 16px; height: 16px; flex-shrink: 0; }
     .toast { position: fixed; bottom: 24px; right: 24px; background: var(--navy); color: var(--white); padding: 12px 20px; border-radius: 10px; font-size: 13px; font-weight: 500; z-index: 9999; box-shadow: 0 4px 16px rgba(0,0,0,0.2); transform: translateY(80px); opacity: 0; transition: all 0.25s; }
     .toast.show { transform: translateY(0); opacity: 1; }
     .toast.error { background: var(--red); }
@@ -163,6 +167,11 @@
     <span class="topbar-title">Financial Aid</span>
   </div>
   <div class="topbar-right">
+    <button class="privacy-toggle" id="privacyToggle" onclick="togglePrivacy()" title="Toggle privacy mode">
+      <svg id="privacyIconOff" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none;"><path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+      <svg id="privacyIconOn" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+      <span id="privacyLabel">Names Visible</span>
+    </button>
     <a href="/billing-report">Billing Reports</a>
     <a href="/billing-rates">Billing Rates</a>
     <a href="/financial-aid/tuition-rates">Tuition Rates</a>
@@ -350,8 +359,53 @@
   let editStudents    = [];
   let selectedUploadFile = null;
 
+  // ─── Privacy Mode ────────────────────────────────────────────────────────
+  let privacyMode = localStorage.getItem('mds_privacy_mode') !== 'off'; // ON by default
+
+  function maskName(name) {
+    if (!name) return '';
+    const parts = name.trim().split(/\s+/);
+    if (parts.length === 1) {
+      const w = parts[0];
+      return w.charAt(0).toUpperCase() + '. ...' + (w.length >= 3 ? w.slice(-3) : w.slice(-w.length));
+    }
+    const first = parts[0];
+    const last = parts[parts.length - 1];
+    return first.charAt(0).toUpperCase() + '. ...' + (last.length >= 3 ? last.slice(-3) : last);
+  }
+
+  function privName(name) {
+    return privacyMode ? maskName(name) : name;
+  }
+
+  function togglePrivacy() {
+    privacyMode = !privacyMode;
+    localStorage.setItem('mds_privacy_mode', privacyMode ? 'on' : 'off');
+    updatePrivacyUI();
+    renderAll();
+  }
+
+  function updatePrivacyUI() {
+    const btn = document.getElementById('privacyToggle');
+    const iconOn = document.getElementById('privacyIconOn');
+    const iconOff = document.getElementById('privacyIconOff');
+    const label = document.getElementById('privacyLabel');
+    if (privacyMode) {
+      btn.classList.add('active');
+      iconOn.style.display = 'none';
+      iconOff.style.display = '';
+      label.textContent = 'Names Hidden';
+    } else {
+      btn.classList.remove('active');
+      iconOn.style.display = '';
+      iconOff.style.display = 'none';
+      label.textContent = 'Names Visible';
+    }
+  }
+
   // ─── Boot ──────────────────────────────────────────────────────────────────
   async function boot() {
+    updatePrivacyUI();
     await loadYears();
     await loadTuitionRates(currentYear);
     await loadData();
@@ -498,7 +552,7 @@
       return `
       <div class="student-row">
         <div style="font-size:13px;font-weight:600;">${esc(s.school||'Unknown')}</div>
-        <div style="font-size:13px;color:var(--muted);">${esc(s.first_name||'')}${s.grade?` <span style="font-size:11px;opacity:0.7;">(${esc(s.grade)})</span>`:''}</div>
+        <div style="font-size:13px;color:var(--muted);">${esc(privacyMode ? maskName(s.first_name||'') : (s.first_name||''))}${s.grade?` <span style="font-size:11px;opacity:0.7;">(${esc(s.grade)})</span>`:''}</div>
         <div class="money fast">${fmt(s.tuition)}</div>
         <div class="money fast">${fmt(s.fast_aid_rec)}</div>
         <div class="money requested" title="${aidTypeLabel}">${s.aid_type ? fmt(s.mds_aid_amount) : '—'}</div>
@@ -523,7 +577,7 @@
     <div class="family-card ${inactive?'inactive':''}" id="family-${f.id}">
       <div class="family-card-header" onclick="toggleCard('family-${f.id}')">
         <div>
-          <div class="family-name">${esc(f.family_name)}</div>
+          <div class="family-name">${esc(privName(f.family_name))}</div>
           <div class="family-meta">${schoolBadges}${f.fast_id?`<span class="badge badge-fast-id">FAST #${f.fast_id}</span>`:''}${contractBadge}${appealBadge}${inactiveBadge}</div>
         </div>
         <div class="family-header-right">
@@ -613,7 +667,7 @@
     editingFamilyId = familyId;
     editStudents    = fam.students.map(s=>({...s}));
     selectedPriorFamilyId = null; // reset — null means no change
-    document.getElementById('editModalTitle').textContent = `Edit — ${fam.family_name}`;
+    document.getElementById('editModalTitle').textContent = `Edit — ${privName(fam.family_name)}`;
     const btn = document.getElementById('editModalStatusBtn');
     if (fam.status==='inactive') { btn.textContent='Mark Active'; btn.className='btn btn-outline btn-sm'; }
     else { btn.textContent='Mark Inactive'; btn.className='btn btn-danger btn-sm'; }
@@ -761,7 +815,7 @@
           <div onclick="selectPriorFamily(${f.id},'${esc(f.family_name)} (${f.school_year})')"
                style="padding:9px 14px;font-size:13px;cursor:pointer;border-bottom:1px solid var(--border);"
                onmouseover="this.style.background='var(--bg)'" onmouseout="this.style.background=''">
-            <strong>${esc(f.family_name)}</strong>
+            <strong>${esc(privName(f.family_name))}</strong>
             <span style="color:var(--muted);margin-left:8px;">${f.school_year}${f.fast_id?' · FAST #'+f.fast_id:''}</span>
           </div>`).join('');
       }
