@@ -948,24 +948,39 @@ function renderGrouped(mode) {
 // ── HELPERS ───────────────────────────────────────────────────────────────────
 function dismissalTag(s) {
   const d = (s.dismissal || '').toLowerCase();
-  if (s.activity) {
-    const cls = s.activity.toLowerCase().includes('aftercare') ? 'tag-aftercare' : 'tag-activity';
-    return `<span class="dismissal-tag ${cls}">${actIcon()} ${esc(s.activity)}</span>`;
+  const act = s.activity || '';
+  const actLower = act.toLowerCase();
+
+  // When plan is filled, activity has the specific destination name
+  if (act) {
+    // Pick Up
+    if (actLower === 'pick up' || actLower === 'pickup') {
+      return `<span class="dismissal-tag tag-pickup">${pickupIcon()} Pick Up</span>`;
+    }
+    // Bus route — check if it's a known bus route or dismissal type is bus
+    if (d === 'bus' || BUS_ROUTES.includes(act)) {
+      return `<span class="dismissal-tag tag-bus">${busIcon()} ${esc(act)}</span>`;
+    }
+    // Aftercare
+    if (actLower.includes('aftercare')) {
+      return `<span class="dismissal-tag tag-aftercare">${actIcon()} ${esc(act)}</span>`;
+    }
+    // Other activity (HOPE, Book Club, etc.)
+    return `<span class="dismissal-tag tag-activity">${actIcon()} ${esc(act)}</span>`;
   }
-  if (d === 'pickup' || s.dismissal === 'Pick Up') {
+
+  // Defaults mode — no specific destination, just generic type
+  if (d === 'pickup') {
     return `<span class="dismissal-tag tag-pickup">${pickupIcon()} Pick Up</span>`;
+  }
+  if (d === 'bus') {
+    return `<span class="dismissal-tag tag-bus">${busIcon()} Bus</span>`;
   }
   if (d === 'activity') {
     return `<span class="dismissal-tag tag-activity">${actIcon()} Activity</span>`;
   }
   if (d === 'aftercare') {
     return `<span class="dismissal-tag tag-aftercare">${actIcon()} Aftercare</span>`;
-  }
-  if (d === 'bus') {
-    return `<span class="dismissal-tag tag-bus">${busIcon()} Bus</span>`;
-  }
-  if (s.dismissal && BUS_ROUTES.includes(s.dismissal)) {
-    return `<span class="dismissal-tag tag-bus">${busIcon()} ${esc(s.dismissal)}</span>`;
   }
   if (s.dismissal) {
     return `<span class="dismissal-tag tag-bus">${busIcon()} ${esc(s.dismissal)}</span>`;
