@@ -582,19 +582,11 @@
   <div class="divider-v"></div>
 
   <div class="filter-group">
-    <span class="filter-label">Homeroom</span>
-    <div class="filter-pills" id="homeroomPills">
-      <div class="pill active" data-homeroom="all" onclick="setHomeroom(this)">All</div>
-    </div>
-  </div>
-
-  <div class="divider-v"></div>
-
-  <div class="filter-group">
     <span class="filter-label">View</span>
     <div class="view-toggle">
       <button class="view-btn" onclick="setView('table', this)">Table</button>
       <button class="view-btn active" onclick="setView('grouped', this)">Grouped</button>
+      <button class="view-btn" onclick="setView('homeroom', this)">Homeroom</button>
     </div>
   </div>
 
@@ -642,7 +634,7 @@ const ELECTIVE_SUBJECTS = ['Art','Music','PE','Library','Technology','Drama','Sp
 let allStudents = [];
 let filteredStudents = [];
 let currentGrade    = localStorage.getItem('dismissal_grade') || 'all';
-let currentHomeroom = 'all';
+// homeroom grouping handled via view mode
 let currentView     = localStorage.getItem('dismissal_view') || 'grouped';
 let groupBy         = 'grade'; // used in grouped view
 let dataSource      = 'today'; // 'today' | 'default'
@@ -700,7 +692,6 @@ async function loadData() {
     (dataSource === 'default') ? 'flex' : 'none';
 
   buildGradePills();
-  buildHomeroomPills();
   applyFilters();
 }
 
@@ -794,22 +785,6 @@ function buildGradePills() {
   });
 }
 
-function buildHomeroomPills() {
-  const teachers = [...new Set(allStudents.map(s => s.homeroomTeacher).filter(Boolean))].sort();
-  const container = document.getElementById('homeroomPills');
-  container.innerHTML = `<div class="pill ${currentHomeroom==='all'?'active':''}" data-homeroom="all" onclick="setHomeroom(this)">All</div>`;
-  teachers.forEach(t => {
-    const div = document.createElement('div');
-    div.className = `pill${currentHomeroom===t?' active':''}`;
-    div.dataset.homeroom = t;
-    // Show last name only for brevity
-    div.textContent = t.split(' ').pop();
-    div.title = t;
-    div.onclick = () => setHomeroom(div);
-    container.appendChild(div);
-  });
-}
-
 function setGrade(el) {
   document.querySelectorAll('#gradePills .pill').forEach(p => p.classList.remove('active'));
   el.classList.add('active');
@@ -818,12 +793,6 @@ function setGrade(el) {
   applyFilters();
 }
 
-function setHomeroom(el) {
-  document.querySelectorAll('#homeroomPills .pill').forEach(p => p.classList.remove('active'));
-  el.classList.add('active');
-  currentHomeroom = el.dataset.homeroom;
-  applyFilters();
-}
 
 function setView(v, el) {
   document.querySelectorAll('.view-btn').forEach(b => b.classList.remove('active'));
@@ -839,7 +808,6 @@ function applyFilters() {
 
   filteredStudents = allStudents.filter(s => {
     if (currentGrade !== 'all' && s.grade !== currentGrade) return false;
-    if (currentHomeroom !== 'all' && (s.homeroomTeacher || '') !== currentHomeroom) return false;
     if (q && !s.name.toLowerCase().includes(q) && !(s.grade||'').toLowerCase().includes(q) &&
         !(s.dismissal||'').toLowerCase().includes(q) && !(s.activity||'').toLowerCase().includes(q) &&
         !(s.elective||'').toLowerCase().includes(q)) return false;
@@ -850,8 +818,9 @@ function applyFilters() {
   filteredStudents.sort((a,b) => (a.lastName||'').localeCompare(b.lastName||''));
 
   renderSummary();
-  if (currentView === 'table')   renderTable();
-  else                           renderGrouped();
+  if (currentView === 'table')        renderTable();
+  else if (currentView === 'homeroom') renderGrouped('homeroom');
+  else                                 renderGrouped('grade');
 }
 
 // ── SUMMARY ───────────────────────────────────────────────────────────────────
@@ -912,19 +881,26 @@ function renderTable() {
 }
 
 // ── GROUPED VIEW ──────────────────────────────────────────────────────────────
-function renderGrouped() {
+function renderGrouped(mode) {
   if (filteredStudents.length === 0) {
     document.getElementById('mainView').innerHTML = emptyState();
     return;
   }
 
-  // Group by grade if currentGrade === 'all', else group by dismissal destination
-  const groupByField = (currentGrade === 'all') ? 'grade' : 'destination';
+  // mode: 'homeroom' groups by teacher, 'grade' groups by grade (or destination if filtered)
+  let groupByField;
+  if (mode === 'homeroom') {
+    groupByField = 'homeroom';
+  } else {
+    groupByField = (currentGrade === 'all') ? 'grade' : 'destination';
+  }
   const groups = {};
 
   filteredStudents.forEach(s => {
     let key;
-    if (groupByField === 'grade') {
+    if (groupByField === 'homeroom') {
+      key = s.homeroomTeacher || 'Unassigned';
+    } else if (groupByField === 'grade') {
       key = s.grade || 'Unknown';
     } else {
       key = s.activity || s.dismissal || 'Unassigned';
@@ -935,6 +911,7 @@ function renderGrouped() {
 
   const gradeOrder = ['JPK','SPK','K','1','2','3','4','5','6','7','8'];
   const sortedKeys = Object.keys(groups).sort((a,b) => {
+    if (groupByField === 'homeroom') return a.localeCompare(b);
     const ai = gradeOrder.indexOf(a), bi = gradeOrder.indexOf(b);
     if (ai !== -1 && bi !== -1) return ai - bi;
     if (ai !== -1) return -1;
@@ -948,7 +925,8 @@ function renderGrouped() {
       <div class="group-student-row">
         <span class="gsrow-name">${esc(s.lastName)}, ${esc(s.firstName)}</span>${attBadge(s)}
         <div class="gsrow-meta">
-          ${groupByField === 'grade' ? dismissalTag(s) : `<span class="grade-badge">${esc(s.grade)}</span>`}
+          ${groupByField === 'homeroom' ? `<span class="grade-badge">${esc(s.grade)}</span>${dismissalTag(s)}` :
+            groupByField === 'grade' ? dismissalTag(s) : `<span class="grade-badge">${esc(s.grade)}</span>`}
         </div>
       </div>
     `).join('');
@@ -956,7 +934,7 @@ function renderGrouped() {
     return `
       <div class="group-card" style="animation-delay:${sortedKeys.indexOf(key)*0.04}s">
         <div class="group-header">
-          <h3>${groupByField === 'grade' ? gradeIcon(key) : destIcon(key)} ${esc(key)}</h3>
+          <h3>${groupByField === 'homeroom' ? hrIcon() : groupByField === 'grade' ? gradeIcon(key) : destIcon(key)} ${esc(key)}</h3>
           <span class="group-count">${students.length}</span>
         </div>
         <div class="group-students">${rows}</div>

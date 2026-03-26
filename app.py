@@ -840,9 +840,11 @@ def get_dismissal_today():
                            s.last_name AS "lastName", s.grade,
                            d.dismissal_type AS dismissal, d.destination AS activity,
                            'homeroom' AS "endsIn", NULL AS elective, d.notes,
-                           att.att_status AS "attStatus"
+                           att.att_status AS "attStatus",
+                           COALESCE(st.first_name || ' ' || st.last_name, '') AS "homeroomTeacher"
                     FROM students s
                     LEFT JOIN daily_dismissal d ON d.student_id=s.student_id AND d.dismissal_date=%s
+                    LEFT JOIN staff st ON st.staff_id = s.homeroom_teacher_id
                     {att_join}
                     WHERE s.status='active' {grade_clause}
                     ORDER BY s.last_name, s.first_name
@@ -860,8 +862,10 @@ def get_dismissal_today():
                            s.last_name AS "lastName", s.grade,
                            s.{col} AS dismissal, NULL AS activity,
                            'homeroom' AS "endsIn", NULL AS elective, NULL AS notes,
-                           att.att_status AS "attStatus"
+                           att.att_status AS "attStatus",
+                           COALESCE(st.first_name || ' ' || st.last_name, '') AS "homeroomTeacher"
                     FROM students s
+                    LEFT JOIN staff st ON st.staff_id = s.homeroom_teacher_id
                     {att_join}
                     WHERE s.status='active' {grade_clause}
                     ORDER BY s.last_name, s.first_name
