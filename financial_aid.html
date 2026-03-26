@@ -367,11 +367,11 @@
     const parts = name.trim().split(/\s+/);
     if (parts.length === 1) {
       const w = parts[0];
-      return w.charAt(0).toUpperCase() + '. ...' + (w.length >= 3 ? w.slice(-3) : w.slice(-w.length));
+      return w.charAt(0).toUpperCase() + '. ...' + (w.length >= 2 ? w.slice(-2) : w);
     }
     const first = parts[0];
     const last = parts[parts.length - 1];
-    return first.charAt(0).toUpperCase() + '. ...' + (last.length >= 3 ? last.slice(-3) : last);
+    return first.charAt(0).toUpperCase() + '. ...' + (last.length >= 2 ? last.slice(-2) : last);
   }
 
   function privName(name) {
