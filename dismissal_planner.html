@@ -230,7 +230,7 @@
   <div class="stat"><div class="stat-dot dot-bus"></div><div><div class="stat-count" id="stat-bus">—</div><div class="stat-label">Bus / Pickup</div></div></div>
   <div class="stat"><div class="stat-dot dot-activity"></div><div><div class="stat-count" id="stat-activity">—</div><div class="stat-label">Activity</div></div></div>
   <div class="stat"><div class="stat-dot dot-present"></div><div><div class="stat-count" id="stat-present">—</div><div class="stat-label">Present</div></div></div>
-  <div class="stat"><div class="stat-dot dot-unset"></div><div><div class="stat-count" id="stat-unset">—</div><div class="stat-label">Incomplete</div></div></div>
+  <div class="stat"><div class="stat-dot dot-unset"></div><div><div class="stat-count" id="stat-unset">—</div><div class="stat-label">Not Assigned</div></div></div>
 </div>
 
 <div class="main">
@@ -244,7 +244,7 @@
       <button class="filter-chip active" onclick="setFilter('all',this)">All</button>
       <button class="filter-chip" onclick="setFilter('bus',this)">🚌 Bus/Pickup</button>
       <button class="filter-chip" onclick="setFilter('activity',this)">⭐ Activity</button>
-      <button class="filter-chip" onclick="setFilter('incomplete',this)">❓ Incomplete</button>
+      <button class="filter-chip" onclick="setFilter('incomplete',this)">❓ Not Assigned</button>
     </div>
     <div class="list-table-wrap">
       <table>
@@ -544,7 +544,7 @@ function renderGroupView() {
     html.push(`<div class="group-card group-unset">
       <div class="group-header">
         <div class="group-icon">❓</div>
-        <div class="group-title">Incomplete</div>
+        <div class="group-title">Dismissal Not Assigned</div>
         <span class="group-count">${groups.incomplete.length}</span>
       </div>
       <div class="group-body">
