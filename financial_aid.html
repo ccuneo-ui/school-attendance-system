@@ -66,6 +66,9 @@
     .badge-contract { background: var(--green-bg); color: var(--green); }
     .badge-no-contract { background: var(--red-bg); color: var(--red); }
     .badge-inactive { background: #f3f4f6; color: var(--muted); }
+    .badge-dnq { background: var(--red-bg); color: var(--red); }
+    .badge-dnqx { background: var(--yellow-bg); color: var(--yellow); }
+    .badge-award { background: var(--green-bg); color: var(--green); }
     .family-header-right { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
     .aid-summary .requested { font-size: 14px; font-weight: 600; color: var(--navy); }
     .aid-summary .net { font-size: 12px; color: var(--muted); margin-top: 1px; }
@@ -543,6 +546,9 @@
     const hasAppeal = f.students.some(s=>s.appeal_letter&&s.appeal_letter.toLowerCase().startsWith('y'));
     const contractBadge = f.contract_sent ? `<span class="badge badge-contract">Contract Sent</span>` : `<span class="badge badge-no-contract">Pending</span>`;
     const appealBadge   = hasAppeal ? `<span class="badge badge-appeal">Appeal</span>` : '';
+    const letterLabels  = {dnq:'DNQ', dnqx:'DNQX', award:'Award'};
+    const letterClasses = {dnq:'badge-dnq', dnqx:'badge-dnqx', award:'badge-award'};
+    const letterBadge   = f.parent_letter ? `<span class="badge ${letterClasses[f.parent_letter]||''}">${letterLabels[f.parent_letter]||f.parent_letter}</span>` : '';
     const inactiveBadge = inactive  ? `<span class="badge badge-inactive">Inactive</span>` : '';
     const schoolBadges  = [...new Set(f.students.map(s=>s.school).filter(Boolean))].map(s=>`<span class="badge badge-school">${s}</span>`).join('');
     const studentRows   = f.students.map(s=>{
@@ -578,7 +584,7 @@
       <div class="family-card-header" onclick="toggleCard('family-${f.id}')">
         <div>
           <div class="family-name">${esc(privName(f.family_name))}</div>
-          <div class="family-meta">${schoolBadges}${f.fast_id?`<span class="badge badge-fast-id">FAST #${f.fast_id}</span>`:''}${contractBadge}${appealBadge}${inactiveBadge}</div>
+          <div class="family-meta">${schoolBadges}${f.fast_id?`<span class="badge badge-fast-id">FAST #${f.fast_id}</span>`:''}${contractBadge}${letterBadge}${appealBadge}${inactiveBadge}</div>
         </div>
         <div class="family-header-right">
           <div class="aid-summary">
@@ -610,6 +616,15 @@
         <div class="edit-row">
           <span class="edit-row-label">Flags:</span>
           <div class="check-item"><input type="checkbox" id="contract-${f.id}" ${f.contract_sent?'checked':''}><span>Contract Sent</span></div>
+          <div class="check-item" style="margin-left:12px;">
+            <span style="font-size:12px;font-weight:600;color:var(--muted);">Parent Letter:</span>
+            <select id="parent-letter-${f.id}" style="padding:4px 8px;border:1px solid var(--border);border-radius:5px;font-family:'DM Sans',sans-serif;font-size:12px;color:var(--navy);background:var(--white);">
+              <option value="" ${!f.parent_letter?'selected':''}>—</option>
+              <option value="dnq" ${f.parent_letter==='dnq'?'selected':''}>DNQ</option>
+              <option value="dnqx" ${f.parent_letter==='dnqx'?'selected':''}>DNQX</option>
+              <option value="award" ${f.parent_letter==='award'?'selected':''}>Award</option>
+            </select>
+          </div>
           <span class="save-feedback" id="feedback-${f.id}"></span>
           <div class="edit-row-right">
             <button class="btn btn-outline btn-sm" onclick="openEditModal(${f.id});event.stopPropagation()">✏ Edit</button>
@@ -632,14 +647,15 @@
   async function saveFamily(familyId) {
     const note     = document.getElementById(`karins-note-${familyId}`)?.value||'';
     const contract = document.getElementById(`contract-${familyId}`)?.checked||false;
+    const parentLetter = document.getElementById(`parent-letter-${familyId}`)?.value||'';
     const feedback = document.getElementById(`feedback-${familyId}`);
     try {
-      const res = await fetch(`/api/financial-aid/${familyId}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({karins_notes:note,contract_sent:contract})});
+      const res = await fetch(`/api/financial-aid/${familyId}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({karins_notes:note,contract_sent:contract,parent_letter:parentLetter||null})});
       if (!res.ok) throw new Error();
       feedback.textContent='Saved ✓'; feedback.style.color='var(--green)';
       setTimeout(()=>{feedback.textContent='';},3000);
       const fam=allFamilies.find(f=>f.id===familyId);
-      if(fam){fam.contract_sent=contract;fam.students.forEach(s=>s.karins_notes=note);}
+      if(fam){fam.contract_sent=contract;fam.parent_letter=parentLetter||null;fam.students.forEach(s=>s.karins_notes=note);}
       updateSummary();
     } catch(e) { feedback.textContent='Error'; feedback.style.color='var(--red)'; }
   }
@@ -1181,10 +1197,11 @@
 
   // ─── Export CSV ────────────────────────────────────────────────────────────
   function exportCSV() {
-    const rows=[['Family','FAST ID','Division','Tuition','FAST Rec','Aid Requested','Net Tuition','Prior Year','Contract Sent','Status','Head of School Notes']];
+    const rows=[['Family','FAST ID','Division','Tuition','FAST Rec','Aid Requested','Net Tuition','Prior Year','Contract Sent','Parent Letter','Status','Head of School Notes']];
+    const letterMap = {dnq:'DNQ',dnqx:'DNQX',award:'Award'};
     allFamilies.forEach(f=>{
       f.students.forEach(s=>{
-        rows.push([f.family_name,f.fast_id||'',s.school||'',s.tuition||'',s.fast_aid_rec||'',s.mds_aid_amount||'',s.net_tuition||'',s.prior_year_tuition||'',f.contract_sent?'Yes':'No',f.status,(s.karins_notes||'').replace(/\n/g,' ')]);
+        rows.push([f.family_name,f.fast_id||'',s.school||'',s.tuition||'',s.fast_aid_rec||'',s.mds_aid_amount||'',s.net_tuition||'',s.prior_year_tuition||'',f.contract_sent?'Yes':'No',letterMap[f.parent_letter]||'',f.status,(s.karins_notes||'').replace(/\n/g,' ')]);
       });
     });
     const csv=rows.map(r=>r.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n');

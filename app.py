@@ -2606,6 +2606,7 @@ def _fa_rows_to_families(rows):
                 'status': row["status"],
                 'school_year': row["school_year"],
                 'prior_family_id': row["prior_family_id"],
+                'parent_letter': row.get("parent_letter"),
                 'students': []
             }
         if row["student_id"]:
@@ -2688,7 +2689,7 @@ def api_financial_aid_list():
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
             cur.execute("""
                 SELECT f.id, f.family_name, f.fast_id, f.contract_sent, f.status, f.school_year,
-                       f.prior_family_id,
+                       f.prior_family_id, f.parent_letter,
                        s.id as student_id, s.first_name, s.grade, s.school, s.tuition, s.max_discount,
                        s.fast_aid_rec, s.appeal_letter, s.family_can_pay,
                        s.mds_aid_amount, s.aid_type, s.net_tuition, s.prior_year_tuition,
@@ -2719,7 +2720,7 @@ def api_financial_aid_update(family_id):
             # Build dynamic update for family table
             fam_fields = []
             fam_vals = []
-            for col in ['contract_sent', 'status', 'prior_family_id']:
+            for col in ['contract_sent', 'status', 'prior_family_id', 'parent_letter']:
                 if col in data:
                     fam_fields.append(f"{col} = %s")
                     fam_vals.append(data[col])
@@ -3946,6 +3947,17 @@ def migrate_financial_aid():
                 results.append("Added aid_type column to financial_aid_students")
             else:
                 results.append("aid_type column already exists (skipped)")
+
+            # Add parent_letter to families if missing
+            cur.execute("""
+                SELECT column_name FROM information_schema.columns
+                WHERE table_name='financial_aid_families' AND column_name='parent_letter'
+            """)
+            if not cur.fetchone():
+                cur.execute("ALTER TABLE financial_aid_families ADD COLUMN parent_letter TEXT")
+                results.append("Added parent_letter column to financial_aid_families")
+            else:
+                results.append("parent_letter column already exists (skipped)")
 
             # Create fa_tuition_rates table if missing
             cur.execute("SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_name='fa_tuition_rates')")
