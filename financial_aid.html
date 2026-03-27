@@ -1265,6 +1265,25 @@
 
   const SIGNATURE = `Sincerely,\n\nEileen Cuneo\nAdmissions Director\nMizzentop Day School`;
 
+  const ENROLLMENT_BLOCK = `
+To continue with enrollment:
+
+1. Click on the following link to visit your family's enrollment portal: {{recipient.verification_link}}
+
+2. {%if recipient.portal_email != blank%}Log in using your Parent Portal Account email: {{recipient.portal_email}}{%else%}Create a Parent Portal Account by clicking the blue 'Create an Account' button in the right sidebar of the Parent Portal login page.{%endif%}
+
+3. Once you log in or create your account, you will be able to select 'Continue Enrollment Process' to begin the enrollment process.
+
+4. Please complete the online contract and submit your deposit payment.
+
+IMPORTANT: For dual household families that are prompted to invite a second signer, both parties MUST have their own unique Parent Portal Account to sign the contract. You will not be able to proceed in the process if you use the same email address to log into the Parent Portal.
+
+If you have any issues with the above link, you can authenticate manually using your authentication code: {{recipient.authentication_code}}.
+
+Questions about using the Parent Portal? Check out our Help Center (https://www.finalsite.com/schooladmin-parent-portal-help)
+
+We look forward to seeing you in the upcoming year!`;
+
   function generateDNQ(fam) {
     return `Dear ${fam.family_name} Family,
 
@@ -1278,7 +1297,8 @@ We recognize that each family's situation is unique, and we value the role that 
 
 If you wish to appeal this decision, please do so by submitting a thorough letter of explanation to me before Friday, April 3.
 
-${SIGNATURE}`;
+${SIGNATURE}
+${ENROLLMENT_BLOCK}`;
   }
 
   function generateDNQX(fam) {
@@ -1301,7 +1321,8 @@ We appreciate the full picture your family presented, including your engagement 
 
 If you wish to appeal your award, please do so by submitting a thorough letter of explanation to me before Friday, April 3.
 
-${SIGNATURE}`;
+${SIGNATURE}
+${ENROLLMENT_BLOCK}`;
   }
 
   function generateAward(fam) {
@@ -1322,7 +1343,8 @@ Please note that our auditors require close adherence to FAST recommendations, a
 
 We appreciate the opportunity to partner with your family and support your child's experience at Mizzentop. If you wish to appeal your award, please do so by submitting a thorough letter of explanation to me before Friday, April 3.
 
-${SIGNATURE}`;
+${SIGNATURE}
+${ENROLLMENT_BLOCK}`;
   }
 
   function copyLetterText() {
