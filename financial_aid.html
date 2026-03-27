@@ -587,7 +587,7 @@
             ${totalPrior>0?(()=>{
               const pctChange = Math.round(((totalNet - totalPrior) / totalPrior) * 100);
               const arrow = pctChange > 0 ? '↑' : pctChange < 0 ? '↓' : '';
-              const color = pctChange > 0 ? 'var(--red)' : pctChange < 0 ? 'var(--green)' : 'var(--muted)';
+              const color = pctChange > 0 ? 'var(--green)' : pctChange < 0 ? 'var(--red)' : 'var(--muted)';
               const pctLabel = pctChange !== 0 ? ` <span style="color:${color};font-weight:600;">${arrow}${Math.abs(pctChange)}%</span>` : '';
               return `<div class="net">Prior year: ${fmt(totalPrior)}${pctLabel}</div>`;
             })():''}
