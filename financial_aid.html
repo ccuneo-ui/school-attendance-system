@@ -145,6 +145,12 @@
     .upload-result.success { background: var(--green-bg); color: var(--green); }
     .upload-result.error { background: var(--red-bg); color: var(--red); }
     .season-info { background: var(--yellow-bg); border: 1px solid #f0d070; border-radius: 8px; padding: 14px 16px; font-size: 13px; color: #7a6000; line-height: 1.6; margin-bottom: 16px; }
+    .btn-gen-letter { padding: 4px 10px; border: 1px solid var(--border); border-radius: 5px; font-family: 'DM Sans', sans-serif; font-size: 11px; font-weight: 600; cursor: pointer; background: var(--white); color: var(--navy); transition: all 0.15s; margin-left: 6px; white-space: nowrap; }
+    .btn-gen-letter:hover { background: var(--light-bg); border-color: var(--navy); }
+    .letter-text-area { white-space: pre-wrap; font-family: 'DM Sans', sans-serif; font-size: 14px; line-height: 1.7; color: var(--navy); background: var(--light-bg); border: 1px solid var(--border); border-radius: 10px; padding: 24px; max-height: 60vh; overflow-y: auto; }
+    .copy-btn-row { display: flex; justify-content: flex-end; gap: 10px; align-items: center; margin-top: 16px; }
+    .copy-feedback { font-size: 13px; font-weight: 600; color: var(--green); opacity: 0; transition: opacity 0.3s; }
+    .copy-feedback.show { opacity: 1; }
     .privacy-toggle { display: flex; align-items: center; gap: 6px; padding: 5px 12px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.25); background: rgba(255,255,255,0.1); color: rgba(255,255,255,0.85); font-family: 'DM Sans', sans-serif; font-size: 12px; font-weight: 500; cursor: pointer; transition: all 0.15s; white-space: nowrap; }
     .privacy-toggle:hover { background: rgba(255,255,255,0.2); color: var(--white); }
     .privacy-toggle.active { background: rgba(255,255,255,0.2); border-color: rgba(255,255,255,0.4); color: var(--white); }
@@ -346,6 +352,23 @@
     <div class="modal-footer">
       <button class="btn btn-outline" onclick="closeModal('newSeasonModal')">Cancel</button>
       <button class="btn btn-primary" onclick="submitNewSeason()">Create Season</button>
+    </div>
+  </div>
+</div>
+
+<!-- LETTER MODAL -->
+<div class="modal-overlay" id="letterModal">
+  <div class="modal" style="max-width:640px;">
+    <div class="modal-header">
+      <h2 id="letterModalTitle">Generated Letter</h2>
+      <button class="modal-close" onclick="closeModal('letterModal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="letter-text-area" id="letterTextArea"></div>
+      <div class="copy-btn-row">
+        <span class="copy-feedback" id="copyFeedback">Copied!</span>
+        <button class="btn btn-primary" onclick="copyLetterText()">Copy to Clipboard</button>
+      </div>
     </div>
   </div>
 </div>
@@ -616,12 +639,13 @@
           <div class="check-item"><input type="checkbox" id="contract-${f.id}" ${f.contract_sent?'checked':''}><span>Contract Sent</span></div>
           <div class="check-item" style="margin-left:12px;">
             <span style="font-size:12px;font-weight:600;color:var(--muted);">Parent Letter:</span>
-            <select id="parent-letter-${f.id}" style="padding:4px 8px;border:1px solid var(--border);border-radius:5px;font-family:'DM Sans',sans-serif;font-size:12px;color:var(--navy);background:var(--white);">
+            <select id="parent-letter-${f.id}" onchange="toggleLetterBtn(${f.id})" style="padding:4px 8px;border:1px solid var(--border);border-radius:5px;font-family:'DM Sans',sans-serif;font-size:12px;color:var(--navy);background:var(--white);">
               <option value="" ${!f.parent_letter?'selected':''}>—</option>
               <option value="dnq" ${f.parent_letter==='dnq'?'selected':''}>DNQ</option>
               <option value="dnqx" ${f.parent_letter==='dnqx'?'selected':''}>DNQX</option>
               <option value="award" ${f.parent_letter==='award'?'selected':''}>Award</option>
             </select>
+            <button id="gen-letter-${f.id}" class="btn-gen-letter" style="${f.parent_letter?'':'display:none;'}" onclick="generateLetter(${f.id});event.stopPropagation()">📄 Generate Letter</button>
           </div>
           <span class="save-feedback" id="feedback-${f.id}"></span>
           <div class="edit-row-right">
@@ -1191,6 +1215,123 @@
       await loadYears();
       await switchYear(toYear);
     } catch(e) { showToast('Error creating season','error'); }
+  }
+
+  // ─── Generate Letter ───────────────────────────────────────────────────────
+  function toggleLetterBtn(familyId) {
+    const sel = document.getElementById(`parent-letter-${familyId}`);
+    const btn = document.getElementById(`gen-letter-${familyId}`);
+    if (btn) btn.style.display = sel.value ? '' : 'none';
+  }
+
+  function fmtDollar(v) {
+    const n = parseFloat(v) || 0;
+    return '$' + Math.round(n).toLocaleString();
+  }
+
+  function generateLetter(familyId) {
+    const fam = allFamilies.find(f => f.id === familyId);
+    if (!fam) return;
+    const letterType = document.getElementById(`parent-letter-${familyId}`)?.value;
+    if (!letterType) return;
+
+    const labels = { dnq: 'DNQ', dnqx: 'DNQX', award: 'Award' };
+    let text = '';
+
+    if (letterType === 'dnq') {
+      text = generateDNQ(fam);
+    } else if (letterType === 'dnqx') {
+      text = generateDNQX(fam);
+    } else if (letterType === 'award') {
+      text = generateAward(fam);
+    }
+
+    document.getElementById('letterModalTitle').textContent = `${labels[letterType]} Letter — ${fam.family_name}`;
+    document.getElementById('letterTextArea').textContent = text;
+    document.getElementById('copyFeedback').classList.remove('show');
+    openModal('letterModal');
+  }
+
+  function studentBlock(students) {
+    return students.map(s => {
+      const tuition = parseFloat(s.tuition) || 0;
+      const aid = parseFloat(s.mds_aid_amount) || 0;
+      const net = parseFloat(s.net_tuition) || 0;
+      const pct = tuition > 0 ? Math.round((aid / tuition) * 100) : 0;
+      const division = s.school || s.grade || '';
+      return `Student: ${s.first_name || ''} — ${division}\nTuition: ${fmtDollar(tuition)}\nAward: ${fmtDollar(aid)} (${pct}%)\nNet Tuition: ${fmtDollar(net)}*`;
+    }).join('\n\n');
+  }
+
+  const SIGNATURE = `Sincerely,\n\nEileen Cuneo\nAdmissions Director\nMizzentop Day School`;
+
+  function generateDNQ(fam) {
+    return `Dear ${fam.family_name} Family,
+
+Thank you for your financial aid application and for the care you put into your submission.
+
+At Mizzentop, tuition does not cover the full cost of providing our program. Financial aid is supported by the broader school community, and every dollar awarded represents resources that cannot be allocated to faculty, programs, or campus needs. For this reason, our process is guided by careful review and defined constraints.
+
+Our Financial Aid Committee conducted a thorough review of your application, including the FAST recommendation and all submitted materials. Please note that we are required by our auditors to adhere closely to FAST recommendations. Based on this review, your family does not qualify for financial aid at this time.
+
+We recognize that each family's situation is unique, and we value the role that parent communication plays in providing context during our review process. If your financial circumstances change, we welcome further conversation.
+
+If you wish to appeal this decision, please do so by submitting a thorough letter of explanation to me before Friday, April 3.
+
+${SIGNATURE}`;
+  }
+
+  function generateDNQX(fam) {
+    const block = studentBlock(fam.students);
+    return `Dear ${fam.family_name} Family,
+
+Thank you for your financial aid application and for sharing additional context through your parent statement.
+
+At Mizzentop, tuition does not cover the full cost of delivering our program. Financial aid is made possible by the greater school community, and each award reflects a balance between individual need and institutional responsibility.
+
+While your family did not qualify for the full amount requested based on the FAST recommendation, the Financial Aid Committee carefully reviewed your parent statement and has elected to extend a limited award. This adjustment reflects both the circumstances you shared and the constraints of our current aid budget.
+
+${block}
+
+*Does not cover fees
+
+Please note that we are required to adhere closely to FAST recommendations, and awards exceeding 40% of tuition require exceptional approval from the Board of Trustees. All required tax documentation must be submitted before an award can be finalized and included in your enrollment contract.
+
+We appreciate the full picture your family presented, including your engagement with and support of the Mizzentop community. We hope this award assists in your planning and look forward to your continued partnership.
+
+If you wish to appeal your award, please do so by submitting a thorough letter of explanation to me before Friday, April 3.
+
+${SIGNATURE}`;
+  }
+
+  function generateAward(fam) {
+    const block = studentBlock(fam.students);
+    return `Dear ${fam.family_name} Family,
+
+Thank you for your financial aid application and for the thoughtful information you provided.
+
+At Mizzentop, tuition does not fully cover the cost of a student's education. Financial aid is funded by the broader school community, and each award reflects a careful balance of need, available resources, and institutional priorities.
+
+After a comprehensive review of your application, including the FAST recommendation and your parent statement, the Financial Aid Committee has approved an award that aligns as closely as possible with your requested level of support and the constraints of our current aid budget.
+
+${block}
+
+*Does not cover fees
+
+Please note that our auditors require close adherence to FAST recommendations, and awards exceeding 40% of tuition require exceptional Board approval. Finalized awards are contingent upon submission of all required tax documentation.
+
+We appreciate the opportunity to partner with your family and support your child's experience at Mizzentop. If you wish to appeal your award, please do so by submitting a thorough letter of explanation to me before Friday, April 3.
+
+${SIGNATURE}`;
+  }
+
+  function copyLetterText() {
+    const text = document.getElementById('letterTextArea').textContent;
+    navigator.clipboard.writeText(text).then(() => {
+      const fb = document.getElementById('copyFeedback');
+      fb.classList.add('show');
+      setTimeout(() => fb.classList.remove('show'), 2000);
+    });
   }
 
   // ─── Export CSV ────────────────────────────────────────────────────────────
