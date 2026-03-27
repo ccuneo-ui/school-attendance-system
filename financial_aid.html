@@ -1249,7 +1249,7 @@
     document.getElementById('letterModalTitle').textContent = `${labels[letterType]} Letter — ${fam.family_name}`;
     document.getElementById('letterTextArea').textContent = text;
     document.getElementById('copyFeedback').classList.remove('show');
-    openModal('letterModal');
+    document.getElementById('letterModal').classList.add('open');
   }
 
   function studentBlock(students) {
