@@ -147,7 +147,7 @@
     .season-info { background: var(--yellow-bg); border: 1px solid #f0d070; border-radius: 8px; padding: 14px 16px; font-size: 13px; color: #7a6000; line-height: 1.6; margin-bottom: 16px; }
     .btn-gen-letter { padding: 4px 10px; border: 1px solid var(--border); border-radius: 5px; font-family: 'DM Sans', sans-serif; font-size: 11px; font-weight: 600; cursor: pointer; background: var(--white); color: var(--navy); transition: all 0.15s; margin-left: 6px; white-space: nowrap; }
     .btn-gen-letter:hover { background: var(--light-bg); border-color: var(--navy); }
-    .letter-text-area { white-space: pre-wrap; font-family: 'DM Sans', sans-serif; font-size: 14px; line-height: 1.7; color: var(--navy); background: var(--light-bg); border: 1px solid var(--border); border-radius: 10px; padding: 24px; max-height: 60vh; overflow-y: auto; }
+    .letter-text-area { font-family: 'DM Sans', sans-serif; font-size: 14px; line-height: 1.7; color: var(--navy); background: var(--light-bg); border: 1px solid var(--border); border-radius: 10px; padding: 24px; max-height: 60vh; overflow-y: auto; }
     .copy-btn-row { display: flex; justify-content: flex-end; gap: 10px; align-items: center; margin-top: 16px; }
     .copy-feedback { font-size: 13px; font-weight: 600; color: var(--green); opacity: 0; transition: opacity 0.3s; }
     .copy-feedback.show { opacity: 1; }
@@ -1254,7 +1254,7 @@
     }
 
     document.getElementById('letterModalTitle').textContent = `${labels[letterType]} Letter — ${fam.family_name}`;
-    document.getElementById('letterTextArea').textContent = text;
+    document.getElementById('letterTextArea').innerHTML = text;
     document.getElementById('copyFeedback').classList.remove('show');
     document.getElementById('letterModal').classList.add('open');
   }
@@ -1266,97 +1266,31 @@
       const net = parseFloat(s.net_tuition) || 0;
       const pct = tuition > 0 ? Math.round((aid / tuition) * 100) : 0;
       const division = s.school || s.grade || '';
-      return `Student: ${s.first_name || ''} — ${division}\nTuition: ${fmtDollar(tuition)}\nAward: ${fmtDollar(aid)} (${pct}%)\nNet Tuition: ${fmtDollar(net)}*`;
-    }).join('\n\n');
+      return `<strong>Student: ${s.first_name || ''} — ${division}<br>Tuition: ${fmtDollar(tuition)}<br>Award: ${fmtDollar(aid)} (${pct}%)<br>Net Tuition: ${fmtDollar(net)}*</strong>`;
+    }).join('<br>');
   }
 
-  const SIGNATURE = `Sincerely,\n\nEileen Cuneo\nAdmissions Director\nMizzentop Day School`;
-
-  const ENROLLMENT_BLOCK = `
-To continue with enrollment:
-
-1. Click on the following link to visit your family's enrollment portal: {{recipient.verification_link}}
-
-2. {%if recipient.portal_email != blank%}Log in using your Parent Portal Account email: {{recipient.portal_email}}{%else%}Create a Parent Portal Account by clicking the blue 'Create an Account' button in the right sidebar of the Parent Portal login page.{%endif%}
-
-3. Once you log in or create your account, you will be able to select 'Continue Enrollment Process' to begin the enrollment process.
-
-4. Please complete the online contract and submit your deposit payment.
-
-IMPORTANT: For dual household families that are prompted to invite a second signer, both parties MUST have their own unique Parent Portal Account to sign the contract. You will not be able to proceed in the process if you use the same email address to log into the Parent Portal.
-
-If you have any issues with the above link, you can authenticate manually using your authentication code: {{recipient.authentication_code}}.
-
-Questions about using the Parent Portal? Check out our Help Center (https://www.finalsite.com/schooladmin-parent-portal-help)
-
-We look forward to seeing you in the upcoming year!`;
+  const ENROLLMENT_BLOCK = `To continue with enrollment:<br>1. Click on the following link to visit your family's enrollment portal: {{recipient.verification_link}}<br>2. {%if recipient.portal_email != blank%}Log in using your Parent Portal Account email: {{recipient.portal_email}}{%else%}Create a Parent Portal Account by clicking the blue 'Create an Account' button in the right sidebar of the Parent Portal login page.{%endif%}<br>3. Once you log in or create your account, you will be able to select 'Continue Enrollment Process' to begin the enrollment process.<br>4. Please complete the online contract and submit your deposit payment.<br>IMPORTANT: For dual household families that are prompted to invite a second signer, both parties MUST have their own unique Parent Portal Account to sign the contract. You will not be able to proceed in the process if you use the same email address to log into the Parent Portal.<br>If you have any issues with the above link, you can authenticate manually using your authentication code: {{recipient.authentication_code}}.<br>Questions about using the Parent Portal? Check out our Help Center (https://www.finalsite.com/schooladmin-parent-portal-help)<br>We look forward to seeing you in the upcoming year!`;
 
   function generateDNQ(fam) {
-    return `Dear ${fam.family_name} Family,
-
-Thank you for your financial aid application and for the care you put into your submission.
-
-At Mizzentop, tuition does not cover the full cost of providing our program. Financial aid is supported by the broader school community, and every dollar awarded represents resources that cannot be allocated to faculty, programs, or campus needs. For this reason, our process is guided by careful review and defined constraints.
-
-Our Financial Aid Committee conducted a thorough review of your application, including the FAST recommendation and all submitted materials. Please note that we are required by our auditors to adhere closely to FAST recommendations. Based on this review, your family does not qualify for financial aid at this time.
-
-We recognize that each family's situation is unique, and we value the role that parent communication plays in providing context during our review process. If your financial circumstances change, we welcome further conversation.
-
-If you wish to appeal this decision, please do so by submitting a thorough letter of explanation to me before Friday, April 3.
-
-${SIGNATURE}
-${ENROLLMENT_BLOCK}`;
+    return `Dear ${fam.family_name} Family,<br>Thank you for your financial aid application and for the care you put into your submission.<br>At Mizzentop, tuition does not cover the full cost of providing our program. Financial aid is supported by the broader school community, and every dollar awarded represents resources that cannot be allocated to faculty, programs, or campus needs. For this reason, our process is guided by careful review and defined constraints.<br>Our Financial Aid Committee conducted a thorough review of your application, including the FAST recommendation and all submitted materials. Please note that we are required by our auditors to adhere closely to FAST recommendations. Based on this review, your family does not qualify for financial aid at this time.<br>We recognize that each family's situation is unique, and we value the role that parent communication plays in providing context during our review process. If your financial circumstances change, we welcome further conversation.<br><strong>If you wish to appeal this decision, please do so by submitting a thorough letter of explanation to me before Friday, April 3.</strong><br>${ENROLLMENT_BLOCK}`;
   }
 
   function generateDNQX(fam) {
     const block = studentBlock(fam.students);
-    return `Dear ${fam.family_name} Family,
-
-Thank you for your financial aid application and for sharing additional context through your parent statement.
-
-At Mizzentop, tuition does not cover the full cost of delivering our program. Financial aid is made possible by the greater school community, and each award reflects a balance between individual need and institutional responsibility.
-
-While your family did not qualify for the full amount requested based on the FAST recommendation, the Financial Aid Committee carefully reviewed your parent statement and has elected to extend a limited award. This adjustment reflects both the circumstances you shared and the constraints of our current aid budget.
-
-${block}
-
-*Does not cover fees
-
-Please note that we are required to adhere closely to FAST recommendations, and awards exceeding 40% of tuition require exceptional approval from the Board of Trustees. All required tax documentation must be submitted before an award can be finalized and included in your enrollment contract.
-
-We appreciate the full picture your family presented, including your engagement with and support of the Mizzentop community. We hope this award assists in your planning and look forward to your continued partnership.
-
-If you wish to appeal your award, please do so by submitting a thorough letter of explanation to me before Friday, April 3.
-
-${SIGNATURE}
-${ENROLLMENT_BLOCK}`;
+    return `Dear ${fam.family_name} Family,<br>Thank you for your financial aid application and for sharing additional context through your parent statement.<br>At Mizzentop, tuition does not cover the full cost of delivering our program. Financial aid is made possible by the greater school community, and each award reflects a balance between individual need and institutional responsibility.<br>While your family did not qualify for the full amount requested based on the FAST recommendation, the Financial Aid Committee carefully reviewed your parent statement and has elected to extend a limited award. This adjustment reflects both the circumstances you shared and the constraints of our current aid budget.<br>${block}<br>*Does not cover fees<br>Please note that we are required to adhere closely to FAST recommendations, and awards exceeding 40% of tuition require exceptional approval from the Board of Trustees. All required tax documentation must be submitted before an award can be finalized and included in your enrollment contract.<br>We appreciate the full picture your family presented, including your engagement with and support of the Mizzentop community. We hope this award assists in your planning and look forward to your continued partnership.<br><strong>If you wish to appeal your award, please do so by submitting a thorough letter of explanation to me before Friday, April 3.</strong><br>${ENROLLMENT_BLOCK}`;
   }
 
   function generateAward(fam) {
     const block = studentBlock(fam.students);
-    return `Dear ${fam.family_name} Family,
-
-Thank you for your financial aid application and for the thoughtful information you provided.
-
-At Mizzentop, tuition does not fully cover the cost of a student's education. Financial aid is funded by the broader school community, and each award reflects a careful balance of need, available resources, and institutional priorities.
-
-After a comprehensive review of your application, including the FAST recommendation and your parent statement, the Financial Aid Committee has approved an award that aligns as closely as possible with your requested level of support and the constraints of our current aid budget.
-
-${block}
-
-*Does not cover fees
-
-Please note that our auditors require close adherence to FAST recommendations, and awards exceeding 40% of tuition require exceptional Board approval. Finalized awards are contingent upon submission of all required tax documentation.
-
-We appreciate the opportunity to partner with your family and support your child's experience at Mizzentop. If you wish to appeal your award, please do so by submitting a thorough letter of explanation to me before Friday, April 3.
-
-${SIGNATURE}
-${ENROLLMENT_BLOCK}`;
+    return `Dear ${fam.family_name} Family,<br>Thank you for your financial aid application and for the thoughtful information you provided.<br>At Mizzentop, tuition does not fully cover the cost of a student's education. Financial aid is funded by the broader school community, and each award reflects a careful balance of need, available resources, and institutional priorities.<br>After a comprehensive review of your application, including the FAST recommendation and your parent statement, the Financial Aid Committee has approved an award that aligns as closely as possible with your requested level of support and the constraints of our current aid budget.<br>${block}<br>*Does not cover fees<br>Please note that our auditors require close adherence to FAST recommendations, and awards exceeding 40% of tuition require exceptional Board approval. Finalized awards are contingent upon submission of all required tax documentation.<br>We appreciate the opportunity to partner with your family and support your child's experience at Mizzentop. <strong>If you wish to appeal your award, please do so by submitting a thorough letter of explanation to me before Friday, April 3.</strong><br>${ENROLLMENT_BLOCK}`;
   }
 
   function copyLetterText() {
-    const text = document.getElementById('letterTextArea').textContent;
-    navigator.clipboard.writeText(text).then(() => {
+    const html = document.getElementById('letterTextArea').innerHTML;
+    const blob = new Blob([html], { type: 'text/html' });
+    const item = new ClipboardItem({ 'text/html': blob });
+    navigator.clipboard.write([item]).then(() => {
       const fb = document.getElementById('copyFeedback');
       fb.classList.add('show');
       setTimeout(() => fb.classList.remove('show'), 2000);
