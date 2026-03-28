@@ -1075,8 +1075,12 @@
       }
       showToast('Saved successfully','success');
       closeModal('editModal');
+      const editedId = editingFamilyId;
       await loadData();
       window.scrollTo(0, savedScroll);
+      // Auto-expand the card that was just edited
+      const card = document.getElementById('family-' + editedId);
+      if (card && !card.classList.contains('expanded')) toggleCard('family-' + editedId);
     } catch(e) { showToast('Error saving','error'); console.error(e); }
   }
 
