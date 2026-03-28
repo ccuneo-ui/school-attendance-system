@@ -587,9 +587,9 @@
   <div class="filter-group">
     <span class="filter-label">View</span>
     <div class="view-toggle">
+      <button class="view-btn active" onclick="setView('homeroom', this)">Homeroom</button>
+      <button class="view-btn" onclick="setView('grouped', this)">Grouped</button>
       <button class="view-btn" onclick="setView('table', this)">Table</button>
-      <button class="view-btn active" onclick="setView('grouped', this)">Grouped</button>
-      <button class="view-btn" onclick="setView('homeroom', this)">Homeroom</button>
     </div>
   </div>
 
@@ -638,7 +638,7 @@ let allStudents = [];
 let filteredStudents = [];
 let currentGrade    = localStorage.getItem('dismissal_grade') || 'all';
 // homeroom grouping handled via view mode
-let currentView     = localStorage.getItem('dismissal_view') || 'grouped';
+let currentView     = localStorage.getItem('dismissal_view') || 'homeroom';
 let groupBy         = 'grade'; // used in grouped view
 let dataSource      = 'today'; // 'today' | 'default'
 
