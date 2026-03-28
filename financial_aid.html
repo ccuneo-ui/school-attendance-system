@@ -674,11 +674,14 @@
     try {
       const res = await fetch(`/api/financial-aid/${familyId}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({karins_notes:note,contract_sent:contract,parent_letter:parentLetter||null})});
       if (!res.ok) throw new Error();
-      feedback.textContent='Saved ✓'; feedback.style.color='var(--green)';
-      setTimeout(()=>{feedback.textContent='';},3000);
       const fam=allFamilies.find(f=>f.id===familyId);
       if(fam){fam.contract_sent=contract;fam.parent_letter=parentLetter||null;fam.students.forEach(s=>s.karins_notes=note);}
-      updateSummary();
+      const savedScroll = window.scrollY;
+      renderAll();
+      window.scrollTo(0, savedScroll);
+      const card = document.getElementById('family-' + familyId);
+      if (card && !card.classList.contains('expanded')) toggleCard('family-' + familyId);
+      showToast('Saved ✓','success');
     } catch(e) { feedback.textContent='Error'; feedback.style.color='var(--red)'; }
   }
 
