@@ -66,8 +66,7 @@
     }
     .dot-present { background: var(--green); }
     .dot-absent { background: var(--red); }
-    .dot-tardy { background: var(--gold); }
-    .dot-ed { background: var(--blue); }
+    .dot-nsd { background: #64748b; }
     .dot-unmarked { background: var(--border); }
 
     .summary-spacer { flex: 1; }
@@ -122,8 +121,7 @@
     .status-btn:hover { border-color: var(--navy); color: var(--navy); }
     .status-btn.active-present { background: var(--green); color: var(--white); border-color: var(--green); }
     .status-btn.active-absent { background: var(--red); color: var(--white); border-color: var(--red); }
-    .status-btn.active-tardy { background: var(--gold); color: var(--white); border-color: var(--gold); }
-    .status-btn.active-ed { background: var(--blue); color: var(--white); border-color: var(--blue); }
+    .status-btn.active-nsd { background: #64748b; color: var(--white); border-color: #64748b; }
 
     /* Admin-set statuses shown as read-only badges */
     .admin-badge {
@@ -204,8 +202,7 @@
   <div class="summary-bar" id="summary-bar" style="display:none;">
     <span class="summary-item"><span class="summary-dot dot-present"></span> <span id="cnt-present">0</span> Present</span>
     <span class="summary-item"><span class="summary-dot dot-absent"></span> <span id="cnt-absent">0</span> Absent</span>
-    <span class="summary-item"><span class="summary-dot dot-tardy"></span> <span id="cnt-tardy">0</span> Tardy</span>
-    <span class="summary-item"><span class="summary-dot dot-ed"></span> <span id="cnt-ed">0</span> ED</span>
+    <span class="summary-item"><span class="summary-dot dot-nsd"></span> <span id="cnt-nsd">0</span> NSD</span>
     <span class="summary-item"><span class="summary-dot dot-unmarked"></span> <span id="cnt-unmarked">0</span> Not Marked</span>
     <span class="summary-spacer"></span>
     <span class="submitted-badge" id="submitted-badge">✓ Submitted</span>
@@ -227,8 +224,8 @@
 
 <script>
 const API = '';
-const ADMIN_STATUSES = ['excused', 'field_trip', 'nsd'];
-const ADMIN_LABELS = { excused: 'Excused Absence', field_trip: 'Field Trip', nsd: 'NSD' };
+const ADMIN_STATUSES = ['excused', 'field_trip'];
+const ADMIN_LABELS = { excused: 'Excused Absence', field_trip: 'Field Trip' };
 
 let students = [];
 let attendance = {};  // student_id -> { status, note }
@@ -342,15 +339,14 @@ function renderStudents() {
     } else {
       html += `<button class="status-btn ${status==='present'?'active-present':''}" onclick="setStatus(${s.student_id},'present')">Present</button>`;
       html += `<button class="status-btn ${status==='absent'?'active-absent':''}" onclick="setStatus(${s.student_id},'absent')">Absent</button>`;
-      html += `<button class="status-btn ${status==='tardy'?'active-tardy':''}" onclick="setStatus(${s.student_id},'tardy')">Tardy</button>`;
-      html += `<button class="status-btn ${status==='ed'?'active-ed':''}" onclick="setStatus(${s.student_id},'ed')">Early Dismissal</button>`;
+      html += `<button class="status-btn ${status==='nsd'?'active-nsd':''}" onclick="setStatus(${s.student_id},'nsd')">NSD – PreK</button>`;
     }
 
     html += `  </div>`;
     html += `</div>`;
 
-    // Show note row for non-present statuses
-    if (status && status !== 'present' && !isAdmin) {
+    // Show note row for absent statuses (not present, not nsd, not admin)
+    if (status && status !== 'present' && status !== 'nsd' && !isAdmin) {
       html += `<div class="note-row">`;
       html += `  <input type="text" placeholder="Optional note..." value="${escapeHtml(note)}" onchange="setNote(${s.student_id}, this.value)">`;
       html += `</div>`;
@@ -405,22 +401,20 @@ function clearAll() {
 }
 
 function updateSummary() {
-  let present = 0, absent = 0, tardy = 0, ed = 0, unmarked = 0;
+  let present = 0, absent = 0, nsd = 0, unmarked = 0;
   students.forEach(s => {
     const att = attendance[s.student_id];
     if (!att || !att.status) { unmarked++; return; }
     switch (att.status) {
       case 'present': present++; break;
       case 'absent': absent++; break;
-      case 'tardy': tardy++; break;
-      case 'ed': ed++; break;
-      default: present++; break; // admin statuses count as accounted for
+      case 'nsd': nsd++; break;
+      default: present++; break; // admin statuses (excused, field_trip) count as accounted for
     }
   });
   document.getElementById('cnt-present').textContent = present;
   document.getElementById('cnt-absent').textContent = absent;
-  document.getElementById('cnt-tardy').textContent = tardy;
-  document.getElementById('cnt-ed').textContent = ed;
+  document.getElementById('cnt-nsd').textContent = nsd;
   document.getElementById('cnt-unmarked').textContent = unmarked;
 }
 
