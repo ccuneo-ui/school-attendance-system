@@ -126,6 +126,11 @@
   document.getElementById('chargeDate').value = today;
 
   let allStudents = [], charges = [], selectedStudentId = null, selectedStudentName = '';
+  let canManageBilling = false;
+  fetch(`${API_BASE}/api/session`, {credentials: 'include'})
+    .then(r => r.json())
+    .then(data => { canManageBilling = !!data.can_manage_billing; })
+    .catch(() => {});
 
   async function loadStudents() {
     try { const res = await fetch(`${API_BASE}/api/mcard/students`); allStudents = await res.json(); }
@@ -172,6 +177,12 @@
     if (!selectedStudentId) { searchInput.focus(); searchInput.style.borderColor = 'var(--red)'; setTimeout(() => searchInput.style.borderColor = '', 1500); showFlash('Please select a student from the list.', true); return; }
     const date = document.getElementById('chargeDate').value;
     if (!date) { document.getElementById('chargeDate').focus(); return; }
+    const chargeDate = new Date(date + 'T12:00:00');
+    const firstOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+    if (chargeDate < firstOfMonth && !canManageBilling) {
+      showFlash('This month is closed for changes or additions. Please contact the billing office at businessoffice@mizzentop.org.', true);
+      return;
+    }
     const btn1 = document.getElementById('addBtn1'), btn2 = document.getElementById('addBtn2');
     btn1.disabled = true; btn2.disabled = true; btn1.textContent = 'Saving...'; btn2.textContent = 'Saving...';
     const nameForFlash = selectedStudentName;
@@ -188,6 +199,15 @@
   }
 
   async function removeCharge(id) {
+    const charge = charges.find(c => c.charge_id === id);
+    if (charge) {
+      const chargeDate = new Date(charge.charge_date + 'T12:00:00');
+      const firstOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+      if (chargeDate < firstOfMonth && !canManageBilling) {
+        showFlash('This month is closed for changes or additions. Please contact the billing office at businessoffice@mizzentop.org.', true);
+        return;
+      }
+    }
     try {
       const res = await fetch(`${API_BASE}/api/mcard/charges/${id}`, {method: 'DELETE'});
       if (!res.ok) throw new Error();
@@ -209,7 +229,12 @@
     filtered.forEach((c, i) => {
       const d = new Date(c.charge_date + 'T12:00:00');
       const dateStr = d.toLocaleDateString('en-US', {month:'short', day:'numeric', year:'numeric'});
-      html += `<tr><td style="color:var(--muted);font-size:13px">${filtered.length - i}</td><td style="font-weight:600">${esc(c.student_name)}</td><td><span class="grade-pill">${esc(c.grade || '?')}</span></td><td style="color:var(--muted)">${dateStr}</td><td><span class="charge-badge">+${c.quantity || 1}</span></td><td><button class="btn-remove" onclick="removeCharge(${c.charge_id})">Remove</button></td></tr>`;
+      const firstOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+      const isLocked = d < firstOfMonth && !canManageBilling;
+      const removeBtn = isLocked
+        ? '<span style="color:var(--muted);font-size:12px;font-style:italic">🔒 Closed</span>'
+        : `<button class="btn-remove" onclick="removeCharge(${c.charge_id})">Remove</button>`;
+      html += `<tr><td style="color:var(--muted);font-size:13px">${filtered.length - i}</td><td style="font-weight:600">${esc(c.student_name)}</td><td><span class="grade-pill">${esc(c.grade || '?')}</span></td><td style="color:var(--muted)">${dateStr}</td><td><span class="charge-badge">+${c.quantity || 1}</span></td><td>${removeBtn}</td></tr>`;
     });
     html += '</tbody></table>';
     wrap.innerHTML = html;
