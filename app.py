@@ -670,6 +670,14 @@ def add_mcard_charge():
         return jsonify({"error":"Quantity must be 1 or 2"}),400
     if not student_id or not charge_date:
         return jsonify({"error":"Missing student_id or charge_date"}),400
+    try:
+        from datetime import date as _date
+        charge_dt = _date.fromisoformat(charge_date)
+    except ValueError:
+        return jsonify({"error":"Invalid date format"}),400
+    first_of_month = datetime.today().date().replace(day=1)
+    if charge_dt < first_of_month and not session.get("can_manage_billing"):
+        return jsonify({"error":"This month is closed for changes or additions. Please contact the billing office at businessoffice@mizzentop.org."}),403
     conn = get_db_connection()
     try:
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
@@ -688,9 +696,21 @@ def add_mcard_charge():
 
 @app.route("/api/mcard/charges/<int:charge_id>", methods=["DELETE"])
 def delete_mcard_charge(charge_id):
+    from datetime import date as _date
+    first_of_month = datetime.today().date().replace(day=1)
     conn = get_db_connection()
     try:
-        with conn.cursor() as cur:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute("SELECT charge_date FROM mcard_charges WHERE charge_id=%s",(charge_id,))
+            row = cur.fetchone()
+            if not row:
+                return jsonify({"error":"Charge not found"}),404
+            try:
+                charge_dt = _date.fromisoformat(str(row["charge_date"]))
+            except ValueError:
+                charge_dt = datetime.today().date()
+            if charge_dt < first_of_month and not session.get("can_manage_billing"):
+                return jsonify({"error":"This month is closed for changes or additions. Please contact the billing office at businessoffice@mizzentop.org."}),403
             cur.execute("DELETE FROM mcard_charges WHERE charge_id=%s",(charge_id,))
         conn.commit()
         return jsonify({"success":True})
