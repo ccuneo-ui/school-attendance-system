@@ -623,7 +623,7 @@ function renderStudentRow(s, showMissing) {
   if (showMissing) {
     const pills = [];
     if (!att) pills.push('<span class="missing-pill">No Att</span>');
-    if (!p) pills.push('<span class="missing-pill">No Dis</span>');
+    if (!p || !p.dismissal_type) pills.push('<span class="missing-pill">No Dis</span>');
     missingHtml = `<div class="missing-pills">${pills.join('')}</div>`;
   }
 
