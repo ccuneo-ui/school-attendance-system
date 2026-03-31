@@ -742,6 +742,10 @@ async function saveStudentRecord() {
       const isOverride = type !== defType;
       await savePlan(editingStudentId, type, dest, notes, isOverride);
       dailyPlan[editingStudentId] = { student_id: editingStudentId, dismissal_type: type, destination: dest, notes, is_override: isOverride };
+    } else if (notes) {
+      // No dismissal selected but has notes — save a note-only record
+      await savePlan(editingStudentId, '', '', notes, false);
+      dailyPlan[editingStudentId] = { student_id: editingStudentId, dismissal_type: '', destination: '', notes, is_override: false };
     } else if (dailyPlan[editingStudentId]) {
       await deletePlan(editingStudentId);
       delete dailyPlan[editingStudentId];
