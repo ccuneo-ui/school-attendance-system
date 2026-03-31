@@ -479,7 +479,8 @@ function getDefaultType(s) {
 }
 
 function isIncomplete(s) {
-  const hasDismissal = !!dailyPlan[s.student_id];
+  const p = dailyPlan[s.student_id];
+  const hasDismissal = !!(p && p.dismissal_type);
   const hasAttendance = !!attendance[s.student_id];
   return !hasDismissal || !hasAttendance;
 }
