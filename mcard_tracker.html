@@ -64,8 +64,8 @@
     .empty-state { text-align: center; padding: 48px 20px; color: var(--muted); font-size: 15px; }
     .empty-state span { font-size: 40px; display: block; margin-bottom: 10px; }
     .error-banner { background: #fff0f0; border: 2px solid var(--red); color: var(--red); border-radius: 12px; padding: 14px 20px; margin-bottom: 20px; font-size: 14px; font-weight: 600; display: none; }
-    .flash { position: fixed; bottom: 24px; right: 24px; background: var(--green); color: #fff; padding: 12px 22px; border-radius: 12px; font-weight: 600; font-size: 14px; box-shadow: 0 8px 24px rgba(0,0,0,0.15); opacity: 0; transform: translateY(10px); transition: all 0.2s; pointer-events: none; z-index: 999; }
-    .flash.show { opacity: 1; transform: translateY(0); }
+    .flash { position: fixed; top: 38%; left: 50%; transform: translateX(-50%) scale(0.95); background: var(--green); color: #fff; padding: 22px 36px; border-radius: 16px; font-weight: 600; font-size: 16px; line-height: 1.5; text-align: center; max-width: 580px; width: 90%; box-shadow: 0 16px 48px rgba(0,0,0,0.28); opacity: 0; transition: opacity 0.2s, transform 0.2s; pointer-events: none; z-index: 9999; }
+    .flash.show { opacity: 1; transform: translateX(-50%) scale(1); }
     .flash.error { background: var(--red); }
   </style>
 </head>
@@ -243,7 +243,7 @@
   function showFlash(msg, isError) {
     const f = document.getElementById('flash');
     f.textContent = msg; f.classList.toggle('error', isError); f.classList.add('show');
-    setTimeout(() => f.classList.remove('show'), 2200);
+    setTimeout(() => f.classList.remove('show'), isError ? 5000 : 2200);
   }
 
   function esc(str) { return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
