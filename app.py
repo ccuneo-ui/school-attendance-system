@@ -1121,11 +1121,11 @@ def save_dismissal_plan():
     data = request.json
     student_id  = data.get("student_id")
     date        = data.get("dismissal_date")
-    d_type      = data.get("dismissal_type")
+    d_type      = data.get("dismissal_type", "") or ""
     destination = data.get("destination","")
     notes       = data.get("notes","")
     is_override = data.get("is_override",0)
-    if not all([student_id, date, d_type]):
+    if not all([student_id, date]):
         return jsonify({"error":"Missing fields"}),400
     conn = get_db_connection()
     try:
