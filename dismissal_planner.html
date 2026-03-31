@@ -268,6 +268,7 @@
           <option value="present">Present</option>
           <option value="absent">Absent</option>
           <option value="tardy">Tardy</option>
+          <option value="excused_tardy">Excused Tardy</option>
           <option value="ed">Early Dismissal</option>
           <option value="excused">Excused Absence</option>
           <option value="field_trip">Field Trip</option>
@@ -317,8 +318,8 @@
 const API = '/api';
 const DAYS = ['sun','mon','tue','wed','thu','fri','sat'];
 const DAY_NAMES = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
-const ATTENDANCE_LABELS = { present:'Present', absent:'Absent', tardy:'Tardy', ed:'Early Dismissal', excused:'Excused Absence', field_trip:'Field Trip', nsd:'NSD' };
-const ATTENDANCE_CLASSES = { present:'badge-present', absent:'badge-absent', tardy:'badge-tardy', ed:'badge-ed', excused:'badge-excused', field_trip:'badge-fieldtrip', nsd:'badge-nsd' };
+const ATTENDANCE_LABELS = { present:'Present', absent:'Absent', tardy:'Tardy', excused_tardy:'Excused Tardy', ed:'Early Dismissal', excused:'Excused Absence', field_trip:'Field Trip', nsd:'NSD' };
+const ATTENDANCE_CLASSES = { present:'badge-present', absent:'badge-absent', tardy:'badge-tardy', excused_tardy:'badge-tardy', ed:'badge-ed', excused:'badge-excused', field_trip:'badge-fieldtrip', nsd:'badge-nsd' };
 
 let currentDate = new Date();
 let allStudents = [];
