@@ -11,6 +11,23 @@ import psycopg2.extras
 from datetime import datetime
 import os
 
+def parse_time_to_minutes(time_str):
+    """Parse 'HH:MM', 'H:MM PM', etc. into total minutes since midnight."""
+    s = str(time_str).strip().upper()
+    pm_offset = 0
+    if "PM" in s:
+        pm_offset = 12
+        s = s.replace("PM", "").strip()
+    if "AM" in s:
+        s = s.replace("AM", "").strip()
+    parts = s.split(":")
+    h, m = int(parts[0]), int(parts[1])
+    if pm_offset and h != 12:
+        h += pm_offset
+    elif not pm_offset and h == 12:
+        h = 0  # 12:xx AM = 0:xx
+    return h * 60 + m
+
 app = Flask(__name__)
 CORS(app)
 app.secret_key = os.environ.get("SECRET_KEY", "dev-secret-change-in-production")
@@ -2111,9 +2128,9 @@ def api_billing_report():
                 """, (first_day, last_day))
                 before_days = {r["student_id"]: int(r["days"]) for r in cur.fetchall()}
 
-                # 5. Aftercare — compute hours from pickup_time vs 4:30 PM start
+                # 5. Aftercare — compute hours from actual checkin_time to pickup_time
                 cur.execute("""
-                    SELECT student_id, session_date, pickup_time
+                    SELECT student_id, session_date, checkin_time, pickup_time
                     FROM   aftercare_attendance
                     WHERE  session_date::date >= %s AND session_date::date <= %s
                       AND  pickup_time IS NOT NULL
@@ -2121,23 +2138,11 @@ def api_billing_report():
                 aftercare_hours = {}
                 aftercare_days_d = {}
 
-                def pickup_hours(pickup_str):
+                def pickup_hours(checkin_str, pickup_str):
                     try:
-                        # Handles "HH:MM" or "H:MM PM" style
-                        s = str(pickup_str).strip().upper()
-                        pm_offset = 0
-                        if "PM" in s:
-                            pm_offset = 12
-                            s = s.replace("PM", "").strip()
-                        if "AM" in s:
-                            s = s.replace("AM", "").strip()
-                        parts = s.split(":")
-                        h, m = int(parts[0]), int(parts[1])
-                        if pm_offset and h != 12:
-                            h += pm_offset
-                        total_min = h * 60 + m
-                        start_min = 16 * 60 + 30  # 4:30 PM
-                        elapsed   = max(0, total_min - start_min)
+                        start_min = parse_time_to_minutes(checkin_str) if checkin_str else 16 * 60 + 30
+                        end_min   = parse_time_to_minutes(pickup_str)
+                        elapsed   = max(0, end_min - start_min)
                         # Minimum 1 hour charge; beyond 1 hour billed in 15-min increments
                         if elapsed <= 60:
                             return 1.0
@@ -2149,7 +2154,7 @@ def api_billing_report():
 
                 for r in cur.fetchall():
                     sid = r["student_id"]
-                    hrs = pickup_hours(r["pickup_time"])
+                    hrs = pickup_hours(r["checkin_time"], r["pickup_time"])
                     aftercare_hours[sid] = aftercare_hours.get(sid, 0.0) + hrs
                     if sid not in aftercare_days_d:
                         aftercare_days_d[sid] = set()
@@ -2314,20 +2319,17 @@ def api_billing_student_detail():
                     ORDER  BY session_date
                 """, (student_id, first_day, last_day))
 
-                def ac_hours(pickup_str):
+                def ac_hours(checkin_str, pickup_str):
                     try:
-                        s = str(pickup_str).strip().upper()
-                        pm = 12 if "PM" in s else 0
-                        s = s.replace("PM","").replace("AM","").strip()
-                        h, m = int(s.split(":")[0]), int(s.split(":")[1])
-                        if pm and h != 12: h += pm
-                        elapsed = max(0, h*60 + m - (16*60+30))
+                        start_min = parse_time_to_minutes(checkin_str) if checkin_str else 16 * 60 + 30
+                        end_min   = parse_time_to_minutes(pickup_str)
+                        elapsed   = max(0, end_min - start_min)
                         return 1.0 if elapsed <= 60 else 1.0 + math.ceil((elapsed-60)/15)*15/60.0
                     except Exception:
                         return 0.0
 
                 for r in cur.fetchall():
-                    hrs    = ac_hours(r["pickup_time"])
+                    hrs    = ac_hours(r.get("checkin_time"), r["pickup_time"])
                     amount = hrs * rates["aftercare_hourly"]
                     checkin = r.get("checkin_time") or "4:30 PM"
                     pickup  = r.get("pickup_time")  or "—"
