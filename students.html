@@ -226,6 +226,18 @@
             <option value="">— Not Assigned —</option>
           </select>
         </div>
+        <div class="field" id="advisory-field" style="grid-column:1/-1; display:none">
+          <label>Advisory Teacher</label>
+          <select id="f-advisory-teacher">
+            <option value="">— Not Assigned —</option>
+          </select>
+        </div>
+        <div class="field" id="elective-field" style="grid-column:1/-1">
+          <label>T3 Elective</label>
+          <select id="f-elective">
+            <option value="">— None —</option>
+          </select>
+        </div>
       </div>
 
       <div class="section-title">Personal Information</div>
@@ -333,7 +345,32 @@ async function init() {
       opt.textContent = `${s.last_name}, ${s.first_name}${s.title ? ' (' + s.title + ')' : ''}`;
       sel.appendChild(opt);
     });
+    // Also populate advisory teacher dropdown with same staff
+    const advSel = document.getElementById('f-advisory-teacher');
+    allStaff.forEach(s => {
+      const opt = document.createElement('option');
+      opt.value = s.staff_id;
+      opt.textContent = `${s.last_name}, ${s.first_name}${s.title ? ' (' + s.title + ')' : ''}`;
+      advSel.appendChild(opt);
+    });
   } catch(e) { console.error('Failed to load staff', e); }
+  // Load electives for dropdown
+  try {
+    const er = await fetch('/api/electives');
+    window.allElectives = await er.json();
+    const elSel = document.getElementById('f-elective');
+    window.allElectives.forEach(el => {
+      const opt = document.createElement('option');
+      opt.value = el.elective_id;
+      opt.textContent = `${el.name}${el.division ? ' (' + el.division + ')' : ''}`;
+      elSel.appendChild(opt);
+    });
+  } catch(e) { console.error('Failed to load electives', e); }
+  // Toggle advisory field visibility when grade changes
+  document.getElementById('f-grade').addEventListener('change', function() {
+    const msGrades = ['5','6','7','8'];
+    document.getElementById('advisory-field').style.display = msGrades.includes(this.value) ? '' : 'none';
+  });
   try {
     const r = await fetch(`${API}/students`);
     allStudents = await r.json();
@@ -457,6 +494,11 @@ function openModal(studentId) {
   document.getElementById('f-ec-phone').value = s.emergency_contact_phone || '';
   document.getElementById('f-enrollment-date').value = s.enrollment_date || '';
   document.getElementById('f-homeroom-teacher').value = s.homeroom_teacher_id || '';
+  document.getElementById('f-advisory-teacher').value = s.advisory_teacher_id || '';
+  document.getElementById('f-elective').value = s.current_elective_id || '';
+  // Show advisory field only for grades 5-8
+  const msGrades = ['5','6','7','8'];
+  document.getElementById('advisory-field').style.display = msGrades.includes(String(s.grade)) ? '' : 'none';
   document.getElementById('f-notes').value = s.notes || '';
   document.getElementById('f-before-care').checked = !!s.before_care;
   document.getElementById('f-mon').value = s.dismissal_mon || '';
@@ -488,6 +530,9 @@ function openAddModal() {
   document.getElementById('f-ec-phone').value = '';
   document.getElementById('f-enrollment-date').value = new Date().toISOString().split('T')[0];
   document.getElementById('f-homeroom-teacher').value = '';
+  document.getElementById('f-advisory-teacher').value = '';
+  document.getElementById('f-elective').value = '';
+  document.getElementById('advisory-field').style.display = 'none';
   document.getElementById('f-notes').value = '';
   document.getElementById('f-before-care').checked = false;
   document.getElementById('f-mon').value = '';
@@ -539,6 +584,8 @@ async function saveStudent() {
     dismissal_thu: document.getElementById('f-thu').value,
     dismissal_fri: document.getElementById('f-fri').value,
     homeroom_teacher_id: document.getElementById('f-homeroom-teacher').value || null,
+    advisory_teacher_id: document.getElementById('f-advisory-teacher').value || null,
+    elective_id: document.getElementById('f-elective').value || null,
   };
 
   try {

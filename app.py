@@ -349,6 +349,34 @@ def init_db():
             if not cur.fetchone():
                 cur.execute("ALTER TABLE students ADD COLUMN homeroom_teacher_id INTEGER")
 
+            # Add advisory_teacher_id to students if missing
+            cur.execute("""
+                SELECT column_name FROM information_schema.columns
+                WHERE table_name='students' AND column_name='advisory_teacher_id'
+            """)
+            if not cur.fetchone():
+                cur.execute("ALTER TABLE students ADD COLUMN advisory_teacher_id INTEGER REFERENCES staff(staff_id)")
+
+            # Add trimester, instructor_id, division columns to electives if missing
+            for col, typedef in [('trimester', 'INTEGER'), ('instructor_id', 'INTEGER REFERENCES staff(staff_id)'), ('division', 'TEXT')]:
+                cur.execute("""
+                    SELECT column_name FROM information_schema.columns
+                    WHERE table_name='electives' AND column_name=%s
+                """, (col,))
+                if not cur.fetchone():
+                    cur.execute(f"ALTER TABLE electives ADD COLUMN {col} {typedef}")
+
+            # Create student_electives junction table
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS student_electives (
+                    id SERIAL PRIMARY KEY,
+                    student_id INTEGER REFERENCES students(student_id),
+                    elective_id INTEGER REFERENCES electives(elective_id),
+                    trimester INTEGER NOT NULL,
+                    UNIQUE(student_id, trimester)
+                )
+            """)
+
         conn.commit()
         print("DB init OK")
     except Exception as e:
@@ -727,7 +755,7 @@ def get_electives():
     conn = get_db_connection()
     try:
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
-            cur.execute("SELECT elective_id, name FROM electives WHERE active=1 ORDER BY name")
+            cur.execute("SELECT elective_id, name, division, trimester FROM electives WHERE active=1 ORDER BY division, name")
             return jsonify(fa(cur))
     finally:
         conn.close()
@@ -1303,13 +1331,21 @@ def get_students_list():
     try:
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
             cur.execute("""
-                SELECT student_id,first_name,last_name,grade,status,
-                       date_of_birth,email,phone,address,
-                       emergency_contact_name,emergency_contact_phone,
-                       enrollment_date,notes,before_care,
-                       dismissal_mon,dismissal_tue,dismissal_wed,dismissal_thu,dismissal_fri,
-                       homeroom_teacher_id
-                FROM students ORDER BY last_name, first_name
+                SELECT s.student_id,s.first_name,s.last_name,s.grade,s.status,
+                       s.date_of_birth,s.email,s.phone,s.address,
+                       s.emergency_contact_name,s.emergency_contact_phone,
+                       s.enrollment_date,s.notes,s.before_care,
+                       s.dismissal_mon,s.dismissal_tue,s.dismissal_wed,s.dismissal_thu,s.dismissal_fri,
+                       s.homeroom_teacher_id,
+                       s.advisory_teacher_id,
+                       adv.first_name || ' ' || adv.last_name AS advisory_teacher_name,
+                       se.elective_id AS current_elective_id,
+                       e.name AS current_elective_name
+                FROM students s
+                LEFT JOIN staff adv ON s.advisory_teacher_id = adv.staff_id
+                LEFT JOIN student_electives se ON s.student_id = se.student_id AND se.trimester = 3
+                LEFT JOIN electives e ON se.elective_id = e.elective_id
+                ORDER BY s.last_name, s.first_name
             """)
             return jsonify(fa(cur))
     finally:
@@ -1359,6 +1395,8 @@ def update_student(student_id):
         with conn.cursor() as cur:
             hr_id = data.get("homeroom_teacher_id")
             hr_id = int(hr_id) if hr_id else None
+            adv_id = data.get("advisory_teacher_id")
+            adv_id = int(adv_id) if adv_id else None
             cur.execute("""
                 UPDATE students SET
                     first_name=%s, last_name=%s, grade=%s, status=%s,
@@ -1367,7 +1405,7 @@ def update_student(student_id):
                     enrollment_date=%s, notes=%s, before_care=%s,
                     dismissal_mon=%s, dismissal_tue=%s, dismissal_wed=%s,
                     dismissal_thu=%s, dismissal_fri=%s,
-                    homeroom_teacher_id=%s,
+                    homeroom_teacher_id=%s, advisory_teacher_id=%s,
                     updated_at=CURRENT_TIMESTAMP
                 WHERE student_id=%s
             """, (data.get("first_name"),data.get("last_name"),data.get("grade"),data.get("status"),
@@ -1376,7 +1414,18 @@ def update_student(student_id):
                   data.get("enrollment_date"),data.get("notes"),
                   1 if data.get("before_care") else 0,
                   data.get("dismissal_mon"),data.get("dismissal_tue"),data.get("dismissal_wed"),
-                  data.get("dismissal_thu"),data.get("dismissal_fri"),hr_id,student_id))
+                  data.get("dismissal_thu"),data.get("dismissal_fri"),hr_id,adv_id,student_id))
+            # Update student_electives if elective_id provided
+            elective_id = data.get("elective_id")
+            if elective_id is not None:
+                if elective_id:
+                    cur.execute("""
+                        INSERT INTO student_electives (student_id, elective_id, trimester)
+                        VALUES (%s, %s, 3)
+                        ON CONFLICT (student_id, trimester) DO UPDATE SET elective_id=EXCLUDED.elective_id
+                    """, (student_id, int(elective_id)))
+                else:
+                    cur.execute("DELETE FROM student_electives WHERE student_id=%s AND trimester=3", (student_id,))
         conn.commit()
         return jsonify({"success":True})
     except Exception as e:
@@ -4044,6 +4093,246 @@ def migrate_financial_aid():
     finally:
         conn.close()
 
+
+
+@app.route('/admin/populate-advisory-electives', methods=['POST'])
+@superadmin_required
+def populate_advisory_electives():
+    """One-time route to populate advisory teachers and T3 electives for all students."""
+    conn = get_db_connection()
+    results = []
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            # --- A. Clear old placeholder electives and insert real T3 electives ---
+            cur.execute("DELETE FROM student_electives")
+            cur.execute("DELETE FROM electives")
+            results.append("Cleared old electives and student_electives")
+
+            t3_electives = [
+                ('World Travelers', 'LS', 3),
+                ('Walking Buddies', 'LS', 3),
+                ('Puzzle Masters', 'LS', 3),
+                ('Reading Club', 'LS', 3),
+                ('Crafting Corner', 'LS', 3),
+                ('Goal Getters', 'LS', 3),
+                ('Canva Pros Jr.', 'LS', 3),
+                ('Engineering/Robotics', 'MS', 3),
+                ('Reading Club', 'MS', 3),
+                ('Shark Tank Jr', 'MS', 3),
+                ('Wall Street Warriors', 'MS', 3),
+                ('Pasta Pals', 'MS', 3),
+                ('Canva Pros', 'MS', 3),
+                ('Financial Literacy', 'MS', 3),
+                ('Sabores y Colores', 'MS', 3),
+            ]
+            # Drop unique constraint on name since "Reading Club" appears twice (LS + MS)
+            cur.execute("ALTER TABLE electives DROP CONSTRAINT IF EXISTS electives_name_key")
+
+            elective_map = {}  # (name, division) -> elective_id
+            for name, division, trimester in t3_electives:
+                cur.execute("""
+                    INSERT INTO electives (name, active, trimester, division)
+                    VALUES (%s, 1, %s, %s) RETURNING elective_id
+                """, (name, trimester, division))
+                eid = cur.fetchone()['elective_id']
+                elective_map[(name, division)] = eid
+            results.append(f"Inserted {len(t3_electives)} T3 electives")
+
+            # --- Helper: match student by first + last name ---
+            def find_student(full_name):
+                parts = full_name.strip().split()
+                if len(parts) < 2:
+                    return None
+                first = parts[0]
+                last = ' '.join(parts[1:])
+                cur.execute(
+                    "SELECT student_id FROM students WHERE first_name ILIKE %s AND last_name ILIKE %s AND status='active'",
+                    (first, last)
+                )
+                row = cur.fetchone()
+                return row['student_id'] if row else None
+
+            # --- B. Find staff by name ---
+            def find_staff(full_name):
+                parts = full_name.strip().split()
+                first = parts[0]
+                last = ' '.join(parts[1:])
+                cur.execute(
+                    "SELECT staff_id FROM staff WHERE first_name ILIKE %s AND last_name ILIKE %s AND status='active'",
+                    (first, last)
+                )
+                row = cur.fetchone()
+                return row['staff_id'] if row else None
+
+            # --- C. Populate advisory_teacher_id for MS students ---
+            advisory_assignments = {
+                'Erica Jordan': [
+                    'Meredith Burlington', 'Sonali Julka', 'Lucas Garland', 'Adam Hanafi',
+                    'Mark Jennings', 'Victor Danieluc', 'Adam Wetterhorn'
+                ],
+                'Lissannia Fermin': [
+                    'Lukas Cuppek', 'Andrew Williams', 'Alex Mack', 'Addison Ceballos',
+                    'Aubrey Murphy', 'Marcellus Johnson'
+                ],
+                'Shane Caropolli': [
+                    'Dylan Mack', 'Ben Catalano', 'LJ Holly', 'Vivek Suseelan',
+                    'Mary Clare Englehart', 'Lily Linquist'
+                ],
+                'Jane Colbert': [
+                    'Isabella Anderson', 'William Hardisty', 'Victoria Braham', 'Tyler Mazzucca',
+                    'Andrew Arena', 'Graham Fritts', 'Mikey Gerosa'
+                ],
+                'Noelle Semenza': [
+                    'Elias Garay', 'Remy Bell', 'Anna Yacoub', 'Aurora DeHaarte',
+                    'Liam Mutchler', 'Cameron Martin'
+                ],
+                'Kelly Curra': [
+                    'Cody Pisciarino', 'Gigi Ponzini', 'Paulie Desatnik', 'Jason Hampton',
+                    'Lexi Modupe', 'Geo Kumar'
+                ],
+                'Jancy McLeod': [
+                    'Blake Sukow', 'Nicolas Barahona', 'Kailani Broderick', 'Luca Parisi',
+                    'Scarlet Lent', 'Noah Garay'
+                ],
+                'Eliza Goff': [
+                    'Eddie Huron', 'Logan Ceballos', 'Joaquin Johnson', 'Ava Perry',
+                    'Nicole Cuppek', 'Konstantinos Bellos'
+                ],
+                'Lara Keenan': [
+                    'Michael Botter', 'Jase Boardman', 'Noah DuPlessis', "Caroline O'Keefe",
+                    'Kacey McLaughlin', 'Samuel Shiller'
+                ],
+                'Mindy Poon': [
+                    'Silas Fitzpatrick', 'Jayden Garland', 'Christopher Argueta',
+                    'Maxwell Mezzapelle', 'John William Salterelli', 'Dakota Holly',
+                    'Keira Philips', 'Coleman Cynamon Ferris', 'Layla Eyring',
+                    'AJ Ferro', 'Teo Danieluc', 'Annie Fritts', 'Dylan Choi',
+                    'Jake Ceballos', 'Gabriel Oludoja', 'Sydney Johnson', 'Brooke Hampton'
+                ],
+            }
+
+            advisory_count = 0
+            advisory_errors = []
+            for advisor_name, student_names in advisory_assignments.items():
+                staff_id = find_staff(advisor_name)
+                if not staff_id:
+                    advisory_errors.append(f"Advisor not found: {advisor_name}")
+                    continue
+                for sname in student_names:
+                    sid = find_student(sname)
+                    if sid:
+                        cur.execute("UPDATE students SET advisory_teacher_id=%s WHERE student_id=%s", (staff_id, sid))
+                        advisory_count += 1
+                    else:
+                        advisory_errors.append(f"Student not found: {sname}")
+            results.append(f"Set advisory teacher for {advisory_count} students")
+            if advisory_errors:
+                results.append(f"Advisory errors: {advisory_errors}")
+
+            # --- D. Populate student_electives for T3 ---
+            ls_elective_roster = {
+                ('World Travelers', 'LS'): [
+                    'Cassidy Sukow', 'Bridget Boardman', 'Jack Shiller', 'Camden Martin',
+                    'Charlotte Pisciarino', 'Alden Mack', 'Adriel Arango', 'Clara Wetterhorn'
+                ],
+                ('Walking Buddies', 'LS'): [
+                    'Mikayla Barahona', 'Lillian Hardisty', 'Charlie Botter', 'Nathaniel Lopez',
+                    'Hank Keenan', 'Johnny Arena', 'Vivienne Eyring', 'Simon Mutchler'
+                ],
+                ('Puzzle Masters', 'LS'): [
+                    'Quinn Martin', 'Julia Garland', 'Sawyer Ceballos', 'Devin Ceballos',
+                    'Matteo Parisi', 'Sebastian Mezzapelle', 'Charlotte Thompson', 'Jack Catalano'
+                ],
+                ('Reading Club', 'LS'): [
+                    'Finley Perry', 'Maeve Philips', 'Roman Bellos', 'Theodore Curra',
+                    'Elisa Fritts', 'Mia Desatnik', 'Mia Murphy', 'Sutton Ponzini'
+                ],
+                ('Crafting Corner', 'LS'): [
+                    'Harper Broderick', 'Gemma DeHaarte', 'Nora Yacoub', 'Evelyn O\'Keefe',
+                    'Vivian Hanafi', 'Mia Choi', 'Ziva Bell'
+                ],
+                ('Goal Getters', 'LS'): [
+                    'Penelope Garay', 'Keira Holly', 'Hannah Huron', 'Noah Gerosa',
+                    'James Anderson', 'Logan Ponzini', 'Miles Julka'
+                ],
+                ('Canva Pros Jr.', 'LS'): [
+                    'Sadie Hampton', 'Cruz Kumar', 'August Bell', 'Laila Johnson',
+                    'Leo Williams', 'David Braham', 'Nora Linquist'
+                ],
+            }
+            ms_elective_roster = {
+                ('Engineering/Robotics', 'MS'): [
+                    'Andrew Arena', 'Jase Boardman', 'Jake Ceballos', 'Addison Ceballos',
+                    'Ben Catalano', 'Graham Fritts', 'Adam Hanafi', 'Mark Jennings',
+                    'Dylan Mack'
+                ],
+                ('Reading Club', 'MS'): [
+                    'Isabella Anderson', 'Victoria Braham', 'Meredith Burlington',
+                    'Mary Clare Englehart', 'Annie Fritts', 'Keira Philips',
+                    'Ava Perry', 'Anna Yacoub'
+                ],
+                ('Shark Tank Jr', 'MS'): [
+                    'Nicolas Barahona', 'Remy Bell', 'Logan Ceballos', 'Lukas Cuppek',
+                    'Nicole Cuppek', 'Teo Danieluc', 'Victor Danieluc', 'AJ Ferro',
+                    'Silas Fitzpatrick'
+                ],
+                ('Wall Street Warriors', 'MS'): [
+                    'Christopher Argueta', 'Konstantinos Bellos', 'Michael Botter',
+                    'Kailani Broderick', 'Coleman Cynamon Ferris', 'Noah DuPlessis',
+                    'Jayden Garland', 'Lucas Garland', 'Mikey Gerosa'
+                ],
+                ('Pasta Pals', 'MS'): [
+                    'Aurora DeHaarte', 'Layla Eyring', 'Elias Garay', 'Noah Garay',
+                    'William Hardisty', 'Brooke Hampton', 'Jason Hampton', 'Dakota Holly',
+                    'LJ Holly'
+                ],
+                ('Canva Pros', 'MS'): [
+                    'Eddie Huron', 'Sonali Julka', 'Geo Kumar', 'Scarlet Lent',
+                    'Lily Linquist', 'Kacey McLaughlin', 'Liam Mutchler', 'Aubrey Murphy',
+                    'Lexi Modupe'
+                ],
+                ('Financial Literacy', 'MS'): [
+                    'Dylan Choi', 'Cameron Martin', 'Tyler Mazzucca', 'Maxwell Mezzapelle',
+                    'Gabriel Oludoja', 'Luca Parisi', 'Cody Pisciarino', 'John William Salterelli',
+                    'Samuel Shiller'
+                ],
+                ('Sabores y Colores', 'MS'): [
+                    'Paulie Desatnik', 'Alex Mack', 'Marcellus Johnson', 'Joaquin Johnson',
+                    'Sydney Johnson', "Caroline O'Keefe", 'Gigi Ponzini', 'Blake Sukow',
+                    'Vivek Suseelan', 'Adam Wetterhorn', 'Andrew Williams'
+                ],
+            }
+
+            elective_count = 0
+            elective_errors = []
+            for roster in [ls_elective_roster, ms_elective_roster]:
+                for (elective_name, division), student_names in roster.items():
+                    eid = elective_map.get((elective_name, division))
+                    if not eid:
+                        elective_errors.append(f"Elective not found: {elective_name} ({division})")
+                        continue
+                    for sname in student_names:
+                        sid = find_student(sname)
+                        if sid:
+                            cur.execute("""
+                                INSERT INTO student_electives (student_id, elective_id, trimester)
+                                VALUES (%s, %s, 3) ON CONFLICT (student_id, trimester) DO UPDATE SET elective_id=EXCLUDED.elective_id
+                            """, (sid, eid))
+                            elective_count += 1
+                        else:
+                            elective_errors.append(f"Student not found for elective: {sname}")
+            results.append(f"Assigned {elective_count} student elective enrollments")
+            if elective_errors:
+                results.append(f"Elective errors: {elective_errors}")
+
+        conn.commit()
+        return jsonify({'ok': True, 'results': results})
+    except Exception as e:
+        conn.rollback()
+        import traceback; traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+    finally:
+        conn.close()
 
 
 @app.route('/financial-aid/tuition-rates')
