@@ -588,6 +588,8 @@
     <span class="filter-label">View</span>
     <div class="view-toggle">
       <button class="view-btn active" onclick="setView('homeroom', this)">Homeroom</button>
+      <button class="view-btn" onclick="setView('advisory', this)">Advisory</button>
+      <button class="view-btn" onclick="setView('elective', this)">Elective</button>
       <button class="view-btn" onclick="setView('grouped', this)">Grouped</button>
       <button class="view-btn" onclick="setView('table', this)">Table</button>
     </div>
@@ -813,9 +815,11 @@ function applyFilters() {
   filteredStudents.sort((a,b) => (a.lastName||'').localeCompare(b.lastName||''));
 
   renderSummary();
-  if (currentView === 'table')        renderTable();
-  else if (currentView === 'homeroom') renderGrouped('homeroom');
-  else                                 renderGrouped('grade');
+  if (currentView === 'table')          renderTable();
+  else if (currentView === 'homeroom')  renderGrouped('homeroom');
+  else if (currentView === 'advisory')  renderGrouped('advisory');
+  else if (currentView === 'elective')  renderGrouped('elective');
+  else                                  renderGrouped('grade');
 }
 
 // ── SUMMARY ───────────────────────────────────────────────────────────────────
@@ -882,10 +886,14 @@ function renderGrouped(mode) {
     return;
   }
 
-  // mode: 'homeroom' groups by teacher, 'grade' groups by grade (or destination if filtered)
+  // mode: 'homeroom' groups by teacher, 'advisory' by advisor, 'elective' by elective, 'grade' by grade/destination
   let groupByField;
   if (mode === 'homeroom') {
     groupByField = 'homeroom';
+  } else if (mode === 'advisory') {
+    groupByField = 'advisory';
+  } else if (mode === 'elective') {
+    groupByField = 'elective';
   } else {
     groupByField = (currentGrade === 'all') ? 'grade' : 'destination';
   }
@@ -895,6 +903,10 @@ function renderGrouped(mode) {
     let key;
     if (groupByField === 'homeroom') {
       key = s.homeroomTeacher || 'Unassigned';
+    } else if (groupByField === 'advisory') {
+      key = s.advisoryTeacher || 'No Advisory';
+    } else if (groupByField === 'elective') {
+      key = s.currentElective || 'No Elective';
     } else if (groupByField === 'grade') {
       key = s.grade || 'Unknown';
     } else {
@@ -920,7 +932,7 @@ function renderGrouped(mode) {
       <div class="group-student-row">
         <span class="gsrow-name">${esc(s.lastName)}, ${esc(s.firstName)}</span>${attBadge(s)}
         <div class="gsrow-meta">
-          ${groupByField === 'homeroom' ? `<span class="grade-badge">${esc(s.grade)}</span>${dismissalTag(s)}` :
+          ${(groupByField === 'homeroom' || groupByField === 'advisory' || groupByField === 'elective') ? `<span class="grade-badge">${esc(s.grade)}</span>${dismissalTag(s)}` :
             groupByField === 'grade' ? dismissalTag(s) : `<span class="grade-badge">${esc(s.grade)}</span>`}
         </div>
       </div>
@@ -929,7 +941,7 @@ function renderGrouped(mode) {
     return `
       <div class="group-card" style="animation-delay:${sortedKeys.indexOf(key)*0.04}s">
         <div class="group-header">
-          <h3>${groupByField === 'homeroom' ? hrIcon() : groupByField === 'grade' ? gradeIcon(key) : destIcon(key)} ${esc(key)}</h3>
+          <h3>${groupByField === 'homeroom' ? hrIcon() : groupByField === 'advisory' ? hrIcon() : groupByField === 'elective' ? electiveIcon() : groupByField === 'grade' ? gradeIcon(key) : destIcon(key)} ${esc(key)}</h3>
           <span class="group-count">${students.length}</span>
         </div>
         <div class="group-students">${rows}</div>
