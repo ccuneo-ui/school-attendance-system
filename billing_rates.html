@@ -32,9 +32,30 @@
 
     .container { max-width: 720px; margin: 0 auto; padding: 32px 24px 80px; }
 
-    .page-header { margin-bottom: 32px; }
+    .page-header { margin-bottom: 24px; }
     .page-header h1 { font-family: 'Playfair Display', serif; font-size: 30px; font-weight: 700; margin-bottom: 6px; }
     .page-header p { color: var(--muted); font-size: 14px; line-height: 1.6; }
+
+    /* ── Tabs ── */
+    .tab-bar {
+      display: flex; gap: 0; margin-bottom: 24px;
+      border-bottom: 2px solid var(--border);
+    }
+    .tab-btn {
+      padding: 10px 24px; border: none; background: none;
+      font-family: 'DM Sans', sans-serif; font-size: 14px; font-weight: 600;
+      color: var(--muted); cursor: pointer; position: relative;
+      transition: color 0.2s;
+    }
+    .tab-btn:hover { color: var(--navy); }
+    .tab-btn.active { color: var(--burgundy); }
+    .tab-btn.active::after {
+      content: ''; position: absolute; bottom: -2px; left: 0; right: 0;
+      height: 2px; background: var(--burgundy);
+    }
+
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
 
     /* ── Cards ── */
     .card {
@@ -189,67 +210,160 @@
     <p>Rates are tied to effective dates. Changing rates here only affects billing from the date you specify — past months keep their original rates.</p>
   </div>
 
-  <!-- Current rates (read-only display) -->
-  <div class="card">
-    <div class="card-header">
-      <h2>Current Rates</h2>
-      <span class="current-badge" id="currentEffective">Loading…</span>
+  <!-- Tabs -->
+  <div class="tab-bar">
+    <button class="tab-btn active" onclick="switchTab('billing')">Billing Rates</button>
+    <button class="tab-btn" onclick="switchTab('comp')">Comp Rates</button>
+  </div>
+
+  <!-- ═══════════════════════════════════════ -->
+  <!-- TAB 1: Billing Rates                   -->
+  <!-- ═══════════════════════════════════════ -->
+  <div class="tab-panel active" id="panel-billing">
+
+    <!-- Current rates (read-only display) -->
+    <div class="card">
+      <div class="card-header">
+        <h2>Current Rates</h2>
+        <span class="current-badge" id="currentEffective">Loading…</span>
+      </div>
+      <div id="currentRatesContainer">
+        <div class="loading">Loading rates…</div>
+      </div>
     </div>
-    <div id="currentRatesContainer">
-      <div class="loading">Loading rates…</div>
+
+    <!-- Set new rates -->
+    <div class="card">
+      <div class="new-rates-section">
+        <h3>Set New Rates</h3>
+        <div class="hint">Choose an effective date and enter the new rates. This creates a new rate period — previous rates remain unchanged for past billing.</div>
+
+        <div class="effective-row">
+          <label>Effective from:</label>
+          <input type="date" id="effectiveDate">
+          <button class="quick-btn" onclick="setEffective('thisMonth', this)">1st of This Month</button>
+          <button class="quick-btn" onclick="setEffective('nextMonth', this)">1st of Next Month</button>
+          <button class="quick-btn" onclick="setEffective('nextYear', this)">Next School Year</button>
+        </div>
+
+        <div class="new-rate-grid" id="newRateGrid">
+          <!-- Filled by JS -->
+        </div>
+
+        <div class="save-row">
+          <span class="save-hint" id="saveHint">Rates will apply from the selected date forward.</span>
+          <button class="btn-save" id="btnSave" onclick="saveNewRates()">Save New Rates</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Rate history -->
+    <div class="card">
+      <div class="history-toggle" onclick="toggleHistory()">
+        <span>Rate History</span>
+        <span id="historyArrow">▼</span>
+      </div>
+      <div class="history-content" id="historyContent">
+        <table class="history-table">
+          <thead>
+            <tr>
+              <th>Program</th>
+              <th>Rate</th>
+              <th>Effective From</th>
+              <th>Set By</th>
+            </tr>
+          </thead>
+          <tbody id="historyBody"></tbody>
+        </table>
+      </div>
     </div>
   </div>
 
-  <!-- Set new rates -->
-  <div class="card">
-    <div class="new-rates-section">
-      <h3>Set New Rates</h3>
-      <div class="hint">Choose an effective date and enter the new rates. This creates a new rate period — previous rates remain unchanged for past billing.</div>
+  <!-- ═══════════════════════════════════════ -->
+  <!-- TAB 2: Comp Rates                      -->
+  <!-- ═══════════════════════════════════════ -->
+  <div class="tab-panel" id="panel-comp">
 
-      <div class="effective-row">
-        <label>Effective from:</label>
-        <input type="date" id="effectiveDate">
-        <button class="quick-btn" onclick="setEffective('thisMonth')">1st of This Month</button>
-        <button class="quick-btn" onclick="setEffective('nextMonth')">1st of Next Month</button>
-        <button class="quick-btn" onclick="setEffective('nextYear')">Next School Year</button>
+    <!-- Current comp rates -->
+    <div class="card">
+      <div class="card-header">
+        <h2>Current Comp Rates</h2>
+        <span class="current-badge" id="compCurrentEffective">Loading…</span>
       </div>
-
-      <div class="new-rate-grid" id="newRateGrid">
-        <!-- Filled by JS -->
+      <div id="compCurrentRatesContainer">
+        <div class="loading">Loading rates…</div>
       </div>
+    </div>
 
-      <div class="save-row">
-        <span class="save-hint" id="saveHint">Rates will apply from the selected date forward.</span>
-        <button class="btn-save" id="btnSave" onclick="saveNewRates()">Save New Rates</button>
+    <!-- Set new comp rates -->
+    <div class="card">
+      <div class="new-rates-section">
+        <h3>Set New Comp Rates</h3>
+        <div class="hint">Choose an effective date and enter what staff are paid for each program. This creates a new rate period — previous rates remain unchanged.</div>
+
+        <div class="effective-row">
+          <label>Effective from:</label>
+          <input type="date" id="compEffectiveDate">
+          <button class="quick-btn" onclick="setCompEffective('thisMonth', this)">1st of This Month</button>
+          <button class="quick-btn" onclick="setCompEffective('nextMonth', this)">1st of Next Month</button>
+          <button class="quick-btn" onclick="setCompEffective('nextYear', this)">Next School Year</button>
+        </div>
+
+        <div class="new-rate-grid" id="compNewRateGrid">
+          <!-- Filled by JS -->
+        </div>
+
+        <div class="save-row">
+          <span class="save-hint">Comp rates will apply from the selected date forward.</span>
+          <button class="btn-save" id="btnCompSave" onclick="saveCompRates()">Save Comp Rates</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Comp rate history -->
+    <div class="card">
+      <div class="history-toggle" onclick="toggleCompHistory()">
+        <span>Comp Rate History</span>
+        <span id="compHistoryArrow">▼</span>
+      </div>
+      <div class="history-content" id="compHistoryContent">
+        <table class="history-table">
+          <thead>
+            <tr>
+              <th>Program</th>
+              <th>Rate</th>
+              <th>Effective From</th>
+              <th>Set By</th>
+            </tr>
+          </thead>
+          <tbody id="compHistoryBody"></tbody>
+        </table>
       </div>
     </div>
   </div>
 
-  <!-- Rate history -->
-  <div class="card">
-    <div class="history-toggle" onclick="toggleHistory()">
-      <span>Rate History</span>
-      <span id="historyArrow">▼</span>
-    </div>
-    <div class="history-content" id="historyContent">
-      <table class="history-table">
-        <thead>
-          <tr>
-            <th>Program</th>
-            <th>Rate</th>
-            <th>Effective From</th>
-            <th>Set By</th>
-          </tr>
-        </thead>
-        <tbody id="historyBody"></tbody>
-      </table>
-    </div>
-  </div>
 </div>
 
 <div class="toast" id="toast"></div>
 
 <script>
+  // ═══════════════════════════════════════
+  // TAB SWITCHING
+  // ═══════════════════════════════════════
+  function switchTab(tab) {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    document.getElementById('panel-' + tab).classList.add('active');
+    event.target.classList.add('active');
+
+    if (tab === 'comp' && !compRatesLoaded) {
+      loadCompRates();
+    }
+  }
+
+  // ═══════════════════════════════════════
+  // BILLING RATES (existing logic)
+  // ═══════════════════════════════════════
   let currentRates = [];
   let historyLoaded = false;
 
@@ -266,7 +380,8 @@
 
   document.addEventListener('DOMContentLoaded', () => {
     loadCurrentRates();
-    setEffective('thisMonth');
+    setEffective('thisMonth', document.querySelector('#panel-billing .quick-btn'));
+    setCompEffective('thisMonth', document.querySelector('#panel-comp .quick-btn'));
   });
 
   // ── Current rates ──
@@ -329,7 +444,7 @@
     }).join('');
   }
 
-  function setEffective(preset) {
+  function setEffective(preset, btn) {
     const input = document.getElementById('effectiveDate');
     const now = new Date();
     let d;
@@ -338,15 +453,12 @@
     } else if (preset === 'nextMonth') {
       d = new Date(now.getFullYear(), now.getMonth() + 1, 1);
     } else if (preset === 'nextYear') {
-      // Next September 1
       const yr = now.getMonth() >= 8 ? now.getFullYear() + 1 : now.getFullYear();
       d = new Date(yr, 8, 1);
     }
     input.value = d.toISOString().slice(0, 10);
-
-    // Highlight active quick button
-    document.querySelectorAll('.quick-btn').forEach(b => b.classList.remove('active'));
-    event.target.classList.add('active');
+    document.querySelectorAll('#panel-billing .quick-btn').forEach(b => b.classList.remove('active'));
+    if (btn) btn.classList.add('active');
   }
 
   async function saveNewRates() {
@@ -401,7 +513,6 @@
       const rows = await res.json();
       historyLoaded = true;
 
-      // Build a set of current rate IDs for badge
       const currentIds = new Set(currentRates.map(r => r.rate_id));
 
       if (!rows.length) {
@@ -430,7 +541,178 @@
     }
   }
 
-  // ── Utilities ──
+  // ═══════════════════════════════════════
+  // COMP RATES
+  // ═══════════════════════════════════════
+  let compRates = [];
+  let compRatesLoaded = false;
+  let compHistoryLoaded = false;
+
+  const COMP_ICONS = {
+    comp_og_session:       { css: 'icon-og',       emoji: '📖' },
+    comp_homework_hourly:  { css: 'icon-homework', emoji: '📚' },
+    comp_tutoring_session: { css: 'icon-tutoring', emoji: '📝' },
+  };
+
+  const COMP_ORDER = ['comp_og_session', 'comp_tutoring_session', 'comp_homework_hourly'];
+
+  async function loadCompRates() {
+    try {
+      const res = await fetch('/api/comp/rates');
+      compRates = await res.json();
+      compRates.sort((a, b) => COMP_ORDER.indexOf(a.rate_key) - COMP_ORDER.indexOf(b.rate_key));
+      compRatesLoaded = true;
+      renderCompRates();
+      populateCompRateForm();
+    } catch(e) {
+      document.getElementById('compCurrentRatesContainer').innerHTML =
+        '<div class="loading" style="color:var(--red);">Failed to load comp rates.</div>';
+    }
+  }
+
+  function renderCompRates() {
+    const container = document.getElementById('compCurrentRatesContainer');
+
+    const effectiveDates = compRates.map(r => r.effective_from).filter(Boolean);
+    const latestEffective = effectiveDates.sort().pop();
+    if (latestEffective) {
+      const d = new Date(latestEffective + 'T12:00:00');
+      const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+      document.getElementById('compCurrentEffective').textContent =
+        `Active since ${months[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`;
+    }
+
+    container.innerHTML = compRates.map(r => {
+      const icon = COMP_ICONS[r.rate_key] || { css: 'icon-mcard', emoji: '💲' };
+      const val = parseFloat(r.rate_value) || 0;
+      const valClass = val === 0 ? 'rate-value zero' : 'rate-value';
+      return `
+        <div class="rate-row">
+          <div class="rate-icon ${icon.css}">${icon.emoji}</div>
+          <div class="rate-info">
+            <div class="rate-label">${esc(r.label)}</div>
+            <div class="rate-unit">${esc(r.unit)}</div>
+          </div>
+          <div class="${valClass}">$${val.toFixed(2)}</div>
+        </div>`;
+    }).join('');
+  }
+
+  function populateCompRateForm() {
+    const grid = document.getElementById('compNewRateGrid');
+    grid.innerHTML = compRates.map(r => {
+      const val = parseFloat(r.rate_value) || 0;
+      return `
+        <div class="new-rate-item">
+          <span class="item-label">${esc(r.label)}</span>
+          <div class="rate-input-wrap">
+            <span class="rate-dollar">$</span>
+            <input type="number" class="rate-input" id="comp-new-${r.rate_key}"
+                   value="${val.toFixed(2)}" min="0" step="0.25">
+          </div>
+        </div>`;
+    }).join('');
+  }
+
+  function setCompEffective(preset, btn) {
+    const input = document.getElementById('compEffectiveDate');
+    const now = new Date();
+    let d;
+    if (preset === 'thisMonth') {
+      d = new Date(now.getFullYear(), now.getMonth(), 1);
+    } else if (preset === 'nextMonth') {
+      d = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+    } else if (preset === 'nextYear') {
+      const yr = now.getMonth() >= 8 ? now.getFullYear() + 1 : now.getFullYear();
+      d = new Date(yr, 8, 1);
+    }
+    input.value = d.toISOString().slice(0, 10);
+    document.querySelectorAll('#panel-comp .quick-btn').forEach(b => b.classList.remove('active'));
+    if (btn) btn.classList.add('active');
+  }
+
+  async function saveCompRates() {
+    const effectiveFrom = document.getElementById('compEffectiveDate').value;
+    if (!effectiveFrom) { showToast('Please select an effective date.'); return; }
+
+    const btn = document.getElementById('btnCompSave');
+    btn.disabled = true;
+    btn.textContent = 'Saving…';
+
+    const rates = compRates.map(r => ({
+      rate_key: r.rate_key,
+      rate_value: parseFloat(document.getElementById(`comp-new-${r.rate_key}`).value) || 0
+    }));
+
+    try {
+      const res = await fetch('/api/comp/rates', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ rates, effective_from: effectiveFrom })
+      });
+      const data = await res.json();
+      if (data.success) {
+        showToast('Comp rates saved ✓');
+        loadCompRates();
+        if (compHistoryLoaded) loadCompHistory();
+      } else {
+        showToast('Error: ' + (data.error || 'Unknown'));
+      }
+    } catch(e) {
+      showToast('Network error.');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Save Comp Rates';
+    }
+  }
+
+  function toggleCompHistory() {
+    const content = document.getElementById('compHistoryContent');
+    const arrow = document.getElementById('compHistoryArrow');
+    const isOpen = content.classList.toggle('open');
+    arrow.textContent = isOpen ? '▲' : '▼';
+    if (isOpen && !compHistoryLoaded) loadCompHistory();
+  }
+
+  async function loadCompHistory() {
+    const tbody = document.getElementById('compHistoryBody');
+    tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--muted);padding:20px;">Loading…</td></tr>';
+    try {
+      const res = await fetch('/api/comp/rates/history');
+      const rows = await res.json();
+      compHistoryLoaded = true;
+
+      const currentIds = new Set(compRates.map(r => r.rate_id));
+
+      if (!rows.length) {
+        tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--muted);padding:20px;">No comp rate history yet.</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = rows.map(r => {
+        const val = parseFloat(r.rate_value) || 0;
+        const isCurrent = currentIds.has(r.rate_id);
+        const d = r.effective_from ? new Date(r.effective_from + 'T12:00:00') : null;
+        const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+        const dateStr = d ? `${months[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}` : '—';
+        return `<tr>
+          <td>${esc(r.label)}</td>
+          <td><strong>$${val.toFixed(2)}</strong></td>
+          <td>
+            <span class="history-date">${dateStr}</span>
+            ${isCurrent ? '<span class="history-current">ACTIVE</span>' : ''}
+          </td>
+          <td>${esc(r.updated_by || '—')}</td>
+        </tr>`;
+      }).join('');
+    } catch(e) {
+      tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--red);padding:20px;">Failed to load history.</td></tr>';
+    }
+  }
+
+  // ═══════════════════════════════════════
+  // UTILITIES
+  // ═══════════════════════════════════════
   function esc(s) {
     if (!s) return '';
     return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');

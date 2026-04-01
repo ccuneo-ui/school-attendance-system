@@ -288,6 +288,32 @@ def init_db():
                         "INSERT INTO billing_rates (rate_key, rate_value, label, unit, effective_from) VALUES (%s,%s,%s,%s,%s) ON CONFLICT DO NOTHING",
                         (key, val, label, unit, '2025-09-01')
                     )
+            # ── Comp Rates (staff compensation) ──
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS comp_rates (
+                    rate_id        SERIAL PRIMARY KEY,
+                    rate_key       TEXT NOT NULL,
+                    rate_value     NUMERIC(10,2) NOT NULL DEFAULT 0,
+                    label          TEXT NOT NULL DEFAULT '',
+                    unit           TEXT NOT NULL DEFAULT '',
+                    effective_from TEXT NOT NULL DEFAULT '2025-09-01',
+                    updated_by     TEXT DEFAULT '',
+                    updated_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    UNIQUE(rate_key, effective_from)
+                )
+            """)
+            cur.execute("SELECT COUNT(*) FROM comp_rates")
+            if cur.fetchone()[0] == 0:
+                comp_defaults = [
+                    ('comp_og_session',       70, 'OG Tutoring',      'per session'),
+                    ('comp_homework_hourly',  20, 'Homework Center',  'per hour'),
+                    ('comp_tutoring_session', 50, '1-on-1 Tutoring',  'per session'),
+                ]
+                for key, val, label, unit in comp_defaults:
+                    cur.execute(
+                        "INSERT INTO comp_rates (rate_key, rate_value, label, unit, effective_from) VALUES (%s,%s,%s,%s,%s) ON CONFLICT DO NOTHING",
+                        (key, val, label, unit, '2025-09-01')
+                    )
             # ── Households, Parents, and linking tables ──
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS households (
@@ -1913,6 +1939,92 @@ def delete_billing_rate(rate_id):
             cur.execute("DELETE FROM billing_rates WHERE rate_id=%s", (rate_id,))
         conn.commit()
         return jsonify({"success": True})
+    finally:
+        conn.close()
+
+
+# ============================================
+# COMP RATES (Staff Compensation)
+# ============================================
+
+@app.route("/api/comp/rates")
+@login_required
+def get_comp_rates():
+    """Get current comp rates (latest effective_from <= today for each key)"""
+    conn = get_db_connection()
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute("""
+                SELECT DISTINCT ON (rate_key)
+                    rate_id, rate_key, rate_value, label, unit,
+                    effective_from, updated_by, updated_at
+                FROM comp_rates
+                WHERE effective_from <= CURRENT_DATE::text
+                ORDER BY rate_key, effective_from DESC
+            """)
+            rows = fa(cur)
+            for r in rows:
+                if hasattr(r.get('rate_value'), '__float__'):
+                    r['rate_value'] = float(r['rate_value'])
+                if hasattr(r.get('updated_at'), 'isoformat'):
+                    r['updated_at'] = r['updated_at'].isoformat()
+            return jsonify(rows)
+    finally:
+        conn.close()
+
+@app.route("/api/comp/rates/history")
+@login_required
+def get_comp_rates_history():
+    """Get full comp rate history"""
+    conn = get_db_connection()
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute("""
+                SELECT rate_id, rate_key, rate_value, label, unit,
+                       effective_from, updated_by, updated_at
+                FROM comp_rates
+                ORDER BY rate_key, effective_from DESC
+            """)
+            rows = fa(cur)
+            for r in rows:
+                if hasattr(r.get('rate_value'), '__float__'):
+                    r['rate_value'] = float(r['rate_value'])
+                if hasattr(r.get('updated_at'), 'isoformat'):
+                    r['updated_at'] = r['updated_at'].isoformat()
+            return jsonify(rows)
+    finally:
+        conn.close()
+
+@app.route("/api/comp/rates", methods=["POST"])
+@login_required
+def save_comp_rates():
+    """Save new comp rates with an effective date."""
+    data = request.json
+    rates = data.get("rates", [])
+    effective_from = data.get("effective_from")
+    if not rates or not effective_from:
+        return jsonify({"error": "rates and effective_from required"}), 400
+    updated_by = session.get("user_name", "")
+    conn = get_db_connection()
+    try:
+        with conn.cursor() as cur:
+            for r in rates:
+                cur.execute("SELECT label, unit FROM comp_rates WHERE rate_key=%s LIMIT 1", (r.get("rate_key"),))
+                existing = cur.fetchone()
+                label = existing[0] if existing else r.get("rate_key")
+                unit = existing[1] if existing else ""
+                cur.execute("""
+                    INSERT INTO comp_rates (rate_key, rate_value, label, unit, effective_from, updated_by)
+                    VALUES (%s,%s,%s,%s,%s,%s)
+                    ON CONFLICT (rate_key, effective_from) DO UPDATE SET
+                        rate_value=EXCLUDED.rate_value, updated_by=EXCLUDED.updated_by,
+                        updated_at=CURRENT_TIMESTAMP
+                """, (r.get("rate_key"), r.get("rate_value", 0), label, unit, effective_from, updated_by))
+        conn.commit()
+        return jsonify({"success": True})
+    except Exception as e:
+        conn.rollback()
+        return jsonify({"error": str(e)}), 500
     finally:
         conn.close()
 
