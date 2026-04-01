@@ -2029,6 +2029,108 @@ def save_comp_rates():
         conn.close()
 
 
+@app.route("/api/comp/report")
+@login_required
+def api_comp_report():
+    """
+    Monthly comp totals per teacher for tutoring programs.
+    OG and 1-on-1 are per session; Homework Center is in 0.5-hr increments.
+    Query params: month (1-12), year (e.g. 2026)
+    """
+    import calendar as cal_mod
+    from datetime import date as dt_date
+
+    try:
+        month = int(request.args.get("month", 0))
+        year  = int(request.args.get("year",  0))
+        if not (1 <= month <= 12) or year < 2020:
+            return jsonify({"error": "Invalid month or year"}), 400
+
+        first_day = dt_date(year, month, 1)
+        last_day  = dt_date(year, month, cal_mod.monthrange(year, month)[1])
+
+        conn = get_db_connection()
+        try:
+            with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+
+                # 1. Comp rates active as of first of month
+                cur.execute("""
+                    SELECT DISTINCT ON (rate_key)
+                           rate_key, rate_value
+                    FROM   comp_rates
+                    WHERE  effective_from::date <= %s
+                    ORDER  BY rate_key, effective_from::date DESC
+                """, (first_day,))
+                rate_rows = cur.fetchall()
+                rates = {r["rate_key"]: float(r["rate_value"]) for r in rate_rows}
+                defaults = {
+                    "comp_og_session":       70.00,
+                    "comp_homework_hourly":  20.00,
+                    "comp_tutoring_session": 50.00,
+                }
+                for k, v in defaults.items():
+                    rates.setdefault(k, v)
+
+                # 2. Program attendance for the 3 tutoring programs, grouped by teacher
+                cur.execute("""
+                    SELECT teacher, program_type, SUM(units) AS total_units,
+                           COUNT(*) AS session_count
+                    FROM   program_attendance
+                    WHERE  session_date::date >= %s AND session_date::date <= %s
+                      AND  program_type IN ('og', 'homework', 'tutoring')
+                      AND  teacher IS NOT NULL AND teacher != ''
+                    GROUP  BY teacher, program_type
+                """, (first_day, last_day))
+
+                teachers = {}
+                for r in cur.fetchall():
+                    name = r["teacher"]
+                    if name not in teachers:
+                        teachers[name] = {
+                            "name": name,
+                            "og_sessions": 0, "og_comp": 0,
+                            "homework_units": 0, "homework_comp": 0,
+                            "tutoring_sessions": 0, "tutoring_comp": 0,
+                            "total_comp": 0
+                        }
+                    t = teachers[name]
+                    pt = r["program_type"]
+                    units = float(r["total_units"])
+                    sessions = int(r["session_count"])
+
+                    if pt == "og":
+                        t["og_sessions"] = sessions
+                        t["og_comp"] = sessions * rates["comp_og_session"]
+                    elif pt == "homework":
+                        t["homework_units"] = units
+                        t["homework_comp"] = units * rates["comp_homework_hourly"]
+                    elif pt == "tutoring":
+                        t["tutoring_sessions"] = sessions
+                        t["tutoring_comp"] = sessions * rates["comp_tutoring_session"]
+
+                for t in teachers.values():
+                    t["total_comp"] = round(t["og_comp"] + t["homework_comp"] + t["tutoring_comp"], 2)
+                    t["og_comp"] = round(t["og_comp"], 2)
+                    t["homework_comp"] = round(t["homework_comp"], 2)
+                    t["tutoring_comp"] = round(t["tutoring_comp"], 2)
+
+                result = sorted(teachers.values(), key=lambda t: t["name"])
+
+        finally:
+            conn.close()
+
+        return jsonify({
+            "teachers": result,
+            "rates": rates,
+            "month": month,
+            "year": year,
+        })
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
+
+
 # ============================================
 # BACKUP
 # ============================================

@@ -59,6 +59,28 @@
     .page-header h1 { font-family: 'Playfair Display', serif; font-size: 28px; font-weight: 700; color: var(--white); margin-bottom: 4px; }
     .page-header p { font-size: 14px; color: rgba(255,255,255,0.65); }
 
+    /* ── Tabs ── */
+    .tab-bar {
+      background: var(--white);
+      border-bottom: 2px solid var(--border);
+      padding: 0 32px;
+      display: flex; gap: 0;
+    }
+    .tab-btn {
+      padding: 14px 24px; border: none; background: none;
+      font-family: 'DM Sans', sans-serif; font-size: 14px; font-weight: 600;
+      color: var(--muted); cursor: pointer; position: relative;
+      transition: color 0.2s;
+    }
+    .tab-btn:hover { color: var(--navy); }
+    .tab-btn.active { color: var(--burgundy); }
+    .tab-btn.active::after {
+      content: ''; position: absolute; bottom: -2px; left: 0; right: 0;
+      height: 2px; background: var(--burgundy);
+    }
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
+
     .controls-bar {
       background: var(--white);
       border-bottom: 1px solid var(--border);
@@ -176,6 +198,7 @@
     tbody td.r { text-align: right; font-variant-numeric: tabular-nums; }
     .zero { color: #ccc; }
     .student-name { font-weight: 500; }
+    .teacher-name { font-weight: 500; }
     tr.total-row td { background: var(--navy); color: var(--white); font-weight: 600; padding: 12px 14px; }
     tr.total-row td.r { font-size: 14px; }
 
@@ -192,10 +215,14 @@
 
     .footer { margin-top: 48px; font-size: 12px; color: var(--muted); text-align: center; padding-bottom: 40px; }
 
+    /* ── Units column ── */
+    .unit-detail { font-size: 11px; color: var(--muted); }
+
     @media (max-width: 700px) {
       .controls-bar, .main { padding: 12px 16px; }
       .page-header { padding: 20px 16px; }
       .grade-pills { margin-left: 0; }
+      .tab-bar { padding: 0 16px; }
     }
   </style>
 </head>
@@ -216,6 +243,17 @@
   <h1>Billing Reports</h1>
   <p>Monthly charges per student — M Card, programs, and before &amp; aftercare</p>
 </div>
+
+<!-- Tabs -->
+<div class="tab-bar">
+  <button class="tab-btn active" onclick="switchReportTab('billing', this)">Billing Report</button>
+  <button class="tab-btn" onclick="switchReportTab('comp', this)">Comp Report</button>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!-- TAB 1: BILLING REPORT                                  -->
+<!-- ═══════════════════════════════════════════════════════ -->
+<div class="tab-panel active" id="panel-billing">
 
 <div class="controls-bar">
   <div class="ctrl-group">
@@ -296,133 +334,90 @@
 
 <div class="footer">Mizzentop Day School &nbsp;·&nbsp; Internal Use Only</div>
 
-<script>
-  let reportData = [];
-  let activeGrade = 'all';
-  let curMonth, curYear;
+</div><!-- end panel-billing -->
 
-  (function init() {
-    const now = new Date();
-    const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
-    const ms = document.getElementById('monthSelect');
-    months.forEach((m,i) => { const o=new Option(m,i+1); if(i+1===now.getMonth()+1) o.selected=true; ms.appendChild(o); });
-    const ys = document.getElementById('yearSelect');
-    for(let y=now.getFullYear(); y>=now.getFullYear()-3; y--) { const o=new Option(y,y); if(y===now.getFullYear()) o.selected=true; ys.appendChild(o); }
-  })();
+<!-- ═══════════════════════════════════════════════════════ -->
+<!-- TAB 2: COMP REPORT                                     -->
+<!-- ═══════════════════════════════════════════════════════ -->
+<div class="tab-panel" id="panel-comp">
 
-  async function generateReport() {
-    curMonth = parseInt(document.getElementById('monthSelect').value);
-    curYear  = parseInt(document.getElementById('yearSelect').value);
-    document.getElementById('stateEmpty').style.display   = 'none';
-    document.getElementById('stateLoading').style.display = '';
-    document.getElementById('reportInner').style.display  = 'none';
-    document.getElementById('summaryRow').style.display   = 'none';
-    try {
-      const res  = await fetch(`/api/billing/report?month=${curMonth}&year=${curYear}`);
-      if(!res.ok) throw new Error(`Server error ${res.status}`);
-      const data = await res.json();
-      if(data.error) throw new Error(data.error);
-      reportData = data.students || [];
-      buildGradePills(reportData);
-      render(reportData);
-    } catch(err) {
-      document.getElementById('stateLoading').style.display = 'none';
-      document.getElementById('stateEmpty').style.display   = '';
-      document.getElementById('stateEmpty').innerHTML = `<div class="icon">⚠️</div><h3>Error</h3><p>${err.message}</p>`;
-    }
-  }
+<div class="controls-bar">
+  <div class="ctrl-group">
+    <span class="ctrl-label">Month</span>
+    <select class="ctrl-select" id="compMonthSelect"></select>
+  </div>
+  <div class="ctrl-group">
+    <span class="ctrl-label">Year</span>
+    <select class="ctrl-select" id="compYearSelect"></select>
+  </div>
+  <button class="btn-generate" onclick="generateCompReport()">Generate Report</button>
+  <button class="btn-export" id="compExportBtn" onclick="exportCompCSV()">⬇ Export CSV</button>
+</div>
 
-  function buildGradePills(students) {
-    const grades = [...new Set(students.map(s=>s.grade))].sort((a,b)=>(parseInt(a)||0)-(parseInt(b)||0));
-    const c = document.getElementById('gradePills');
-    c.innerHTML = '<div class="grade-pill active" data-grade="all" onclick="filterGrade(\'all\',this)">All Grades</div>';
-    grades.forEach(g => {
-      const d=document.createElement('div'); d.className='grade-pill'; d.dataset.grade=g;
-      d.textContent=`Grade ${g}`; d.onclick=()=>filterGrade(g,d); c.appendChild(d);
-    });
-    activeGrade='all';
-  }
+<div class="main">
+  <div class="summary-row" id="compSummaryRow" style="display:none;">
+    <div class="summary-card accent-gold">
+      <div class="s-label">Total Comp</div>
+      <div class="s-value" id="cTotalComp">—</div>
+      <div class="s-sub" id="cTotalTeachers">—</div>
+    </div>
+    <div class="summary-card">
+      <div class="s-label">OG Tutoring</div>
+      <div class="s-value" id="cOG">—</div>
+      <div class="s-sub" id="cOGSub">—</div>
+    </div>
+    <div class="summary-card">
+      <div class="s-label">Homework Center</div>
+      <div class="s-value" id="cHW">—</div>
+      <div class="s-sub" id="cHWSub">—</div>
+    </div>
+    <div class="summary-card accent-burg">
+      <div class="s-label">1-on-1 Tutoring</div>
+      <div class="s-value" id="cTutor">—</div>
+      <div class="s-sub" id="cTutorSub">—</div>
+    </div>
+  </div>
 
-  function filterGrade(grade,el) {
-    activeGrade=grade;
-    document.querySelectorAll('.grade-pill').forEach(p=>p.classList.remove('active'));
-    el.classList.add('active');
-    const filtered = grade==='all' ? reportData : reportData.filter(s=>s.grade===grade);
-    renderTable(filtered); renderSummary(filtered);
-  }
+  <div class="report-box" id="compReportBox">
+    <div class="state-box" id="compStateEmpty">
+      <div class="icon">📋</div>
+      <h3>No comp report generated yet</h3>
+      <p>Select a month and year above, then click Generate Report.</p>
+    </div>
+    <div class="state-box" id="compStateLoading" style="display:none;">
+      <div><div class="spinner"></div></div>
+      <p>Generating comp report…</p>
+    </div>
+    <div id="compReportInner" style="display:none;">
+      <div class="report-box-header">
+        <h2>Monthly Comp Detail</h2>
+        <span class="period-badge" id="compPeriodBadge"></span>
+      </div>
+      <div class="tbl-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Teacher</th>
+              <th class="r">OG Sessions</th>
+              <th class="r">OG Comp</th>
+              <th class="r">HW Hours</th>
+              <th class="r">HW Comp</th>
+              <th class="r">1-on-1 Sessions</th>
+              <th class="r">1-on-1 Comp</th>
+              <th class="r" style="background:#f0ede8;">Total Comp</th>
+            </tr>
+          </thead>
+          <tbody id="compReportTbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
 
-  function render(students) {
-    const months=['January','February','March','April','May','June','July','August','September','October','November','December'];
-    document.getElementById('periodBadge').textContent = `${months[curMonth-1]} ${curYear}`;
-    document.getElementById('stateLoading').style.display = 'none';
-    renderSummary(students); renderTable(students);
-    document.getElementById('summaryRow').style.display = '';
-    document.getElementById('reportInner').style.display = '';
-    document.getElementById('exportBtn').classList.add('show');
-  }
+<div class="footer">Mizzentop Day School &nbsp;·&nbsp; Internal Use Only</div>
 
-  function money(n) { return (!n||n===0) ? '<span class="zero">—</span>' : '$'+n.toFixed(2); }
+</div><!-- end panel-comp -->
 
-  function renderTable(students) {
-    const tbody = document.getElementById('reportTbody');
-    tbody.innerHTML = '';
-    if(!students.length) {
-      tbody.innerHTML='<tr><td colspan="9" style="text-align:center;padding:2rem;color:var(--muted);">No billing activity for this period.</td></tr>';
-      return;
-    }
-    const byGrade={};
-    students.forEach(s=>{ if(!byGrade[s.grade]) byGrade[s.grade]=[]; byGrade[s.grade].push(s); });
-    const sortedGrades=Object.keys(byGrade).sort((a,b)=>(parseInt(a)||0)-(parseInt(b)||0));
-    let gm=0,gbc=0,gac=0,gog=0,ghw=0,goo=0;
-
-    sortedGrades.forEach(grade => {
-      const hr=document.createElement('tr'); hr.className='grade-hdr';
-      hr.innerHTML=`<td colspan="9">Grade ${grade}</td>`; tbody.appendChild(hr);
-      byGrade[grade].forEach(s => {
-        gm+=s.mcard||0; gbc+=s.beforecare||0; gac+=s.aftercare||0;
-        gog+=s.og_tutoring||0; ghw+=s.homework_center||0; goo+=s.one_on_one||0;
-        const t=(s.mcard||0)+(s.beforecare||0)+(s.aftercare||0)+(s.og_tutoring||0)+(s.homework_center||0)+(s.one_on_one||0);
-        const tr=document.createElement('tr');
-        tr.innerHTML=`<td class="student-name">${esc(s.name)}</td><td>${esc(s.grade)}</td><td class="r">${money(s.mcard)}</td><td class="r">${money(s.beforecare)}</td><td class="r">${money(s.aftercare)}</td><td class="r">${money(s.og_tutoring)}</td><td class="r">${money(s.homework_center)}</td><td class="r">${money(s.one_on_one)}</td><td class="r" style="font-weight:600;">${t>0?'$'+t.toFixed(2):'<span class="zero">—</span>'}</td>`;
-        tbody.appendChild(tr);
-      });
-    });
-
-    const gt=gm+gbc+gac+gog+ghw+goo;
-    const tr=document.createElement('tr'); tr.className='total-row';
-    tr.innerHTML=`<td colspan="2">${students.length} student${students.length!==1?'s':''} — Total</td><td class="r">$${gm.toFixed(2)}</td><td class="r">$${gbc.toFixed(2)}</td><td class="r">$${gac.toFixed(2)}</td><td class="r">$${gog.toFixed(2)}</td><td class="r">$${ghw.toFixed(2)}</td><td class="r">$${goo.toFixed(2)}</td><td class="r">$${gt.toFixed(2)}</td>`;
-    tbody.appendChild(tr);
-  }
-
-  function renderSummary(students) {
-    let mc=0,bc=0,ac=0,pg=0,mq=0,ps=0,cd=0;
-    students.forEach(s=>{ mc+=s.mcard||0; bc+=s.beforecare||0; ac+=s.aftercare||0; pg+=(s.og_tutoring||0)+(s.homework_center||0)+(s.one_on_one||0); mq+=s.mcard_qty||0; ps+=s.program_sessions||0; cd+=s.care_days||0; });
-    document.getElementById('sTotalBilling').textContent  = '$'+(mc+bc+ac+pg).toFixed(2);
-    document.getElementById('sTotalStudents').textContent = `${students.length} student${students.length!==1?'s':''}`;
-    document.getElementById('sMcard').textContent         = '$'+mc.toFixed(2);
-    document.getElementById('sMcardSub').textContent      = `${mq} snack${mq!==1?'s':''}`;
-    document.getElementById('sProgram').textContent       = '$'+pg.toFixed(2);
-    document.getElementById('sProgramSub').textContent    = `${ps} sessions / hours`;
-    document.getElementById('sCare').textContent          = '$'+(bc+ac).toFixed(2);
-    document.getElementById('sCareSub').textContent       = `${cd} day${cd!==1?'s':''}`;
-  }
-
-  function exportCSV() {
-    const months=['January','February','March','April','May','June','July','August','September','October','November','December'];
-    const label=`${months[curMonth-1]}_${curYear}`;
-    const filtered=activeGrade==='all'?reportData:reportData.filter(s=>s.grade===activeGrade);
-    const rows=[['Student','Grade','M Card','Before Care','Aftercare','OG Tutoring','Homework Center','1-on-1 Tutoring','Total']];
-    filtered.forEach(s=>{
-      const t=(s.mcard||0)+(s.beforecare||0)+(s.aftercare||0)+(s.og_tutoring||0)+(s.homework_center||0)+(s.one_on_one||0);
-      rows.push([s.name,s.grade,(s.mcard||0).toFixed(2),(s.beforecare||0).toFixed(2),(s.aftercare||0).toFixed(2),(s.og_tutoring||0).toFixed(2),(s.homework_center||0).toFixed(2),(s.one_on_one||0).toFixed(2),t.toFixed(2)]);
-    });
-    const csv=rows.map(r=>r.map(c=>`"${c}"`).join(',')).join('\n');
-    const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
-    a.download=`Mizzentop_Billing_${label}.csv`; a.click();
-  }
-
-  function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
-</script>
 
 <!-- ═══════════════════════════════════════════════════════ -->
 <!-- STUDENT DETAIL / DISPUTE LOOKUP                        -->
@@ -625,13 +620,13 @@
 </style>
 
 <!-- Divider -->
-<div class="divider" style="padding-top:8px;">
+<div class="divider" style="padding-top:8px;" id="detailDivider">
   <div class="divider-line"></div>
   <div class="divider-label">Student Detail / Dispute Lookup</div>
   <div class="divider-line"></div>
 </div>
 
-<div class="detail-section">
+<div class="detail-section" id="detailSection">
   <!-- Controls -->
   <div class="detail-controls">
     <h3>Student Charge Detail</h3>
@@ -689,150 +684,417 @@
 </div>
 
 <script>
-// ── Student Detail state ──
-let allStudents = [];
-let selectedStudentId = null;
-let selectedStudentName = '';
-let lastDetailData = null;
+  // ═══════════════════════════════════════
+  // TAB SWITCHING
+  // ═══════════════════════════════════════
+  function switchReportTab(tab, btn) {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('panel-' + tab).classList.add('active');
 
-// ── Init detail month/year selects (mirrors main selects) ──
-(function initDetail() {
-  const now = new Date();
-  const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
-  const dm = document.getElementById('detailMonth');
-  months.forEach((m,i) => { const o=new Option(m,i+1); if(i+1===now.getMonth()+1) o.selected=true; dm.appendChild(o); });
-  const dy = document.getElementById('detailYear');
-  for(let y=now.getFullYear(); y>=now.getFullYear()-3; y--) { const o=new Option(y,y); if(y===now.getFullYear()) o.selected=true; dy.appendChild(o); }
-
-  // Load student list
-  fetch('/api/students?status=active')
-    .then(r=>r.json())
-    .then(data => {
-      allStudents = (data.students||data||[]).map(s=>({
-        id: s.student_id,
-        name: `${s.last_name}, ${s.first_name}`,
-        grade: s.grade
-      })).sort((a,b)=>a.name.localeCompare(b.name));
-    })
-    .catch(()=>{});
-})();
-
-// ── Autocomplete ──
-function onStudentSearch() {
-  const q = document.getElementById('studentSearch').value.trim().toLowerCase();
-  selectedStudentId = null;
-  document.getElementById('lookupBtn').disabled = true;
-
-  const list = document.getElementById('autocompleteList');
-  if(q.length < 1) { list.classList.remove('open'); return; }
-
-  const matches = allStudents.filter(s => s.name.toLowerCase().includes(q)).slice(0, 8);
-  if(!matches.length) { list.classList.remove('open'); return; }
-
-  list.innerHTML = matches.map(s =>
-    `<div class="autocomplete-item" onmousedown="selectStudent(${s.id},'${esc(s.name)}','${esc(s.grade)}')">
-      ${esc(s.name)}<span class="grade-tag">Gr ${esc(s.grade)}</span>
-    </div>`
-  ).join('');
-  list.classList.add('open');
-}
-
-function selectStudent(id, name, grade) {
-  selectedStudentId = id;
-  selectedStudentName = name;
-  document.getElementById('studentSearch').value = name;
-  document.getElementById('autocompleteList').classList.remove('open');
-  document.getElementById('lookupBtn').disabled = false;
-}
-
-function scheduleCloseList() {
-  setTimeout(() => document.getElementById('autocompleteList').classList.remove('open'), 200);
-}
-
-// ── Lookup ──
-async function runLookup() {
-  if(!selectedStudentId) return;
-  const month = document.getElementById('detailMonth').value;
-  const year  = document.getElementById('detailYear').value;
-
-  const btn = document.getElementById('lookupBtn');
-  btn.textContent = 'Loading…'; btn.disabled = true;
-
-  try {
-    const res  = await fetch(`/api/billing/student-detail?student_id=${selectedStudentId}&month=${month}&year=${year}`);
-    if(!res.ok) throw new Error(`Server error ${res.status}`);
-    const data = await res.json();
-    if(data.error) throw new Error(data.error);
-    lastDetailData = data;
-    renderDetail(data, month, year);
-  } catch(err) {
-    alert('Error: ' + err.message);
-  } finally {
-    btn.textContent = 'Look Up'; btn.disabled = false;
-  }
-}
-
-// ── Render detail ──
-function renderDetail(data, month, year) {
-  const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
-  document.getElementById('detailStudentName').textContent = selectedStudentName;
-  document.getElementById('detailPeriod').textContent = `${months[month-1]} ${year}`;
-  document.getElementById('detailResult').classList.add('show');
-
-  const rows = data.rows || [];
-  const tbody = document.getElementById('detailTbody');
-  const tfoot = document.getElementById('detailTfoot');
-  tbody.innerHTML = '';
-  tfoot.innerHTML = '';
-
-  if(!rows.length) {
-    tbody.innerHTML = '<tr><td colspan="5" class="detail-empty">No charges found for this student in this period.</td></tr>';
-    document.getElementById('detailTotalBadge').textContent = '$0.00';
-    return;
+    // Show/hide student detail section (only on billing tab)
+    const detailDivider = document.getElementById('detailDivider');
+    const detailSection = document.getElementById('detailSection');
+    if (tab === 'billing') {
+      detailDivider.style.display = '';
+      detailSection.style.display = '';
+    } else {
+      detailDivider.style.display = 'none';
+      detailSection.style.display = 'none';
+    }
   }
 
-  let grandTotal = 0;
-  rows.forEach(r => {
-    grandTotal += r.amount||0;
-    const tr = document.createElement('tr');
-    tr.innerHTML = `
-      <td>${esc(r.date)}</td>
-      <td><span class="prog-chip chip-${esc(r.program_key)}">${esc(r.program_label)}</span></td>
-      <td>${esc(r.detail)}</td>
-      <td class="recorded-by">${esc(r.recorded_by||'—')}</td>
-      <td class="r">$${(r.amount||0).toFixed(2)}</td>`;
+  // ═══════════════════════════════════════
+  // BILLING REPORT
+  // ═══════════════════════════════════════
+  let reportData = [];
+  let activeGrade = 'all';
+  let curMonth, curYear;
+
+  (function init() {
+    const now = new Date();
+    const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+    const ms = document.getElementById('monthSelect');
+    months.forEach((m,i) => { const o=new Option(m,i+1); if(i+1===now.getMonth()+1) o.selected=true; ms.appendChild(o); });
+    const ys = document.getElementById('yearSelect');
+    for(let y=now.getFullYear(); y>=now.getFullYear()-3; y--) { const o=new Option(y,y); if(y===now.getFullYear()) o.selected=true; ys.appendChild(o); }
+  })();
+
+  async function generateReport() {
+    curMonth = parseInt(document.getElementById('monthSelect').value);
+    curYear  = parseInt(document.getElementById('yearSelect').value);
+    document.getElementById('stateEmpty').style.display   = 'none';
+    document.getElementById('stateLoading').style.display = '';
+    document.getElementById('reportInner').style.display  = 'none';
+    document.getElementById('summaryRow').style.display   = 'none';
+    try {
+      const res  = await fetch(`/api/billing/report?month=${curMonth}&year=${curYear}`);
+      if(!res.ok) throw new Error(`Server error ${res.status}`);
+      const data = await res.json();
+      if(data.error) throw new Error(data.error);
+      reportData = data.students || [];
+      buildGradePills(reportData);
+      render(reportData);
+    } catch(err) {
+      document.getElementById('stateLoading').style.display = 'none';
+      document.getElementById('stateEmpty').style.display   = '';
+      document.getElementById('stateEmpty').innerHTML = `<div class="icon">⚠️</div><h3>Error</h3><p>${err.message}</p>`;
+    }
+  }
+
+  function buildGradePills(students) {
+    const grades = [...new Set(students.map(s=>s.grade))].sort((a,b)=>(parseInt(a)||0)-(parseInt(b)||0));
+    const c = document.getElementById('gradePills');
+    c.innerHTML = '<div class="grade-pill active" data-grade="all" onclick="filterGrade(\'all\',this)">All Grades</div>';
+    grades.forEach(g => {
+      const d=document.createElement('div'); d.className='grade-pill'; d.dataset.grade=g;
+      d.textContent=`Grade ${g}`; d.onclick=()=>filterGrade(g,d); c.appendChild(d);
+    });
+    activeGrade='all';
+  }
+
+  function filterGrade(grade,el) {
+    activeGrade=grade;
+    document.querySelectorAll('.grade-pill').forEach(p=>p.classList.remove('active'));
+    el.classList.add('active');
+    const filtered = grade==='all' ? reportData : reportData.filter(s=>s.grade===grade);
+    renderTable(filtered); renderSummary(filtered);
+  }
+
+  function render(students) {
+    const months=['January','February','March','April','May','June','July','August','September','October','November','December'];
+    document.getElementById('periodBadge').textContent = `${months[curMonth-1]} ${curYear}`;
+    document.getElementById('stateLoading').style.display = 'none';
+    renderSummary(students); renderTable(students);
+    document.getElementById('summaryRow').style.display = '';
+    document.getElementById('reportInner').style.display = '';
+    document.getElementById('exportBtn').classList.add('show');
+  }
+
+  function money(n) { return (!n||n===0) ? '<span class="zero">—</span>' : '$'+n.toFixed(2); }
+
+  function renderTable(students) {
+    const tbody = document.getElementById('reportTbody');
+    tbody.innerHTML = '';
+    if(!students.length) {
+      tbody.innerHTML='<tr><td colspan="9" style="text-align:center;padding:2rem;color:var(--muted);">No billing activity for this period.</td></tr>';
+      return;
+    }
+    const byGrade={};
+    students.forEach(s=>{ if(!byGrade[s.grade]) byGrade[s.grade]=[]; byGrade[s.grade].push(s); });
+    const sortedGrades=Object.keys(byGrade).sort((a,b)=>(parseInt(a)||0)-(parseInt(b)||0));
+    let gm=0,gbc=0,gac=0,gog=0,ghw=0,goo=0;
+
+    sortedGrades.forEach(grade => {
+      const hr=document.createElement('tr'); hr.className='grade-hdr';
+      hr.innerHTML=`<td colspan="9">Grade ${grade}</td>`; tbody.appendChild(hr);
+      byGrade[grade].forEach(s => {
+        gm+=s.mcard||0; gbc+=s.beforecare||0; gac+=s.aftercare||0;
+        gog+=s.og_tutoring||0; ghw+=s.homework_center||0; goo+=s.one_on_one||0;
+        const t=(s.mcard||0)+(s.beforecare||0)+(s.aftercare||0)+(s.og_tutoring||0)+(s.homework_center||0)+(s.one_on_one||0);
+        const tr=document.createElement('tr');
+        tr.innerHTML=`<td class="student-name">${esc(s.name)}</td><td>${esc(s.grade)}</td><td class="r">${money(s.mcard)}</td><td class="r">${money(s.beforecare)}</td><td class="r">${money(s.aftercare)}</td><td class="r">${money(s.og_tutoring)}</td><td class="r">${money(s.homework_center)}</td><td class="r">${money(s.one_on_one)}</td><td class="r" style="font-weight:600;">${t>0?'$'+t.toFixed(2):'<span class="zero">—</span>'}</td>`;
+        tbody.appendChild(tr);
+      });
+    });
+
+    const gt=gm+gbc+gac+gog+ghw+goo;
+    const tr=document.createElement('tr'); tr.className='total-row';
+    tr.innerHTML=`<td colspan="2">${students.length} student${students.length!==1?'s':''} — Total</td><td class="r">$${gm.toFixed(2)}</td><td class="r">$${gbc.toFixed(2)}</td><td class="r">$${gac.toFixed(2)}</td><td class="r">$${gog.toFixed(2)}</td><td class="r">$${ghw.toFixed(2)}</td><td class="r">$${goo.toFixed(2)}</td><td class="r">$${gt.toFixed(2)}</td>`;
     tbody.appendChild(tr);
-  });
+  }
 
-  tfoot.innerHTML = `<tr>
-    <td colspan="4">Total — ${rows.length} charge${rows.length!==1?'s':''}</td>
-    <td class="r">$${grandTotal.toFixed(2)}</td>
-  </tr>`;
+  function renderSummary(students) {
+    let mc=0,bc=0,ac=0,pg=0,mq=0,ps=0,cd=0;
+    students.forEach(s=>{ mc+=s.mcard||0; bc+=s.beforecare||0; ac+=s.aftercare||0; pg+=(s.og_tutoring||0)+(s.homework_center||0)+(s.one_on_one||0); mq+=s.mcard_qty||0; ps+=s.program_sessions||0; cd+=s.care_days||0; });
+    document.getElementById('sTotalBilling').textContent  = '$'+(mc+bc+ac+pg).toFixed(2);
+    document.getElementById('sTotalStudents').textContent = `${students.length} student${students.length!==1?'s':''}`;
+    document.getElementById('sMcard').textContent         = '$'+mc.toFixed(2);
+    document.getElementById('sMcardSub').textContent      = `${mq} snack${mq!==1?'s':''}`;
+    document.getElementById('sProgram').textContent       = '$'+pg.toFixed(2);
+    document.getElementById('sProgramSub').textContent    = `${ps} sessions / hours`;
+    document.getElementById('sCare').textContent          = '$'+(bc+ac).toFixed(2);
+    document.getElementById('sCareSub').textContent       = `${cd} day${cd!==1?'s':''}`;
+  }
 
-  document.getElementById('detailTotalBadge').textContent = '$' + grandTotal.toFixed(2);
-  document.getElementById('detailExportBtn').style.display = rows.length ? 'flex' : 'none';
-}
+  function exportCSV() {
+    const months=['January','February','March','April','May','June','July','August','September','October','November','December'];
+    const label=`${months[curMonth-1]}_${curYear}`;
+    const filtered=activeGrade==='all'?reportData:reportData.filter(s=>s.grade===activeGrade);
+    const rows=[['Student','Grade','M Card','Before Care','Aftercare','OG Tutoring','Homework Center','1-on-1 Tutoring','Total']];
+    filtered.forEach(s=>{
+      const t=(s.mcard||0)+(s.beforecare||0)+(s.aftercare||0)+(s.og_tutoring||0)+(s.homework_center||0)+(s.one_on_one||0);
+      rows.push([s.name,s.grade,(s.mcard||0).toFixed(2),(s.beforecare||0).toFixed(2),(s.aftercare||0).toFixed(2),(s.og_tutoring||0).toFixed(2),(s.homework_center||0).toFixed(2),(s.one_on_one||0).toFixed(2),t.toFixed(2)]);
+    });
+    const csv=rows.map(r=>r.map(c=>`"${c}"`).join(',')).join('\n');
+    const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
+    a.download=`Mizzentop_Billing_${label}.csv`; a.click();
+  }
 
-function exportDetailCSV() {
-  if(!lastDetailData || !lastDetailData.rows) return;
-  const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
-  const m = document.getElementById('detailMonth').value;
-  const y = document.getElementById('detailYear').value;
-  const label = `${months[m-1]}_${y}`;
-  const safeName = selectedStudentName.replace(/,\s*/,'_').replace(/\s+/g,'_');
+  // ═══════════════════════════════════════
+  // COMP REPORT
+  // ═══════════════════════════════════════
+  let compReportData = [];
+  let compMonth, compYear;
 
-  const rows = [['Date','Program','Detail','Recorded By','Amount']];
-  lastDetailData.rows.forEach(r => {
-    rows.push([r.date, r.program_label, r.detail, r.recorded_by||'—', (r.amount||0).toFixed(2)]);
-  });
-  rows.push(['','','','Total', lastDetailData.total.toFixed(2)]);
+  (function initComp() {
+    const now = new Date();
+    const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+    const ms = document.getElementById('compMonthSelect');
+    months.forEach((m,i) => { const o=new Option(m,i+1); if(i+1===now.getMonth()+1) o.selected=true; ms.appendChild(o); });
+    const ys = document.getElementById('compYearSelect');
+    for(let y=now.getFullYear(); y>=now.getFullYear()-3; y--) { const o=new Option(y,y); if(y===now.getFullYear()) o.selected=true; ys.appendChild(o); }
+  })();
 
-  const csv = rows.map(r => r.map(c => `"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n');
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(new Blob([csv], {type:'text/csv'}));
-  a.download = `Mizzentop_Detail_${safeName}_${label}.csv`;
-  a.click();
-}
+  async function generateCompReport() {
+    compMonth = parseInt(document.getElementById('compMonthSelect').value);
+    compYear  = parseInt(document.getElementById('compYearSelect').value);
+    document.getElementById('compStateEmpty').style.display   = 'none';
+    document.getElementById('compStateLoading').style.display = '';
+    document.getElementById('compReportInner').style.display  = 'none';
+    document.getElementById('compSummaryRow').style.display   = 'none';
+    try {
+      const res  = await fetch(`/api/comp/report?month=${compMonth}&year=${compYear}`);
+      if(!res.ok) throw new Error(`Server error ${res.status}`);
+      const data = await res.json();
+      if(data.error) throw new Error(data.error);
+      compReportData = data.teachers || [];
+      renderCompReport(compReportData);
+    } catch(err) {
+      document.getElementById('compStateLoading').style.display = 'none';
+      document.getElementById('compStateEmpty').style.display   = '';
+      document.getElementById('compStateEmpty').innerHTML = `<div class="icon">⚠️</div><h3>Error</h3><p>${err.message}</p>`;
+    }
+  }
+
+  function renderCompReport(teachers) {
+    const months=['January','February','March','April','May','June','July','August','September','October','November','December'];
+    document.getElementById('compPeriodBadge').textContent = `${months[compMonth-1]} ${compYear}`;
+    document.getElementById('compStateLoading').style.display = 'none';
+
+    // Summary
+    let totComp=0, totOG=0, totHW=0, totTutor=0;
+    let totOGSess=0, totHWHrs=0, totTutorSess=0;
+    teachers.forEach(t => {
+      totComp += t.total_comp;
+      totOG += t.og_comp; totHW += t.homework_comp; totTutor += t.tutoring_comp;
+      totOGSess += t.og_sessions; totHWHrs += t.homework_units; totTutorSess += t.tutoring_sessions;
+    });
+
+    document.getElementById('cTotalComp').textContent = '$' + totComp.toFixed(2);
+    document.getElementById('cTotalTeachers').textContent = `${teachers.length} teacher${teachers.length!==1?'s':''}`;
+    document.getElementById('cOG').textContent = '$' + totOG.toFixed(2);
+    document.getElementById('cOGSub').textContent = `${totOGSess} session${totOGSess!==1?'s':''}`;
+    document.getElementById('cHW').textContent = '$' + totHW.toFixed(2);
+    document.getElementById('cHWSub').textContent = `${totHWHrs} hr${totHWHrs!==1?'s':''}`;
+    document.getElementById('cTutor').textContent = '$' + totTutor.toFixed(2);
+    document.getElementById('cTutorSub').textContent = `${totTutorSess} session${totTutorSess!==1?'s':''}`;
+
+    document.getElementById('compSummaryRow').style.display = '';
+
+    // Table
+    const tbody = document.getElementById('compReportTbody');
+    tbody.innerHTML = '';
+
+    if(!teachers.length) {
+      tbody.innerHTML='<tr><td colspan="8" style="text-align:center;padding:2rem;color:var(--muted);">No comp activity for this period.</td></tr>';
+      document.getElementById('compReportInner').style.display = '';
+      document.getElementById('compExportBtn').classList.remove('show');
+      return;
+    }
+
+    teachers.forEach(t => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td class="teacher-name">${esc(t.name)}</td>
+        <td class="r">${t.og_sessions || '<span class="zero">—</span>'}</td>
+        <td class="r">${compMoney(t.og_comp)}</td>
+        <td class="r">${t.homework_units ? t.homework_units : '<span class="zero">—</span>'}</td>
+        <td class="r">${compMoney(t.homework_comp)}</td>
+        <td class="r">${t.tutoring_sessions || '<span class="zero">—</span>'}</td>
+        <td class="r">${compMoney(t.tutoring_comp)}</td>
+        <td class="r" style="font-weight:600;">${t.total_comp > 0 ? '$'+t.total_comp.toFixed(2) : '<span class="zero">—</span>'}</td>`;
+      tbody.appendChild(tr);
+    });
+
+    // Total row
+    const tr = document.createElement('tr'); tr.className = 'total-row';
+    tr.innerHTML = `
+      <td>${teachers.length} teacher${teachers.length!==1?'s':''} — Total</td>
+      <td class="r">${totOGSess}</td>
+      <td class="r">$${totOG.toFixed(2)}</td>
+      <td class="r">${totHWHrs}</td>
+      <td class="r">$${totHW.toFixed(2)}</td>
+      <td class="r">${totTutorSess}</td>
+      <td class="r">$${totTutor.toFixed(2)}</td>
+      <td class="r">$${totComp.toFixed(2)}</td>`;
+    tbody.appendChild(tr);
+
+    document.getElementById('compReportInner').style.display = '';
+    document.getElementById('compExportBtn').classList.add('show');
+  }
+
+  function compMoney(n) { return (!n||n===0) ? '<span class="zero">—</span>' : '$'+n.toFixed(2); }
+
+  function exportCompCSV() {
+    const months=['January','February','March','April','May','June','July','August','September','October','November','December'];
+    const label=`${months[compMonth-1]}_${compYear}`;
+    const rows=[['Teacher','OG Sessions','OG Comp','HW Hours','HW Comp','1-on-1 Sessions','1-on-1 Comp','Total Comp']];
+    compReportData.forEach(t=>{
+      rows.push([t.name, t.og_sessions, t.og_comp.toFixed(2), t.homework_units, t.homework_comp.toFixed(2), t.tutoring_sessions, t.tutoring_comp.toFixed(2), t.total_comp.toFixed(2)]);
+    });
+    const csv=rows.map(r=>r.map(c=>`"${c}"`).join(',')).join('\n');
+    const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
+    a.download=`Mizzentop_Comp_Report_${label}.csv`; a.click();
+  }
+
+  // ═══════════════════════════════════════
+  // STUDENT DETAIL
+  // ═══════════════════════════════════════
+  let allStudents = [];
+  let selectedStudentId = null;
+  let selectedStudentName = '';
+  let lastDetailData = null;
+
+  (function initDetail() {
+    const now = new Date();
+    const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+    const dm = document.getElementById('detailMonth');
+    months.forEach((m,i) => { const o=new Option(m,i+1); if(i+1===now.getMonth()+1) o.selected=true; dm.appendChild(o); });
+    const dy = document.getElementById('detailYear');
+    for(let y=now.getFullYear(); y>=now.getFullYear()-3; y--) { const o=new Option(y,y); if(y===now.getFullYear()) o.selected=true; dy.appendChild(o); }
+
+    fetch('/api/students?status=active')
+      .then(r=>r.json())
+      .then(data => {
+        allStudents = (data.students||data||[]).map(s=>({
+          id: s.student_id,
+          name: `${s.last_name}, ${s.first_name}`,
+          grade: s.grade
+        })).sort((a,b)=>a.name.localeCompare(b.name));
+      })
+      .catch(()=>{});
+  })();
+
+  function onStudentSearch() {
+    const q = document.getElementById('studentSearch').value.trim().toLowerCase();
+    selectedStudentId = null;
+    document.getElementById('lookupBtn').disabled = true;
+
+    const list = document.getElementById('autocompleteList');
+    if(q.length < 1) { list.classList.remove('open'); return; }
+
+    const matches = allStudents.filter(s => s.name.toLowerCase().includes(q)).slice(0, 8);
+    if(!matches.length) { list.classList.remove('open'); return; }
+
+    list.innerHTML = matches.map(s =>
+      `<div class="autocomplete-item" onmousedown="selectStudent(${s.id},'${esc(s.name)}','${esc(s.grade)}')">
+        ${esc(s.name)}<span class="grade-tag">Gr ${esc(s.grade)}</span>
+      </div>`
+    ).join('');
+    list.classList.add('open');
+  }
+
+  function selectStudent(id, name, grade) {
+    selectedStudentId = id;
+    selectedStudentName = name;
+    document.getElementById('studentSearch').value = name;
+    document.getElementById('autocompleteList').classList.remove('open');
+    document.getElementById('lookupBtn').disabled = false;
+  }
+
+  function scheduleCloseList() {
+    setTimeout(() => document.getElementById('autocompleteList').classList.remove('open'), 200);
+  }
+
+  async function runLookup() {
+    if(!selectedStudentId) return;
+    const month = document.getElementById('detailMonth').value;
+    const year  = document.getElementById('detailYear').value;
+
+    const btn = document.getElementById('lookupBtn');
+    btn.textContent = 'Loading…'; btn.disabled = true;
+
+    try {
+      const res  = await fetch(`/api/billing/student-detail?student_id=${selectedStudentId}&month=${month}&year=${year}`);
+      if(!res.ok) throw new Error(`Server error ${res.status}`);
+      const data = await res.json();
+      if(data.error) throw new Error(data.error);
+      lastDetailData = data;
+      renderDetail(data, month, year);
+    } catch(err) {
+      alert('Error: ' + err.message);
+    } finally {
+      btn.textContent = 'Look Up'; btn.disabled = false;
+    }
+  }
+
+  function renderDetail(data, month, year) {
+    const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+    document.getElementById('detailStudentName').textContent = selectedStudentName;
+    document.getElementById('detailPeriod').textContent = `${months[month-1]} ${year}`;
+    document.getElementById('detailResult').classList.add('show');
+
+    const rows = data.rows || [];
+    const tbody = document.getElementById('detailTbody');
+    const tfoot = document.getElementById('detailTfoot');
+    tbody.innerHTML = '';
+    tfoot.innerHTML = '';
+
+    if(!rows.length) {
+      tbody.innerHTML = '<tr><td colspan="5" class="detail-empty">No charges found for this student in this period.</td></tr>';
+      document.getElementById('detailTotalBadge').textContent = '$0.00';
+      return;
+    }
+
+    let grandTotal = 0;
+    rows.forEach(r => {
+      grandTotal += r.amount||0;
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${esc(r.date)}</td>
+        <td><span class="prog-chip chip-${esc(r.program_key)}">${esc(r.program_label)}</span></td>
+        <td>${esc(r.detail)}</td>
+        <td class="recorded-by">${esc(r.recorded_by||'—')}</td>
+        <td class="r">$${(r.amount||0).toFixed(2)}</td>`;
+      tbody.appendChild(tr);
+    });
+
+    tfoot.innerHTML = `<tr>
+      <td colspan="4">Total — ${rows.length} charge${rows.length!==1?'s':''}</td>
+      <td class="r">$${grandTotal.toFixed(2)}</td>
+    </tr>`;
+
+    document.getElementById('detailTotalBadge').textContent = '$' + grandTotal.toFixed(2);
+    document.getElementById('detailExportBtn').style.display = rows.length ? 'flex' : 'none';
+  }
+
+  function exportDetailCSV() {
+    if(!lastDetailData || !lastDetailData.rows) return;
+    const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+    const m = document.getElementById('detailMonth').value;
+    const y = document.getElementById('detailYear').value;
+    const label = `${months[m-1]}_${y}`;
+    const safeName = selectedStudentName.replace(/,\s*/,'_').replace(/\s+/g,'_');
+
+    const rows = [['Date','Program','Detail','Recorded By','Amount']];
+    lastDetailData.rows.forEach(r => {
+      rows.push([r.date, r.program_label, r.detail, r.recorded_by||'—', (r.amount||0).toFixed(2)]);
+    });
+    rows.push(['','','','Total', lastDetailData.total.toFixed(2)]);
+
+    const csv = rows.map(r => r.map(c => `"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n');
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([csv], {type:'text/csv'}));
+    a.download = `Mizzentop_Detail_${safeName}_${label}.csv`;
+    a.click();
+  }
+
+  // ═══════════════════════════════════════
+  // UTILITIES
+  // ═══════════════════════════════════════
+  function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 </script>
 </body>
 </html>
