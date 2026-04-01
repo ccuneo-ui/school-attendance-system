@@ -4139,12 +4139,36 @@ def populate_advisory_electives():
             results.append(f"Inserted {len(t3_electives)} T3 electives")
 
             # --- Helper: match student by first + last name ---
+            name_corrections = {
+                'LJ Holly': ('John', 'Holly'),
+                'Mary Clare Englehart': ('Mary Clare', 'Englehart'),
+                'Mikey Gerosa': ('Michael', 'Gerosa'),
+                'Cody Pisciarino': ('Cody', 'Piscarino'),
+                'Gigi Ponzini': ('Giuliana', 'Ponzini'),
+                'Paulie Desatnik': ('Paul', 'Desatnik'),
+                'Lexi Modupe': ('Alexandria', 'Modupe'),
+                'Geo Kumar': ('Gotham "Geo"', 'Kumar'),
+                'Scarlet Lent': ('Scarlett', 'Lent'),
+                'John William Salterelli': ('John William', 'Saltarelli'),
+                'Keira Philips': ('Keira', 'Phillips'),
+                'Coleman Cynamon Ferris': ('Coleman', 'Cynamon-Ferris'),
+                'Lilliana Welsh': ('Lilliana', 'Welch'),
+                'Maddie Byrne': ('Madeleine', 'Byrne'),
+                'Cat Taylor': ('Catherine', 'Taylor'),
+                'Eli Rodriguez': ('Elijah', 'Rodriguez'),
+                'Diana Furhman': ('Diana', 'Fuhrman'),
+                'Gabby Modupe': ('Gabriella', 'Modupe'),
+            }
+
             def find_student(full_name):
-                parts = full_name.strip().split()
-                if len(parts) < 2:
-                    return None
-                first = parts[0]
-                last = ' '.join(parts[1:])
+                if full_name in name_corrections:
+                    first, last = name_corrections[full_name]
+                else:
+                    parts = full_name.strip().split()
+                    if len(parts) < 2:
+                        return None
+                    first = parts[0]
+                    last = ' '.join(parts[1:])
                 cur.execute(
                     "SELECT student_id FROM students WHERE first_name ILIKE %s AND last_name ILIKE %s AND status='active'",
                     (first, last)
