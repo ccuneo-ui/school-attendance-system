@@ -4174,7 +4174,7 @@ def populate_advisory_electives():
                     'Lukas Cuppek', 'Andrew Williams', 'Alex Mack', 'Addison Ceballos',
                     'Aubrey Murphy', 'Marcellus Johnson'
                 ],
-                'Shane Caropolli': [
+                'Shane Caroppoli': [
                     'Dylan Mack', 'Ben Catalano', 'LJ Holly', 'Vivek Suseelan',
                     'Mary Clare Englehart', 'Lily Linquist'
                 ],
@@ -4232,74 +4232,71 @@ def populate_advisory_electives():
             # --- D. Populate student_electives for T3 ---
             ls_elective_roster = {
                 ('World Travelers', 'LS'): [
-                    'Cassidy Sukow', 'Bridget Boardman', 'Jack Shiller', 'Camden Martin',
-                    'Charlotte Pisciarino', 'Alden Mack', 'Adriel Arango', 'Clara Wetterhorn'
+                    'Noah Nelson', 'Jake Broderick', 'Ryan Kerr', 'Arden Englehart',
+                    'Lucas Berg', 'Deacon Lent', 'Noah Johnson'
                 ],
                 ('Walking Buddies', 'LS'): [
-                    'Mikayla Barahona', 'Lillian Hardisty', 'Charlie Botter', 'Nathaniel Lopez',
-                    'Hank Keenan', 'Johnny Arena', 'Vivienne Eyring', 'Simon Mutchler'
+                    'Lilliana Welsh', 'Olivia Berg', 'Ella Steiner', 'Peter Danieluc',
+                    'Danelyn Coyle', 'Brady Gillman', 'Layla Penn', 'Maddie Byrne'
                 ],
                 ('Puzzle Masters', 'LS'): [
-                    'Quinn Martin', 'Julia Garland', 'Sawyer Ceballos', 'Devin Ceballos',
-                    'Matteo Parisi', 'Sebastian Mezzapelle', 'Charlotte Thompson', 'Jack Catalano'
+                    'Sophia Garay', 'Thomas Horan', 'Chengduo Zou', 'James Lallouz',
+                    'Bowie Brody', 'David Friedman', 'Lia Steiner', 'Owen Denley'
                 ],
                 ('Reading Club', 'LS'): [
-                    'Finley Perry', 'Maeve Philips', 'Roman Bellos', 'Theodore Curra',
-                    'Elisa Fritts', 'Mia Desatnik', 'Mia Murphy', 'Sutton Ponzini'
+                    'Charlotte Roe', 'Sabrina Hobson', 'Ella Jennings', 'Tommy Beck',
+                    'Noel Mutchler', 'Zephram Thomas', 'Kay Friedman', 'Miles Dolan'
                 ],
                 ('Crafting Corner', 'LS'): [
-                    'Harper Broderick', 'Gemma DeHaarte', 'Nora Yacoub', 'Evelyn O\'Keefe',
-                    'Vivian Hanafi', 'Mia Choi', 'Ziva Bell'
+                    'Danny Braham', 'Abigail Gavin', 'Will Huron', 'Cat Taylor',
+                    'Colt Laino', 'Zara Intwala', 'Carly Hildenbrand', 'Reign Myint'
                 ],
                 ('Goal Getters', 'LS'): [
-                    'Penelope Garay', 'Keira Holly', 'Hannah Huron', 'Noah Gerosa',
-                    'James Anderson', 'Logan Ponzini', 'Miles Julka'
+                    'Finn Kelsay', 'Hudson Sorrentino', 'Derek Kelsay', 'Eli Rodriguez',
+                    "Owen O'Keefe", 'Ezra Johnson', 'Cameron Pool', 'Grant McCarthy'
                 ],
                 ('Canva Pros Jr.', 'LS'): [
-                    'Sadie Hampton', 'Cruz Kumar', 'August Bell', 'Laila Johnson',
-                    'Leo Williams', 'David Braham', 'Nora Linquist'
+                    'Grace Loosen', 'Diana Furhman', 'Aurelia Nelson', 'Gabby Modupe',
+                    'Leo Hardisty', 'Andy Harrison', 'Olivier Suseelan'
                 ],
             }
             ms_elective_roster = {
                 ('Engineering/Robotics', 'MS'): [
-                    'Andrew Arena', 'Jase Boardman', 'Jake Ceballos', 'Addison Ceballos',
-                    'Ben Catalano', 'Graham Fritts', 'Adam Hanafi', 'Mark Jennings',
-                    'Dylan Mack'
+                    'Silas Fitzpatrick', 'Jayden Garland', 'Christopher Argueta',
+                    'Maxwell Mezzapelle', 'John William Salterelli', 'Dylan Mack',
+                    'Sonali Julka', 'Vivek Suseelan', 'LJ Holly', 'Remy Bell'
                 ],
                 ('Reading Club', 'MS'): [
-                    'Isabella Anderson', 'Victoria Braham', 'Meredith Burlington',
-                    'Mary Clare Englehart', 'Annie Fritts', 'Keira Philips',
-                    'Ava Perry', 'Anna Yacoub'
+                    'Meredith Burlington', 'Lily Linquist', 'Anna Yacoub',
+                    'Noah DuPlessis', 'Liam Mutchler', 'Aurora DeHaarte'
                 ],
                 ('Shark Tank Jr', 'MS'): [
-                    'Nicolas Barahona', 'Remy Bell', 'Logan Ceballos', 'Lukas Cuppek',
-                    'Nicole Cuppek', 'Teo Danieluc', 'Victor Danieluc', 'AJ Ferro',
-                    'Silas Fitzpatrick'
+                    'Dakota Holly', 'Keira Philips', 'Elias Garay', 'Tyler Mazzucca',
+                    'Joaquin Johnson', 'Lucas Garland', 'Ben Catalano', 'Samuel Shiller'
                 ],
                 ('Wall Street Warriors', 'MS'): [
-                    'Christopher Argueta', 'Konstantinos Bellos', 'Michael Botter',
-                    'Kailani Broderick', 'Coleman Cynamon Ferris', 'Noah DuPlessis',
-                    'Jayden Garland', 'Lucas Garland', 'Mikey Gerosa'
+                    'Coleman Cynamon Ferris', 'Gigi Ponzini', 'Andrew Williams',
+                    'Lexi Modupe', 'Victoria Braham', 'Geo Kumar', 'Marcellus Johnson',
+                    'Graham Fritts', 'Noah Garay'
                 ],
                 ('Pasta Pals', 'MS'): [
-                    'Aurora DeHaarte', 'Layla Eyring', 'Elias Garay', 'Noah Garay',
-                    'William Hardisty', 'Brooke Hampton', 'Jason Hampton', 'Dakota Holly',
-                    'LJ Holly'
+                    'Layla Eyring', 'AJ Ferro', 'Teo Danieluc', 'William Hardisty',
+                    'Michael Botter', 'Mikey Gerosa', 'Luca Parisi', 'Jason Hampton',
+                    'Kacey McLaughlin', 'Cameron Martin'
                 ],
                 ('Canva Pros', 'MS'): [
-                    'Eddie Huron', 'Sonali Julka', 'Geo Kumar', 'Scarlet Lent',
-                    'Lily Linquist', 'Kacey McLaughlin', 'Liam Mutchler', 'Aubrey Murphy',
-                    'Lexi Modupe'
+                    'Annie Fritts', 'Dylan Choi', 'Isabella Anderson', 'Eddie Huron',
+                    'Lukas Cuppek', 'Nicolas Barahona', 'Ava Perry', 'Paulie Desatnik',
+                    'Jase Boardman', 'Nicole Cuppek', 'Mary Clare Englehart'
                 ],
                 ('Financial Literacy', 'MS'): [
-                    'Dylan Choi', 'Cameron Martin', 'Tyler Mazzucca', 'Maxwell Mezzapelle',
-                    'Gabriel Oludoja', 'Luca Parisi', 'Cody Pisciarino', 'John William Salterelli',
-                    'Samuel Shiller'
+                    'Jake Ceballos', 'Gabriel Oludoja', 'Blake Sukow', 'Logan Ceballos',
+                    'Victor Danieluc', 'Konstantinos Bellos', "Caroline O'Keefe", 'Adam Hanafi'
                 ],
                 ('Sabores y Colores', 'MS'): [
-                    'Paulie Desatnik', 'Alex Mack', 'Marcellus Johnson', 'Joaquin Johnson',
-                    'Sydney Johnson', "Caroline O'Keefe", 'Gigi Ponzini', 'Blake Sukow',
-                    'Vivek Suseelan', 'Adam Wetterhorn', 'Andrew Williams'
+                    'Sydney Johnson', 'Brooke Hampton', 'Addison Ceballos',
+                    'Cody Pisciarino', 'Mark Jennings', 'Alex Mack', 'Kailani Broderick',
+                    'Aubrey Murphy', 'Adam Wetterhorn', 'Andrew Arena', 'Scarlet Lent'
                 ],
             }
 
