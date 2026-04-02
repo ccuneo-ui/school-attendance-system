@@ -80,25 +80,6 @@
     /* PRINT BUTTON */
     .btn-print { padding: 7px 14px; border: 1px solid var(--light); border-radius: 8px; background: #fff; font-size: 13px; font-weight: 500; color: var(--navy); cursor: pointer; font-family: 'DM Sans', sans-serif; transition: all 0.15s; display: inline-flex; align-items: center; gap: 6px; }
     .btn-print:hover { border-color: var(--navy); }
-
-    /* PRINT STYLES */
-    @media print {
-      body { background: #fff; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-      .topnav, .date-controls, .btn-print, .source-banner { display: none !important; }
-      .page { max-width: 100%; padding: 0; margin: 0; }
-      .page-header { margin-bottom: 12px; }
-      .page-header h1 { font-size: 22px; }
-      .print-date { display: block !important; font-size: 13px; color: var(--muted); margin-top: 2px; }
-      .summary-bar { margin-bottom: 12px; gap: 6px; }
-      .stat-chip { padding: 6px 10px; font-size: 11px; border: 1px solid #ccc; }
-      .stat-chip strong { font-size: 15px; }
-      .table-wrap { box-shadow: none; border: 1px solid #ccc; }
-      .bus-header td { padding: 7px 14px; font-size: 12px; }
-      tbody tr.student-row td { padding: 6px 14px; font-size: 12px; }
-      .spacer-row td { height: 6px; }
-      .col-headers th { padding: 5px 14px; font-size: 10px; }
-    }
-    .print-date { display: none; }
   </style>
 </head>
 <body>
@@ -122,14 +103,13 @@
         <button onclick="changeDate(1)">›</button>
       </div>
       <button class="btn-today" onclick="goToday()">Today</button>
-      <button class="btn-print" onclick="window.print()">
+      <button class="btn-print" onclick="generateReport()">
         <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
-        Print
+        Print Report
       </button>
     </div>
   </div>
 
-  <span class="print-date" id="printDate"></span>
   <div class="source-banner" id="sourceBanner"></div>
 
   <div class="summary-bar" id="summaryBar"></div>
@@ -145,6 +125,7 @@
 
 <script>
   let currentDate = new Date();
+  let lastLoadedBuses = [];
 
   function dateStr(d) {
     const y = d.getFullYear();
@@ -171,7 +152,6 @@
 
   async function loadData() {
     document.getElementById('dateDisplay').textContent = formatDateDisplay(currentDate);
-    document.getElementById('printDate').textContent = formatDateDisplay(currentDate);
     document.getElementById('busBody').innerHTML = '<tr><td colspan="3" class="empty-state"><p>Loading…</p></td></tr>';
     document.getElementById('summaryBar').innerHTML = '';
 
@@ -179,6 +159,7 @@
       const res = await fetch(`/api/dismissal/buses?date=${dateStr(currentDate)}`);
       if (!res.ok) throw new Error();
       const data = await res.json();
+      lastLoadedBuses = data.buses;
       renderBanner(data.source);
       renderSummary(data.buses);
       renderTable(data.buses);
@@ -259,6 +240,63 @@
   function esc(str) {
     if (!str && str !== 0) return '—';
     return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  function generateReport() {
+    const buses = lastLoadedBuses;
+    if (!buses.length) { alert('No bus data to print.'); return; }
+
+    const dateLabel = formatDateDisplay(currentDate);
+    const totalStudents = buses.reduce((s, b) => s + b.count, 0);
+
+    // Build compact multi-column bus blocks
+    let busBlocks = '';
+    buses.forEach(bus => {
+      const rows = bus.students.map(s =>
+        `<tr><td style="padding:2px 8px;font-size:11px;border-bottom:1px solid #eee;">${esc(s.last_name)}, ${esc(s.first_name)}</td><td style="padding:2px 8px;font-size:11px;border-bottom:1px solid #eee;text-align:center;">${esc(s.grade)}</td></tr>`
+      ).join('');
+      busBlocks += `
+        <div style="break-inside:avoid;margin-bottom:10px;">
+          <div style="background:#1a2744;color:#fff;padding:5px 10px;font-size:12px;font-weight:700;border-radius:4px 4px 0 0;">
+            ${esc(bus.route)} <span style="opacity:0.7;font-weight:400;margin-left:6px;">${bus.count} student${bus.count!==1?'s':''}</span>
+          </div>
+          <table style="width:100%;border-collapse:collapse;border:1px solid #ddd;border-top:none;">
+            <tr style="background:#f5f3ef;">
+              <th style="padding:3px 8px;text-align:left;font-size:9px;text-transform:uppercase;letter-spacing:0.05em;color:#666;border-bottom:1px solid #ddd;">Student</th>
+              <th style="padding:3px 8px;text-align:center;font-size:9px;text-transform:uppercase;letter-spacing:0.05em;color:#666;border-bottom:1px solid #ddd;">Grade</th>
+            </tr>
+            ${rows}
+          </table>
+        </div>`;
+    });
+
+    const html = `<!DOCTYPE html><html><head><title>Bus Report – ${dateLabel}</title>
+      <style>
+        @page { size: letter; margin: 0.5in; }
+        body { font-family: -apple-system, 'Helvetica Neue', Arial, sans-serif; color: #1a2744; margin: 0; }
+        .header { display: flex; justify-content: space-between; align-items: baseline; border-bottom: 2px solid #1a2744; padding-bottom: 6px; margin-bottom: 10px; }
+        .header h1 { font-size: 18px; margin: 0; }
+        .header .meta { font-size: 11px; color: #666; text-align: right; }
+        .summary { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
+        .summary span { font-size: 11px; color: #444; }
+        .summary strong { color: #1a2744; }
+        .grid { columns: 2; column-gap: 16px; }
+      </style>
+    </head><body>
+      <div class="header">
+        <h1>Bus Report</h1>
+        <div class="meta">${dateLabel}<br>${totalStudents} students · ${buses.length} routes</div>
+      </div>
+      <div class="summary">
+        ${buses.map(b => `<span><strong>${b.count}</strong> ${esc(b.route)}</span>`).join('<span style="color:#ccc;">|</span>')}
+      </div>
+      <div class="grid">${busBlocks}</div>
+      <script>window.onload=function(){window.print();}<\/script>
+    </body></html>`;
+
+    const w = window.open('', '_blank');
+    w.document.write(html);
+    w.document.close();
   }
 
   loadData();
