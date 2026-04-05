@@ -420,6 +420,54 @@ def init_db():
                 )
             """)
 
+            # Create store_items table
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS store_items (
+                    item_id        SERIAL PRIMARY KEY,
+                    name           TEXT NOT NULL,
+                    default_price  NUMERIC(10,2) NOT NULL,
+                    available_colors TEXT,
+                    available_sizes  TEXT,
+                    is_active      BOOLEAN NOT NULL DEFAULT TRUE,
+                    sort_order     INTEGER NOT NULL DEFAULT 0
+                )
+            """)
+
+            # Create store_purchases table
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS store_purchases (
+                    purchase_id   SERIAL PRIMARY KEY,
+                    student_id    INTEGER NOT NULL,
+                    item_id       INTEGER NOT NULL,
+                    color         TEXT,
+                    size          TEXT,
+                    quantity      INTEGER NOT NULL DEFAULT 1,
+                    unit_price    NUMERIC(10,2) NOT NULL,
+                    purchase_date TEXT NOT NULL,
+                    recorded_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    recorded_by   TEXT
+                )
+            """)
+
+            # Seed store items if empty
+            cur.execute("SELECT COUNT(*) FROM store_items")
+            if cur.fetchone()[0] == 0:
+                seed_items = [
+                    ("Water Bottle", 40.00, None, None, 1),
+                    ("T-Shirt", 30.00, "Navy,White,Yellow", "YXS,YS,YM,YL,YXL,AS,AM,AL,AXXL", 2),
+                    ("LS Shirt", 35.00, "Navy,White", "YXS,YS,YM,YL,YXL,AS,AM,AL,AXXL", 3),
+                    ("LS Arm Logo", 35.00, "White", "YXS,YS,YM,YL,YXL,AS,AM,AL,AXXL", 4),
+                    ("Hoodie", 40.00, None, "YXS,YS,YM,YL,YXL,AS,AM,AL,AXXL", 5),
+                    ("Sweatpants", 45.00, "Navy", "YS,YM,YL,YXL,AS,AM,AL,AXXL", 6),
+                    ("Shorts", 30.00, None, "YXS,YS,YM,YL,YXL,AS,AM,AL,AXXL", 7),
+                    ("1/4 Zip", 40.00, "Navy", "AS,AM,AL,AXXL", 8),
+                ]
+                for name, price, colors, sizes, sort in seed_items:
+                    cur.execute(
+                        "INSERT INTO store_items (name, default_price, available_colors, available_sizes, sort_order) VALUES (%s,%s,%s,%s,%s)",
+                        (name, price, colors, sizes, sort)
+                    )
+
         conn.commit()
         print("DB init OK")
     except Exception as e:
@@ -562,6 +610,11 @@ def program_attendance():
 @login_required
 def aftercare():
     return send_from_directory(".", "aftercare_attendance.html")
+
+@app.route("/school-store")
+@login_required
+def school_store():
+    return send_from_directory(".", "school_store.html")
 
 @app.route("/billing-rates")
 @login_required
@@ -785,6 +838,192 @@ def delete_mcard_charge(charge_id):
             cur.execute("DELETE FROM mcard_charges WHERE charge_id=%s",(charge_id,))
         conn.commit()
         return jsonify({"success":True})
+    finally:
+        conn.close()
+
+
+# ============================================
+# SCHOOL STORE
+# ============================================
+
+@app.route("/api/store/items")
+@login_required
+def get_store_items():
+    conn = get_db_connection()
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute("SELECT * FROM store_items ORDER BY sort_order, name")
+            items = cur.fetchall()
+            for item in items:
+                if "default_price" in item:
+                    item["default_price"] = float(item["default_price"])
+        return jsonify(items)
+    finally:
+        conn.close()
+
+
+@app.route("/api/store/items", methods=["POST"])
+@login_required
+def add_store_item():
+    data = request.get_json()
+    name = (data.get("name") or "").strip()
+    price = data.get("default_price")
+    if not name or price is None:
+        return jsonify({"error": "Name and price are required"}), 400
+    conn = get_db_connection()
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute("""
+                INSERT INTO store_items (name, default_price, available_colors, available_sizes, sort_order)
+                VALUES (%s, %s, %s, %s, COALESCE((SELECT MAX(sort_order)+1 FROM store_items), 1))
+                RETURNING *
+            """, (name, price, data.get("available_colors"), data.get("available_sizes")))
+            item = cur.fetchone()
+            conn.commit()
+            if "default_price" in item:
+                item["default_price"] = float(item["default_price"])
+        return jsonify(item), 201
+    except Exception as e:
+        conn.rollback()
+        return jsonify({"error": str(e)}), 500
+    finally:
+        conn.close()
+
+
+@app.route("/api/store/items/<int:item_id>", methods=["PUT"])
+@login_required
+def update_store_item(item_id):
+    data = request.get_json()
+    conn = get_db_connection()
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute("""
+                UPDATE store_items
+                SET name=%s, default_price=%s, available_colors=%s, available_sizes=%s, is_active=%s
+                WHERE item_id=%s RETURNING *
+            """, (
+                data.get("name"), data.get("default_price"),
+                data.get("available_colors"), data.get("available_sizes"),
+                data.get("is_active", True), item_id
+            ))
+            item = cur.fetchone()
+            conn.commit()
+        if not item:
+            return jsonify({"error": "Item not found"}), 404
+        if "default_price" in item:
+            item["default_price"] = float(item["default_price"])
+        return jsonify(item)
+    except Exception as e:
+        conn.rollback()
+        return jsonify({"error": str(e)}), 500
+    finally:
+        conn.close()
+
+
+@app.route("/api/store/purchases")
+@login_required
+def get_store_purchases():
+    month = request.args.get("month", "")  # YYYY-MM format
+    conn = get_db_connection()
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            if month:
+                cur.execute("""
+                    SELECT sp.*, s.first_name, s.last_name, si.name AS item_name
+                    FROM store_purchases sp
+                    JOIN students s ON sp.student_id = s.student_id
+                    JOIN store_items si ON sp.item_id = si.item_id
+                    WHERE sp.purchase_date LIKE %s
+                    ORDER BY sp.purchase_date DESC, sp.recorded_at DESC
+                """, (month + "%",))
+            else:
+                cur.execute("""
+                    SELECT sp.*, s.first_name, s.last_name, si.name AS item_name
+                    FROM store_purchases sp
+                    JOIN students s ON sp.student_id = s.student_id
+                    JOIN store_items si ON sp.item_id = si.item_id
+                    ORDER BY sp.purchase_date DESC, sp.recorded_at DESC
+                    LIMIT 200
+                """)
+            purchases = cur.fetchall()
+        for p in purchases:
+            if "unit_price" in p:
+                p["unit_price"] = float(p["unit_price"])
+        return jsonify(purchases)
+    finally:
+        conn.close()
+
+
+@app.route("/api/store/purchases", methods=["POST"])
+@login_required
+def add_store_purchase():
+    data = request.get_json()
+    student_id = data.get("student_id")
+    item_id = data.get("item_id")
+    quantity = int(data.get("quantity", 1))
+    unit_price = data.get("unit_price")
+    purchase_date = data.get("purchase_date")
+    color = data.get("color") or None
+    size = data.get("size") or None
+
+    if not all([student_id, item_id, unit_price, purchase_date]):
+        return jsonify({"error": "Missing required fields"}), 400
+
+    from datetime import date as dt_date
+    try:
+        pd = dt_date.fromisoformat(purchase_date)
+        today = dt_date.today()
+        first_of_month = today.replace(day=1)
+        if pd < first_of_month and not session.get("can_manage_billing"):
+            return jsonify({"error": "This month is closed for changes or additions. Please contact the billing office at businessoffice@mizzentop.org."}), 403
+    except ValueError:
+        pass
+
+    conn = get_db_connection()
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute("""
+                INSERT INTO store_purchases (student_id, item_id, color, size, quantity, unit_price, purchase_date, recorded_by)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                RETURNING purchase_id
+            """, (student_id, item_id, color, size, quantity, unit_price, purchase_date, session.get("user_name", "unknown")))
+            row = cur.fetchone()
+            conn.commit()
+        return jsonify({"purchase_id": row["purchase_id"]}), 201
+    except Exception as e:
+        conn.rollback()
+        return jsonify({"error": str(e)}), 500
+    finally:
+        conn.close()
+
+
+@app.route("/api/store/purchases/<int:purchase_id>", methods=["DELETE"])
+@login_required
+def delete_store_purchase(purchase_id):
+    conn = get_db_connection()
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute("SELECT purchase_date FROM store_purchases WHERE purchase_id=%s", (purchase_id,))
+            row = cur.fetchone()
+            if not row:
+                return jsonify({"error": "Not found"}), 404
+
+            from datetime import date as dt_date
+            try:
+                pd = dt_date.fromisoformat(row["purchase_date"])
+                today = dt_date.today()
+                first_of_month = today.replace(day=1)
+                if pd < first_of_month and not session.get("can_manage_billing"):
+                    return jsonify({"error": "This month is closed for changes or additions. Please contact the billing office at businessoffice@mizzentop.org."}), 403
+            except ValueError:
+                pass
+
+            cur.execute("DELETE FROM store_purchases WHERE purchase_id=%s", (purchase_id,))
+            conn.commit()
+        return jsonify({"deleted": True})
+    except Exception as e:
+        conn.rollback()
+        return jsonify({"error": str(e)}), 500
     finally:
         conn.close()
 
@@ -2374,6 +2613,15 @@ def api_billing_report():
                         aftercare_days_d[sid] = set()
                     aftercare_days_d[sid].add(str(r["session_date"]))
 
+                # 5b. School Store purchases
+                cur.execute("""
+                    SELECT student_id, SUM(quantity * unit_price) AS store_total
+                    FROM   store_purchases
+                    WHERE  purchase_date::date >= %s AND purchase_date::date <= %s
+                    GROUP  BY student_id
+                """, (first_day, last_day))
+                store_totals = {r["student_id"]: float(r["store_total"]) for r in cur.fetchall()}
+
                 # 6. All active students
                 cur.execute("""
                     SELECT student_id, first_name, last_name, grade
@@ -2401,8 +2649,9 @@ def api_billing_report():
             og_units = sp.get("og", 0.0)
             hw_units = sp.get("homework", 0.0)
             oo_units = sp.get("tutoring", 0.0)
+            store_amt = store_totals.get(sid, 0.0)
 
-            if not any([mc_qty, bc_days, ac_hours, og_units, hw_units, oo_units]):
+            if not any([mc_qty, bc_days, ac_hours, og_units, hw_units, oo_units, store_amt]):
                 continue
 
             mcard_amt  = mc_qty   * rates["mcard_snack"]
@@ -2423,6 +2672,7 @@ def api_billing_report():
                 "og_tutoring":      round(og_amt, 2),
                 "homework_center":  round(hw_amt, 2),
                 "one_on_one":       round(oo_amt, 2),
+                "school_store":     round(store_amt, 2),
                 "program_sessions": round(og_units + hw_units + oo_units, 2),
                 "care_days":        bc_days + ac_days,
             })
@@ -2553,6 +2803,33 @@ def api_billing_student_detail():
                         "detail": f"In: {checkin} · Out: {pickup} ({hrs:g} hr{'s' if hrs!=1 else ''})",
                         "recorded_by": r.get("recorded_by") or "—",
                         "amount": round(amount, 2),
+                    })
+
+                # 4. School Store purchases
+                cur.execute("""
+                    SELECT sp.purchase_date, si.name AS item_name, sp.color, sp.size,
+                           sp.quantity, sp.unit_price, sp.recorded_by
+                    FROM   store_purchases sp
+                    JOIN   store_items si ON sp.item_id = si.item_id
+                    WHERE  sp.student_id = %s
+                      AND  sp.purchase_date::date >= %s AND sp.purchase_date::date <= %s
+                    ORDER  BY sp.purchase_date
+                """, (student_id, first_day, last_day))
+                for r in cur.fetchall():
+                    qty = int(r["quantity"])
+                    price = float(r["unit_price"])
+                    parts = [r["item_name"]]
+                    if r.get("color"):
+                        parts.append(r["color"])
+                    if r.get("size"):
+                        parts.append(r["size"])
+                    detail = f"{qty}x {' / '.join(parts)} @ ${price:.2f}"
+                    rows.append({
+                        "date": str(r["purchase_date"]), "program_key": "store",
+                        "program_label": "School Store",
+                        "detail": detail,
+                        "recorded_by": r.get("recorded_by") or "—",
+                        "amount": round(qty * price, 2),
                     })
 
         finally:

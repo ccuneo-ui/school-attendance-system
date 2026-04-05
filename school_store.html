@@ -1,0 +1,550 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>School Store — Mizzentop Day School</title>
+  <link rel="icon" type="image/svg+xml" href="/logo.svg">
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@700;900&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root { --navy:#1a2744; --gold:#f5c842; --gold-dark:#d4a800; --cream:#fef9ee; --red:#e84040; --green:#2eaa6e; --card-bg:#ffffff; --border:#e2d9c8; --text:#1a2744; --muted:#7a7a8c; --burgundy:#4a1a2c; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'DM Sans', sans-serif; background: var(--cream); min-height: 100vh; color: var(--text); }
+    header { background: var(--navy); padding: 18px 32px; display: flex; align-items: center; gap: 16px; box-shadow: 0 4px 20px rgba(26,39,68,0.3); }
+    .logo-badge { background: var(--gold); color: var(--navy); font-family: 'Fraunces', serif; font-weight: 900; font-size: 22px; width: 48px; height: 48px; border-radius: 12px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    header h1 { font-family: 'Fraunces', serif; font-weight: 700; font-size: 22px; color: #fff; line-height: 1.2; }
+    header p { color: #a0aec0; font-size: 13px; margin-top: 2px; }
+    .nav-link { margin-left: auto; color: var(--gold); text-decoration: none; font-size: 13px; font-weight: 600; border: 2px solid var(--gold); padding: 7px 16px; border-radius: 8px; transition: all 0.15s; }
+    .nav-link:hover { background: var(--gold); color: var(--navy); }
+    .container { max-width: 1060px; margin: 0 auto; padding: 32px 20px; }
+
+    /* Tabs */
+    .tabs { display: flex; gap: 4px; margin-bottom: 24px; }
+    .tab-btn { padding: 10px 24px; border: 2px solid var(--border); background: var(--card-bg); border-radius: 12px 12px 0 0; font-family: 'DM Sans', sans-serif; font-size: 14px; font-weight: 600; cursor: pointer; color: var(--muted); transition: all 0.15s; }
+    .tab-btn.active { background: var(--navy); color: #fff; border-color: var(--navy); }
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
+
+    /* Form card */
+    .form-card { background: var(--card-bg); border-radius: 20px; padding: 28px; border: 2px solid var(--border); box-shadow: 0 4px 24px rgba(26,39,68,0.06); margin-bottom: 28px; }
+    .form-card h2 { font-family: 'Fraunces', serif; font-size: 18px; margin-bottom: 20px; color: var(--navy); }
+    .form-grid { display: grid; grid-template-columns: 2fr 2fr 1fr; gap: 14px; align-items: end; }
+    .form-grid-2 { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr 1fr auto; gap: 14px; align-items: end; margin-top: 14px; }
+    @media (max-width: 768px) { .form-grid, .form-grid-2 { grid-template-columns: 1fr; } }
+    label { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); display: block; margin-bottom: 6px; }
+
+    /* Inputs */
+    .student-select-wrap { position: relative; }
+    .text-input, select, input[type="date"] { width: 100%; padding: 12px 14px; border: 2px solid var(--border); border-radius: 12px; font-size: 15px; font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(--text); outline: none; transition: border-color 0.2s; -webkit-appearance: none; }
+    .text-input:focus, select:focus, input[type="date"]:focus { border-color: var(--gold-dark); background: #fff; }
+    .dropdown-list { position: absolute; top: calc(100% + 4px); left: 0; right: 0; background: #fff; border: 2px solid var(--gold-dark); border-radius: 12px; max-height: 240px; overflow-y: auto; z-index: 100; display: none; box-shadow: 0 8px 24px rgba(26,39,68,0.12); }
+    .dropdown-list.open { display: block; }
+    .dropdown-item { padding: 10px 14px; cursor: pointer; font-size: 14px; display: flex; justify-content: space-between; align-items: center; transition: background 0.1s; }
+    .dropdown-item:hover { background: #faf6ec; }
+    .dropdown-item .grade-tag { font-size: 11px; background: var(--navy); color: #fff; border-radius: 6px; padding: 2px 8px; font-weight: 600; }
+    .dropdown-empty { padding: 14px; color: var(--muted); font-size: 14px; text-align: center; }
+
+    .total-display { font-family: 'Fraunces', serif; font-size: 24px; font-weight: 900; color: var(--navy); padding: 8px 0; }
+
+    /* Buttons */
+    .btn-primary { border: none; padding: 12px 22px; border-radius: 12px; font-size: 15px; font-weight: 700; font-family: 'DM Sans', sans-serif; cursor: pointer; white-space: nowrap; transition: background 0.15s, transform 0.1s; height: 48px; background: var(--gold); color: var(--navy); }
+    .btn-primary:hover { background: var(--gold-dark); }
+    .btn-primary:active { transform: scale(0.97); }
+    .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-secondary { border: 2px solid var(--navy); padding: 8px 18px; border-radius: 10px; font-size: 13px; font-weight: 600; font-family: 'DM Sans', sans-serif; cursor: pointer; background: #fff; color: var(--navy); transition: all 0.15s; }
+    .btn-secondary:hover { background: var(--navy); color: #fff; }
+    .btn-danger { background: none; border: 2px solid #e2d9c8; color: var(--muted); border-radius: 8px; padding: 5px 12px; font-size: 12px; font-family: 'DM Sans', sans-serif; cursor: pointer; transition: all 0.15s; font-weight: 600; }
+    .btn-danger:hover { border-color: var(--red); color: var(--red); background: #fff0f0; }
+    .btn-sm { padding: 6px 14px; font-size: 12px; border-radius: 8px; height: auto; }
+
+    /* Table card */
+    .table-card { background: var(--card-bg); border-radius: 20px; border: 2px solid var(--border); overflow: hidden; box-shadow: 0 4px 24px rgba(26,39,68,0.06); }
+    .table-header { display: flex; justify-content: space-between; align-items: center; padding: 18px 24px; border-bottom: 2px solid var(--border); flex-wrap: wrap; gap: 10px; }
+    .table-header h2 { font-family: 'Fraunces', serif; font-size: 17px; color: var(--navy); }
+    table { width: 100%; border-collapse: collapse; }
+    thead th { background: var(--navy); color: #fff; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; padding: 12px 16px; text-align: left; }
+    tbody tr { border-bottom: 1px solid var(--border); transition: background 0.1s; }
+    tbody tr:last-child { border-bottom: none; }
+    tbody tr:hover { background: #faf6ec; }
+    td { padding: 12px 16px; font-size: 14px; vertical-align: middle; }
+    .r { text-align: right; }
+    .grade-pill { background: var(--navy); color: #fff; font-size: 11px; font-weight: 600; border-radius: 6px; padding: 2px 8px; display: inline-block; }
+    .empty-state { text-align: center; padding: 48px 20px; color: var(--muted); font-size: 15px; }
+    .empty-state span { font-size: 40px; display: block; margin-bottom: 10px; }
+    .error-banner { background: #fff0f0; border: 2px solid var(--red); color: var(--red); border-radius: 12px; padding: 14px 20px; margin-bottom: 20px; font-size: 14px; font-weight: 600; display: none; }
+    .flash { position: fixed; top: 38%; left: 50%; transform: translateX(-50%) scale(0.95); background: var(--green); color: #fff; padding: 22px 36px; border-radius: 16px; font-weight: 600; font-size: 16px; line-height: 1.5; text-align: center; max-width: 580px; width: 90%; box-shadow: 0 16px 48px rgba(0,0,0,0.28); opacity: 0; transition: opacity 0.2s, transform 0.2s; pointer-events: none; z-index: 9999; }
+    .flash.show { opacity: 1; transform: translateX(-50%) scale(1); }
+    .flash.error { background: var(--red); }
+    .month-total { padding: 16px 24px; font-family: 'Fraunces', serif; font-size: 18px; font-weight: 700; color: var(--navy); border-top: 2px solid var(--border); text-align: right; }
+
+    /* Manage items */
+    .item-row-inactive { opacity: 0.5; }
+    .status-badge { font-size: 11px; font-weight: 700; border-radius: 6px; padding: 3px 10px; display: inline-block; }
+    .status-active { background: #dcfce7; color: #166534; }
+    .status-inactive { background: #fee2e2; color: #991b1b; }
+
+    /* Modal */
+    .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(26,39,68,0.5); z-index: 1000; align-items: center; justify-content: center; }
+    .modal-overlay.open { display: flex; }
+    .modal { background: var(--card-bg); border-radius: 20px; padding: 32px; max-width: 500px; width: 90%; box-shadow: 0 20px 60px rgba(0,0,0,0.3); }
+    .modal h3 { font-family: 'Fraunces', serif; font-size: 20px; margin-bottom: 20px; color: var(--navy); }
+    .modal-field { margin-bottom: 16px; }
+    .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 24px; }
+    .toggle-wrap { display: flex; align-items: center; gap: 10px; }
+    .toggle { position: relative; width: 44px; height: 24px; background: #ccc; border-radius: 12px; cursor: pointer; transition: background 0.2s; }
+    .toggle.on { background: var(--green); }
+    .toggle::after { content: ''; position: absolute; top: 2px; left: 2px; width: 20px; height: 20px; background: #fff; border-radius: 50%; transition: transform 0.2s; }
+    .toggle.on::after { transform: translateX(20px); }
+    .hidden { display: none !important; }
+  </style>
+</head>
+<body>
+<header>
+  <div class="logo-badge">S</div>
+  <div>
+    <h1>School Store</h1>
+    <p>Record clothing and merchandise purchases</p>
+  </div>
+  <a href="/" class="nav-link">&larr; Home</a>
+</header>
+
+<div class="container">
+  <div class="error-banner" id="errorBanner"></div>
+
+  <div class="tabs">
+    <button class="tab-btn active" onclick="switchTab('record')">Record Purchases</button>
+    <button class="tab-btn" onclick="switchTab('manage')">Manage Items</button>
+  </div>
+
+  <!-- TAB 1: Record Purchases -->
+  <div class="tab-panel active" id="tab-record">
+    <div class="form-card">
+      <h2>New Purchase</h2>
+      <div class="form-grid">
+        <div>
+          <label>Student</label>
+          <div class="student-select-wrap">
+            <input type="text" class="text-input" id="studentSearch" placeholder="Type to search students..." autocomplete="off">
+            <div class="dropdown-list" id="dropdownList"></div>
+          </div>
+        </div>
+        <div>
+          <label>Item</label>
+          <select id="itemSelect" class="text-input" onchange="onItemChange()">
+            <option value="">Select an item...</option>
+          </select>
+        </div>
+        <div>
+          <label>Date</label>
+          <input type="date" id="purchaseDate">
+        </div>
+      </div>
+      <div class="form-grid-2">
+        <div id="colorWrap" class="hidden">
+          <label>Color</label>
+          <select id="colorSelect" class="text-input"></select>
+        </div>
+        <div id="sizeWrap" class="hidden">
+          <label>Size</label>
+          <select id="sizeSelect" class="text-input"></select>
+        </div>
+        <div>
+          <label>Qty</label>
+          <input type="text" inputmode="numeric" class="text-input" id="qtyInput" value="1" onchange="calcTotal()" oninput="calcTotal()">
+        </div>
+        <div>
+          <label>Unit Price</label>
+          <input type="text" inputmode="decimal" class="text-input" id="priceInput" onchange="calcTotal()" oninput="calcTotal()">
+        </div>
+        <div>
+          <label>Total</label>
+          <div class="total-display" id="totalDisplay">$0.00</div>
+        </div>
+        <div>
+          <button class="btn-primary" id="recordBtn" onclick="recordPurchase()">Record Purchase</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="table-card">
+      <div class="table-header">
+        <h2>Purchase Log</h2>
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+          <select id="monthFilter" class="text-input" style="width:180px;padding:8px 14px;font-size:13px" onchange="loadPurchases()"></select>
+        </div>
+      </div>
+      <div id="purchaseTableWrap"><div class="empty-state"><span>...</span>Loading...</div></div>
+      <div class="month-total" id="monthTotal"></div>
+    </div>
+  </div>
+
+  <!-- TAB 2: Manage Items -->
+  <div class="tab-panel" id="tab-manage">
+    <div class="form-card" style="padding:18px 24px">
+      <button class="btn-primary btn-sm" onclick="openItemModal(null)">+ Add New Item</button>
+    </div>
+    <div class="table-card">
+      <div class="table-header"><h2>Store Items</h2></div>
+      <div id="itemsTableWrap"><div class="empty-state"><span>...</span>Loading...</div></div>
+    </div>
+  </div>
+</div>
+
+<div class="flash" id="flash"></div>
+
+<!-- Item Edit Modal -->
+<div class="modal-overlay" id="itemModal">
+  <div class="modal">
+    <h3 id="modalTitle">Add Item</h3>
+    <div class="modal-field">
+      <label>Name</label>
+      <input type="text" class="text-input" id="modalName">
+    </div>
+    <div class="modal-field">
+      <label>Default Price</label>
+      <input type="text" inputmode="decimal" class="text-input" id="modalPrice">
+    </div>
+    <div class="modal-field">
+      <label>Colors (comma-separated, leave blank for none)</label>
+      <input type="text" class="text-input" id="modalColors" placeholder="e.g. Navy,White,Yellow">
+    </div>
+    <div class="modal-field">
+      <label>Sizes (comma-separated, leave blank for none)</label>
+      <input type="text" class="text-input" id="modalSizes" placeholder="e.g. YXS,YS,YM,YL,YXL,AS,AM,AL,AXXL">
+    </div>
+    <div class="modal-field">
+      <div class="toggle-wrap">
+        <div class="toggle on" id="modalActiveToggle" onclick="this.classList.toggle('on')"></div>
+        <span style="font-size:14px;font-weight:600">Active</span>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-secondary" onclick="closeItemModal()">Cancel</button>
+      <button class="btn-primary btn-sm" onclick="saveItem()">Save</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  const API = window.location.origin;
+  const today = new Date().toISOString().split('T')[0];
+  document.getElementById('purchaseDate').value = today;
+
+  let allStudents = [], storeItems = [], purchases = [];
+  let selectedStudentId = null, selectedStudentName = '';
+  let canManageBilling = false;
+  let editingItemId = null;
+
+  // ── Init ──
+  fetch(`${API}/api/session`, {credentials:'include'}).then(r=>r.json()).then(d=>{ canManageBilling = !!d.can_manage_billing; }).catch(()=>{});
+
+  async function init() {
+    await Promise.all([loadStudents(), loadItems()]);
+    populateItemSelect();
+    populateMonthFilter();
+    loadPurchases();
+  }
+
+  // ── Students (reuse mcard endpoint) ──
+  async function loadStudents() {
+    try { const r = await fetch(`${API}/api/mcard/students`); allStudents = await r.json(); }
+    catch(e) { showError('Could not load students.'); }
+  }
+
+  // ── Student search dropdown ──
+  const searchInput = document.getElementById('studentSearch');
+  const dropdown = document.getElementById('dropdownList');
+
+  searchInput.addEventListener('input', () => {
+    selectedStudentId = null; selectedStudentName = '';
+    const q = searchInput.value.trim().toLowerCase();
+    if (!q) { closeDropdown(); return; }
+    const matches = allStudents.filter(s => (s.first_name+' '+s.last_name).toLowerCase().includes(q) || (s.last_name+', '+s.first_name).toLowerCase().includes(q)).slice(0, 20);
+    if (!matches.length) {
+      dropdown.innerHTML = '<div class="dropdown-empty">No students found</div>';
+    } else {
+      dropdown.innerHTML = matches.map(s => `<div class="dropdown-item" data-id="${s.student_id}" data-name="${esc(s.first_name+' '+s.last_name)}"><span>${esc(s.first_name)} ${esc(s.last_name)}</span><span class="grade-tag">Grade ${esc(String(s.grade||'?'))}</span></div>`).join('');
+      dropdown.querySelectorAll('.dropdown-item').forEach(el => {
+        el.addEventListener('mousedown', e => { e.preventDefault(); selectedStudentId = parseInt(el.dataset.id); selectedStudentName = el.dataset.name; searchInput.value = selectedStudentName; closeDropdown(); });
+      });
+    }
+    dropdown.classList.add('open');
+  });
+  searchInput.addEventListener('focus', () => { if (searchInput.value.trim()) searchInput.dispatchEvent(new Event('input')); });
+  document.addEventListener('click', e => { if (!e.target.closest('.student-select-wrap')) closeDropdown(); });
+  function closeDropdown() { dropdown.classList.remove('open'); }
+
+  // ── Items ──
+  async function loadItems() {
+    try { const r = await fetch(`${API}/api/store/items`); storeItems = await r.json(); }
+    catch(e) { showError('Could not load store items.'); }
+  }
+
+  function populateItemSelect() {
+    const sel = document.getElementById('itemSelect');
+    sel.innerHTML = '<option value="">Select an item...</option>';
+    storeItems.filter(i => i.is_active).forEach(i => {
+      sel.innerHTML += `<option value="${i.item_id}">${esc(i.name)} — $${Number(i.default_price).toFixed(2)}</option>`;
+    });
+  }
+
+  function onItemChange() {
+    const itemId = parseInt(document.getElementById('itemSelect').value);
+    const item = storeItems.find(i => i.item_id === itemId);
+    const colorWrap = document.getElementById('colorWrap');
+    const sizeWrap = document.getElementById('sizeWrap');
+    const colorSel = document.getElementById('colorSelect');
+    const sizeSel = document.getElementById('sizeSelect');
+    const priceInput = document.getElementById('priceInput');
+
+    if (!item) {
+      colorWrap.classList.add('hidden'); sizeWrap.classList.add('hidden');
+      priceInput.value = ''; calcTotal(); return;
+    }
+
+    priceInput.value = Number(item.default_price).toFixed(2);
+
+    if (item.available_colors) {
+      const colors = item.available_colors.split(',').map(c => c.trim()).filter(Boolean);
+      colorSel.innerHTML = colors.map(c => `<option value="${esc(c)}">${esc(c)}</option>`).join('');
+      colorWrap.classList.remove('hidden');
+    } else {
+      colorWrap.classList.add('hidden');
+      colorSel.innerHTML = '';
+    }
+
+    if (item.available_sizes) {
+      const sizes = item.available_sizes.split(',').map(s => s.trim()).filter(Boolean);
+      sizeSel.innerHTML = sizes.map(s => `<option value="${esc(s)}">${esc(s)}</option>`).join('');
+      sizeWrap.classList.remove('hidden');
+    } else {
+      sizeWrap.classList.add('hidden');
+      sizeSel.innerHTML = '';
+    }
+
+    calcTotal();
+  }
+
+  function calcTotal() {
+    const qty = parseInt(document.getElementById('qtyInput').value) || 0;
+    const price = parseFloat(document.getElementById('priceInput').value) || 0;
+    document.getElementById('totalDisplay').textContent = '$' + (qty * price).toFixed(2);
+  }
+
+  // ── Record purchase ──
+  async function recordPurchase() {
+    if (!selectedStudentId) { searchInput.focus(); searchInput.style.borderColor='var(--red)'; setTimeout(()=>searchInput.style.borderColor='',1500); showFlash('Please select a student.',true); return; }
+    const itemId = parseInt(document.getElementById('itemSelect').value);
+    if (!itemId) { showFlash('Please select an item.',true); return; }
+    const qty = parseInt(document.getElementById('qtyInput').value) || 0;
+    if (qty < 1) { showFlash('Quantity must be at least 1.',true); return; }
+    const price = parseFloat(document.getElementById('priceInput').value);
+    if (isNaN(price) || price < 0) { showFlash('Please enter a valid price.',true); return; }
+    const purchaseDate = document.getElementById('purchaseDate').value;
+    if (!purchaseDate) { showFlash('Please select a date.',true); return; }
+
+    const color = document.getElementById('colorSelect').value || null;
+    const size = document.getElementById('sizeSelect').value || null;
+
+    const btn = document.getElementById('recordBtn');
+    btn.disabled = true; btn.textContent = 'Saving...';
+    const nameForFlash = selectedStudentName;
+    const item = storeItems.find(i => i.item_id === itemId);
+
+    try {
+      const res = await fetch(`${API}/api/store/purchases`, {
+        method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ student_id: selectedStudentId, item_id: itemId, quantity: qty, unit_price: price, purchase_date: purchaseDate, color, size })
+      });
+      const result = await res.json();
+      if (!res.ok) throw new Error(result.error || 'Failed');
+
+      // Reset form but keep student selected
+      document.getElementById('itemSelect').value = '';
+      document.getElementById('qtyInput').value = '1';
+      document.getElementById('priceInput').value = '';
+      document.getElementById('colorWrap').classList.add('hidden');
+      document.getElementById('sizeWrap').classList.add('hidden');
+      calcTotal();
+
+      showFlash(`${item ? item.name : 'Item'} recorded for ${nameForFlash}!`, false);
+      loadPurchases();
+    } catch(e) {
+      showFlash(e.message || 'Error saving purchase.', true);
+    }
+    btn.disabled = false; btn.textContent = 'Record Purchase';
+  }
+
+  // ── Month filter ──
+  function populateMonthFilter() {
+    const sel = document.getElementById('monthFilter');
+    const now = new Date();
+    sel.innerHTML = '';
+    for (let i = 0; i < 12; i++) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const val = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0');
+      const label = d.toLocaleDateString('en-US', {month:'long', year:'numeric'});
+      sel.innerHTML += `<option value="${val}"${i===0?' selected':''}>${label}</option>`;
+    }
+  }
+
+  // ── Load & render purchases ──
+  async function loadPurchases() {
+    const month = document.getElementById('monthFilter').value;
+    try {
+      const r = await fetch(`${API}/api/store/purchases?month=${month}`);
+      purchases = await r.json();
+      renderPurchases();
+    } catch(e) { showError('Could not load purchases.'); }
+  }
+
+  function renderPurchases() {
+    const wrap = document.getElementById('purchaseTableWrap');
+    const totalEl = document.getElementById('monthTotal');
+    if (!purchases.length) {
+      wrap.innerHTML = '<div class="empty-state"><span>🛍</span>No purchases this month.</div>';
+      totalEl.textContent = '';
+      return;
+    }
+    const firstOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+    let total = 0;
+    let html = `<table><thead><tr><th>Date</th><th>Student</th><th>Item</th><th>Color</th><th>Size</th><th class="r">Qty</th><th class="r">Unit Price</th><th class="r">Total</th><th>Recorded By</th><th></th></tr></thead><tbody>`;
+    purchases.forEach(p => {
+      const d = new Date(p.purchase_date + 'T12:00:00');
+      const dateStr = d.toLocaleDateString('en-US', {month:'short', day:'numeric'});
+      const lineTotal = (p.quantity || 1) * (p.unit_price || 0);
+      total += lineTotal;
+      const isLocked = d < firstOfMonth && !canManageBilling;
+      const delBtn = isLocked
+        ? '<span style="color:var(--muted);font-size:12px;font-style:italic">Closed</span>'
+        : `<button class="btn-danger" onclick="deletePurchase(${p.purchase_id})">Remove</button>`;
+      html += `<tr>
+        <td style="color:var(--muted)">${dateStr}</td>
+        <td style="font-weight:600">${esc(p.first_name+' '+p.last_name)}</td>
+        <td>${esc(p.item_name||'')}</td>
+        <td>${esc(p.color||'—')}</td>
+        <td>${esc(p.size||'—')}</td>
+        <td class="r">${p.quantity}</td>
+        <td class="r">$${Number(p.unit_price).toFixed(2)}</td>
+        <td class="r" style="font-weight:600">$${lineTotal.toFixed(2)}</td>
+        <td style="color:var(--muted);font-size:12px">${esc(p.recorded_by||'—')}</td>
+        <td>${delBtn}</td>
+      </tr>`;
+    });
+    html += '</tbody></table>';
+    wrap.innerHTML = html;
+    totalEl.textContent = `Month Total: $${total.toFixed(2)}`;
+  }
+
+  async function deletePurchase(id) {
+    try {
+      const res = await fetch(`${API}/api/store/purchases/${id}`, {method:'DELETE'});
+      const result = await res.json();
+      if (!res.ok) throw new Error(result.error || 'Failed');
+      showFlash('Purchase removed.', false);
+      loadPurchases();
+    } catch(e) { showFlash(e.message || 'Error removing purchase.', true); }
+  }
+
+  // ── Tabs ──
+  function switchTab(tab) {
+    document.querySelectorAll('.tab-btn').forEach((b,i) => b.classList.toggle('active', (tab==='record'?i===0:i===1)));
+    document.getElementById('tab-record').classList.toggle('active', tab==='record');
+    document.getElementById('tab-manage').classList.toggle('active', tab==='manage');
+    if (tab === 'manage') renderItemsTable();
+  }
+
+  // ── Manage Items ──
+  function renderItemsTable() {
+    const wrap = document.getElementById('itemsTableWrap');
+    if (!storeItems.length) { wrap.innerHTML = '<div class="empty-state"><span>📦</span>No items yet.</div>'; return; }
+    const sorted = [...storeItems].sort((a,b) => {
+      if (a.is_active !== b.is_active) return a.is_active ? -1 : 1;
+      return a.sort_order - b.sort_order;
+    });
+    let html = `<table><thead><tr><th>Name</th><th class="r">Price</th><th>Colors</th><th>Sizes</th><th>Status</th><th></th></tr></thead><tbody>`;
+    sorted.forEach(item => {
+      const cls = item.is_active ? '' : ' class="item-row-inactive"';
+      const badge = item.is_active ? '<span class="status-badge status-active">Active</span>' : '<span class="status-badge status-inactive">Inactive</span>';
+      html += `<tr${cls}>
+        <td style="font-weight:600">${esc(item.name)}</td>
+        <td class="r">$${Number(item.default_price).toFixed(2)}</td>
+        <td style="font-size:13px;color:var(--muted)">${esc(item.available_colors||'—')}</td>
+        <td style="font-size:13px;color:var(--muted)">${esc(item.available_sizes||'—')}</td>
+        <td>${badge}</td>
+        <td><button class="btn-secondary btn-sm" onclick="openItemModal(${item.item_id})">Edit</button></td>
+      </tr>`;
+    });
+    html += '</tbody></table>';
+    wrap.innerHTML = html;
+  }
+
+  function openItemModal(itemId) {
+    editingItemId = itemId;
+    const modal = document.getElementById('itemModal');
+    const title = document.getElementById('modalTitle');
+    if (itemId) {
+      const item = storeItems.find(i => i.item_id === itemId);
+      if (!item) return;
+      title.textContent = 'Edit Item';
+      document.getElementById('modalName').value = item.name;
+      document.getElementById('modalPrice').value = Number(item.default_price).toFixed(2);
+      document.getElementById('modalColors').value = item.available_colors || '';
+      document.getElementById('modalSizes').value = item.available_sizes || '';
+      document.getElementById('modalActiveToggle').classList.toggle('on', item.is_active);
+    } else {
+      title.textContent = 'Add Item';
+      document.getElementById('modalName').value = '';
+      document.getElementById('modalPrice').value = '';
+      document.getElementById('modalColors').value = '';
+      document.getElementById('modalSizes').value = '';
+      document.getElementById('modalActiveToggle').classList.add('on');
+    }
+    modal.classList.add('open');
+  }
+
+  function closeItemModal() { document.getElementById('itemModal').classList.remove('open'); editingItemId = null; }
+
+  async function saveItem() {
+    const name = document.getElementById('modalName').value.trim();
+    const price = parseFloat(document.getElementById('modalPrice').value);
+    if (!name) { showFlash('Name is required.', true); return; }
+    if (isNaN(price) || price < 0) { showFlash('Valid price is required.', true); return; }
+    const colors = document.getElementById('modalColors').value.trim() || null;
+    const sizes = document.getElementById('modalSizes').value.trim() || null;
+    const isActive = document.getElementById('modalActiveToggle').classList.contains('on');
+
+    const body = { name, default_price: price, available_colors: colors, available_sizes: sizes, is_active: isActive };
+
+    try {
+      let res;
+      if (editingItemId) {
+        res = await fetch(`${API}/api/store/items/${editingItemId}`, { method: 'PUT', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body) });
+      } else {
+        res = await fetch(`${API}/api/store/items`, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body) });
+      }
+      if (!res.ok) { const err = await res.json(); throw new Error(err.error || 'Failed'); }
+      closeItemModal();
+      await loadItems();
+      populateItemSelect();
+      renderItemsTable();
+      showFlash(editingItemId ? 'Item updated.' : 'Item added.', false);
+    } catch(e) { showFlash(e.message || 'Error saving item.', true); }
+  }
+
+  // ── Helpers ──
+  function showFlash(msg, isError) {
+    const f = document.getElementById('flash');
+    f.textContent = msg; f.classList.toggle('error', isError); f.classList.add('show');
+    setTimeout(() => f.classList.remove('show'), isError ? 5000 : 2200);
+  }
+  function showError(msg) { const b = document.getElementById('errorBanner'); b.textContent = msg; b.style.display = 'block'; }
+  function esc(str) { return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+  // Close modal on overlay click
+  document.getElementById('itemModal').addEventListener('click', e => { if (e.target === e.currentTarget) closeItemModal(); });
+
+  init();
+</script>
+</body>
+</html>

@@ -322,6 +322,7 @@
               <th class="r">OG Tutoring</th>
               <th class="r">Homework Ctr</th>
               <th class="r">1-on-1 Tutoring</th>
+              <th class="r">School Store</th>
               <th class="r" style="background:#f0ede8;">Total</th>
             </tr>
           </thead>
@@ -595,6 +596,7 @@
   .chip-tutoring { background: #f3e8ff; color: #6b21a8; }
   .chip-beforecare { background: #ffedd5; color: #9a3412; }
   .chip-aftercare  { background: #fce7f3; color: #9d174d; }
+  .chip-store      { background: #e0e7ff; color: #3730a3; }
 
   .recorded-by { font-size: 11px; color: var(--muted); }
 
@@ -784,31 +786,31 @@
     const byGrade={};
     students.forEach(s=>{ if(!byGrade[s.grade]) byGrade[s.grade]=[]; byGrade[s.grade].push(s); });
     const sortedGrades=Object.keys(byGrade).sort((a,b)=>(parseInt(a)||0)-(parseInt(b)||0));
-    let gm=0,gbc=0,gac=0,gog=0,ghw=0,goo=0;
+    let gm=0,gbc=0,gac=0,gog=0,ghw=0,goo=0,gss=0;
 
     sortedGrades.forEach(grade => {
       const hr=document.createElement('tr'); hr.className='grade-hdr';
-      hr.innerHTML=`<td colspan="9">Grade ${grade}</td>`; tbody.appendChild(hr);
+      hr.innerHTML=`<td colspan="10">Grade ${grade}</td>`; tbody.appendChild(hr);
       byGrade[grade].forEach(s => {
         gm+=s.mcard||0; gbc+=s.beforecare||0; gac+=s.aftercare||0;
-        gog+=s.og_tutoring||0; ghw+=s.homework_center||0; goo+=s.one_on_one||0;
-        const t=(s.mcard||0)+(s.beforecare||0)+(s.aftercare||0)+(s.og_tutoring||0)+(s.homework_center||0)+(s.one_on_one||0);
+        gog+=s.og_tutoring||0; ghw+=s.homework_center||0; goo+=s.one_on_one||0; gss+=s.school_store||0;
+        const t=(s.mcard||0)+(s.beforecare||0)+(s.aftercare||0)+(s.og_tutoring||0)+(s.homework_center||0)+(s.one_on_one||0)+(s.school_store||0);
         const tr=document.createElement('tr');
-        tr.innerHTML=`<td class="student-name">${esc(s.name)}</td><td>${esc(s.grade)}</td><td class="r">${money(s.mcard)}</td><td class="r">${money(s.beforecare)}</td><td class="r">${money(s.aftercare)}</td><td class="r">${money(s.og_tutoring)}</td><td class="r">${money(s.homework_center)}</td><td class="r">${money(s.one_on_one)}</td><td class="r" style="font-weight:600;">${t>0?'$'+t.toFixed(2):'<span class="zero">—</span>'}</td>`;
+        tr.innerHTML=`<td class="student-name">${esc(s.name)}</td><td>${esc(s.grade)}</td><td class="r">${money(s.mcard)}</td><td class="r">${money(s.beforecare)}</td><td class="r">${money(s.aftercare)}</td><td class="r">${money(s.og_tutoring)}</td><td class="r">${money(s.homework_center)}</td><td class="r">${money(s.one_on_one)}</td><td class="r">${money(s.school_store)}</td><td class="r" style="font-weight:600;">${t>0?'$'+t.toFixed(2):'<span class="zero">—</span>'}</td>`;
         tbody.appendChild(tr);
       });
     });
 
-    const gt=gm+gbc+gac+gog+ghw+goo;
+    const gt=gm+gbc+gac+gog+ghw+goo+gss;
     const tr=document.createElement('tr'); tr.className='total-row';
-    tr.innerHTML=`<td colspan="2">${students.length} student${students.length!==1?'s':''} — Total</td><td class="r">$${gm.toFixed(2)}</td><td class="r">$${gbc.toFixed(2)}</td><td class="r">$${gac.toFixed(2)}</td><td class="r">$${gog.toFixed(2)}</td><td class="r">$${ghw.toFixed(2)}</td><td class="r">$${goo.toFixed(2)}</td><td class="r">$${gt.toFixed(2)}</td>`;
+    tr.innerHTML=`<td colspan="2">${students.length} student${students.length!==1?'s':''} — Total</td><td class="r">$${gm.toFixed(2)}</td><td class="r">$${gbc.toFixed(2)}</td><td class="r">$${gac.toFixed(2)}</td><td class="r">$${gog.toFixed(2)}</td><td class="r">$${ghw.toFixed(2)}</td><td class="r">$${goo.toFixed(2)}</td><td class="r">$${gss.toFixed(2)}</td><td class="r">$${gt.toFixed(2)}</td>`;
     tbody.appendChild(tr);
   }
 
   function renderSummary(students) {
-    let mc=0,bc=0,ac=0,pg=0,mq=0,ps=0,cd=0;
-    students.forEach(s=>{ mc+=s.mcard||0; bc+=s.beforecare||0; ac+=s.aftercare||0; pg+=(s.og_tutoring||0)+(s.homework_center||0)+(s.one_on_one||0); mq+=s.mcard_qty||0; ps+=s.program_sessions||0; cd+=s.care_days||0; });
-    document.getElementById('sTotalBilling').textContent  = '$'+(mc+bc+ac+pg).toFixed(2);
+    let mc=0,bc=0,ac=0,pg=0,mq=0,ps=0,cd=0,ss=0;
+    students.forEach(s=>{ mc+=s.mcard||0; bc+=s.beforecare||0; ac+=s.aftercare||0; pg+=(s.og_tutoring||0)+(s.homework_center||0)+(s.one_on_one||0); ss+=s.school_store||0; mq+=s.mcard_qty||0; ps+=s.program_sessions||0; cd+=s.care_days||0; });
+    document.getElementById('sTotalBilling').textContent  = '$'+(mc+bc+ac+pg+ss).toFixed(2);
     document.getElementById('sTotalStudents').textContent = `${students.length} student${students.length!==1?'s':''}`;
     document.getElementById('sMcard').textContent         = '$'+mc.toFixed(2);
     document.getElementById('sMcardSub').textContent      = `${mq} snack${mq!==1?'s':''}`;
@@ -822,10 +824,10 @@
     const months=['January','February','March','April','May','June','July','August','September','October','November','December'];
     const label=`${months[curMonth-1]}_${curYear}`;
     const filtered=activeGrade==='all'?reportData:reportData.filter(s=>s.grade===activeGrade);
-    const rows=[['Student','Grade','M Card','Before Care','Aftercare','OG Tutoring','Homework Center','1-on-1 Tutoring','Total']];
+    const rows=[['Student','Grade','M Card','Before Care','Aftercare','OG Tutoring','Homework Center','1-on-1 Tutoring','School Store','Total']];
     filtered.forEach(s=>{
-      const t=(s.mcard||0)+(s.beforecare||0)+(s.aftercare||0)+(s.og_tutoring||0)+(s.homework_center||0)+(s.one_on_one||0);
-      rows.push([s.name,s.grade,(s.mcard||0).toFixed(2),(s.beforecare||0).toFixed(2),(s.aftercare||0).toFixed(2),(s.og_tutoring||0).toFixed(2),(s.homework_center||0).toFixed(2),(s.one_on_one||0).toFixed(2),t.toFixed(2)]);
+      const t=(s.mcard||0)+(s.beforecare||0)+(s.aftercare||0)+(s.og_tutoring||0)+(s.homework_center||0)+(s.one_on_one||0)+(s.school_store||0);
+      rows.push([s.name,s.grade,(s.mcard||0).toFixed(2),(s.beforecare||0).toFixed(2),(s.aftercare||0).toFixed(2),(s.og_tutoring||0).toFixed(2),(s.homework_center||0).toFixed(2),(s.one_on_one||0).toFixed(2),(s.school_store||0).toFixed(2),t.toFixed(2)]);
     });
     const csv=rows.map(r=>r.map(c=>`"${c}"`).join(',')).join('\n');
     const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
