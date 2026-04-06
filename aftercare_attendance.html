@@ -354,6 +354,7 @@
           <th>Grade</th>
           <th id="col3Header">Attended</th>
           <th id="col4Header" style="display:none;">Check-Out</th>
+          <th id="col5Header" style="display:none;">Notes</th>
           <th></th>
         </tr>
       </thead>
@@ -385,6 +386,7 @@
   let selectedCheckinTime = '3:30 PM';
   let records = [];
   let aftercareRoster = [];
+  let dismissalNotes = {};
 
   // Modal state
   let checkoutRecordId = null;
@@ -451,6 +453,7 @@
       ? 'Record Before Care Attendance' : 'Check In to Aftercare';
     document.getElementById('col3Header').textContent = isBefore ? 'Attended' : 'Check-In';
     document.getElementById('col4Header').style.display = isBefore ? 'none' : '';
+    document.getElementById('col5Header').style.display = isBefore ? 'none' : '';
     document.getElementById('rosterSection').style.display = isBefore ? 'none' : '';
     document.getElementById('statCheckedInCard').style.display = isBefore ? 'none' : '';
     document.getElementById('statCheckedOutCard').style.display = isBefore ? 'none' : '';
@@ -615,11 +618,13 @@
             checkoutCell = `<span class="badge-waiting">Waiting</span>
               <button class="btn-checkout" onclick="openCheckoutModal(${rid}, '${esc(name)}', '${esc(r.checkin_time || '3:30 PM')}')">Check Out</button>`;
           }
+          const note = dismissalNotes[r.student_id] || '';
           return `<tr>
             <td><strong>${name}</strong></td>
             <td>${grade}</td>
             <td>${checkinBadge}</td>
             <td>${checkoutCell}</td>
+            <td style="font-size:13px;color:var(--muted);font-style:italic;max-width:200px">${esc(note)}</td>
             <td><button class="btn-remove" onclick="removeRecord('/api/aftercare/${rid}')">Remove</button></td>
           </tr>`;
         }
@@ -694,6 +699,10 @@
     try {
       const res = await fetch(`/api/dismissal/plan/${date}`);
       const plan = await res.json();
+      // Build notes lookup from all dismissal plan entries
+      dismissalNotes = {};
+      plan.forEach(p => { if (p.notes) dismissalNotes[p.student_id] = p.notes; });
+
       const aftercareIds = plan
         .filter(p => p.destination && p.destination.toLowerCase() === 'aftercare')
         .map(p => p.student_id);
