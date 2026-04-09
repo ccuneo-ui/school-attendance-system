@@ -1909,6 +1909,59 @@ def delete_program_attendance(record_id):
     finally:
         conn.close()
 
+@app.route("/api/program-attendance/my-monthly-overview")
+@login_required
+def get_my_program_monthly_overview():
+    """Get the logged-in teacher's sessions for a given month and program type"""
+    program_type = request.args.get("program_type")
+    month = request.args.get("month")  # format: YYYY-MM
+    if not program_type or not month:
+        return jsonify({"error": "program_type and month required"}), 400
+
+    user_name = session.get("user_name", "")
+    start_date = f"{month}-01"
+
+    import calendar as cal_mod
+    year, mon = int(month.split("-")[0]), int(month.split("-")[1])
+    last_day = cal_mod.monthrange(year, mon)[1]
+    end_date = f"{month}-{last_day:02d}"
+
+    conn = get_db_connection()
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute("""
+                SELECT pa.session_date, pa.student_id, pa.units,
+                       s.first_name, s.last_name, s.grade
+                FROM program_attendance pa
+                JOIN students s ON pa.student_id = s.student_id
+                WHERE pa.program_type = %s
+                  AND pa.session_date BETWEEN %s AND %s
+                  AND (pa.teacher = %s OR pa.recorded_by = %s)
+                ORDER BY pa.session_date, s.last_name, s.first_name
+            """, (program_type, start_date, end_date, user_name, user_name))
+            rows = fa(cur)
+
+        from collections import defaultdict
+        by_date = defaultdict(list)
+        for r in rows:
+            by_date[r["session_date"]].append({
+                "name": f"{r['first_name']} {r['last_name']}",
+                "grade": r["grade"],
+                "units": float(r["units"])
+            })
+
+        result = []
+        for d, students in sorted(by_date.items()):
+            result.append({
+                "date": d,
+                "count": len(students),
+                "students": students
+            })
+
+        return jsonify({"month": month, "program_type": program_type, "user_name": user_name, "days": result})
+    finally:
+        conn.close()
+
 @app.route("/api/program-attendance/summary")
 @login_required
 def get_program_attendance_summary():

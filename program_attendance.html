@@ -207,6 +207,77 @@
     }
     .toast.show { transform: translateY(0); opacity: 1; }
 
+    /* ── My Monthly Overview Modal ── */
+    .mmo-overlay {
+      display: none; position: fixed; inset: 0; background: rgba(10,20,40,0.55);
+      z-index: 2000; align-items: flex-start; justify-content: center; padding: 40px 16px; overflow-y: auto;
+    }
+    .mmo-overlay.open { display: flex; }
+    .mmo-modal {
+      background: #faf6ef; border-radius: 14px; max-width: 700px; width: 100%;
+      box-shadow: 0 12px 40px rgba(0,0,0,0.25); padding: 24px 26px; color: var(--navy);
+    }
+    .mmo-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+    .mmo-title { font-family: 'Playfair Display', serif; font-size: 22px; margin: 0; color: var(--navy); }
+    .mmo-program { font-size: 13px; font-weight: 600; margin-top: 2px; }
+    .mmo-close {
+      background: none; border: none; font-size: 28px; line-height: 1;
+      cursor: pointer; color: var(--navy); padding: 0 4px;
+    }
+    .mmo-user { font-size: 13px; color: var(--muted, #6b7280); margin-top: 6px; }
+    .mmo-monthnav {
+      display: flex; align-items: center; justify-content: center; gap: 16px;
+      margin: 18px 0 10px; font-weight: 600; font-size: 15px;
+    }
+    .mmo-monthnav button {
+      background: var(--white); border: 1px solid var(--border, #e5e0d5);
+      border-radius: 6px; padding: 4px 12px; cursor: pointer; color: var(--navy);
+    }
+    .mmo-monthnav button:disabled { opacity: 0.3; cursor: not-allowed; }
+    .mmo-weekdays {
+      display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px;
+      font-size: 11px; font-weight: 600; text-transform: uppercase;
+      color: var(--muted, #6b7280); text-align: center; margin-bottom: 4px;
+    }
+    .mmo-grid {
+      display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px;
+    }
+    .mmo-day {
+      aspect-ratio: 1 / 1; border: 1px solid #e5e0d5; border-radius: 6px;
+      padding: 4px 6px; font-size: 13px; background: var(--white);
+      position: relative; display: flex; flex-direction: column;
+      align-items: flex-start; justify-content: flex-start;
+    }
+    .mmo-day.empty { border: none; background: transparent; }
+    .mmo-day.weekend { background: #f3f1ec; color: #9b9689; }
+    .mmo-day.has-sessions { background: #e8f5e9; cursor: pointer; }
+    .mmo-day.gap { background: #fff3e0; }
+    .mmo-day.today { border: 2px solid #8B1A1A; }
+    .mmo-day.future { color: #c5c0b3; }
+    .mmo-day.selected { outline: 2px solid #fbdb04; }
+    .mmo-count {
+      position: absolute; bottom: 4px; right: 4px;
+      background: #2d5016; color: #fff; border-radius: 10px;
+      min-width: 18px; height: 18px; padding: 0 5px;
+      font-size: 11px; font-weight: 600;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .mmo-detail {
+      margin-top: 18px; padding: 14px 16px; background: var(--white);
+      border: 1px solid #e5e0d5; border-radius: 8px; font-size: 13px;
+      display: none;
+    }
+    .mmo-detail.open { display: block; }
+    .mmo-detail h4 { margin: 0 0 8px; font-size: 14px; color: var(--navy); }
+    .mmo-detail ul { margin: 0; padding-left: 18px; }
+    .mmo-detail li { margin: 2px 0; }
+    .mmo-detail .grade { color: var(--muted, #6b7280); font-size: 12px; }
+    @media (max-width: 640px) {
+      .mmo-modal { padding: 18px 16px; }
+      .mmo-day { font-size: 11px; padding: 2px 4px; }
+      .mmo-title { font-size: 18px; }
+    }
+
     @media (max-width: 640px) {
       .container { padding: 20px 16px 60px; }
       .add-row { flex-direction: column; }
@@ -248,7 +319,32 @@
     <input type="date" id="sessionDate" onchange="loadRecords()">
     <button onclick="changeDate(1)">▶</button>
     <button onclick="setToday()">Today</button>
+    <button onclick="openMonthlyOverview()">My Month</button>
     <span class="date-label" id="dayLabel"></span>
+  </div>
+
+  <!-- My Monthly Overview Modal -->
+  <div class="mmo-overlay" id="mmoOverlay" onclick="handleMmoOverlayClick(event)">
+    <div class="mmo-modal" onclick="event.stopPropagation()">
+      <div class="mmo-header">
+        <div>
+          <h2 class="mmo-title">My Monthly Overview</h2>
+          <div class="mmo-program" id="mmoProgram"></div>
+        </div>
+        <button class="mmo-close" onclick="closeMonthlyOverview()">×</button>
+      </div>
+      <div class="mmo-user" id="mmoUser"></div>
+      <div class="mmo-monthnav">
+        <button onclick="mmoChangeMonth(-1)">◀</button>
+        <span id="mmoMonthLabel"></span>
+        <button id="mmoNextBtn" onclick="mmoChangeMonth(1)">▶</button>
+      </div>
+      <div class="mmo-weekdays">
+        <div>Sun</div><div>Mon</div><div>Tue</div><div>Wed</div><div>Thu</div><div>Fri</div><div>Sat</div>
+      </div>
+      <div class="mmo-grid" id="mmoGrid"></div>
+      <div class="mmo-detail" id="mmoDetail"></div>
+    </div>
   </div>
 
   <!-- Stats -->
@@ -630,6 +726,143 @@
     t.textContent = msg;
     t.classList.add('show');
     setTimeout(() => t.classList.remove('show'), 2500);
+  }
+
+  // ── My Monthly Overview ──
+  let mmoCurrentMonth = null; // Date set to day 1
+  let mmoData = null;
+  let mmoUserName = '';
+  let mmoSelectedDate = null;
+
+  async function openMonthlyOverview() {
+    const today = new Date();
+    mmoCurrentMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+    mmoSelectedDate = null;
+    document.getElementById('mmoOverlay').classList.add('open');
+    document.addEventListener('keydown', mmoEscHandler);
+    const prog = PROGRAMS[currentTab];
+    const progEl = document.getElementById('mmoProgram');
+    progEl.textContent = prog.label;
+    progEl.style.color = prog.color;
+    try {
+      const s = await fetch('/api/session').then(r => r.json());
+      mmoUserName = s.name || '';
+      document.getElementById('mmoUser').textContent = mmoUserName;
+    } catch (e) { mmoUserName = ''; }
+    await mmoLoadMonth();
+  }
+
+  function closeMonthlyOverview() {
+    document.getElementById('mmoOverlay').classList.remove('open');
+    document.removeEventListener('keydown', mmoEscHandler);
+    document.getElementById('mmoDetail').classList.remove('open');
+  }
+
+  function handleMmoOverlayClick(e) {
+    if (e.target.id === 'mmoOverlay') closeMonthlyOverview();
+  }
+
+  function mmoEscHandler(e) {
+    if (e.key === 'Escape') closeMonthlyOverview();
+  }
+
+  function mmoChangeMonth(delta) {
+    const next = new Date(mmoCurrentMonth.getFullYear(), mmoCurrentMonth.getMonth() + delta, 1);
+    const today = new Date();
+    const curMonthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+    if (next > curMonthStart) return;
+    mmoCurrentMonth = next;
+    mmoSelectedDate = null;
+    document.getElementById('mmoDetail').classList.remove('open');
+    mmoLoadMonth();
+  }
+
+  async function mmoLoadMonth() {
+    const y = mmoCurrentMonth.getFullYear();
+    const m = mmoCurrentMonth.getMonth() + 1;
+    const monthStr = `${y}-${String(m).padStart(2, '0')}`;
+    document.getElementById('mmoMonthLabel').textContent =
+      mmoCurrentMonth.toLocaleString('en-US', { month: 'long', year: 'numeric' });
+    const today = new Date();
+    const curMonthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+    document.getElementById('mmoNextBtn').disabled =
+      mmoCurrentMonth.getTime() >= curMonthStart.getTime();
+    const prog = PROGRAMS[currentTab];
+    try {
+      const res = await fetch(`/api/program-attendance/my-monthly-overview?program_type=${prog.type}&month=${monthStr}`);
+      mmoData = await res.json();
+    } catch (e) {
+      mmoData = { days: [] };
+    }
+    mmoRenderGrid();
+  }
+
+  function mmoRenderGrid() {
+    const grid = document.getElementById('mmoGrid');
+    grid.innerHTML = '';
+    const y = mmoCurrentMonth.getFullYear();
+    const m = mmoCurrentMonth.getMonth();
+    const firstDow = new Date(y, m, 1).getDay();
+    const daysInMonth = new Date(y, m + 1, 0).getDate();
+    const today = new Date();
+    const todayStr = formatDate(today);
+
+    const byDate = {};
+    (mmoData.days || []).forEach(d => { byDate[d.date] = d; });
+
+    for (let i = 0; i < firstDow; i++) {
+      const cell = document.createElement('div');
+      cell.className = 'mmo-day empty';
+      grid.appendChild(cell);
+    }
+    for (let day = 1; day <= daysInMonth; day++) {
+      const dateObj = new Date(y, m, day);
+      const dateStr = formatDate(dateObj);
+      const dow = dateObj.getDay();
+      const isWeekend = dow === 0 || dow === 6;
+      const isFuture = dateObj > today && dateStr !== todayStr;
+      const isToday = dateStr === todayStr;
+      const info = byDate[dateStr];
+
+      const cell = document.createElement('div');
+      cell.className = 'mmo-day';
+      if (isWeekend) cell.classList.add('weekend');
+      if (isFuture) cell.classList.add('future');
+      if (isToday) cell.classList.add('today');
+      if (info) cell.classList.add('has-sessions');
+      else if (!isWeekend && !isFuture) cell.classList.add('gap');
+      if (mmoSelectedDate === dateStr) cell.classList.add('selected');
+
+      cell.innerHTML = `<span>${day}</span>`;
+      if (info) {
+        const badge = document.createElement('div');
+        badge.className = 'mmo-count';
+        badge.textContent = info.count;
+        cell.appendChild(badge);
+        cell.onclick = () => mmoSelectDay(dateStr);
+      }
+      grid.appendChild(cell);
+    }
+  }
+
+  function mmoSelectDay(dateStr) {
+    mmoSelectedDate = dateStr;
+    mmoRenderGrid();
+    const info = (mmoData.days || []).find(d => d.date === dateStr);
+    const detail = document.getElementById('mmoDetail');
+    const [yy, mm, dd] = dateStr.split('-').map(Number);
+    const dObj = new Date(yy, mm - 1, dd);
+    const heading = dObj.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+    let body;
+    if (info && info.students.length) {
+      body = '<ul>' + info.students.map(s =>
+        `<li>${s.name} <span class="grade">— ${s.grade || ''}</span></li>`
+      ).join('') + '</ul>';
+    } else {
+      body = '<div>No sessions recorded</div>';
+    }
+    detail.innerHTML = `<h4>${heading}</h4>${body}`;
+    detail.classList.add('open');
   }
 </script>
 </body>
