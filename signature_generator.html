@@ -153,11 +153,12 @@
       display: flex;
       align-items: center;
       gap: 0;
+      width: fit-content;
     }
     /* Left: personal info */
     .sig-personal {
-      flex: 1;
-      padding-right: 20px;
+      flex: 0 0 auto;
+      padding-right: 16px;
       border-right: 1px solid #e0e0e0;
     }
     .sig-name {
@@ -184,10 +185,10 @@
       display: flex;
       align-items: center;
       gap: 12px;
-      padding: 0 20px;
-      flex-shrink: 0;
+      padding: 0 16px 0 8px;
+      flex: 1;
     }
-    .sig-logo-cell img { width: 52px; height: 52px; display: block; border-radius: 50%; }
+    .sig-logo-cell img { width: 76px; height: 76px; display: block; border-radius: 50%; }
     .sig-info { }
     .sig-school-name {
       font-size: 12px;
@@ -390,7 +391,7 @@
             </div>
             <div class="sig-school">
               <div class="sig-logo-cell">
-                <img src="/logo.svg" width="52" height="52" alt="Mizzentop Day School" style="border-radius:50%;" />
+                <img src="/logo.svg" width="76" height="76" alt="Mizzentop Day School" style="border-radius:50%;" />
               </div>
               <div class="sig-info">
                 <p class="sig-school-name">Mizzentop Day School</p>
@@ -434,17 +435,17 @@
         ? `<p style="margin:0; font-size:12px; color:#555555;">${esc(phone)}</p>`
         : '';
 
-      const sigHTML = `<table cellpadding="0" cellspacing="0" border="0" style="font-family:Arial,Helvetica,sans-serif; min-width:400px; border-top:3px solid #1a2a4a; background:#ffffff;">
+      const sigHTML = `<table cellpadding="0" cellspacing="0" border="0" style="font-family:Arial,Helvetica,sans-serif; border-top:3px solid #1a2a4a; background:#ffffff;">
 <tr>
-<td valign="middle" style="padding:16px 16px 16px 18px; border-right:1px solid #e0e0e0;">
+<td width="1" valign="middle" style="padding:16px 16px 16px 18px; border-right:1px solid #e0e0e0; white-space:nowrap;">
 <p style="margin:0 0 2px 0; font-size:16px; font-weight:bold; color:#1a2a4a; font-family:Georgia,serif;">${esc(name)}</p>
 <p style="margin:0 0 10px 0; font-size:11px; color:#8B1A1A; text-transform:uppercase; letter-spacing:0.07em;">${esc(title)}</p>
 ${phoneRow}
 </td>
-<td valign="middle" style="padding:16px 16px; border-right:1px solid #e0e0e0; white-space:nowrap;">
+<td valign="middle" style="padding:16px 16px 16px 12px; border-right:1px solid #e0e0e0; white-space:nowrap;">
 <table cellpadding="0" cellspacing="0" border="0"><tr>
 <td valign="middle" style="padding-right:10px;">
-<img src="https://admin.mizzentopdayschool.org/logo.svg" width="52" height="52" alt="Mizzentop Day School" style="display:block; border-radius:50%;" /></td>
+<img src="https://admin.mizzentopdayschool.org/logo.svg" width="76" height="76" alt="Mizzentop Day School" style="display:block; border-radius:50%;" /></td>
 <td valign="middle">
 <p style="margin:0 0 2px 0; font-size:12px; font-weight:bold; color:#1a2a4a; font-family:Georgia,serif;">Mizzentop Day School</p>
 <p style="margin:0 0 1px 0; font-size:10.5px; color:#666666;">64 E Main Street, Pawling, NY 12564</p>
@@ -452,7 +453,7 @@ ${phoneRow}
 <p style="margin:0; font-size:10.5px;"><a href="https://www.mizzentopdayschool.org" style="color:#1a2a4a; text-decoration:none;">www.mizzentopdayschool.org</a></p>
 </td></tr></table>
 </td>
-<td valign="middle" style="padding:16px 14px;">
+<td width="1" valign="middle" style="padding:16px 14px; border-left:1px solid #e0e0e0; white-space:nowrap;">
 <table cellpadding="0" cellspacing="0" border="0">
 <tr><td style="padding-bottom:8px;">
 <a href="https://www.facebook.com/MizzentopDaySchool" style="text-decoration:none;">
