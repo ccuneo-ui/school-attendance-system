@@ -353,12 +353,8 @@ def init_db():
                     "INSERT INTO calendar_categories (key, label, color, sort_order) VALUES (%s,%s,%s,%s) ON CONFLICT (key) DO NOTHING",
                     (key, label, color, sort_order)
                 )
-            # Retire legacy single 'lunch_day' category if it exists and has no tags yet
-            cur.execute("""
-                DELETE FROM calendar_categories
-                WHERE key = 'lunch_day'
-                  AND NOT EXISTS (SELECT 1 FROM calendar_day_tags WHERE category_key = 'lunch_day')
-            """)
+            # Retire legacy single 'lunch_day' category — cascades to any tags that were applied to it.
+            cur.execute("DELETE FROM calendar_categories WHERE key = 'lunch_day'")
             # ── Households, Parents, and linking tables ──
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS households (
