@@ -1,0 +1,790 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>School Calendar — Mizzentop Admin</title>
+  <link rel="icon" type="image/svg+xml" href="/logo.svg">
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --navy:     #1a2744;
+      --burgundy: #4a1a2c;
+      --gold:     #c8992a;
+      --cream:    #f7f3ec;
+      --white:    #ffffff;
+      --muted:    #6b7280;
+      --border:   #e2ddd6;
+      --mist:     #f0ede8;
+    }
+    html, body {
+      min-height: 100%;
+      font-family: 'DM Sans', sans-serif;
+      background-color: var(--cream);
+      color: var(--navy);
+    }
+
+    .topbar {
+      background: var(--navy);
+      padding: 14px 28px;
+      display: flex; align-items: center; justify-content: space-between; gap: 16px;
+    }
+    .topbar-left { display: flex; align-items: center; gap: 14px; }
+    .topbar img { width: 36px; height: 36px; }
+    .topbar-title { font-family: 'Playfair Display', serif; font-size: 17px; font-weight: 700; color: var(--white); }
+    .topbar-sub { font-size: 11px; color: rgba(255,255,255,0.5); letter-spacing: 0.1em; text-transform: uppercase; }
+    .btn-home {
+      font-family: 'DM Sans', sans-serif; font-size: 12px; font-weight: 500;
+      color: rgba(255,255,255,0.8); text-decoration: none;
+      padding: 7px 14px; border-radius: 8px;
+      border: 1px solid rgba(255,255,255,0.25);
+      transition: all 0.2s; white-space: nowrap;
+    }
+    .btn-home:hover { background: rgba(255,255,255,0.12); color: var(--white); }
+
+    .page-header {
+      background: var(--burgundy);
+      padding: 32px 32px 28px;
+      border-bottom: 3px solid var(--gold);
+    }
+    .page-header h1 { font-family: 'Playfair Display', serif; font-size: 28px; font-weight: 700; color: var(--white); margin-bottom: 4px; }
+    .page-header p { font-size: 14px; color: rgba(255,255,255,0.65); }
+
+    .layout {
+      display: grid;
+      grid-template-columns: 280px 1fr;
+      gap: 24px;
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 24px 32px 40px;
+    }
+    @media (max-width: 860px) {
+      .layout { grid-template-columns: 1fr; padding: 16px; }
+    }
+
+    /* Sidebar */
+    .sidebar {
+      background: var(--white);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 18px;
+      box-shadow: 0 1px 6px rgba(26,39,68,0.06);
+      align-self: start;
+      position: sticky;
+      top: 16px;
+    }
+    .sidebar h3 {
+      font-family: 'Playfair Display', serif;
+      font-size: 16px; font-weight: 700; color: var(--navy);
+      margin-bottom: 4px;
+    }
+    .sidebar .hint {
+      font-size: 11px; color: var(--muted); margin-bottom: 14px;
+      line-height: 1.4;
+    }
+    .cat-list { display: flex; flex-direction: column; gap: 6px; }
+    .cat-item {
+      display: flex; align-items: center; gap: 10px;
+      padding: 8px 10px;
+      border: 1.5px solid var(--border);
+      border-radius: 8px;
+      background: var(--white);
+      cursor: pointer;
+      transition: all 0.15s;
+      font-size: 13px;
+      text-align: left;
+      font-family: 'DM Sans', sans-serif;
+      width: 100%;
+    }
+    .cat-item:hover { border-color: var(--navy); background: var(--mist); }
+    .cat-item.active {
+      border-color: var(--navy);
+      box-shadow: inset 0 0 0 1px var(--navy);
+      background: var(--mist);
+    }
+    .cat-swatch {
+      width: 14px; height: 14px; border-radius: 4px; flex-shrink: 0;
+    }
+    .cat-label { flex: 1; font-weight: 500; color: var(--navy); }
+    .cat-count {
+      font-size: 11px; color: var(--muted);
+      background: #f3f0eb; padding: 2px 8px; border-radius: 10px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* Main area */
+    .main {
+      background: var(--white);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      box-shadow: 0 1px 6px rgba(26,39,68,0.06);
+      overflow: hidden;
+    }
+    .month-toolbar {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 16px 20px;
+      background: var(--burgundy);
+      color: var(--white);
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .month-title {
+      font-family: 'Playfair Display', serif;
+      font-size: 20px; font-weight: 700; color: var(--white);
+    }
+    .month-nav { display: flex; align-items: center; gap: 8px; }
+    .nav-btn {
+      width: 32px; height: 32px; border-radius: 8px;
+      background: rgba(255,255,255,0.1);
+      border: 1px solid rgba(255,255,255,0.25);
+      color: var(--white); cursor: pointer;
+      font-size: 16px; line-height: 1;
+      display: flex; align-items: center; justify-content: center;
+      transition: background 0.15s;
+    }
+    .nav-btn:hover { background: rgba(255,255,255,0.22); }
+    .ctrl-select {
+      font-family: 'DM Sans', sans-serif; font-size: 13px;
+      padding: 6px 28px 6px 10px;
+      border-radius: 8px; border: 1px solid rgba(255,255,255,0.25);
+      background: rgba(255,255,255,0.1); color: var(--white);
+      cursor: pointer; appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='white' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+      background-repeat: no-repeat; background-position: right 10px center;
+    }
+    .ctrl-select option { color: var(--navy); }
+
+    .action-bar {
+      display: flex; gap: 8px; padding: 12px 20px;
+      border-bottom: 1px solid var(--border);
+      background: #f8f6f2;
+      flex-wrap: wrap;
+    }
+    .btn {
+      font-family: 'DM Sans', sans-serif; font-size: 12px; font-weight: 500;
+      padding: 7px 14px; border-radius: 8px; cursor: pointer;
+      border: 1.5px solid var(--border); background: var(--white); color: var(--navy);
+      transition: all 0.15s;
+    }
+    .btn:hover:not(:disabled) { border-color: var(--navy); background: var(--mist); }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-primary { background: var(--navy); border-color: var(--navy); color: var(--white); }
+    .btn-primary:hover:not(:disabled) { background: #253660; border-color: #253660; color: var(--white); }
+    .btn-danger { color: var(--burgundy); border-color: rgba(74,26,44,0.3); }
+    .btn-danger:hover:not(:disabled) { background: var(--burgundy); color: var(--white); border-color: var(--burgundy); }
+
+    /* Calendar grid */
+    .cal-grid {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      border-top: 1px solid var(--border);
+    }
+    .cal-dayhead {
+      padding: 8px; text-align: center;
+      font-size: 10px; font-weight: 600; text-transform: uppercase;
+      letter-spacing: 0.1em; color: var(--muted);
+      background: #f8f6f2;
+      border-bottom: 1px solid var(--border);
+    }
+    .cal-cell {
+      min-height: 92px;
+      border-right: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+      padding: 6px 8px;
+      background: var(--white);
+      position: relative;
+      cursor: pointer;
+      transition: background 0.1s;
+      display: flex; flex-direction: column;
+      gap: 4px;
+    }
+    .cal-cell:nth-child(7n + 7) { border-right: none; }
+    .cal-cell:hover { background: var(--mist); }
+    .cal-cell.blank { background: #faf8f3; cursor: default; }
+    .cal-cell.blank:hover { background: #faf8f3; }
+    .cal-cell.weekend { background: #faf8f3; }
+    .cal-cell.today { background: #fff6de; }
+    .cal-cell.today .cell-num { color: var(--burgundy); font-weight: 700; }
+    .cell-num {
+      font-size: 13px; font-weight: 500; color: var(--navy);
+      font-variant-numeric: tabular-nums;
+    }
+    .cell-tags { display: flex; flex-wrap: wrap; gap: 3px; margin-top: 2px; }
+    .cell-tag {
+      font-size: 10px; font-weight: 500;
+      padding: 2px 6px; border-radius: 10px; color: var(--white);
+      line-height: 1.2; white-space: nowrap;
+      max-width: 100%; overflow: hidden; text-overflow: ellipsis;
+    }
+    .read-only .cal-cell { cursor: default; }
+
+    /* Popover */
+    .popover-overlay {
+      position: fixed; inset: 0;
+      background: rgba(26,39,68,0.35);
+      display: none; align-items: center; justify-content: center;
+      z-index: 100;
+    }
+    .popover-overlay.open { display: flex; }
+    .popover {
+      background: var(--white);
+      border-radius: 12px;
+      padding: 22px;
+      min-width: 300px; max-width: 420px;
+      box-shadow: 0 16px 40px rgba(26,39,68,0.25);
+    }
+    .popover h4 {
+      font-family: 'Playfair Display', serif;
+      font-size: 17px; font-weight: 700; color: var(--navy);
+      margin-bottom: 4px;
+    }
+    .popover .sub { font-size: 12px; color: var(--muted); margin-bottom: 14px; }
+    .pop-cat-row {
+      display: flex; align-items: center; gap: 10px;
+      padding: 8px 2px;
+      border-bottom: 1px solid var(--border);
+      cursor: pointer;
+    }
+    .pop-cat-row:last-child { border-bottom: none; }
+    .pop-cat-row input[type=checkbox] {
+      width: 16px; height: 16px; cursor: pointer; accent-color: var(--navy);
+    }
+    .pop-cat-row .cat-swatch { width: 12px; height: 12px; border-radius: 3px; }
+    .pop-cat-row label { flex: 1; font-size: 13px; color: var(--navy); cursor: pointer; }
+    .popover-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; }
+
+    /* Copy modal */
+    .modal-row { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
+    .modal-row label { font-size: 11px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); }
+    .modal-row select, .modal-row input[type=date] {
+      font-family: 'DM Sans', sans-serif; font-size: 14px;
+      padding: 8px 12px; border-radius: 8px;
+      border: 1.5px solid var(--border); background: var(--white); color: var(--navy);
+    }
+    .inline-row { display: flex; gap: 8px; }
+    .inline-row > * { flex: 1; }
+    .chk-row { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--navy); margin-bottom: 14px; }
+    .chk-row input[type=checkbox] { width: 15px; height: 15px; accent-color: var(--navy); }
+
+    .footer { margin-top: 28px; font-size: 12px; color: var(--muted); text-align: center; padding-bottom: 40px; }
+
+    .toast {
+      position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+      background: var(--navy); color: var(--white);
+      padding: 10px 20px; border-radius: 24px;
+      font-size: 13px; font-weight: 500;
+      box-shadow: 0 8px 24px rgba(26,39,68,0.25);
+      opacity: 0; pointer-events: none; transition: opacity 0.2s;
+      z-index: 200;
+    }
+    .toast.show { opacity: 1; }
+    .toast.error { background: var(--burgundy); }
+  </style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-left">
+    <img src="/logo.svg" alt="Mizzentop">
+    <div>
+      <div class="topbar-title">Mizzentop Admin</div>
+      <div class="topbar-sub">School Calendar</div>
+    </div>
+  </div>
+  <a href="/" class="btn-home">← Home</a>
+</div>
+
+<div class="page-header">
+  <h1>School Calendar</h1>
+  <p>Tag days with categories used by billing and reporting</p>
+</div>
+
+<div class="layout" id="layout">
+  <aside class="sidebar">
+    <h3>Categories</h3>
+    <p class="hint" id="sidebarHint">Click a category to make it the active brush. Click any day to toggle that tag on or off.</p>
+    <div class="cat-list" id="catList"></div>
+  </aside>
+
+  <section class="main">
+    <div class="month-toolbar">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <button class="nav-btn" id="prevBtn" title="Previous month">‹</button>
+        <div class="month-title" id="monthTitle">—</div>
+        <button class="nav-btn" id="nextBtn" title="Next month">›</button>
+      </div>
+      <div style="display:flex;gap:8px;">
+        <select class="ctrl-select" id="monthSelect"></select>
+        <select class="ctrl-select" id="yearSelect"></select>
+      </div>
+    </div>
+
+    <div class="action-bar" id="actionBar">
+      <button class="btn btn-primary" id="applyWeekdaysBtn" disabled>Apply to weekdays</button>
+      <button class="btn btn-danger" id="clearMonthBtn" disabled>Clear this month</button>
+      <button class="btn" id="copyMonthBtn">Copy previous month…</button>
+    </div>
+
+    <div style="display:grid;grid-template-columns:repeat(7,1fr);">
+      <div class="cal-dayhead">Sun</div>
+      <div class="cal-dayhead">Mon</div>
+      <div class="cal-dayhead">Tue</div>
+      <div class="cal-dayhead">Wed</div>
+      <div class="cal-dayhead">Thu</div>
+      <div class="cal-dayhead">Fri</div>
+      <div class="cal-dayhead">Sat</div>
+    </div>
+    <div class="cal-grid" id="calGrid"></div>
+  </section>
+</div>
+
+<footer class="footer">
+  Mizzentop Day School &nbsp;·&nbsp; Internal Use Only
+</footer>
+
+<!-- Day popover (multi-tag toggle) -->
+<div class="popover-overlay" id="popoverOverlay">
+  <div class="popover">
+    <h4 id="popTitle">—</h4>
+    <div class="sub">Toggle any combination of categories for this day.</div>
+    <div id="popCats"></div>
+    <div class="popover-actions">
+      <button class="btn" onclick="closePopover()">Done</button>
+    </div>
+  </div>
+</div>
+
+<!-- Copy-month modal -->
+<div class="popover-overlay" id="copyOverlay">
+  <div class="popover">
+    <h4>Copy a month's tags</h4>
+    <div class="sub">Copies all calendar tags from the source month into the target month, aligned by day-of-month.</div>
+    <div class="inline-row">
+      <div class="modal-row">
+        <label>From month</label>
+        <select id="copyFromMonth"></select>
+      </div>
+      <div class="modal-row">
+        <label>From year</label>
+        <select id="copyFromYear"></select>
+      </div>
+    </div>
+    <div class="inline-row">
+      <div class="modal-row">
+        <label>To month</label>
+        <select id="copyToMonth"></select>
+      </div>
+      <div class="modal-row">
+        <label>To year</label>
+        <select id="copyToYear"></select>
+      </div>
+    </div>
+    <div class="chk-row">
+      <input type="checkbox" id="copyOverwrite">
+      <label for="copyOverwrite">Clear target month first (overwrite)</label>
+    </div>
+    <div class="popover-actions">
+      <button class="btn" onclick="closeCopy()">Cancel</button>
+      <button class="btn btn-primary" id="copyConfirmBtn" onclick="runCopy()">Copy</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+  const MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const state = {
+    now: new Date(),
+    month: 0,
+    year: 0,
+    canEdit: false,
+    categories: [],
+    activeKey: null,
+    days: {},
+  };
+
+  function showToast(msg, isErr) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.className = 'toast show' + (isErr ? ' error' : '');
+    clearTimeout(showToast._t);
+    showToast._t = setTimeout(() => t.className = 'toast', 2200);
+  }
+
+  async function api(path, opts) {
+    const res = await fetch(path, opts);
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || data.error) throw new Error(data.error || `HTTP ${res.status}`);
+    return data;
+  }
+
+  function iso(y, m, d) {
+    return `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+  }
+
+  function daysInMonth(y, m) { return new Date(y, m, 0).getDate(); }
+
+  async function init() {
+    // Check permissions
+    try {
+      const s = await (await fetch('/api/session')).json();
+      state.canEdit = !!(s.can_manage_people || s.is_superadmin);
+    } catch (_) { state.canEdit = false; }
+
+    if (!state.canEdit) {
+      document.getElementById('layout').classList.add('read-only');
+      document.getElementById('actionBar').style.display = 'none';
+      document.getElementById('sidebarHint').textContent = 'Read-only view. Ask an admin to edit calendar tags.';
+    }
+
+    // Month / year selectors
+    const ms = document.getElementById('monthSelect');
+    MONTH_NAMES.forEach((n, i) => ms.appendChild(new Option(n, i + 1)));
+    const ys = document.getElementById('yearSelect');
+    const thisYear = state.now.getFullYear();
+    for (let y = thisYear - 1; y <= thisYear + 2; y++) ys.appendChild(new Option(y, y));
+
+    state.month = state.now.getMonth() + 1;
+    state.year  = thisYear;
+    ms.value = state.month;
+    ys.value = state.year;
+
+    ms.addEventListener('change', () => { state.month = parseInt(ms.value); refresh(); });
+    ys.addEventListener('change', () => { state.year  = parseInt(ys.value); refresh(); });
+
+    document.getElementById('prevBtn').addEventListener('click', () => shiftMonth(-1));
+    document.getElementById('nextBtn').addEventListener('click', () => shiftMonth(1));
+    document.getElementById('applyWeekdaysBtn').addEventListener('click', bulkApplyWeekdays);
+    document.getElementById('clearMonthBtn').addEventListener('click', bulkClear);
+    document.getElementById('copyMonthBtn').addEventListener('click', openCopy);
+
+    // Copy modal selectors
+    const cfm = document.getElementById('copyFromMonth');
+    const ctm = document.getElementById('copyToMonth');
+    MONTH_NAMES.forEach((n, i) => { cfm.appendChild(new Option(n, i + 1)); ctm.appendChild(new Option(n, i + 1)); });
+    const cfy = document.getElementById('copyFromYear');
+    const cty = document.getElementById('copyToYear');
+    for (let y = thisYear - 2; y <= thisYear + 2; y++) {
+      cfy.appendChild(new Option(y, y));
+      cty.appendChild(new Option(y, y));
+    }
+
+    // Popover background close
+    document.getElementById('popoverOverlay').addEventListener('click', (e) => {
+      if (e.target.id === 'popoverOverlay') closePopover();
+    });
+    document.getElementById('copyOverlay').addEventListener('click', (e) => {
+      if (e.target.id === 'copyOverlay') closeCopy();
+    });
+
+    await loadCategories();
+    await refresh();
+  }
+
+  function shiftMonth(delta) {
+    let m = state.month + delta;
+    let y = state.year;
+    if (m < 1) { m = 12; y -= 1; }
+    if (m > 12) { m = 1;  y += 1; }
+    state.month = m; state.year = y;
+    document.getElementById('monthSelect').value = m;
+    const ys = document.getElementById('yearSelect');
+    if (![...ys.options].some(o => parseInt(o.value) === y)) ys.appendChild(new Option(y, y));
+    ys.value = y;
+    refresh();
+  }
+
+  async function loadCategories() {
+    try {
+      const d = await api('/api/calendar/categories');
+      state.categories = (d.categories || []).filter(c => c.active);
+      if (state.categories.length && !state.activeKey) {
+        state.activeKey = state.categories[0].key;
+      }
+    } catch (e) {
+      showToast('Could not load categories', true);
+    }
+  }
+
+  async function refresh() {
+    document.getElementById('monthTitle').textContent = `${MONTH_NAMES[state.month - 1]} ${state.year}`;
+    try {
+      const d = await api(`/api/calendar/days?month=${state.month}&year=${state.year}`);
+      state.days = d.days || {};
+    } catch (e) {
+      state.days = {};
+      showToast('Could not load days', true);
+    }
+    renderSidebar();
+    renderGrid();
+    updateEditButtons();
+  }
+
+  function renderSidebar() {
+    const counts = {};
+    Object.values(state.days).forEach(tags => tags.forEach(k => counts[k] = (counts[k] || 0) + 1));
+    const list = document.getElementById('catList');
+    list.innerHTML = '';
+    state.categories.forEach(c => {
+      const btn = document.createElement('button');
+      btn.className = 'cat-item' + (c.key === state.activeKey ? ' active' : '');
+      btn.innerHTML = `
+        <span class="cat-swatch" style="background:${c.color}"></span>
+        <span class="cat-label">${escapeHtml(c.label)}</span>
+        <span class="cat-count">${counts[c.key] || 0}</span>
+      `;
+      btn.addEventListener('click', () => {
+        state.activeKey = c.key;
+        renderSidebar();
+        updateEditButtons();
+      });
+      list.appendChild(btn);
+    });
+  }
+
+  function updateEditButtons() {
+    const active = state.categories.find(c => c.key === state.activeKey);
+    const label = active ? active.label : '';
+    document.getElementById('applyWeekdaysBtn').textContent = active
+      ? `Apply ${label} to weekdays` : 'Apply to weekdays';
+    document.getElementById('clearMonthBtn').textContent = active
+      ? `Clear ${label} this month` : 'Clear this month';
+    const enable = state.canEdit && !!active;
+    document.getElementById('applyWeekdaysBtn').disabled = !enable;
+    document.getElementById('clearMonthBtn').disabled = !enable;
+  }
+
+  function renderGrid() {
+    const grid = document.getElementById('calGrid');
+    grid.innerHTML = '';
+    const m = state.month, y = state.year;
+    const first = new Date(y, m - 1, 1);
+    const firstDow = first.getDay();
+    const dim = daysInMonth(y, m);
+    const today = new Date();
+    const isThisMonth = (today.getMonth() + 1 === m && today.getFullYear() === y);
+    const colorFor = {};
+    state.categories.forEach(c => colorFor[c.key] = { color: c.color, label: c.label });
+
+    for (let i = 0; i < firstDow; i++) {
+      const blank = document.createElement('div');
+      blank.className = 'cal-cell blank';
+      grid.appendChild(blank);
+    }
+    for (let d = 1; d <= dim; d++) {
+      const cell = document.createElement('div');
+      cell.className = 'cal-cell';
+      const date = iso(y, m, d);
+      const dow = new Date(y, m - 1, d).getDay();
+      if (dow === 0 || dow === 6) cell.classList.add('weekend');
+      if (isThisMonth && d === today.getDate()) cell.classList.add('today');
+      cell.dataset.date = date;
+
+      const num = document.createElement('div');
+      num.className = 'cell-num';
+      num.textContent = d;
+      cell.appendChild(num);
+
+      const tags = state.days[date] || [];
+      if (tags.length) {
+        const wrap = document.createElement('div');
+        wrap.className = 'cell-tags';
+        tags.forEach(k => {
+          const c = colorFor[k];
+          if (!c) return;
+          const pill = document.createElement('span');
+          pill.className = 'cell-tag';
+          pill.style.background = c.color;
+          pill.textContent = c.label;
+          wrap.appendChild(pill);
+        });
+        cell.appendChild(wrap);
+      }
+
+      if (state.canEdit) {
+        cell.addEventListener('click', (e) => {
+          if (e.shiftKey || e.metaKey || e.ctrlKey) { openPopover(date); return; }
+          toggleDayActive(date, cell);
+        });
+        cell.addEventListener('contextmenu', (e) => {
+          e.preventDefault();
+          openPopover(date);
+        });
+      }
+      grid.appendChild(cell);
+    }
+    // Fill to 42 cells (6 weeks) for consistent height
+    const total = firstDow + dim;
+    const trailing = (7 - (total % 7)) % 7;
+    for (let i = 0; i < trailing; i++) {
+      const blank = document.createElement('div');
+      blank.className = 'cal-cell blank';
+      grid.appendChild(blank);
+    }
+  }
+
+  async function toggleDayActive(date, cell) {
+    if (!state.activeKey) { showToast('Pick a category first', true); return; }
+    const cat = state.activeKey;
+    const current = state.days[date] || [];
+    const has = current.includes(cat);
+    const next = !has;
+    // Optimistic
+    if (next) state.days[date] = [...current, cat];
+    else state.days[date] = current.filter(k => k !== cat);
+    renderGrid();
+    renderSidebar();
+    try {
+      await api('/api/calendar/days', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ date, category_key: cat, on: next })
+      });
+    } catch (e) {
+      // Revert
+      state.days[date] = current;
+      renderGrid();
+      renderSidebar();
+      showToast('Save failed', true);
+    }
+  }
+
+  function openPopover(date) {
+    const existing = state.days[date] || [];
+    const container = document.getElementById('popCats');
+    container.innerHTML = '';
+    state.categories.forEach(c => {
+      const row = document.createElement('div');
+      row.className = 'pop-cat-row';
+      const checked = existing.includes(c.key);
+      row.innerHTML = `
+        <input type="checkbox" id="pop_${c.key}" ${checked ? 'checked' : ''}>
+        <span class="cat-swatch" style="background:${c.color}"></span>
+        <label for="pop_${c.key}">${escapeHtml(c.label)}</label>
+      `;
+      const cb = row.querySelector('input');
+      cb.addEventListener('change', async () => {
+        const on = cb.checked;
+        try {
+          await api('/api/calendar/days', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ date, category_key: c.key, on })
+          });
+          const cur = state.days[date] || [];
+          if (on && !cur.includes(c.key)) state.days[date] = [...cur, c.key];
+          else if (!on) state.days[date] = cur.filter(k => k !== c.key);
+          renderGrid();
+          renderSidebar();
+        } catch (e) {
+          cb.checked = !on;
+          showToast('Save failed', true);
+        }
+      });
+      container.appendChild(row);
+    });
+    const dObj = new Date(date + 'T00:00:00');
+    const wd = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][dObj.getDay()];
+    document.getElementById('popTitle').textContent = `${wd}, ${MONTH_NAMES[dObj.getMonth()]} ${dObj.getDate()}, ${dObj.getFullYear()}`;
+    document.getElementById('popoverOverlay').classList.add('open');
+  }
+
+  function closePopover() {
+    document.getElementById('popoverOverlay').classList.remove('open');
+  }
+
+  async function bulkApplyWeekdays() {
+    if (!state.activeKey) return;
+    const dim = daysInMonth(state.year, state.month);
+    try {
+      await api('/api/calendar/days/bulk', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          category_key: state.activeKey,
+          start: iso(state.year, state.month, 1),
+          end:   iso(state.year, state.month, dim),
+          weekdays_only: true,
+          action: 'apply'
+        })
+      });
+      showToast('Applied to weekdays');
+      await refresh();
+    } catch (e) { showToast('Bulk apply failed', true); }
+  }
+
+  async function bulkClear() {
+    if (!state.activeKey) return;
+    const active = state.categories.find(c => c.key === state.activeKey);
+    if (!confirm(`Clear all "${active.label}" tags in ${MONTH_NAMES[state.month-1]} ${state.year}?`)) return;
+    const dim = daysInMonth(state.year, state.month);
+    try {
+      await api('/api/calendar/days/bulk', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          category_key: state.activeKey,
+          start: iso(state.year, state.month, 1),
+          end:   iso(state.year, state.month, dim),
+          weekdays_only: false,
+          action: 'clear'
+        })
+      });
+      showToast('Cleared');
+      await refresh();
+    } catch (e) { showToast('Clear failed', true); }
+  }
+
+  function openCopy() {
+    let pm = state.month - 1, py = state.year;
+    if (pm < 1) { pm = 12; py -= 1; }
+    document.getElementById('copyFromMonth').value = pm;
+    document.getElementById('copyFromYear').value  = py;
+    document.getElementById('copyToMonth').value   = state.month;
+    document.getElementById('copyToYear').value    = state.year;
+    document.getElementById('copyOverwrite').checked = false;
+    document.getElementById('copyOverlay').classList.add('open');
+  }
+  function closeCopy() {
+    document.getElementById('copyOverlay').classList.remove('open');
+  }
+  async function runCopy() {
+    const body = {
+      from_month: parseInt(document.getElementById('copyFromMonth').value),
+      from_year:  parseInt(document.getElementById('copyFromYear').value),
+      to_month:   parseInt(document.getElementById('copyToMonth').value),
+      to_year:    parseInt(document.getElementById('copyToYear').value),
+      overwrite:  document.getElementById('copyOverwrite').checked
+    };
+    try {
+      const d = await api('/api/calendar/copy-month', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+      showToast(`Copied ${d.inserted || 0} tag${d.inserted === 1 ? '' : 's'}`);
+      closeCopy();
+      if (body.to_month === state.month && body.to_year === state.year) {
+        await refresh();
+      } else {
+        state.month = body.to_month; state.year = body.to_year;
+        document.getElementById('monthSelect').value = state.month;
+        document.getElementById('yearSelect').value  = state.year;
+        await refresh();
+      }
+    } catch (e) { showToast('Copy failed', true); }
+  }
+
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, c => ({
+      '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+    }[c]));
+  }
+
+  init();
+</script>
+
+</body>
+</html>

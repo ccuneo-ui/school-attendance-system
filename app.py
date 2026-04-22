@@ -314,6 +314,46 @@ def init_db():
                         "INSERT INTO comp_rates (rate_key, rate_value, label, unit, effective_from) VALUES (%s,%s,%s,%s,%s) ON CONFLICT DO NOTHING",
                         (key, val, label, unit, '2025-09-01')
                     )
+            # ── School Calendar: categories + per-day tags ──
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS calendar_categories (
+                    category_id   SERIAL PRIMARY KEY,
+                    key           TEXT NOT NULL UNIQUE,
+                    label         TEXT NOT NULL,
+                    color         TEXT NOT NULL DEFAULT '#c8992a',
+                    sort_order    INTEGER NOT NULL DEFAULT 0,
+                    active        BOOLEAN NOT NULL DEFAULT TRUE,
+                    created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS calendar_day_tags (
+                    tag_id       SERIAL PRIMARY KEY,
+                    day_date     DATE NOT NULL,
+                    category_key TEXT NOT NULL REFERENCES calendar_categories(key) ON DELETE CASCADE ON UPDATE CASCADE,
+                    created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    created_by   TEXT,
+                    UNIQUE(day_date, category_key)
+                )
+            """)
+            cur.execute("CREATE INDEX IF NOT EXISTS idx_calendar_day_tags_date ON calendar_day_tags(day_date)")
+            cur.execute("CREATE INDEX IF NOT EXISTS idx_calendar_day_tags_cat_date ON calendar_day_tags(category_key, day_date)")
+            # Seed default categories if empty
+            cur.execute("SELECT COUNT(*) FROM calendar_categories")
+            if cur.fetchone()[0] == 0:
+                seed_cats = [
+                    ('lunch_day',            'Lunch Day',             '#c8992a',  1),
+                    ('school_day',           'School Day',            '#1a2744',  2),
+                    ('half_day',             'Half Day',              '#6b7280',  3),
+                    ('holiday',              'Holiday',               '#4a1a2c',  4),
+                    ('teacher_conference',   'Teacher Conference',    '#3b6b4a',  5),
+                    ('teacher_development',  'Teacher Development',   '#a0522d',  6),
+                ]
+                for key, label, color, sort_order in seed_cats:
+                    cur.execute(
+                        "INSERT INTO calendar_categories (key, label, color, sort_order) VALUES (%s,%s,%s,%s) ON CONFLICT DO NOTHING",
+                        (key, label, color, sort_order)
+                    )
             # ── Households, Parents, and linking tables ──
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS households (
@@ -625,6 +665,11 @@ def billing_rates():
 @login_required
 def financial_aid_page():
     return send_from_directory(".", "financial_aid.html")
+
+@app.route("/school-calendar")
+@login_required
+def school_calendar_page():
+    return send_from_directory(".", "school_calendar.html")
 
 @app.route("/api/test")
 def test():
@@ -2684,6 +2729,14 @@ def api_billing_report():
                 """)
                 student_rows = cur.fetchall()
 
+                # 7. Lunch-day count for the month (from school calendar)
+                cur.execute("""
+                    SELECT COUNT(*) AS n FROM calendar_day_tags
+                    WHERE category_key = 'lunch_day'
+                      AND day_date >= %s AND day_date <= %s
+                """, (first_day, last_day))
+                lunch_days = int(cur.fetchone()["n"])
+
         finally:
             conn.close()
 
@@ -2730,7 +2783,7 @@ def api_billing_report():
                 "care_days":        bc_days + ac_days,
             })
 
-        return jsonify({"month": month, "year": year, "students": results, "rates": rates})
+        return jsonify({"month": month, "year": year, "students": results, "rates": rates, "lunch_days": lunch_days})
 
     except Exception as e:
         import traceback
@@ -4989,6 +5042,322 @@ def icon_linkedin():
 @login_required
 def signature_generator():
     return send_from_directory('.', 'signature_generator.html')
+
+
+# ============================================
+# SCHOOL CALENDAR
+# ============================================
+
+@app.route("/api/calendar/categories")
+@login_required
+def api_calendar_categories():
+    conn = get_db_connection()
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute("""
+                SELECT category_id, key, label, color, sort_order, active
+                FROM calendar_categories
+                ORDER BY sort_order, label
+            """)
+            return jsonify({"categories": cur.fetchall()})
+    finally:
+        conn.close()
+
+
+@app.route("/api/calendar/categories", methods=["POST"])
+@people_required
+def api_calendar_categories_create():
+    data = request.get_json() or {}
+    key   = (data.get("key")   or "").strip().lower().replace(" ", "_")
+    label = (data.get("label") or "").strip()
+    color = (data.get("color") or "#c8992a").strip()
+    sort_order = int(data.get("sort_order") or 99)
+    if not key or not label:
+        return jsonify({"error": "key and label required"}), 400
+    conn = get_db_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                INSERT INTO calendar_categories (key, label, color, sort_order)
+                VALUES (%s,%s,%s,%s)
+                ON CONFLICT (key) DO UPDATE
+                    SET label=EXCLUDED.label, color=EXCLUDED.color,
+                        sort_order=EXCLUDED.sort_order, active=TRUE
+                RETURNING category_id
+            """, (key, label, color, sort_order))
+            conn.commit()
+            return jsonify({"success": True, "category_id": cur.fetchone()[0]})
+    except Exception as e:
+        conn.rollback()
+        return jsonify({"error": str(e)}), 500
+    finally:
+        conn.close()
+
+
+@app.route("/api/calendar/categories/<int:category_id>", methods=["PUT"])
+@people_required
+def api_calendar_categories_update(category_id):
+    data = request.get_json() or {}
+    fields, values = [], []
+    for col in ("label", "color", "sort_order", "active"):
+        if col in data:
+            fields.append(f"{col} = %s")
+            values.append(data[col])
+    if not fields:
+        return jsonify({"error": "no fields to update"}), 400
+    values.append(category_id)
+    conn = get_db_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                f"UPDATE calendar_categories SET {', '.join(fields)} WHERE category_id = %s",
+                values
+            )
+            conn.commit()
+            return jsonify({"success": True})
+    except Exception as e:
+        conn.rollback()
+        return jsonify({"error": str(e)}), 500
+    finally:
+        conn.close()
+
+
+@app.route("/api/calendar/days")
+@login_required
+def api_calendar_days():
+    """
+    Return all tags in a date range.
+    Query params: start=YYYY-MM-DD, end=YYYY-MM-DD
+    OR: month=1..12, year=YYYY (returns the whole month)
+    """
+    import calendar as cal_mod
+    from datetime import date as dt_date
+
+    start = request.args.get("start")
+    end   = request.args.get("end")
+    if not (start and end):
+        try:
+            m = int(request.args.get("month", 0))
+            y = int(request.args.get("year",  0))
+            if not (1 <= m <= 12) or y < 2020:
+                return jsonify({"error": "provide start+end or month+year"}), 400
+            start = dt_date(y, m, 1).isoformat()
+            end   = dt_date(y, m, cal_mod.monthrange(y, m)[1]).isoformat()
+        except Exception:
+            return jsonify({"error": "invalid params"}), 400
+
+    conn = get_db_connection()
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute("""
+                SELECT day_date, category_key
+                FROM   calendar_day_tags
+                WHERE  day_date >= %s AND day_date <= %s
+                ORDER  BY day_date, category_key
+            """, (start, end))
+            out = {}
+            for r in cur.fetchall():
+                d = r["day_date"].isoformat()
+                out.setdefault(d, []).append(r["category_key"])
+            return jsonify({"start": start, "end": end, "days": out})
+    finally:
+        conn.close()
+
+
+@app.route("/api/calendar/days", methods=["POST"])
+@people_required
+def api_calendar_days_toggle():
+    """
+    Toggle a single (date, category) tag.
+    Body: { "date": "YYYY-MM-DD", "category_key": "lunch_day", "on": true/false }
+    If "on" is omitted, the endpoint flips the current state.
+    """
+    data = request.get_json() or {}
+    day  = (data.get("date") or "").strip()
+    cat  = (data.get("category_key") or "").strip()
+    on   = data.get("on", None)
+    if not day or not cat:
+        return jsonify({"error": "date and category_key required"}), 400
+    conn = get_db_connection()
+    try:
+        with conn.cursor() as cur:
+            if on is None:
+                cur.execute(
+                    "SELECT 1 FROM calendar_day_tags WHERE day_date=%s AND category_key=%s",
+                    (day, cat)
+                )
+                on = cur.fetchone() is None
+
+            if on:
+                cur.execute("""
+                    INSERT INTO calendar_day_tags (day_date, category_key, created_by)
+                    VALUES (%s, %s, %s)
+                    ON CONFLICT (day_date, category_key) DO NOTHING
+                """, (day, cat, session.get("user_email", "")))
+            else:
+                cur.execute(
+                    "DELETE FROM calendar_day_tags WHERE day_date=%s AND category_key=%s",
+                    (day, cat)
+                )
+            conn.commit()
+            return jsonify({"success": True, "on": bool(on)})
+    except Exception as e:
+        conn.rollback()
+        return jsonify({"error": str(e)}), 500
+    finally:
+        conn.close()
+
+
+@app.route("/api/calendar/days/bulk", methods=["POST"])
+@people_required
+def api_calendar_days_bulk():
+    """
+    Bulk apply or clear a category for a date range.
+    """
+    from datetime import date as dt_date, timedelta
+    data = request.get_json() or {}
+    cat    = (data.get("category_key") or "").strip()
+    start  = (data.get("start") or "").strip()
+    end    = (data.get("end")   or "").strip()
+    weekdays_only = bool(data.get("weekdays_only", False))
+    action = (data.get("action") or "apply").strip()
+
+    if not (cat and start and end):
+        return jsonify({"error": "category_key, start, end required"}), 400
+    try:
+        d0 = dt_date.fromisoformat(start)
+        d1 = dt_date.fromisoformat(end)
+    except Exception:
+        return jsonify({"error": "invalid date format"}), 400
+    if d1 < d0:
+        return jsonify({"error": "end before start"}), 400
+
+    dates = []
+    cur_d = d0
+    while cur_d <= d1:
+        if (not weekdays_only) or cur_d.weekday() < 5:
+            dates.append(cur_d.isoformat())
+        cur_d += timedelta(days=1)
+
+    conn = get_db_connection()
+    try:
+        with conn.cursor() as cur:
+            if action == "apply":
+                for d in dates:
+                    cur.execute("""
+                        INSERT INTO calendar_day_tags (day_date, category_key, created_by)
+                        VALUES (%s, %s, %s)
+                        ON CONFLICT (day_date, category_key) DO NOTHING
+                    """, (d, cat, session.get("user_email", "")))
+            elif action == "clear":
+                cur.execute("""
+                    DELETE FROM calendar_day_tags
+                    WHERE  category_key = %s
+                      AND  day_date >= %s AND day_date <= %s
+                      AND  (%s = FALSE OR EXTRACT(ISODOW FROM day_date) < 6)
+                """, (cat, d0, d1, weekdays_only))
+            else:
+                return jsonify({"error": "action must be 'apply' or 'clear'"}), 400
+            conn.commit()
+            return jsonify({"success": True, "affected": len(dates)})
+    except Exception as e:
+        conn.rollback()
+        return jsonify({"error": str(e)}), 500
+    finally:
+        conn.close()
+
+
+@app.route("/api/calendar/copy-month", methods=["POST"])
+@people_required
+def api_calendar_copy_month():
+    """
+    Copy all tags from one month into another (shifted by day-of-month).
+    """
+    import calendar as cal_mod
+    from datetime import date as dt_date
+    data = request.get_json() or {}
+    try:
+        fm = int(data["from_month"]); fy = int(data["from_year"])
+        tm = int(data["to_month"]);   ty = int(data["to_year"])
+    except Exception:
+        return jsonify({"error": "from_month/from_year/to_month/to_year required"}), 400
+    overwrite = bool(data.get("overwrite", False))
+
+    conn = get_db_connection()
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            f_first = dt_date(fy, fm, 1)
+            f_last  = dt_date(fy, fm, cal_mod.monthrange(fy, fm)[1])
+            cur.execute("""
+                SELECT day_date, category_key
+                FROM calendar_day_tags
+                WHERE day_date >= %s AND day_date <= %s
+            """, (f_first, f_last))
+            src = cur.fetchall()
+
+            if overwrite:
+                t_first = dt_date(ty, tm, 1)
+                t_last  = dt_date(ty, tm, cal_mod.monthrange(ty, tm)[1])
+                cur.execute(
+                    "DELETE FROM calendar_day_tags WHERE day_date >= %s AND day_date <= %s",
+                    (t_first, t_last)
+                )
+
+            last_day_target = cal_mod.monthrange(ty, tm)[1]
+            inserted = 0
+            for r in src:
+                dom = r["day_date"].day
+                if dom > last_day_target:
+                    continue
+                target = dt_date(ty, tm, dom).isoformat()
+                cur.execute("""
+                    INSERT INTO calendar_day_tags (day_date, category_key, created_by)
+                    VALUES (%s, %s, %s)
+                    ON CONFLICT (day_date, category_key) DO NOTHING
+                """, (target, r["category_key"], session.get("user_email", "")))
+                if cur.rowcount:
+                    inserted += 1
+            conn.commit()
+            return jsonify({"success": True, "inserted": inserted})
+    except Exception as e:
+        conn.rollback()
+        return jsonify({"error": str(e)}), 500
+    finally:
+        conn.close()
+
+
+@app.route("/api/calendar/month-summary")
+@login_required
+def api_calendar_month_summary():
+    """
+    Counts of each category in a month. Used by billing and dashboards.
+    """
+    import calendar as cal_mod
+    from datetime import date as dt_date
+    try:
+        m = int(request.args.get("month", 0))
+        y = int(request.args.get("year",  0))
+        if not (1 <= m <= 12) or y < 2020:
+            return jsonify({"error": "invalid month/year"}), 400
+    except Exception:
+        return jsonify({"error": "invalid month/year"}), 400
+
+    first = dt_date(y, m, 1)
+    last  = dt_date(y, m, cal_mod.monthrange(y, m)[1])
+    conn = get_db_connection()
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute("""
+                SELECT category_key, COUNT(*) AS n
+                FROM   calendar_day_tags
+                WHERE  day_date >= %s AND day_date <= %s
+                GROUP  BY category_key
+            """, (first, last))
+            counts = {r["category_key"]: int(r["n"]) for r in cur.fetchall()}
+            return jsonify({"month": m, "year": y, "counts": counts})
+    finally:
+        conn.close()
+
 
 # ============================================
 # STARTUP + RUN

@@ -293,6 +293,11 @@
       <div class="s-value" id="sCare">—</div>
       <div class="s-sub" id="sCareSub">—</div>
     </div>
+    <div class="summary-card">
+      <div class="s-label">Lunch Days</div>
+      <div class="s-value" id="sLunchDays">—</div>
+      <div class="s-sub" id="sLunchDaysSub">—</div>
+    </div>
   </div>
 
   <div class="report-box" id="reportBox">
@@ -772,6 +777,18 @@
     document.getElementById('summaryRow').style.display = '';
     document.getElementById('reportInner').style.display = '';
     document.getElementById('exportBtn').classList.add('show');
+
+    fetch(`/api/calendar/month-summary?month=${curMonth}&year=${curYear}`)
+      .then(r => r.json())
+      .then(s => {
+        const lunch = (s.counts && s.counts.lunch_day) || 0;
+        document.getElementById('sLunchDays').textContent = lunch;
+        document.getElementById('sLunchDaysSub').textContent = `in ${months[curMonth-1]} ${curYear}`;
+      })
+      .catch(() => {
+        document.getElementById('sLunchDays').textContent = '—';
+        document.getElementById('sLunchDaysSub').textContent = '—';
+      });
   }
 
   function money(n) { return (!n||n===0) ? '<span class="zero">—</span>' : '$'+n.toFixed(2); }
