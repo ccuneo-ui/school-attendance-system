@@ -338,22 +338,27 @@ def init_db():
             """)
             cur.execute("CREATE INDEX IF NOT EXISTS idx_calendar_day_tags_date ON calendar_day_tags(day_date)")
             cur.execute("CREATE INDEX IF NOT EXISTS idx_calendar_day_tags_cat_date ON calendar_day_tags(category_key, day_date)")
-            # Seed default categories if empty
-            cur.execute("SELECT COUNT(*) FROM calendar_categories")
-            if cur.fetchone()[0] == 0:
-                seed_cats = [
-                    ('lunch_day',            'Lunch Day',             '#c8992a',  1),
-                    ('school_day',           'School Day',            '#1a2744',  2),
-                    ('half_day',             'Half Day',              '#6b7280',  3),
-                    ('holiday',              'Holiday',               '#4a1a2c',  4),
-                    ('teacher_conference',   'Teacher Conference',    '#3b6b4a',  5),
-                    ('teacher_development',  'Teacher Development',   '#a0522d',  6),
-                ]
-                for key, label, color, sort_order in seed_cats:
-                    cur.execute(
-                        "INSERT INTO calendar_categories (key, label, color, sort_order) VALUES (%s,%s,%s,%s) ON CONFLICT DO NOTHING",
-                        (key, label, color, sort_order)
-                    )
+            # Seed / upsert default categories (idempotent — new defaults land on redeploy)
+            seed_cats = [
+                ('lunch_day_prek_k',     'Lunch Day (PreK–K)',    '#d4a63d',  1),
+                ('lunch_day_1_8',        'Lunch Day (1–8)',       '#8a6a1a',  2),
+                ('school_day',           'School Day',            '#1a2744',  3),
+                ('half_day',             'Half Day',              '#6b7280',  4),
+                ('holiday',              'Holiday',               '#4a1a2c',  5),
+                ('teacher_conference',   'Teacher Conference',    '#3b6b4a',  6),
+                ('teacher_development',  'Teacher Development',   '#a0522d',  7),
+            ]
+            for key, label, color, sort_order in seed_cats:
+                cur.execute(
+                    "INSERT INTO calendar_categories (key, label, color, sort_order) VALUES (%s,%s,%s,%s) ON CONFLICT (key) DO NOTHING",
+                    (key, label, color, sort_order)
+                )
+            # Retire legacy single 'lunch_day' category if it exists and has no tags yet
+            cur.execute("""
+                DELETE FROM calendar_categories
+                WHERE key = 'lunch_day'
+                  AND NOT EXISTS (SELECT 1 FROM calendar_day_tags WHERE category_key = 'lunch_day')
+            """)
             # ── Households, Parents, and linking tables ──
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS households (
@@ -2729,13 +2734,16 @@ def api_billing_report():
                 """)
                 student_rows = cur.fetchall()
 
-                # 7. Lunch-day count for the month (from school calendar)
+                # 7. Lunch-day counts for the month (from school calendar)
                 cur.execute("""
-                    SELECT COUNT(*) AS n FROM calendar_day_tags
-                    WHERE category_key = 'lunch_day'
+                    SELECT category_key, COUNT(*) AS n FROM calendar_day_tags
+                    WHERE category_key IN ('lunch_day_prek_k', 'lunch_day_1_8')
                       AND day_date >= %s AND day_date <= %s
+                    GROUP BY category_key
                 """, (first_day, last_day))
-                lunch_days = int(cur.fetchone()["n"])
+                _lc = {r["category_key"]: int(r["n"]) for r in cur.fetchall()}
+                lunch_days_prek_k = _lc.get("lunch_day_prek_k", 0)
+                lunch_days_1_8    = _lc.get("lunch_day_1_8", 0)
 
         finally:
             conn.close()
@@ -2783,7 +2791,8 @@ def api_billing_report():
                 "care_days":        bc_days + ac_days,
             })
 
-        return jsonify({"month": month, "year": year, "students": results, "rates": rates, "lunch_days": lunch_days})
+        return jsonify({"month": month, "year": year, "students": results, "rates": rates,
+                        "lunch_days_prek_k": lunch_days_prek_k, "lunch_days_1_8": lunch_days_1_8})
 
     except Exception as e:
         import traceback

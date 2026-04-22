@@ -294,9 +294,14 @@
       <div class="s-sub" id="sCareSub">—</div>
     </div>
     <div class="summary-card">
-      <div class="s-label">Lunch Days</div>
-      <div class="s-value" id="sLunchDays">—</div>
-      <div class="s-sub" id="sLunchDaysSub">—</div>
+      <div class="s-label">Lunch Days · PreK–K</div>
+      <div class="s-value" id="sLunchDaysPK">—</div>
+      <div class="s-sub" id="sLunchDaysPKSub">—</div>
+    </div>
+    <div class="summary-card">
+      <div class="s-label">Lunch Days · 1–8</div>
+      <div class="s-value" id="sLunchDaysG18">—</div>
+      <div class="s-sub" id="sLunchDaysG18Sub">—</div>
     </div>
   </div>
 
@@ -781,13 +786,20 @@
     fetch(`/api/calendar/month-summary?month=${curMonth}&year=${curYear}`)
       .then(r => r.json())
       .then(s => {
-        const lunch = (s.counts && s.counts.lunch_day) || 0;
-        document.getElementById('sLunchDays').textContent = lunch;
-        document.getElementById('sLunchDaysSub').textContent = `in ${months[curMonth-1]} ${curYear}`;
+        const c = s.counts || {};
+        const pk  = c.lunch_day_prek_k || 0;
+        const g18 = c.lunch_day_1_8    || 0;
+        const sub = `in ${months[curMonth-1]} ${curYear}`;
+        document.getElementById('sLunchDaysPK').textContent    = pk;
+        document.getElementById('sLunchDaysPKSub').textContent = sub;
+        document.getElementById('sLunchDaysG18').textContent    = g18;
+        document.getElementById('sLunchDaysG18Sub').textContent = sub;
       })
       .catch(() => {
-        document.getElementById('sLunchDays').textContent = '—';
-        document.getElementById('sLunchDaysSub').textContent = '—';
+        document.getElementById('sLunchDaysPK').textContent = '—';
+        document.getElementById('sLunchDaysPKSub').textContent = '—';
+        document.getElementById('sLunchDaysG18').textContent = '—';
+        document.getElementById('sLunchDaysG18Sub').textContent = '—';
       });
   }
 
