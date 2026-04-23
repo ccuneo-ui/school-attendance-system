@@ -110,6 +110,52 @@
       font-size: 15px;
     }
 
+    /* ── Detail modal ── */
+    .modal-overlay {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,0.5); z-index: 100;
+      align-items: flex-start; justify-content: center;
+      padding: 40px 20px; overflow-y: auto;
+    }
+    .modal-overlay.open { display: flex; }
+    .modal-panel {
+      background: var(--white); border-radius: 12px;
+      max-width: 720px; width: 100%; padding: 24px;
+    }
+    .modal-header {
+      display: flex; justify-content: space-between; align-items: center;
+      margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid var(--border);
+    }
+    .modal-header h2 { font-family: 'Playfair Display', serif; font-size: 22px; font-weight: 700; }
+    .close-btn { background: none; border: none; font-size: 24px; cursor: pointer; color: var(--muted); line-height: 1; }
+    .close-btn:hover { color: var(--navy); }
+
+    .legend { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 20px; font-size: 12px; color: var(--navy); }
+    .legend-item { display: flex; align-items: center; gap: 6px; }
+    .legend-swatch { width: 14px; height: 14px; border-radius: 3px; flex-shrink: 0; }
+
+    .month-block { margin-bottom: 24px; }
+    .month-block h3 {
+      font-family: 'Playfair Display', serif; font-size: 16px; font-weight: 700;
+      margin-bottom: 8px; color: var(--navy);
+    }
+    .weekday-row, .day-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+    .weekday-row .wd {
+      font-size: 10px; font-weight: 600; text-transform: uppercase;
+      color: var(--muted); text-align: center; padding: 4px 0;
+    }
+    .day {
+      aspect-ratio: 1; display: flex; align-items: center; justify-content: center;
+      font-size: 13px; font-weight: 500; border-radius: 4px;
+      background: var(--light-bg); color: var(--navy);
+    }
+    .day.blank { background: transparent; }
+    .day.out-of-window { background: transparent; color: #d4d0c8; font-weight: 300; }
+    .day.no-school { background: var(--light-bg); color: #b8b3aa; font-weight: 300; }
+    .day.not-marked { background: var(--white); border: 1.5px solid var(--red); color: var(--red); }
+
+    tbody tr { cursor: pointer; }
+
     @media (max-width: 720px) {
       .controls { flex-direction: column; align-items: stretch; }
       .control-group select { min-width: unset; width: 100%; }
@@ -148,6 +194,28 @@
 
   <div class="table-wrap" id="table-wrap">
     <div class="empty-state">Select a homeroom teacher to view the report.</div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="detail-modal" onclick="if(event.target===this) closeDetail()">
+  <div class="modal-panel">
+    <div class="modal-header">
+      <h2 id="detail-modal-title"></h2>
+      <button class="close-btn" onclick="closeDetail()">×</button>
+    </div>
+    <div class="legend">
+      <span class="legend-item"><span class="legend-swatch" style="background:#2e7d32;"></span>Present</span>
+      <span class="legend-item"><span class="legend-swatch" style="background:#c0392b;"></span>Absent</span>
+      <span class="legend-item"><span class="legend-swatch" style="background:#ea580c;"></span>Tardy</span>
+      <span class="legend-item"><span class="legend-swatch" style="background:#d97706;"></span>Excused Tardy</span>
+      <span class="legend-item"><span class="legend-swatch" style="background:#7c3aed;"></span>Early Dismissal</span>
+      <span class="legend-item"><span class="legend-swatch" style="background:#b8860b;"></span>Excused</span>
+      <span class="legend-item"><span class="legend-swatch" style="background:#2563eb;"></span>Field Trip</span>
+      <span class="legend-item"><span class="legend-swatch" style="background:#94a3b8;"></span>NSD</span>
+      <span class="legend-item"><span class="legend-swatch" style="background:#ffffff; border:1.5px solid #c0392b;"></span>Not Marked</span>
+      <span class="legend-item"><span class="legend-swatch" style="background:#f0ece4;"></span>Not a School Day</span>
+    </div>
+    <div id="detail-modal-body"></div>
   </div>
 </div>
 
@@ -239,7 +307,7 @@ function renderReport(data) {
   html += '</tr></thead><tbody>';
 
   data.students.forEach(s => {
-    html += '<tr>';
+    html += `<tr onclick="openStudentDetail(${s.student_id})">`;
     html += `<td>${escapeHtml(s.last_name)}</td>`;
     html += `<td>${escapeHtml(s.first_name)}</td>`;
     html += `<td class="grade">${escapeHtml(String(s.grade ?? ''))}</td>`;
@@ -270,6 +338,99 @@ function escapeHtml(str) {
   div.textContent = str;
   return div.innerHTML;
 }
+
+// ── Per-student detail modal ──
+const STATUS_COLORS = {
+  present:       { bg: '#2e7d32', label: 'Present' },
+  absent:        { bg: '#c0392b', label: 'Absent' },
+  tardy:         { bg: '#ea580c', label: 'Tardy' },
+  excused_tardy: { bg: '#d97706', label: 'Excused Tardy' },
+  ed:            { bg: '#7c3aed', label: 'Early Dismissal' },
+  excused:       { bg: '#b8860b', label: 'Excused' },
+  field_trip:    { bg: '#2563eb', label: 'Field Trip' },
+  nsd:           { bg: '#94a3b8', label: 'NSD' },
+};
+const detailCache = {};
+
+async function openStudentDetail(studentId) {
+  document.getElementById('detail-modal').classList.add('open');
+  document.getElementById('detail-modal-body').innerHTML = '<div class="loading-state">Loading…</div>';
+  document.getElementById('detail-modal-title').textContent = '';
+
+  if (!detailCache[studentId]) {
+    const res = await fetch(`/api/homeroom-attendance-report/student/${studentId}`);
+    detailCache[studentId] = await res.json();
+  }
+  renderDetail(detailCache[studentId]);
+}
+
+function renderDetail(data) {
+  const byDate = {};
+  data.records.forEach(r => { byDate[r.date] = r; });
+  const schoolDateSet = new Set(data.school_dates);
+
+  document.getElementById('detail-modal-title').textContent =
+    `${data.student.first_name} ${data.student.last_name} · Grade ${data.student.grade}`;
+
+  // JS month is 0-indexed: Feb=1, Jun=5
+  const months = [
+    { year: 2026, month: 1, name: 'February 2026' },
+    { year: 2026, month: 2, name: 'March 2026'    },
+    { year: 2026, month: 3, name: 'April 2026'    },
+    { year: 2026, month: 4, name: 'May 2026'      },
+    { year: 2026, month: 5, name: 'June 2026'     },
+  ];
+  const start = data.start_date, end = data.end_date;
+
+  let html = '';
+  months.forEach(m => {
+    html += `<div class="month-block"><h3>${m.name}</h3>`;
+    html += `<div class="weekday-row">${['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(d=>`<div class="wd">${d}</div>`).join('')}</div>`;
+    html += `<div class="day-grid">`;
+
+    const firstDay = new Date(m.year, m.month, 1);
+    const startWeekday = firstDay.getDay();
+    const daysInMonth = new Date(m.year, m.month + 1, 0).getDate();
+
+    for (let i = 0; i < startWeekday; i++) html += `<div class="day blank"></div>`;
+    for (let d = 1; d <= daysInMonth; d++) {
+      const dateStr = `${m.year}-${String(m.month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+      const inWindow = dateStr >= start && dateStr <= end;
+      let cls = 'day';
+      let style = '';
+      let tooltip = dateStr;
+      if (!inWindow) {
+        cls += ' out-of-window';
+      } else if (byDate[dateStr]) {
+        const rec = byDate[dateStr];
+        const c = STATUS_COLORS[rec.status];
+        if (c) {
+          style = `background:${c.bg}; color:white;`;
+          tooltip = `${dateStr} · ${c.label}${rec.notes ? ' · ' + rec.notes : ''}`;
+        } else {
+          tooltip = `${dateStr} · ${rec.status}${rec.notes ? ' · ' + rec.notes : ''}`;
+        }
+      } else if (schoolDateSet.has(dateStr)) {
+        cls += ' not-marked';
+        tooltip = `${dateStr} · Not Marked`;
+      } else {
+        cls += ' no-school';
+      }
+      html += `<div class="${cls}" style="${style}" title="${tooltip}">${d}</div>`;
+    }
+    html += `</div></div>`;
+  });
+
+  document.getElementById('detail-modal-body').innerHTML = html;
+}
+
+function closeDetail() {
+  document.getElementById('detail-modal').classList.remove('open');
+}
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') closeDetail();
+});
 </script>
 </body>
 </html>

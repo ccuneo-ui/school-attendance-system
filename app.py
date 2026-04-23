@@ -1624,6 +1624,67 @@ def get_homeroom_attendance_report_csv():
         headers={"Content-Disposition": f"attachment; filename=attendance_report_{teacher_slug}_T3.csv"}
     )
 
+@app.route("/api/homeroom-attendance-report/student/<int:student_id>")
+@login_required
+def get_student_attendance_detail(student_id):
+    conn = get_db_connection()
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute("SELECT program_id FROM programs WHERE program_name='General Attendance' AND status='active' LIMIT 1")
+            program = fo(cur)
+            if not program:
+                return jsonify({"error": "General Attendance program not found"}), 404
+            program_id = program["program_id"]
+
+            cur.execute("""
+                SELECT s.student_id, s.first_name, s.last_name, s.grade, s.homeroom_teacher_id
+                FROM students s
+                WHERE s.student_id = %s
+            """, (student_id,))
+            student = fo(cur)
+            if not student:
+                return jsonify({"error": "Student not found"}), 404
+
+            cur.execute("""
+                SELECT a.attendance_date, a.status, a.notes
+                FROM attendance_records a
+                JOIN enrollments e ON a.enrollment_id = e.enrollment_id
+                WHERE e.student_id = %s
+                  AND e.program_id = %s
+                  AND a.attendance_date BETWEEN %s AND %s
+                ORDER BY a.attendance_date
+            """, (student_id, program_id, T3_START_DATE, T3_END_DATE))
+            records = [
+                {"date": str(r["attendance_date"]), "status": r["status"], "notes": r["notes"] or ""}
+                for r in fa(cur)
+            ]
+
+            cur.execute("""
+                SELECT DISTINCT a.attendance_date
+                FROM attendance_records a
+                JOIN enrollments e ON a.enrollment_id = e.enrollment_id
+                JOIN students s ON e.student_id = s.student_id
+                WHERE s.homeroom_teacher_id = %s
+                  AND e.program_id = %s
+                  AND a.attendance_date BETWEEN %s AND %s
+            """, (student["homeroom_teacher_id"], program_id, T3_START_DATE, T3_END_DATE))
+            school_dates = sorted([str(r["attendance_date"]) for r in fa(cur)])
+
+            return jsonify({
+                "student": {
+                    "student_id": student["student_id"],
+                    "first_name": student["first_name"],
+                    "last_name":  student["last_name"],
+                    "grade":      student["grade"],
+                },
+                "start_date":   T3_START_DATE,
+                "end_date":     T3_END_DATE,
+                "records":      records,
+                "school_dates": school_dates,
+            })
+    finally:
+        conn.close()
+
 @app.route("/api/dismissal/students")
 def get_dismissal_students():
     conn = get_db_connection()
