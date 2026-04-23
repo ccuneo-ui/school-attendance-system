@@ -1533,27 +1533,33 @@ def _build_homeroom_report(teacher_id):
             results = []
             for s in roster:
                 c = counts_by_student.get(s["student_id"], {})
-                present    = c.get("present", 0)
-                absent     = c.get("absent", 0)
-                excused    = c.get("excused", 0)
-                field_trip = c.get("field_trip", 0)
-                nsd        = c.get("nsd", 0)
+                present       = c.get("present", 0)
+                absent        = c.get("absent", 0)
+                tardy         = c.get("tardy", 0)
+                excused_tardy = c.get("excused_tardy", 0)
+                ed            = c.get("ed", 0)
+                excused       = c.get("excused", 0)
+                field_trip    = c.get("field_trip", 0)
+                nsd           = c.get("nsd", 0)
                 # NSD is NOT an absence and NOT a school day for this student
                 student_school_days = max(0, homeroom_school_days - nsd)
-                marked = present + absent + excused + field_trip
+                marked = present + absent + tardy + excused_tardy + ed + excused + field_trip
                 not_marked = max(0, student_school_days - marked)
                 results.append({
-                    "student_id": s["student_id"],
-                    "first_name": s["first_name"],
-                    "last_name":  s["last_name"],
-                    "grade":      s["grade"],
-                    "present":    present,
-                    "absent":     absent,
-                    "excused":    excused,
-                    "field_trip": field_trip,
-                    "nsd":        nsd,
-                    "not_marked": not_marked,
-                    "school_days": student_school_days,
+                    "student_id":    s["student_id"],
+                    "first_name":    s["first_name"],
+                    "last_name":     s["last_name"],
+                    "grade":         s["grade"],
+                    "present":       present,
+                    "absent":        absent,
+                    "tardy":         tardy,
+                    "excused_tardy": excused_tardy,
+                    "ed":            ed,
+                    "excused":       excused,
+                    "field_trip":    field_trip,
+                    "nsd":           nsd,
+                    "not_marked":    not_marked,
+                    "school_days":   student_school_days,
                 })
 
             return {
@@ -1604,10 +1610,12 @@ def get_homeroom_attendance_report_csv():
     w.writerow([f"Teacher: {t.get('first_name','')} {t.get('last_name','')}"])
     w.writerow([f"Total school days in window: {data['homeroom_school_days']}"])
     w.writerow([])
-    w.writerow(["Last", "First", "Grade", "Present", "Absent", "Excused", "Field Trip", "NSD", "Not Marked", "School Days"])
+    w.writerow(["Last", "First", "Grade", "Present", "Absent", "Tardy", "Excused Tardy",
+                "Early Dismissal", "Excused", "Field Trip", "NSD", "Not Marked", "School Days"])
     for s in data["students"]:
         w.writerow([s["last_name"], s["first_name"], s["grade"],
-                    s["present"], s["absent"], s["excused"], s["field_trip"],
+                    s["present"], s["absent"], s["tardy"], s["excused_tardy"],
+                    s["ed"], s["excused"], s["field_trip"],
                     s["nsd"], s["not_marked"], s["school_days"]])
 
     return Response(
