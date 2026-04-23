@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Homeroom Attendance Report — Mizzentop</title>
+  <link rel="icon" type="image/svg+xml" href="/logo.svg">
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --navy: #1a2744;
+      --cream: #f7f3ec;
+      --muted: #6b7280;
+      --white: #ffffff;
+      --border: #e5e1da;
+      --light-bg: #f0ece4;
+      --green: #2e7d32;
+      --red: #c0392b;
+      --gold: #b8860b;
+    }
+    html, body { min-height: 100vh; font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(--navy); }
+
+    .topbar {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 14px 28px; background: var(--navy); color: var(--white);
+    }
+    .topbar a { color: rgba(255,255,255,0.75); text-decoration: none; font-size: 13px; font-weight: 500; }
+    .topbar a:hover { color: var(--white); }
+    .topbar-title { font-family: 'Playfair Display', serif; font-size: 18px; font-weight: 700; }
+
+    .container { max-width: 1080px; margin: 0 auto; padding: 32px 24px 80px; }
+
+    .page-header { margin-bottom: 28px; }
+    .page-header h1 { font-family: 'Playfair Display', serif; font-size: 30px; font-weight: 700; margin-bottom: 6px; }
+    .page-header p { color: var(--muted); font-size: 14px; }
+
+    .controls {
+      display: flex; gap: 12px; align-items: end; flex-wrap: wrap;
+      margin-bottom: 18px;
+    }
+    .control-group { display: flex; flex-direction: column; gap: 4px; }
+    .control-group label {
+      font-size: 11px; font-weight: 600; text-transform: uppercase;
+      letter-spacing: 0.5px; color: var(--muted);
+    }
+    .control-group select {
+      padding: 10px 14px; border: 1px solid var(--border); border-radius: 8px;
+      font-family: 'DM Sans', sans-serif; font-size: 14px; background: var(--white);
+      color: var(--navy); min-width: 240px;
+    }
+    .controls-spacer { flex: 1; }
+
+    .btn {
+      padding: 10px 20px; border: none; border-radius: 8px;
+      font-family: 'DM Sans', sans-serif; font-size: 14px; font-weight: 600;
+      cursor: pointer; transition: all 0.15s ease;
+    }
+    .btn-secondary { background: var(--white); color: var(--navy); border: 1px solid var(--border); }
+    .btn-secondary:hover:not(:disabled) { background: var(--light-bg); }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .summary-line {
+      font-size: 13px; color: var(--muted); margin-bottom: 14px;
+      font-weight: 500;
+    }
+    .summary-line strong { color: var(--navy); font-weight: 600; }
+
+    .table-wrap {
+      background: var(--white); border-radius: 10px;
+      border: 1px solid var(--border); overflow: hidden;
+    }
+
+    table { width: 100%; border-collapse: collapse; }
+    thead th {
+      position: sticky; top: 0;
+      background: var(--light-bg); color: var(--navy);
+      font-size: 11px; font-weight: 600;
+      text-transform: uppercase; letter-spacing: 0.5px;
+      padding: 12px 14px; text-align: left;
+      border-bottom: 1px solid var(--border);
+      white-space: nowrap;
+    }
+    thead th.num { text-align: right; }
+    thead th.absent-col { background: #fbeae6; color: #8a2a1c; }
+
+    tbody td {
+      padding: 11px 14px; font-size: 14px;
+      border-bottom: 1px solid var(--border);
+    }
+    tbody tr:last-child td { border-bottom: none; }
+    tbody tr:hover { background: #fafaf6; }
+
+    td.num {
+      text-align: right;
+      font-family: 'DM Mono', monospace;
+      font-size: 13px;
+      color: var(--muted);
+    }
+    td.num.has-present { color: var(--green); font-weight: 600; }
+    td.num.has-absent  { color: var(--red); font-weight: 600; }
+    td.num.has-not-marked { color: var(--gold); font-weight: 600; }
+
+    td.grade {
+      font-size: 12px; color: var(--muted); font-weight: 500;
+    }
+
+    .empty-state, .loading-state {
+      text-align: center; padding: 48px 24px; color: var(--muted);
+      font-size: 15px;
+    }
+
+    @media (max-width: 720px) {
+      .controls { flex-direction: column; align-items: stretch; }
+      .control-group select { min-width: unset; width: 100%; }
+      .controls-spacer { display: none; }
+      .table-wrap { overflow-x: auto; }
+      table { min-width: 800px; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="topbar">
+  <a href="/">← Home</a>
+  <span class="topbar-title">Homeroom Attendance Report</span>
+  <span></span>
+</div>
+
+<div class="container">
+  <div class="page-header">
+    <h1>Homeroom Attendance Report</h1>
+    <p>3rd Trimester · February 23 – June 12, 2026</p>
+  </div>
+
+  <div class="controls">
+    <div class="control-group">
+      <label>Homeroom Teacher</label>
+      <select id="teacher-select">
+        <option value="">— Select —</option>
+      </select>
+    </div>
+    <div class="controls-spacer"></div>
+    <button class="btn btn-secondary" id="download-csv-btn" disabled>Download CSV</button>
+  </div>
+
+  <div class="summary-line" id="summary-line" style="display:none;"></div>
+
+  <div class="table-wrap" id="table-wrap">
+    <div class="empty-state">Select a homeroom teacher to view the report.</div>
+  </div>
+</div>
+
+<script>
+const API = '';
+let currentTeacherId = null;
+let currentReportData = null;
+
+document.addEventListener('DOMContentLoaded', async () => {
+  const sel = document.getElementById('teacher-select');
+
+  const [sessionRes, teachersRes] = await Promise.all([
+    fetch('/api/session').then(r => r.json()),
+    fetch('/api/homeroom-attendance/teachers').then(r => r.json())
+  ]);
+
+  teachersRes.forEach(t => {
+    const opt = document.createElement('option');
+    opt.value = t.staff_id;
+    opt.textContent = `${t.first_name} ${t.last_name}`;
+    sel.appendChild(opt);
+  });
+
+  const match = teachersRes.find(t => t.email === sessionRes.email);
+  if (match) {
+    sel.value = match.staff_id;
+    onTeacherChange();
+  }
+
+  sel.addEventListener('change', onTeacherChange);
+  document.getElementById('download-csv-btn').addEventListener('click', downloadCsv);
+});
+
+async function onTeacherChange() {
+  currentTeacherId = document.getElementById('teacher-select').value;
+  document.getElementById('download-csv-btn').disabled = !currentTeacherId;
+  if (!currentTeacherId) {
+    renderEmpty('Select a homeroom teacher to view the report.');
+    return;
+  }
+  await loadReport();
+}
+
+async function loadReport() {
+  document.getElementById('summary-line').style.display = 'none';
+  document.getElementById('table-wrap').innerHTML = '<div class="loading-state">Loading…</div>';
+
+  const res = await fetch(`${API}/api/homeroom-attendance-report?teacher_id=${currentTeacherId}`);
+  currentReportData = await res.json();
+
+  if (currentReportData.error) {
+    renderEmpty(currentReportData.error);
+    return;
+  }
+  renderReport(currentReportData);
+}
+
+function renderEmpty(msg) {
+  document.getElementById('summary-line').style.display = 'none';
+  document.getElementById('table-wrap').innerHTML = `<div class="empty-state">${escapeHtml(msg)}</div>`;
+}
+
+function renderReport(data) {
+  const wrap = document.getElementById('table-wrap');
+  const summary = document.getElementById('summary-line');
+
+  if (!data.students || data.students.length === 0) {
+    summary.style.display = 'none';
+    wrap.innerHTML = '<div class="empty-state">No active students assigned to this homeroom.</div>';
+    return;
+  }
+
+  summary.style.display = 'block';
+  summary.innerHTML = `<strong>${data.homeroom_school_days}</strong> school days in window · <strong>${data.students.length}</strong> students`;
+
+  let html = '<table>';
+  html += '<thead><tr>';
+  html += '<th>Last Name</th><th>First Name</th><th>Grade</th>';
+  html += '<th class="num">Present</th>';
+  html += '<th class="num absent-col">Absent</th>';
+  html += '<th class="num">Excused</th>';
+  html += '<th class="num">Field Trip</th>';
+  html += '<th class="num">NSD</th>';
+  html += '<th class="num">Not Marked</th>';
+  html += '<th class="num">School Days</th>';
+  html += '</tr></thead><tbody>';
+
+  data.students.forEach(s => {
+    html += '<tr>';
+    html += `<td>${escapeHtml(s.last_name)}</td>`;
+    html += `<td>${escapeHtml(s.first_name)}</td>`;
+    html += `<td class="grade">${escapeHtml(String(s.grade ?? ''))}</td>`;
+    html += `<td class="num${s.present > 0 ? ' has-present' : ''}">${s.present}</td>`;
+    html += `<td class="num${s.absent > 0 ? ' has-absent' : ''}">${s.absent}</td>`;
+    html += `<td class="num">${s.excused}</td>`;
+    html += `<td class="num">${s.field_trip}</td>`;
+    html += `<td class="num">${s.nsd}</td>`;
+    html += `<td class="num${s.not_marked > 0 ? ' has-not-marked' : ''}">${s.not_marked}</td>`;
+    html += `<td class="num">${s.school_days}</td>`;
+    html += '</tr>';
+  });
+
+  html += '</tbody></table>';
+  wrap.innerHTML = html;
+}
+
+function downloadCsv() {
+  if (!currentTeacherId) return;
+  window.location.href = `/api/homeroom-attendance-report.csv?teacher_id=${currentTeacherId}`;
+}
+
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+</script>
+</body>
+</html>

@@ -642,6 +642,11 @@ def dismissal_options_page():
 def homeroom_attendance_page():
     return send_from_directory(".", "homeroom_attendance.html")
 
+@app.route("/homeroom-attendance-report")
+@login_required
+def homeroom_attendance_report_page():
+    return send_from_directory(".", "homeroom_attendance_report.html")
+
 @app.route("/program-attendance")
 @login_required
 def program_attendance():
@@ -1472,6 +1477,144 @@ def save_homeroom_attendance():
         return jsonify({"error": str(e)}), 500
     finally:
         conn.close()
+
+# ============================================
+# HOMEROOM ATTENDANCE REPORT (Trimester tally)
+# ============================================
+
+# 3rd trimester window — hard-coded for v1
+T3_START_DATE = "2026-02-23"
+T3_END_DATE   = "2026-06-12"
+
+def _build_homeroom_report(teacher_id):
+    """Shared logic for JSON + CSV report endpoints. Returns a dict."""
+    conn = get_db_connection()
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute("SELECT program_id FROM programs WHERE program_name='General Attendance' AND status='active' LIMIT 1")
+            program = fo(cur)
+            if not program:
+                return {"error": "General Attendance program not found"}, 404
+            program_id = program["program_id"]
+
+            cur.execute("""
+                SELECT student_id, first_name, last_name, grade
+                FROM students
+                WHERE homeroom_teacher_id = %s AND status = 'active'
+                ORDER BY last_name, first_name
+            """, (teacher_id,))
+            roster = fa(cur)
+
+            cur.execute("""
+                SELECT COUNT(DISTINCT a.attendance_date) AS school_days
+                FROM attendance_records a
+                JOIN enrollments e ON a.enrollment_id = e.enrollment_id
+                JOIN students s ON e.student_id = s.student_id
+                WHERE e.program_id = %s
+                  AND s.homeroom_teacher_id = %s
+                  AND a.attendance_date BETWEEN %s AND %s
+            """, (program_id, teacher_id, T3_START_DATE, T3_END_DATE))
+            homeroom_school_days = (fo(cur) or {}).get("school_days") or 0
+
+            cur.execute("""
+                SELECT s.student_id, a.status, COUNT(*) AS n
+                FROM attendance_records a
+                JOIN enrollments e ON a.enrollment_id = e.enrollment_id
+                JOIN students s ON e.student_id = s.student_id
+                WHERE e.program_id = %s
+                  AND s.homeroom_teacher_id = %s
+                  AND a.attendance_date BETWEEN %s AND %s
+                GROUP BY s.student_id, a.status
+            """, (program_id, teacher_id, T3_START_DATE, T3_END_DATE))
+            counts_by_student = {}
+            for row in fa(cur):
+                counts_by_student.setdefault(row["student_id"], {})[row["status"]] = row["n"]
+
+            results = []
+            for s in roster:
+                c = counts_by_student.get(s["student_id"], {})
+                present    = c.get("present", 0)
+                absent     = c.get("absent", 0)
+                excused    = c.get("excused", 0)
+                field_trip = c.get("field_trip", 0)
+                nsd        = c.get("nsd", 0)
+                # NSD is NOT an absence and NOT a school day for this student
+                student_school_days = max(0, homeroom_school_days - nsd)
+                marked = present + absent + excused + field_trip
+                not_marked = max(0, student_school_days - marked)
+                results.append({
+                    "student_id": s["student_id"],
+                    "first_name": s["first_name"],
+                    "last_name":  s["last_name"],
+                    "grade":      s["grade"],
+                    "present":    present,
+                    "absent":     absent,
+                    "excused":    excused,
+                    "field_trip": field_trip,
+                    "nsd":        nsd,
+                    "not_marked": not_marked,
+                    "school_days": student_school_days,
+                })
+
+            return {
+                "trimester": "3rd Trimester",
+                "start_date": T3_START_DATE,
+                "end_date":   T3_END_DATE,
+                "homeroom_school_days": homeroom_school_days,
+                "students": results,
+            }, 200
+    finally:
+        conn.close()
+
+@app.route("/api/homeroom-attendance-report")
+@login_required
+def get_homeroom_attendance_report():
+    teacher_id = request.args.get("teacher_id")
+    if not teacher_id:
+        return jsonify({"error": "teacher_id required"}), 400
+    data, code = _build_homeroom_report(teacher_id)
+    return jsonify(data), code
+
+@app.route("/api/homeroom-attendance-report.csv")
+@login_required
+def get_homeroom_attendance_report_csv():
+    import csv, io
+    from flask import Response
+    teacher_id = request.args.get("teacher_id")
+    if not teacher_id:
+        return ("teacher_id required", 400)
+
+    data, code = _build_homeroom_report(teacher_id)
+    if code != 200:
+        return (data.get("error", "error"), code)
+
+    conn = get_db_connection()
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute("SELECT first_name, last_name FROM staff WHERE staff_id = %s", (teacher_id,))
+            t = fo(cur) or {}
+    finally:
+        conn.close()
+
+    teacher_slug = f"{t.get('last_name','teacher')}_{t.get('first_name','')}".replace(" ", "")
+
+    buf = io.StringIO()
+    w = csv.writer(buf)
+    w.writerow([f"Homeroom Attendance Report — {data['trimester']} ({data['start_date']} to {data['end_date']})"])
+    w.writerow([f"Teacher: {t.get('first_name','')} {t.get('last_name','')}"])
+    w.writerow([f"Total school days in window: {data['homeroom_school_days']}"])
+    w.writerow([])
+    w.writerow(["Last", "First", "Grade", "Present", "Absent", "Excused", "Field Trip", "NSD", "Not Marked", "School Days"])
+    for s in data["students"]:
+        w.writerow([s["last_name"], s["first_name"], s["grade"],
+                    s["present"], s["absent"], s["excused"], s["field_trip"],
+                    s["nsd"], s["not_marked"], s["school_days"]])
+
+    return Response(
+        buf.getvalue(),
+        mimetype="text/csv",
+        headers={"Content-Disposition": f"attachment; filename=attendance_report_{teacher_slug}_T3.csv"}
+    )
 
 @app.route("/api/dismissal/students")
 def get_dismissal_students():
