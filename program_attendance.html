@@ -143,6 +143,13 @@
     .btn-og { background: var(--og-color); }
     .btn-hw { background: var(--hw-color); }
     .btn-tutor { background: var(--tutor-color); }
+    .btn-tutor-outline {
+      background: var(--white); color: var(--tutor-color);
+      border: 1px solid var(--tutor-color);
+    }
+    .btn-tutor-outline:hover { background: var(--tutor-color); color: var(--white); opacity: 1; }
+    .tutor-record-row { display: none; gap: 8px; }
+    .tutor-record-row.show { display: flex; }
 
     /* ── Today's records table ── */
     .records-card {
@@ -387,6 +394,10 @@
         </div>
       </div>
       <button class="btn-record btn-og" id="btnRecord" onclick="saveRecord()">+ Record</button>
+      <div class="tutor-record-row" id="tutorRecordRow">
+        <button class="btn-record btn-tutor-outline" id="btnRecordTutor30" onclick="saveRecord(30)">+ Record 30 min</button>
+        <button class="btn-record btn-tutor" id="btnRecordTutor60" onclick="saveRecord(60)">+ Record 1 hr</button>
+      </div>
     </div>
   </div>
 
@@ -402,6 +413,7 @@
           <th>Student</th>
           <th>Grade</th>
           <th>Teacher</th>
+          <th id="durationHeader" style="display:none;">Duration</th>
           <th id="unitsHeader">Session</th>
           <th></th>
         </tr>
@@ -484,11 +496,17 @@
     const btnRecord = document.getElementById('btnRecord');
     btnRecord.className = 'btn-record ' + prog.btnClass;
 
+    // Tutoring tab uses dual duration buttons; other tabs use the single record button
+    const isTutoring = tab === 'tutoring';
+    btnRecord.style.display = isTutoring ? 'none' : '';
+    document.getElementById('tutorRecordRow').classList.toggle('show', isTutoring);
+
     // Show/hide HW time field
     document.getElementById('hwTimeField').style.display = tab === 'homework' ? '' : 'none';
 
     // Update headers
     document.getElementById('unitsHeader').textContent = tab === 'homework' ? 'Time' : 'Session';
+    document.getElementById('durationHeader').style.display = isTutoring ? '' : 'none';
     document.getElementById('addTitle').textContent = `Record ${prog.label} Attendance`;
 
     loadRecords();
@@ -594,18 +612,27 @@
   }
 
   // ── Save record ──
-  async function saveRecord() {
+  async function saveRecord(durationMinutes) {
     if (!selectedStudentId) {
       showToast('Please select a student first.');
       return;
     }
-    const date = document.getElementById('sessionDate').value;
     const teacher = document.getElementById('teacherSearch').value.trim();
+    if (currentTab === 'tutoring' && !teacher) {
+      showToast('Please select a teacher first.');
+      return;
+    }
+    const date = document.getElementById('sessionDate').value;
     const prog = PROGRAMS[currentTab];
     const units = currentTab === 'homework' ? hwUnits : 1;
+    const duration = currentTab === 'tutoring' ? (durationMinutes || 60) : 60;
 
-    const btnRecord = document.getElementById('btnRecord');
-    btnRecord.disabled = true;
+    const btns = [
+      document.getElementById('btnRecord'),
+      document.getElementById('btnRecordTutor30'),
+      document.getElementById('btnRecordTutor60'),
+    ];
+    btns.forEach(b => { if (b) b.disabled = true; });
 
     try {
       const res = await fetch('/api/program-attendance', {
@@ -616,7 +643,8 @@
           program_type: prog.type,
           session_date: date,
           units: units,
-          teacher: teacher
+          teacher: teacher,
+          duration_minutes: duration
         })
       });
       const data = await res.json();
@@ -633,7 +661,7 @@
     } catch(e) {
       showToast('Network error. Please try again.');
     } finally {
-      btnRecord.disabled = false;
+      btns.forEach(b => { if (b) b.disabled = false; });
     }
   }
 
@@ -656,6 +684,7 @@
     const empty = document.getElementById('emptyState');
     const prog = PROGRAMS[currentTab];
     const isHw = currentTab === 'homework';
+    const isTutoring = currentTab === 'tutoring';
 
     if (records.length === 0) {
       tbody.innerHTML = '';
@@ -672,10 +701,14 @@
         } else {
           unitDisplay = '✓';
         }
+        const durationCell = isTutoring
+          ? `<td>${(r.duration_minutes ?? 60) === 60 ? '1 hr' : `${r.duration_minutes} min`}</td>`
+          : '';
         return `<tr>
           <td><strong>${escHtml(r.last_name)}, ${escHtml(r.first_name)}</strong></td>
           <td>${escHtml(r.grade || '—')}</td>
           <td>${escHtml(r.teacher || '—')}</td>
+          ${durationCell}
           <td><span class="units-badge ${isHw ? 'units-time' : 'units-session'}">${unitDisplay}</span></td>
           <td><button class="btn-remove" onclick="removeRecord(${r.record_id})">Remove</button></td>
         </tr>`;
@@ -684,7 +717,8 @@
 
     // Update counts
     document.getElementById('recordsCount').textContent = `${records.length} record${records.length !== 1 ? 's' : ''}`;
-    document.getElementById('statStudents').textContent = records.length;
+    const uniqueStudents = new Set(records.map(r => r.student_id)).size;
+    document.getElementById('statStudents').textContent = isTutoring ? uniqueStudents : records.length;
 
     if (isHw) {
       const totalUnits = records.reduce((sum, r) => sum + parseFloat(r.units || 0), 0);
@@ -693,6 +727,12 @@
       const m = totalMins % 60;
       document.getElementById('statUnits').textContent = hrs > 0 ? `${hrs}h ${m}m` : `${m}m`;
       document.getElementById('statUnitsLabel').textContent = 'Total Time';
+    } else if (isTutoring) {
+      const totalMins = records.reduce((sum, r) => sum + (r.duration_minutes ?? 60), 0);
+      const sessions = totalMins / 60;
+      const display = Number.isInteger(sessions) ? sessions.toString() : sessions.toFixed(1);
+      document.getElementById('statUnits').textContent = display;
+      document.getElementById('statUnitsLabel').textContent = 'Sessions';
     } else {
       document.getElementById('statUnits').textContent = records.length;
       document.getElementById('statUnitsLabel').textContent = 'Sessions';
