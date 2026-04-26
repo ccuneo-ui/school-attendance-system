@@ -211,17 +211,25 @@ def init_db():
             # Program attendance for billable after-school programs
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS program_attendance (
-                    record_id      SERIAL PRIMARY KEY,
-                    student_id     INTEGER NOT NULL,
-                    program_type   TEXT NOT NULL,
-                    session_date   TEXT NOT NULL,
-                    units          NUMERIC(3,1) NOT NULL DEFAULT 1,
-                    teacher        TEXT DEFAULT '',
-                    recorded_by    TEXT DEFAULT '',
-                    recorded_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    record_id        SERIAL PRIMARY KEY,
+                    student_id       INTEGER NOT NULL,
+                    program_type     TEXT NOT NULL,
+                    session_date     TEXT NOT NULL,
+                    units            NUMERIC(3,1) NOT NULL DEFAULT 1,
+                    teacher          TEXT DEFAULT '',
+                    duration_minutes INTEGER NOT NULL DEFAULT 60,
+                    recorded_by      TEXT DEFAULT '',
+                    recorded_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     UNIQUE(student_id, program_type, session_date)
                 )
             """)
+            # Migrate: add duration_minutes column on existing tables (backfills to 60 for all rows)
+            cur.execute("""
+                SELECT column_name FROM information_schema.columns
+                WHERE table_name='program_attendance' AND column_name='duration_minutes'
+            """)
+            if not cur.fetchone():
+                cur.execute("ALTER TABLE program_attendance ADD COLUMN duration_minutes INTEGER NOT NULL DEFAULT 60")
             # Aftercare attendance — billed by check-in/check-out time
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS aftercare_attendance (
@@ -2090,7 +2098,8 @@ def get_program_attendance_records():
             if date:
                 cur.execute("""
                     SELECT pa.record_id, pa.student_id, pa.program_type,
-                           pa.session_date, pa.units, pa.teacher, pa.recorded_by, pa.recorded_at,
+                           pa.session_date, pa.units, pa.teacher, pa.duration_minutes,
+                           pa.recorded_by, pa.recorded_at,
                            s.first_name, s.last_name, s.grade
                     FROM program_attendance pa
                     JOIN students s ON pa.student_id=s.student_id
@@ -2100,7 +2109,8 @@ def get_program_attendance_records():
             elif start_date and end_date:
                 cur.execute("""
                     SELECT pa.record_id, pa.student_id, pa.program_type,
-                           pa.session_date, pa.units, pa.teacher, pa.recorded_by, pa.recorded_at,
+                           pa.session_date, pa.units, pa.teacher, pa.duration_minutes,
+                           pa.recorded_by, pa.recorded_at,
                            s.first_name, s.last_name, s.grade
                     FROM program_attendance pa
                     JOIN students s ON pa.student_id=s.student_id
@@ -2110,7 +2120,8 @@ def get_program_attendance_records():
             else:
                 cur.execute("""
                     SELECT pa.record_id, pa.student_id, pa.program_type,
-                           pa.session_date, pa.units, pa.teacher, pa.recorded_by, pa.recorded_at,
+                           pa.session_date, pa.units, pa.teacher, pa.duration_minutes,
+                           pa.recorded_by, pa.recorded_at,
                            s.first_name, s.last_name, s.grade
                     FROM program_attendance pa
                     JOIN students s ON pa.student_id=s.student_id
@@ -2131,6 +2142,9 @@ def save_program_attendance():
     session_date = data.get("session_date")
     units        = data.get("units", 1)
     teacher      = data.get("teacher", "")
+    duration_minutes = data.get("duration_minutes", 60)
+    if duration_minutes not in (30, 60):
+        duration_minutes = 60
     recorded_by  = session.get("user_name", "")
     if not all([student_id, program_type, session_date]):
         return jsonify({"error":"Missing required fields"}),400
@@ -2138,13 +2152,14 @@ def save_program_attendance():
     try:
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
             cur.execute("""
-                INSERT INTO program_attendance (student_id, program_type, session_date, units, teacher, recorded_by)
-                VALUES (%s,%s,%s,%s,%s,%s)
+                INSERT INTO program_attendance (student_id, program_type, session_date, units, teacher, duration_minutes, recorded_by)
+                VALUES (%s,%s,%s,%s,%s,%s,%s)
                 ON CONFLICT (student_id, program_type, session_date) DO UPDATE SET
                     units=EXCLUDED.units, teacher=EXCLUDED.teacher,
+                    duration_minutes=EXCLUDED.duration_minutes,
                     recorded_by=EXCLUDED.recorded_by, recorded_at=CURRENT_TIMESTAMP
                 RETURNING record_id
-            """, (student_id, program_type, session_date, units, teacher, recorded_by))
+            """, (student_id, program_type, session_date, units, teacher, duration_minutes, recorded_by))
             record = fo(cur)
         conn.commit()
         return jsonify({"success":True, "record_id": record["record_id"] if record else None})
@@ -2622,9 +2637,11 @@ def api_comp_report():
                     rates.setdefault(k, v)
 
                 # 2. Program attendance for the 3 tutoring programs, grouped by teacher
+                #    For 1-on-1 tutoring, sessions are weighted by duration (30 min = 0.5, 60 min = 1).
                 cur.execute("""
                     SELECT teacher, program_type, SUM(units) AS total_units,
-                           COUNT(*) AS session_count
+                           COUNT(*) AS session_count,
+                           SUM(duration_minutes) AS total_minutes
                     FROM   program_attendance
                     WHERE  session_date::date >= %s AND session_date::date <= %s
                       AND  program_type IN ('og', 'homework', 'tutoring')
@@ -2647,6 +2664,7 @@ def api_comp_report():
                     pt = r["program_type"]
                     units = float(r["total_units"])
                     sessions = int(r["session_count"])
+                    total_minutes = int(r["total_minutes"] or 0)
 
                     if pt == "og":
                         t["og_sessions"] = sessions
@@ -2655,8 +2673,9 @@ def api_comp_report():
                         t["homework_units"] = units
                         t["homework_comp"] = units * rates["comp_homework_hourly"]
                     elif pt == "tutoring":
-                        t["tutoring_sessions"] = sessions
-                        t["tutoring_comp"] = sessions * rates["comp_tutoring_session"]
+                        weighted = total_minutes / 60.0
+                        t["tutoring_sessions"] = round(weighted, 2)
+                        t["tutoring_comp"] = weighted * rates["comp_tutoring_session"]
 
                 for t in teachers.values():
                     t["total_comp"] = round(t["og_comp"] + t["homework_comp"] + t["tutoring_comp"], 2)
@@ -2869,8 +2888,14 @@ def api_billing_report():
                 mcard = {r["student_id"]: int(r["qty"]) for r in cur.fetchall()}
 
                 # 3. Program attendance (beforecare + tutoring programs)
+                #    For 1-on-1 tutoring, units are weighted by duration_minutes/60 so a
+                #    30-min record counts as 0.5 of a session in billing totals.
                 cur.execute("""
-                    SELECT student_id, program_type, SUM(units) AS total_units
+                    SELECT student_id, program_type,
+                           SUM(CASE WHEN program_type='tutoring'
+                                    THEN duration_minutes / 60.0
+                                    ELSE units
+                               END) AS total_units
                     FROM   program_attendance
                     WHERE  session_date::date >= %s AND session_date::date <= %s
                     GROUP  BY student_id, program_type
@@ -3068,7 +3093,7 @@ def api_billing_student_detail():
 
                 # 2. Program attendance
                 cur.execute("""
-                    SELECT session_date, program_type, units, teacher, recorded_by
+                    SELECT session_date, program_type, units, teacher, duration_minutes, recorded_by
                     FROM   program_attendance
                     WHERE  student_id = %s
                       AND  session_date::date >= %s AND session_date::date <= %s
@@ -3085,8 +3110,15 @@ def api_billing_student_detail():
                     units = float(r["units"])
                     label, key, rate_key, unit_word = prog_labels.get(
                         pt, (pt.replace("_"," ").title(), pt, "og_session", "unit"))
-                    amount = units * rates[rate_key]
-                    detail = f"{units:g} {unit_word}{'s' if units != 1 else ''}"
+                    if pt == "tutoring":
+                        dm = int(r.get("duration_minutes") or 60)
+                        weight = dm / 60.0
+                        amount = weight * rates[rate_key]
+                        dur_str = "1 hr" if dm == 60 else f"{dm} min"
+                        detail = f"{dur_str} session"
+                    else:
+                        amount = units * rates[rate_key]
+                        detail = f"{units:g} {unit_word}{'s' if units != 1 else ''}"
                     if r.get("teacher"):
                         detail += f" · Teacher: {r['teacher']}"
                     rows.append({
