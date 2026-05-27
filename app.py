@@ -1490,12 +1490,56 @@ def save_homeroom_attendance():
 # HOMEROOM ATTENDANCE REPORT (Trimester tally)
 # ============================================
 
-# 3rd trimester window — hard-coded for v1
+# Trimester windows for 2025–26 — hard-coded for v1 (no school_calendar table yet)
+T1_START_DATE = "2025-09-02"
+T1_END_DATE   = "2025-11-21"
+T2_START_DATE = "2025-11-22"
+T2_END_DATE   = "2026-02-22"
 T3_START_DATE = "2026-02-23"
 T3_END_DATE   = "2026-06-12"
 
+TRIMESTER_WINDOWS = [
+    ("t1", "Trimester 1", T1_START_DATE, T1_END_DATE),
+    ("t2", "Trimester 2", T2_START_DATE, T2_END_DATE),
+    ("t3", "Trimester 3", T3_START_DATE, T3_END_DATE),
+]
+
+
+def _trimester_unexcused_counts(cur, program_id, teacher_id, start_date, end_date):
+    """
+    Return per-student unexcused counts for one trimester window:
+      {student_id: {"absent": n, "tardy": n, "ed": n}, ...}
+
+    Per Karin: excused absences (status='excused') and excused tardies
+    (status='excused_tardy') are NOT counted in any column. Only the three
+    unexcused statuses below are surfaced in the report.
+    """
+    cur.execute("""
+        SELECT s.student_id, a.status, COUNT(*) AS n
+        FROM attendance_records a
+        JOIN enrollments e ON a.enrollment_id = e.enrollment_id
+        JOIN students s ON e.student_id = s.student_id
+        WHERE e.program_id = %s
+          AND s.homeroom_teacher_id = %s
+          AND a.attendance_date BETWEEN %s AND %s
+          AND a.status IN ('absent', 'tardy', 'ed')
+        GROUP BY s.student_id, a.status
+    """, (program_id, teacher_id, start_date, end_date))
+    out = {}
+    for r in fa(cur):
+        out.setdefault(r["student_id"], {"absent": 0, "tardy": 0, "ed": 0})[r["status"]] = r["n"]
+    return out
+
+
 def _build_homeroom_report(teacher_id):
-    """Shared logic for JSON + CSV report endpoints. Returns a dict."""
+    """
+    Whole-year homeroom attendance report. Returns one row per active student
+    in the homeroom with unexcused absent/tardy/ED counts for each trimester
+    laid out side-by-side.
+
+    One parameterized counts query, invoked once per trimester window. Results
+    are merged in Python by student_id.
+    """
     conn = get_db_connection()
     try:
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
@@ -1506,75 +1550,39 @@ def _build_homeroom_report(teacher_id):
             program_id = program["program_id"]
 
             cur.execute("""
-                SELECT student_id, first_name, last_name, grade
+                SELECT student_id, first_name, last_name
                 FROM students
                 WHERE homeroom_teacher_id = %s AND status = 'active'
                 ORDER BY last_name, first_name
             """, (teacher_id,))
             roster = fa(cur)
 
-            cur.execute("""
-                SELECT COUNT(DISTINCT a.attendance_date) AS school_days
-                FROM attendance_records a
-                JOIN enrollments e ON a.enrollment_id = e.enrollment_id
-                JOIN students s ON e.student_id = s.student_id
-                WHERE e.program_id = %s
-                  AND s.homeroom_teacher_id = %s
-                  AND a.attendance_date BETWEEN %s AND %s
-            """, (program_id, teacher_id, T3_START_DATE, T3_END_DATE))
-            homeroom_school_days = (fo(cur) or {}).get("school_days") or 0
-
-            cur.execute("""
-                SELECT s.student_id, a.status, COUNT(*) AS n
-                FROM attendance_records a
-                JOIN enrollments e ON a.enrollment_id = e.enrollment_id
-                JOIN students s ON e.student_id = s.student_id
-                WHERE e.program_id = %s
-                  AND s.homeroom_teacher_id = %s
-                  AND a.attendance_date BETWEEN %s AND %s
-                GROUP BY s.student_id, a.status
-            """, (program_id, teacher_id, T3_START_DATE, T3_END_DATE))
-            counts_by_student = {}
-            for row in fa(cur):
-                counts_by_student.setdefault(row["student_id"], {})[row["status"]] = row["n"]
+            # One counts query per trimester; merge by student_id
+            counts_by_trimester = {
+                key: _trimester_unexcused_counts(cur, program_id, teacher_id, start, end)
+                for key, _label, start, end in TRIMESTER_WINDOWS
+            }
 
             results = []
             for s in roster:
-                c = counts_by_student.get(s["student_id"], {})
-                present       = c.get("present", 0)
-                absent        = c.get("absent", 0)
-                tardy         = c.get("tardy", 0)
-                excused_tardy = c.get("excused_tardy", 0)
-                ed            = c.get("ed", 0)
-                excused       = c.get("excused", 0)
-                field_trip    = c.get("field_trip", 0)
-                nsd           = c.get("nsd", 0)
-                # NSD is NOT an absence and NOT a school day for this student
-                student_school_days = max(0, homeroom_school_days - nsd)
-                marked = present + absent + tardy + excused_tardy + ed + excused + field_trip
-                not_marked = max(0, student_school_days - marked)
-                results.append({
-                    "student_id":    s["student_id"],
-                    "first_name":    s["first_name"],
-                    "last_name":     s["last_name"],
-                    "grade":         s["grade"],
-                    "present":       present,
-                    "absent":        absent,
-                    "tardy":         tardy,
-                    "excused_tardy": excused_tardy,
-                    "ed":            ed,
-                    "excused":       excused,
-                    "field_trip":    field_trip,
-                    "nsd":           nsd,
-                    "not_marked":    not_marked,
-                    "school_days":   student_school_days,
-                })
+                sid = s["student_id"]
+                row = {
+                    "student_id": sid,
+                    "first_name": s["first_name"],
+                    "last_name":  s["last_name"],
+                }
+                for key, _label, _start, _end in TRIMESTER_WINDOWS:
+                    c = counts_by_trimester[key].get(sid, {})
+                    row[f"{key}_absent"] = c.get("absent", 0)
+                    row[f"{key}_tardy"]  = c.get("tardy",  0)
+                    row[f"{key}_ed"]     = c.get("ed",     0)
+                results.append(row)
 
             return {
-                "trimester": "3rd Trimester",
-                "start_date": T3_START_DATE,
-                "end_date":   T3_END_DATE,
-                "homeroom_school_days": homeroom_school_days,
+                "trimesters": [
+                    {"key": key, "label": label, "start_date": start, "end_date": end}
+                    for key, label, start, end in TRIMESTER_WINDOWS
+                ],
                 "students": results,
             }, 200
     finally:
@@ -1614,22 +1622,26 @@ def get_homeroom_attendance_report_csv():
 
     buf = io.StringIO()
     w = csv.writer(buf)
-    w.writerow([f"Homeroom Attendance Report — {data['trimester']} ({data['start_date']} to {data['end_date']})"])
+    w.writerow(["Homeroom Attendance Report — Full Year (Trimesters 1, 2, and 3)"])
     w.writerow([f"Teacher: {t.get('first_name','')} {t.get('last_name','')}"])
-    w.writerow([f"Total school days in window: {data['homeroom_school_days']}"])
+    for tri in data["trimesters"]:
+        w.writerow([f"{tri['label']}: {tri['start_date']} to {tri['end_date']}"])
+    w.writerow(["Counts shown are unexcused only (excused absences and excused tardies are excluded)."])
     w.writerow([])
-    w.writerow(["Last", "First", "Grade", "Present", "Absent", "Tardy", "Excused Tardy",
-                "Early Dismissal", "Excused", "Field Trip", "NSD", "Not Marked", "School Days"])
+    w.writerow(["Last Name", "First Name",
+                "T1 Absent", "T1 Tardy", "T1 ED",
+                "T2 Absent", "T2 Tardy", "T2 ED",
+                "T3 Absent", "T3 Tardy", "T3 ED"])
     for s in data["students"]:
-        w.writerow([s["last_name"], s["first_name"], s["grade"],
-                    s["present"], s["absent"], s["tardy"], s["excused_tardy"],
-                    s["ed"], s["excused"], s["field_trip"],
-                    s["nsd"], s["not_marked"], s["school_days"]])
+        w.writerow([s["last_name"], s["first_name"],
+                    s["t1_absent"], s["t1_tardy"], s["t1_ed"],
+                    s["t2_absent"], s["t2_tardy"], s["t2_ed"],
+                    s["t3_absent"], s["t3_tardy"], s["t3_ed"]])
 
     return Response(
         buf.getvalue(),
         mimetype="text/csv",
-        headers={"Content-Disposition": f"attachment; filename=attendance_report_{teacher_slug}_T3.csv"}
+        headers={"Content-Disposition": f"attachment; filename=attendance_report_{teacher_slug}_full_year.csv"}
     )
 
 @app.route("/api/homeroom-attendance-report/student/<int:student_id>")

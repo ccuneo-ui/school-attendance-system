@@ -84,6 +84,20 @@
     thead th.num { text-align: right; }
     thead th.absent-col { background: #fbeae6; color: #8a2a1c; }
 
+    /* Group headers for trimester columns */
+    thead th.tri-group {
+      text-align: center;
+      background: #ece6da;
+      border-left: 2px solid var(--border);
+      font-family: 'Playfair Display', serif;
+      font-size: 13px;
+      text-transform: none;
+      letter-spacing: 0;
+      font-weight: 700;
+    }
+    thead tr:nth-child(2) th.tri-first  { border-left: 2px solid var(--border); }
+    tbody td.tri-first { border-left: 2px solid var(--border); }
+
     tbody td {
       padding: 11px 14px; font-size: 14px;
       border-bottom: 1px solid var(--border);
@@ -154,8 +168,6 @@
     .day.no-school { background: var(--light-bg); color: #b8b3aa; font-weight: 300; }
     .day.not-marked { background: var(--white); border: 1.5px solid var(--red); color: var(--red); }
 
-    tbody tr { cursor: pointer; }
-
     @media (max-width: 720px) {
       .controls { flex-direction: column; align-items: stretch; }
       .control-group select { min-width: unset; width: 100%; }
@@ -176,7 +188,7 @@
 <div class="container">
   <div class="page-header">
     <h1>Homeroom Attendance Report</h1>
-    <p>3rd Trimester · February 23 – June 12, 2026</p>
+    <p>Full Year · Trimesters 1, 2, and 3 (2025–26)</p>
   </div>
 
   <div class="controls">
@@ -289,38 +301,47 @@ function renderReport(data) {
   }
 
   summary.style.display = 'block';
-  summary.innerHTML = `<strong>${data.homeroom_school_days}</strong> school days in window · <strong>${data.students.length}</strong> students`;
+  summary.innerHTML =
+    `<strong>${data.students.length}</strong> students · ` +
+    `counts are unexcused only (excused absences and excused tardies are excluded)`;
 
   let html = '<table>';
-  html += '<thead><tr>';
-  html += '<th>Last Name</th><th>First Name</th><th>Grade</th>';
-  html += '<th class="num">Present</th>';
-  html += '<th class="num absent-col">Absent</th>';
-  html += '<th class="num">Tardy</th>';
-  html += '<th class="num">Exc. Tardy</th>';
-  html += '<th class="num">Early Dis.</th>';
-  html += '<th class="num">Excused</th>';
-  html += '<th class="num">Field Trip</th>';
-  html += '<th class="num">NSD</th>';
-  html += '<th class="num">Not Marked</th>';
-  html += '<th class="num">School Days</th>';
-  html += '</tr></thead><tbody>';
+  html += '<thead>';
+  // Row 1: name columns + trimester group headers
+  html += '<tr>';
+  html += '<th rowspan="2">Last Name</th>';
+  html += '<th rowspan="2">First Name</th>';
+  data.trimesters.forEach(tri => {
+    html += `<th colspan="3" class="tri-group" title="${escapeHtml(tri.start_date)} → ${escapeHtml(tri.end_date)}">${escapeHtml(tri.label)}</th>`;
+  });
+  html += '</tr>';
+  // Row 2: per-trimester column labels
+  html += '<tr>';
+  data.trimesters.forEach((_tri, i) => {
+    const firstClass = i === 0 ? '' : ' tri-first';
+    html += `<th class="num${firstClass}">Absent</th>`;
+    html += `<th class="num">Tardy</th>`;
+    html += `<th class="num">ED</th>`;
+  });
+  html += '</tr>';
+  html += '</thead><tbody>';
 
   data.students.forEach(s => {
-    html += `<tr onclick="openStudentDetail(${s.student_id})">`;
+    // Per-student row. The detail modal currently shows T3-only data, so
+    // it's intentionally NOT wired up here — clicking a row does nothing
+    // until the modal is expanded to show all three trimesters.
+    html += '<tr>';
     html += `<td>${escapeHtml(s.last_name)}</td>`;
     html += `<td>${escapeHtml(s.first_name)}</td>`;
-    html += `<td class="grade">${escapeHtml(String(s.grade ?? ''))}</td>`;
-    html += `<td class="num${s.present > 0 ? ' has-present' : ''}">${s.present}</td>`;
-    html += `<td class="num${s.absent > 0 ? ' has-absent' : ''}">${s.absent}</td>`;
-    html += `<td class="num">${s.tardy}</td>`;
-    html += `<td class="num">${s.excused_tardy}</td>`;
-    html += `<td class="num">${s.ed}</td>`;
-    html += `<td class="num">${s.excused}</td>`;
-    html += `<td class="num">${s.field_trip}</td>`;
-    html += `<td class="num">${s.nsd}</td>`;
-    html += `<td class="num${s.not_marked > 0 ? ' has-not-marked' : ''}">${s.not_marked}</td>`;
-    html += `<td class="num">${s.school_days}</td>`;
+    data.trimesters.forEach((tri, i) => {
+      const firstClass = i === 0 ? '' : ' tri-first';
+      const absent = s[`${tri.key}_absent`] ?? 0;
+      const tardy  = s[`${tri.key}_tardy`]  ?? 0;
+      const ed     = s[`${tri.key}_ed`]     ?? 0;
+      html += `<td class="num${firstClass}${absent > 0 ? ' has-absent' : ''}">${absent}</td>`;
+      html += `<td class="num">${tardy}</td>`;
+      html += `<td class="num">${ed}</td>`;
+    });
     html += '</tr>';
   });
 
