@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lunch Dashboard — Mizzentop Admin</title>
+  <link rel="icon" type="image/svg+xml" href="/logo.svg">
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --navy: #1a2744;
+      --burgundy: #4a1a2c;
+      --cream: #f7f3ec;
+      --muted: #6b7280;
+      --white: #ffffff;
+      --border: #e5e1da;
+      --light-bg: #f0ece4;
+      --gold: #c8992a;
+      --green: #2d5016;
+      --red: #c0392b;
+    }
+    html, body { min-height: 100vh; font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(--navy); }
+
+    .topbar {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 14px 28px; background: var(--burgundy); color: var(--white);
+    }
+    .topbar a { color: rgba(255,255,255,0.78); text-decoration: none; font-size: 13px; font-weight: 500; }
+    .topbar a:hover { color: var(--white); }
+    .topbar-title { font-family: 'Playfair Display', serif; font-size: 18px; font-weight: 700; }
+
+    .page-header { padding: 24px 28px 6px; }
+    .page-header h1 { font-family: 'Playfair Display', serif; font-size: 28px; font-weight: 700; margin-bottom: 4px; }
+    .page-header p { color: var(--muted); font-size: 13px; }
+
+    /* ── Control bar ── */
+    .controls {
+      display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+      padding: 14px 28px; border-bottom: 1px solid var(--border);
+    }
+    .ctrl { display: flex; align-items: center; gap: 7px; }
+    .ctrl label { font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+    select, input[type="text"] {
+      padding: 7px 10px; border: 1px solid var(--border); border-radius: 8px;
+      font-family: 'DM Sans', sans-serif; font-size: 13px; background: var(--white); color: var(--navy);
+    }
+    input[type="text"] { min-width: 180px; }
+    select:focus, input:focus { outline: none; border-color: var(--burgundy); }
+
+    .chips { display: flex; gap: 10px; flex-wrap: wrap; padding: 14px 28px; }
+    .chip {
+      display: flex; flex-direction: column; gap: 2px;
+      padding: 10px 16px; border-radius: 10px; background: var(--white);
+      border: 1px solid var(--border); min-width: 120px;
+    }
+    .chip .c-num { font-family: 'Playfair Display', serif; font-size: 22px; font-weight: 700; }
+    .chip .c-lbl { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+    .chip.fy { border-left: 3px solid var(--gold); }
+    .chip.mo { border-left: 3px solid var(--green); }
+    .chip.pz { border-left: 3px solid #b8860b; }
+    .chip.hm { border-left: 3px solid var(--muted); }
+
+    .warn-chip {
+      display: none; margin: 0 28px 8px; padding: 8px 14px; border-radius: 8px;
+      background: #fdf3e3; border: 1px solid #e8c98a; color: #8a5a1a; font-size: 12px;
+    }
+    .warn-chip.show { display: block; }
+
+    /* ── Grid ── */
+    .grid-wrap { overflow-x: auto; padding: 8px 28px 80px; }
+    table.grid { border-collapse: separate; border-spacing: 0; font-size: 13px; }
+    table.grid th, table.grid td {
+      border-bottom: 1px solid var(--border); border-right: 1px solid var(--border);
+      padding: 6px 8px; text-align: center; background: var(--white);
+    }
+    table.grid thead th {
+      position: sticky; top: 0; z-index: 6; background: var(--light-bg);
+      font-size: 11px; font-weight: 600; color: var(--navy);
+    }
+    .mhdr-sub { font-size: 10px; color: var(--muted); font-weight: 500; }
+    .mhdr-sub.zero { color: var(--red); }
+
+    /* sticky left columns */
+    .col-last  { position: sticky; left: 0;     z-index: 5; min-width: 110px; text-align: left; }
+    .col-first { position: sticky; left: 110px; z-index: 5; min-width: 100px; text-align: left; }
+    .col-grade { position: sticky; left: 210px; z-index: 5; min-width: 56px; }
+    thead .col-last, thead .col-first, thead .col-grade { z-index: 7; }
+    .col-last, .col-first, .col-grade { box-shadow: 1px 0 0 var(--border); }
+
+    .mcell { min-width: 104px; vertical-align: top; padding: 5px 6px; }
+    .status-sel {
+      width: 100%; padding: 4px 6px; border-radius: 6px; border: 1px solid var(--border);
+      font-size: 11px; font-weight: 600; cursor: pointer; background: var(--white);
+    }
+    .status-sel.s-home        { color: var(--muted); }
+    .status-sel.s-monthly     { background: #e7f2e0; color: var(--green); border-color: #bcd9ab; }
+    .status-sel.s-fullYearPaid{ background: #fbf1d9; color: #8a6a1a; border-color: #e8c98a; }
+
+    .pizza { display: flex; align-items: center; justify-content: center; gap: 4px; margin-top: 4px; height: 20px; }
+    .pz-btn {
+      width: 18px; height: 18px; border-radius: 5px; border: 1px solid var(--border);
+      background: var(--white); color: var(--navy); cursor: pointer; font-size: 12px;
+      line-height: 1; display: flex; align-items: center; justify-content: center; padding: 0;
+    }
+    .pz-btn:hover { background: var(--light-bg); }
+    .pz-n { font-size: 11px; font-weight: 700; min-width: 14px; }
+    .pizza .pz-minus, .pizza .pz-n { display: none; }
+    .pizza.has .pz-minus, .pizza.has .pz-n { display: flex; }
+    .pizza.has .pz-add { background: #fdf4e3; border-color: #e8c98a; }
+
+    .col-total { min-width: 86px; font-weight: 700; font-family: 'Playfair Display', serif; }
+
+    .grp-row td {
+      background: var(--navy); color: var(--white); text-align: left;
+      font-weight: 600; font-size: 12px; letter-spacing: 0.03em;
+      position: sticky; left: 0;
+    }
+    .grp-row .grp-total { float: right; font-family: 'Playfair Display', serif; }
+
+    .row-actions { white-space: nowrap; }
+    .ra-btn {
+      font-size: 10px; padding: 3px 6px; border-radius: 5px; border: 1px solid var(--border);
+      background: var(--white); cursor: pointer; color: var(--navy); margin: 1px;
+    }
+    .ra-btn:hover { background: var(--light-bg); }
+
+    .loading { padding: 60px; text-align: center; color: var(--muted); }
+
+    .save-badge {
+      position: fixed; bottom: 22px; right: 22px; padding: 8px 16px; border-radius: 20px;
+      font-size: 12px; font-weight: 600; box-shadow: 0 4px 14px rgba(0,0,0,0.15);
+      opacity: 0; transform: translateY(12px); transition: all 0.25s; z-index: 100;
+    }
+    .save-badge.show { opacity: 1; transform: translateY(0); }
+    .save-badge.saving { background: var(--navy); color: var(--white); }
+    .save-badge.saved  { background: #e7f2e0; color: var(--green); border: 1px solid #bcd9ab; }
+    .save-badge.error  { background: #fde2de; color: var(--red); border: 1px solid #f0a79e; }
+  </style>
+</head>
+<body>
+
+<div class="topbar">
+  <span class="topbar-title">Mizzentop Admin</span>
+  <a href="/">← Home</a>
+</div>
+
+<div class="page-header">
+  <h1>Lunch Dashboard</h1>
+  <p>Enter monthly lunch enrollment and pizza counts. Changes save automatically.</p>
+</div>
+
+<div class="controls">
+  <div class="ctrl">
+    <label>School Year</label>
+    <select id="yearSelect"></select>
+  </div>
+  <div class="ctrl">
+    <label>Summary Month</label>
+    <select id="summaryMonth"></select>
+  </div>
+  <div class="ctrl">
+    <label>Search</label>
+    <input type="text" id="searchBox" placeholder="Student name…">
+  </div>
+  <div class="ctrl">
+    <label>Grade</label>
+    <select id="gradeFilter"><option value="all">All</option></select>
+  </div>
+  <div class="ctrl">
+    <label>Status</label>
+    <select id="statusFilter">
+      <option value="all">All</option>
+      <option value="monthly">Monthly</option>
+      <option value="fullYearPaid">Full Year Paid</option>
+      <option value="home">Home</option>
+      <option value="pizza">Has Pizza</option>
+    </select>
+  </div>
+</div>
+
+<div class="chips" id="chips"></div>
+<div class="warn-chip" id="warnChip"></div>
+
+<div class="grid-wrap">
+  <div class="loading" id="loading">Loading roster…</div>
+  <table class="grid" id="grid" style="display:none;">
+    <thead id="gridHead"></thead>
+    <tbody id="gridBody"></tbody>
+  </table>
+</div>
+
+<div class="save-badge" id="saveBadge"></div>
+
+<script>
+  const MONTH_SHORT = {'01':'Jan','02':'Feb','03':'Mar','04':'Apr','05':'May','06':'Jun',
+                       '07':'Jul','08':'Aug','09':'Sep','10':'Oct','11':'Nov','12':'Dec'};
+  const GRADE_ORDER = ['JPK','SPK','K','1','2','3','4','5','6','7','8'];
+  const EC_GRADES = ['JPK','SPK','K'];
+  const STATUS_LABELS = { home:'Home', monthly:'Monthly', fullYearPaid:'Full Year Paid' };
+
+  let state = { students: [], month_keys: [], lunch_days: {}, rates: {}, school_year: '' };
+  const saveTimers = {};
+
+  function isEC(grade){ return EC_GRADES.includes(String(grade).toUpperCase()); }
+  function gradeRank(g){ const i = GRADE_ORDER.indexOf(String(g).toUpperCase()); return i < 0 ? 99 : i; }
+  function monthLabel(mk){ return MONTH_SHORT[mk.slice(5)] || mk; }
+  function esc(s){ return (s==null?'':String(s)).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+  function money(n){ return '$' + (Math.round(n*100)/100).toFixed(2); }
+
+  function cellOf(stu, mk){
+    const c = (stu.months && stu.months[mk]) || {};
+    return { status: c.status || 'home', pizza: parseInt(c.pizzaCount || 0) || 0 };
+  }
+
+  function monthCharge(grade, status, pizza, mk){
+    const ec = isEC(grade);
+    const dc = state.lunch_days[mk] || { ec:0, g18:0 };
+    const days = ec ? dc.ec : dc.g18;
+    const rate = ec ? state.rates.lunch_rate_ec : state.rates.lunch_rate_1_8;
+    const statusCharge = status === 'monthly' ? days * rate : 0;
+    const pizzaCharge = (pizza || 0) * rate;
+    return { days, rate, statusCharge, pizzaCharge };
+  }
+
+  function yearTotal(stu){
+    const ec = isEC(stu.grade);
+    const fy = ec ? state.rates.lunch_fy_ec : state.rates.lunch_fy_1_8;
+    let anyFy = false, pizzaTot = 0, monthlyTot = 0;
+    state.month_keys.forEach(mk => {
+      const c = cellOf(stu, mk);
+      const { statusCharge, pizzaCharge } = monthCharge(stu.grade, c.status, c.pizza, mk);
+      pizzaTot += pizzaCharge; monthlyTot += statusCharge;
+      if (c.status === 'fullYearPaid') anyFy = true;
+    });
+    return anyFy ? fy + pizzaTot : monthlyTot + pizzaTot;
+  }
+
+  // ── Loading ──
+  async function loadYear(){
+    const yr = document.getElementById('yearSelect').value;
+    document.getElementById('loading').style.display = '';
+    document.getElementById('grid').style.display = 'none';
+    try {
+      const res = await fetch('/api/lunch/enrollment?school_year=' + encodeURIComponent(yr));
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      state = data;
+      buildSummaryMonthOptions();
+      buildGradeFilter();
+      buildHeader();
+      render();
+      document.getElementById('loading').style.display = 'none';
+      document.getElementById('grid').style.display = '';
+      checkCalendarWarning();
+    } catch(e){
+      document.getElementById('loading').textContent = 'Failed to load: ' + e.message;
+    }
+  }
+
+  function checkCalendarWarning(){
+    const empty = state.month_keys.filter(mk => {
+      const dc = state.lunch_days[mk] || {ec:0,g18:0};
+      return dc.ec === 0 && dc.g18 === 0;
+    });
+    const w = document.getElementById('warnChip');
+    if (empty.length){
+      w.textContent = '⚠ No calendar lunch days tagged yet for: ' +
+        empty.map(monthLabel).join(', ') + '. Those months bill $0 until the School Calendar is filled in.';
+      w.classList.add('show');
+    } else { w.classList.remove('show'); }
+  }
+
+  function buildSummaryMonthOptions(){
+    const sel = document.getElementById('summaryMonth');
+    const prev = sel.value;
+    sel.innerHTML = '';
+    const todayKey = new Date().toISOString().slice(0,7);
+    state.month_keys.forEach(mk => {
+      const o = new Option(monthLabel(mk) + ' ' + mk.slice(0,4), mk);
+      sel.appendChild(o);
+    });
+    if (state.month_keys.includes(prev)) sel.value = prev;
+    else if (state.month_keys.includes(todayKey)) sel.value = todayKey;
+    else sel.value = state.month_keys[state.month_keys.length-1];
+  }
+
+  function buildGradeFilter(){
+    const grades = [...new Set(state.students.map(s => s.grade))].sort((a,b)=>gradeRank(a)-gradeRank(b));
+    const sel = document.getElementById('gradeFilter');
+    const prev = sel.value;
+    sel.innerHTML = '<option value="all">All</option>';
+    grades.forEach(g => sel.appendChild(new Option('Grade ' + g, g)));
+    if ([...sel.options].some(o=>o.value===prev)) sel.value = prev;
+  }
+
+  function buildHeader(){
+    const summaryMk = document.getElementById('summaryMonth').value;
+    let h = '<tr>' +
+      '<th class="col-last">Last</th>' +
+      '<th class="col-first">First</th>' +
+      '<th class="col-grade">Grade</th>';
+    state.month_keys.forEach(mk => {
+      const dc = state.lunch_days[mk] || {ec:0,g18:0};
+      const zero = (dc.ec===0 && dc.g18===0) ? ' zero' : '';
+      h += `<th>${monthLabel(mk)}<div class="mhdr-sub${zero}">${dc.ec} / ${dc.g18}</div></th>`;
+    });
+    h += '<th class="col-total">Year Total</th><th>Actions</th></tr>';
+    document.getElementById('gridHead').innerHTML = h;
+  }
+
+  // ── Render grid ──
+  function passesFilter(stu){
+    const q = document.getElementById('searchBox').value.trim().toLowerCase();
+    const gf = document.getElementById('gradeFilter').value;
+    const sf = document.getElementById('statusFilter').value;
+    if (q && !((stu.last_name+' '+stu.first_name).toLowerCase().includes(q) ||
+               (stu.first_name+' '+stu.last_name).toLowerCase().includes(q))) return false;
+    if (gf !== 'all' && stu.grade !== gf) return false;
+    if (sf !== 'all'){
+      const anyMatch = state.month_keys.some(mk => {
+        const c = cellOf(stu, mk);
+        if (sf === 'pizza') return c.pizza > 0;
+        return c.status === sf;
+      });
+      if (!anyMatch) return false;
+    }
+    return true;
+  }
+
+  function render(){
+    const visible = state.students.filter(passesFilter);
+    const byGrade = {};
+    visible.forEach(s => { (byGrade[s.grade] = byGrade[s.grade] || []).push(s); });
+    const grades = Object.keys(byGrade).sort((a,b)=>gradeRank(a)-gradeRank(b));
+    const colCount = state.month_keys.length + 5;
+
+    let html = '';
+    grades.forEach(g => {
+      const rows = byGrade[g].sort((a,b)=>(a.last_name+a.first_name).localeCompare(b.last_name+b.first_name));
+      const grpTotal = rows.reduce((sum,s)=>sum+yearTotal(s),0);
+      html += `<tr class="grp-row"><td colspan="${colCount}">Grade ${esc(g)} `
+            + `<span style="opacity:0.7;">· ${rows.length} student${rows.length!==1?'s':''}</span>`
+            + `<span class="grp-total">${money(grpTotal)}</span></td></tr>`;
+      rows.forEach(s => { html += rowHtml(s); });
+    });
+    document.getElementById('gridBody').innerHTML = html || `<tr><td colspan="${colCount}" style="padding:40px;color:var(--muted);">No students match these filters.</td></tr>`;
+    renderChips();
+  }
+
+  function rowHtml(s){
+    let h = `<tr data-sid="${s.student_id}">` +
+      `<td class="col-last">${esc(s.last_name)}</td>` +
+      `<td class="col-first">${esc(s.first_name)}</td>` +
+      `<td class="col-grade">${esc(s.grade)}</td>`;
+    state.month_keys.forEach(mk => {
+      const c = cellOf(s, mk);
+      const hasPz = c.pizza > 0 ? ' has' : '';
+      h += `<td class="mcell" data-mk="${mk}">` +
+        `<select class="status-sel s-${c.status}" data-act="status">` +
+          `<option value="home"${c.status==='home'?' selected':''}>Home</option>` +
+          `<option value="monthly"${c.status==='monthly'?' selected':''}>Monthly</option>` +
+          `<option value="fullYearPaid"${c.status==='fullYearPaid'?' selected':''}>Full Year Paid</option>` +
+        `</select>` +
+        `<div class="pizza${hasPz}">` +
+          `<button class="pz-btn pz-minus" data-act="pz" data-d="-1">−</button>` +
+          `<span class="pz-n">${c.pizza}</span>` +
+          `<button class="pz-btn pz-add" data-act="pz" data-d="1" title="Pizza">🍕</button>` +
+        `</div>` +
+      `</td>`;
+    });
+    h += `<td class="col-total" data-act="total">${money(yearTotal(s))}</td>`;
+    h += `<td class="row-actions">` +
+      `<button class="ra-btn" data-act="allfy">Full Yr ▸ all</button>` +
+      `<button class="ra-btn" data-act="reset">Reset</button>` +
+      `</td>`;
+    h += `</tr>`;
+    return h;
+  }
+
+  function findStudent(sid){ return state.students.find(s => String(s.student_id) === String(sid)); }
+
+  function setCell(stu, mk, status, pizza){
+    stu.months = stu.months || {};
+    const cur = stu.months[mk] || {};
+    stu.months[mk] = {
+      status: status != null ? status : (cur.status || 'home'),
+      pizzaCount: pizza != null ? pizza : (parseInt(cur.pizzaCount||0)||0)
+    };
+  }
+
+  // ── Event delegation ──
+  document.getElementById('gridBody').addEventListener('change', e => {
+    const sel = e.target.closest('.status-sel');
+    if (!sel) return;
+    const tr = e.target.closest('tr'); const td = e.target.closest('.mcell');
+    const stu = findStudent(tr.dataset.sid); const mk = td.dataset.mk;
+    setCell(stu, mk, sel.value, null);
+    saveCell(stu, mk);
+    render();
+  });
+
+  document.getElementById('gridBody').addEventListener('click', e => {
+    const btn = e.target.closest('button'); if (!btn) return;
+    const tr = e.target.closest('tr'); const stu = findStudent(tr.dataset.sid);
+    const act = btn.dataset.act;
+    if (act === 'pz'){
+      const td = btn.closest('.mcell'); const mk = td.dataset.mk;
+      const c = cellOf(stu, mk);
+      const next = Math.max(0, c.pizza + parseInt(btn.dataset.d));
+      setCell(stu, mk, null, next);
+      saveCell(stu, mk);
+      render();
+    } else if (act === 'allfy'){
+      const months = {};
+      state.month_keys.forEach(mk => {
+        const c = cellOf(stu, mk);
+        setCell(stu, mk, 'fullYearPaid', c.pizza);
+        months[mk] = { status: 'fullYearPaid', pizzaCount: c.pizza };
+      });
+      saveBulk(stu, months);
+      render();
+    } else if (act === 'reset'){
+      const months = {};
+      state.month_keys.forEach(mk => { setCell(stu, mk, 'home', 0); months[mk] = { status:'home', pizzaCount:0 }; });
+      saveBulk(stu, months);
+      render();
+    }
+  });
+
+  ['searchBox','gradeFilter','statusFilter'].forEach(id =>
+    document.getElementById(id).addEventListener('input', render));
+  document.getElementById('summaryMonth').addEventListener('change', () => { buildHeader(); render(); });
+
+  // ── Saving ──
+  function showBadge(kind, text){
+    const b = document.getElementById('saveBadge');
+    b.className = 'save-badge show ' + kind;
+    b.textContent = text;
+    if (kind !== 'saving'){ clearTimeout(b._t); b._t = setTimeout(()=>b.classList.remove('show'), 1600); }
+  }
+
+  function saveCell(stu, mk){
+    const key = stu.student_id + '|' + mk;
+    showBadge('saving', 'Saving…');
+    clearTimeout(saveTimers[key]);
+    saveTimers[key] = setTimeout(() => {
+      const c = cellOf(stu, mk);
+      postSave({ student_id: stu.student_id, school_year: state.school_year, grade: stu.grade,
+                 month: mk, status: c.status, pizzaCount: c.pizza });
+    }, 500);
+  }
+
+  function saveBulk(stu, months){
+    showBadge('saving', 'Saving…');
+    postSave({ student_id: stu.student_id, school_year: state.school_year, grade: stu.grade, months });
+  }
+
+  async function postSave(payload){
+    try {
+      const res = await fetch('/api/lunch/enrollment', {
+        method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      if (data.success) showBadge('saved', 'Saved ✓');
+      else showBadge('error', 'Error: ' + (data.error || 'failed'));
+    } catch(e){ showBadge('error', 'Network error'); }
+  }
+
+  // ── Summary chips ──
+  function renderChips(){
+    const mk = document.getElementById('summaryMonth').value;
+    let fy = 0, mo = 0, pz = 0, hm = 0;
+    state.students.forEach(s => {
+      const anyFy = state.month_keys.some(k => cellOf(s,k).status === 'fullYearPaid');
+      const c = cellOf(s, mk);
+      if (anyFy) fy++;
+      if (c.status === 'monthly') mo++;
+      else if (c.status === 'home' && c.pizza > 0) pz++;
+      else if (c.status === 'home') hm++;
+    });
+    const lbl = monthLabel(mk);
+    document.getElementById('chips').innerHTML =
+      chip('fy', fy, 'Full Year (any month)') +
+      chip('mo', mo, 'Monthly · ' + lbl) +
+      chip('pz', pz, 'Pizza-only · ' + lbl) +
+      chip('hm', hm, 'Home · ' + lbl);
+  }
+  function chip(cls, num, lbl){
+    return `<div class="chip ${cls}"><span class="c-num">${num}</span><span class="c-lbl">${lbl}</span></div>`;
+  }
+
+  // ── Init ──
+  (function init(){
+    const sel = document.getElementById('yearSelect');
+    const now = new Date();
+    const startYr = now.getMonth() >= 8 ? now.getFullYear() : now.getFullYear() - 1;
+    for (let y = startYr + 1; y >= startYr - 3; y--){
+      const sy = `${y}-${y+1}`;
+      const o = new Option(sy, sy);
+      if (y === startYr) o.selected = true;
+      sel.appendChild(o);
+    }
+    sel.addEventListener('change', loadYear);
+    loadYear();
+  })();
+</script>
+</body>
+</html>

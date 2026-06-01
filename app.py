@@ -296,6 +296,34 @@ def init_db():
                         "INSERT INTO billing_rates (rate_key, rate_value, label, unit, effective_from) VALUES (%s,%s,%s,%s,%s) ON CONFLICT DO NOTHING",
                         (key, val, label, unit, '2025-09-01')
                     )
+            # Lunch rates — seeded idempotently so they land on redeploy even when the
+            # billing_rates table is already populated. Pizza bills at the regular per-day rate.
+            lunch_rate_defaults = [
+                ('lunch_rate_ec',  4.50,   'EC Lunch (JPK/SPK/K)', 'per day'),
+                ('lunch_rate_1_8', 5.50,   'Lunch (Grades 1–8)',   'per day'),
+                ('lunch_fy_ec',    742.50, 'Full Year — EC',       'per year'),
+                ('lunch_fy_1_8',   876.75, 'Full Year — Grades 1–8','per year'),
+            ]
+            for key, val, label, unit in lunch_rate_defaults:
+                cur.execute(
+                    "INSERT INTO billing_rates (rate_key, rate_value, label, unit, effective_from) VALUES (%s,%s,%s,%s,%s) ON CONFLICT (rate_key, effective_from) DO NOTHING",
+                    (key, val, label, unit, '2025-09-01')
+                )
+            # ── Lunch enrollment: one row per student per school year ──
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS lunch_enrollment (
+                    enrollment_id           SERIAL PRIMARY KEY,
+                    student_id              INTEGER NOT NULL REFERENCES students(student_id) ON DELETE CASCADE,
+                    school_year             TEXT NOT NULL,
+                    grade_at_time_of_record TEXT NOT NULL DEFAULT '',
+                    months                  JSONB NOT NULL DEFAULT '{}'::jsonb,
+                    notes                   TEXT DEFAULT '',
+                    updated_at              TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_by              TEXT DEFAULT '',
+                    UNIQUE(student_id, school_year)
+                )
+            """)
+            cur.execute("CREATE INDEX IF NOT EXISTS idx_lunch_enrollment_year ON lunch_enrollment(school_year)")
             # ── Comp Rates (staff compensation) ──
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS comp_rates (
@@ -2521,6 +2549,228 @@ def delete_billing_rate(rate_id):
 
 
 # ============================================
+# LUNCH BILLING
+# ============================================
+
+LUNCH_EC_GRADES = {"JPK", "SPK", "K"}
+LUNCH_STATUSES = {"home", "monthly", "fullYearPaid"}
+
+
+def _lunch_default_year():
+    from datetime import date as _d
+    t = _d.today()
+    start = t.year if t.month >= 9 else t.year - 1
+    return f"{start}-{start + 1}"
+
+
+def _lunch_school_year_months(school_year):
+    """Ordered 'YYYY-MM' keys for Sep..Jun of a '2025-2026' school year."""
+    try:
+        start = int(str(school_year)[:4])
+    except (ValueError, TypeError):
+        start = int(_lunch_default_year()[:4])
+    seq = [(start, m) for m in (9, 10, 11, 12)] + [(start + 1, m) for m in (1, 2, 3, 4, 5, 6)]
+    return [f"{y:04d}-{m:02d}" for y, m in seq]
+
+
+def _lunch_school_year_for(year, month):
+    return f"{year}-{year + 1}" if month >= 9 else f"{year - 1}-{year}"
+
+
+def _lunch_is_ec(grade):
+    return str(grade).upper() in LUNCH_EC_GRADES
+
+
+def _lunch_clean_cell(cell):
+    cell = cell or {}
+    status = cell.get("status", "home")
+    if status not in LUNCH_STATUSES:
+        status = "home"
+    try:
+        pizza = int(cell.get("pizzaCount", 0) or 0)
+    except (ValueError, TypeError):
+        pizza = 0
+    return {"status": status, "pizzaCount": max(0, pizza)}
+
+
+def _lunch_rates(cur, as_of_date):
+    cur.execute("""
+        SELECT DISTINCT ON (rate_key) rate_key, rate_value
+        FROM billing_rates
+        WHERE rate_key IN ('lunch_rate_ec','lunch_rate_1_8','lunch_fy_ec','lunch_fy_1_8')
+          AND effective_from::date <= %s
+        ORDER BY rate_key, effective_from::date DESC
+    """, (as_of_date,))
+    rates = {r["rate_key"]: float(r["rate_value"]) for r in cur.fetchall()}
+    for k, v in (('lunch_rate_ec', 4.50), ('lunch_rate_1_8', 5.50),
+                 ('lunch_fy_ec', 742.50), ('lunch_fy_1_8', 876.75)):
+        rates.setdefault(k, v)
+    return rates
+
+
+def _lunch_day_counts(cur, month_keys):
+    """{month_key: {'ec': n, 'g18': n}} of calendar lunch-day tags per month."""
+    import calendar as _cal
+    out = {mk: {"ec": 0, "g18": 0} for mk in month_keys}
+    if not month_keys:
+        return out
+    first = month_keys[0] + "-01"
+    ly, lm = month_keys[-1].split("-")
+    last = f"{ly}-{lm}-{_cal.monthrange(int(ly), int(lm))[1]:02d}"
+    cur.execute("""
+        SELECT category_key, to_char(day_date, 'YYYY-MM') AS mk, COUNT(*) AS n
+        FROM calendar_day_tags
+        WHERE category_key IN ('lunch_day_prek_k','lunch_day_1_8')
+          AND day_date >= %s AND day_date <= %s
+        GROUP BY category_key, to_char(day_date, 'YYYY-MM')
+    """, (first, last))
+    for r in cur.fetchall():
+        mk = r["mk"]
+        if mk in out:
+            if r["category_key"] == "lunch_day_prek_k":
+                out[mk]["ec"] = int(r["n"])
+            else:
+                out[mk]["g18"] = int(r["n"])
+    return out
+
+
+def _lunch_month_charge(grade, status, pizza_count, day_count, rates):
+    """Returns (lunch_days, rate, status_charge, pizza_charge) for one student-month."""
+    ec = _lunch_is_ec(grade)
+    lunch_days = day_count.get("ec", 0) if ec else day_count.get("g18", 0)
+    rate = rates["lunch_rate_ec"] if ec else rates["lunch_rate_1_8"]
+    status_charge = lunch_days * rate if status == "monthly" else 0.0
+    pizza_charge = max(0, int(pizza_count or 0)) * rate
+    return lunch_days, rate, round(status_charge, 2), round(pizza_charge, 2)
+
+
+def _lunch_year_total(grade, months_doc, day_counts_by_month, rates, month_keys):
+    """Year total: full-year price (+pizza) if any month is fullYearPaid, else sum of monthly charges."""
+    ec = _lunch_is_ec(grade)
+    rate = rates["lunch_rate_ec"] if ec else rates["lunch_rate_1_8"]
+    fy_price = rates["lunch_fy_ec"] if ec else rates["lunch_fy_1_8"]
+    months_doc = months_doc or {}
+    any_fy = False
+    pizza_total = 0.0
+    monthly_total = 0.0
+    for mk in month_keys:
+        cell = months_doc.get(mk) or {}
+        status = cell.get("status", "home")
+        dc = day_counts_by_month.get(mk, {"ec": 0, "g18": 0})
+        _, _, status_charge, pizza_charge = _lunch_month_charge(grade, status, cell.get("pizzaCount", 0), dc, rates)
+        pizza_total += pizza_charge
+        if status == "fullYearPaid":
+            any_fy = True
+        monthly_total += status_charge
+    if any_fy:
+        return round(fy_price + pizza_total, 2)
+    return round(monthly_total + pizza_total, 2)
+
+
+@app.route("/lunch-dashboard")
+@login_required
+def lunch_dashboard_page():
+    return send_from_directory(".", "lunch_dashboard.html")
+
+
+@app.route("/api/lunch/enrollment")
+@login_required
+def api_lunch_enrollment():
+    school_year = request.args.get("school_year") or _lunch_default_year()
+    month_keys = _lunch_school_year_months(school_year)
+    conn = get_db_connection()
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            rates = _lunch_rates(cur, month_keys[0] + "-01")
+            day_counts = _lunch_day_counts(cur, month_keys)
+            cur.execute("""
+                SELECT student_id, first_name, last_name, grade
+                FROM students WHERE status='active'
+                ORDER BY last_name, first_name
+            """)
+            students = fa(cur)
+            cur.execute(
+                "SELECT student_id, grade_at_time_of_record, months, notes FROM lunch_enrollment WHERE school_year=%s",
+                (school_year,))
+            enr = {r["student_id"]: r for r in fa(cur)}
+            out = []
+            for s in students:
+                e = enr.get(s["student_id"])
+                months_doc = (e["months"] if e else {}) or {}
+                out.append({
+                    "student_id": s["student_id"],
+                    "first_name": s["first_name"],
+                    "last_name": s["last_name"],
+                    "grade": str(s["grade"]),
+                    "months": months_doc,
+                    "notes": (e["notes"] if e else "") or "",
+                    "year_total": _lunch_year_total(s["grade"], months_doc, day_counts, rates, month_keys),
+                })
+            return jsonify({
+                "school_year": school_year,
+                "month_keys": month_keys,
+                "lunch_days": day_counts,
+                "rates": rates,
+                "students": out,
+            })
+    finally:
+        conn.close()
+
+
+@app.route("/api/lunch/enrollment", methods=["POST"])
+@login_required
+def api_lunch_enrollment_save():
+    data = request.json or {}
+    student_id = data.get("student_id")
+    school_year = data.get("school_year")
+    grade = data.get("grade", "") or ""
+    if not student_id or not school_year:
+        return jsonify({"error": "student_id and school_year required"}), 400
+    updated_by = session.get("user_name", "")
+    conn = get_db_connection()
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute(
+                "SELECT months FROM lunch_enrollment WHERE student_id=%s AND school_year=%s",
+                (student_id, school_year))
+            row = cur.fetchone()
+            months_doc = (row["months"] if row else {}) or {}
+            if isinstance(data.get("months"), dict):
+                for mk, cell in data["months"].items():
+                    months_doc[mk] = _lunch_clean_cell(cell)
+            elif data.get("month"):
+                mk = data["month"]
+                prev = months_doc.get(mk, {})
+                months_doc[mk] = _lunch_clean_cell({
+                    "status": data.get("status", prev.get("status", "home")),
+                    "pizzaCount": data.get("pizzaCount", prev.get("pizzaCount", 0)),
+                })
+            else:
+                return jsonify({"error": "month or months required"}), 400
+            notes = data.get("notes")
+            cur.execute("""
+                INSERT INTO lunch_enrollment
+                    (student_id, school_year, grade_at_time_of_record, months, notes, updated_by, updated_at)
+                VALUES (%s,%s,%s,%s,COALESCE(%s,''),%s,CURRENT_TIMESTAMP)
+                ON CONFLICT (student_id, school_year) DO UPDATE SET
+                    grade_at_time_of_record=EXCLUDED.grade_at_time_of_record,
+                    months=EXCLUDED.months,
+                    notes=COALESCE(%s, lunch_enrollment.notes),
+                    updated_by=EXCLUDED.updated_by,
+                    updated_at=CURRENT_TIMESTAMP
+            """, (student_id, school_year, grade, psycopg2.extras.Json(months_doc),
+                  notes, updated_by, notes))
+        conn.commit()
+        return jsonify({"success": True})
+    except Exception as e:
+        conn.rollback()
+        return jsonify({"error": str(e)}), 500
+    finally:
+        conn.close()
+
+
+
+# ============================================
 # COMP RATES (Staff Compensation)
 # ============================================
 
@@ -2990,6 +3240,18 @@ def api_billing_report():
                 lunch_days_prek_k = _lc.get("lunch_day_prek_k", 0)
                 lunch_days_1_8    = _lc.get("lunch_day_1_8", 0)
 
+                # 8. Lunch enrollment for the school year covering this month
+                lunch_mk          = f"{year}-{month:02d}"
+                lunch_school_year = _lunch_school_year_for(year, month)
+                lunch_rates       = _lunch_rates(cur, first_day)
+                lunch_dc          = {"ec": lunch_days_prek_k, "g18": lunch_days_1_8}
+                cur.execute("""
+                    SELECT student_id, months, grade_at_time_of_record
+                    FROM   lunch_enrollment
+                    WHERE  school_year = %s
+                """, (lunch_school_year,))
+                lunch_enr = {r["student_id"]: r for r in cur.fetchall()}
+
         finally:
             conn.close()
 
@@ -3010,7 +3272,18 @@ def api_billing_report():
             oo_units = sp.get("tutoring", 0.0)
             store_amt = store_totals.get(sid, 0.0)
 
-            if not any([mc_qty, bc_days, ac_hours, og_units, hw_units, oo_units, store_amt]):
+            # Lunch — monthly charge (status + pizza) from lunch_enrollment, same math helpers
+            le = lunch_enr.get(sid)
+            lunch_amt = 0.0
+            if le:
+                grade_used  = (le.get("grade_at_time_of_record") or "").strip() or s["grade"]
+                lunch_cell  = (le.get("months") or {}).get(lunch_mk) or {}
+                _, _, l_status_charge, l_pizza_charge = _lunch_month_charge(
+                    grade_used, lunch_cell.get("status", "home"),
+                    lunch_cell.get("pizzaCount", 0), lunch_dc, lunch_rates)
+                lunch_amt = round(l_status_charge + l_pizza_charge, 2)
+
+            if not any([mc_qty, bc_days, ac_hours, og_units, hw_units, oo_units, store_amt, lunch_amt]):
                 continue
 
             mcard_amt  = mc_qty   * rates["mcard_snack"]
@@ -3032,6 +3305,7 @@ def api_billing_report():
                 "homework_center":  round(hw_amt, 2),
                 "one_on_one":       round(oo_amt, 2),
                 "school_store":     round(store_amt, 2),
+                "lunch":            lunch_amt,
                 "program_sessions": round(og_units + hw_units + oo_units, 2),
                 "care_days":        bc_days + ac_days,
             })
@@ -3198,6 +3472,46 @@ def api_billing_student_detail():
                         "recorded_by": r.get("recorded_by") or "—",
                         "amount": round(qty * price, 2),
                     })
+
+                # 5. Lunch — single monthly line item (status + pizza), same math as report
+                lunch_mk          = f"{year}-{month:02d}"
+                lunch_school_year = _lunch_school_year_for(year, month)
+                lunch_rates       = _lunch_rates(cur, first_day)
+                lunch_dc          = _lunch_day_counts(cur, [lunch_mk]).get(lunch_mk, {"ec": 0, "g18": 0})
+                cur.execute("""
+                    SELECT student_id, grade
+                    FROM   students
+                    WHERE  student_id = %s
+                """, (student_id,))
+                _sr = cur.fetchone()
+                cur.execute("""
+                    SELECT months, grade_at_time_of_record
+                    FROM   lunch_enrollment
+                    WHERE  student_id = %s AND school_year = %s
+                """, (student_id, lunch_school_year))
+                _le = cur.fetchone()
+                if _le:
+                    grade_used = (_le.get("grade_at_time_of_record") or "").strip() or (
+                        (_sr or {}).get("grade") or "")
+                    lunch_cell = (_le.get("months") or {}).get(lunch_mk) or {}
+                    status     = lunch_cell.get("status", "home")
+                    pizza_ct   = int(lunch_cell.get("pizzaCount", 0) or 0)
+                    l_days, l_rate, l_status_charge, l_pizza_charge = _lunch_month_charge(
+                        grade_used, status, pizza_ct, lunch_dc, lunch_rates)
+                    lunch_amt = round(l_status_charge + l_pizza_charge, 2)
+                    if lunch_amt:
+                        bits = []
+                        if l_status_charge:
+                            bits.append(f"Monthly · {l_days} lunch day{'s' if l_days != 1 else ''} @ ${l_rate:.2f}")
+                        if l_pizza_charge:
+                            bits.append(f"{pizza_ct} pizza @ ${l_rate:.2f}")
+                        rows.append({
+                            "date": str(first_day), "program_key": "lunch",
+                            "program_label": "Lunch",
+                            "detail": " · ".join(bits) or "Lunch",
+                            "recorded_by": "—",
+                            "amount": lunch_amt,
+                        })
 
         finally:
             conn.close()

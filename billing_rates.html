@@ -93,6 +93,7 @@
     .icon-tutoring   { background: #fce4ec; color: #880e4f; }
     .icon-og         { background: #e8f5e9; color: #2e7d32; }
     .icon-homework   { background: #e8eaf6; color: #283593; }
+    .icon-lunch      { background: #fdf4e3; color: #8a6a1a; }
 
     .rate-info { flex: 1; }
     .rate-label { font-size: 14px; font-weight: 600; margin-bottom: 1px; }
@@ -374,9 +375,14 @@
     tutoring_session:   { css: 'icon-tutoring',   emoji: '📝' },
     og_session:         { css: 'icon-og',          emoji: '📖' },
     homework_hourly:    { css: 'icon-homework',   emoji: '📚' },
+    lunch_rate_ec:      { css: 'icon-lunch',      emoji: '🥪' },
+    lunch_rate_1_8:     { css: 'icon-lunch',      emoji: '🍱' },
+    lunch_fy_ec:        { css: 'icon-lunch',      emoji: '🍎' },
+    lunch_fy_1_8:       { css: 'icon-lunch',      emoji: '🍏' },
   };
 
-  const ORDER = ['og_session', 'tutoring_session', 'homework_hourly', 'beforecare_session', 'aftercare_hourly', 'mcard_snack'];
+  const ORDER = ['og_session', 'tutoring_session', 'homework_hourly', 'beforecare_session', 'aftercare_hourly', 'mcard_snack',
+                 'lunch_rate_ec', 'lunch_rate_1_8', 'lunch_fy_ec', 'lunch_fy_1_8'];
 
   document.addEventListener('DOMContentLoaded', () => {
     loadCurrentRates();
