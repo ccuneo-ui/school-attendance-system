@@ -48,6 +48,14 @@ DATABASE_URL = os.environ.get("DATABASE_URL", "")
 if DATABASE_URL.startswith("postgres://"):
     DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
 
+# ── LOCAL DEVELOPMENT ONLY — never active on the live site ──
+# When the DEV_LOGIN environment variable equals "1", the app skips Google
+# sign-in and auto-logs in as the superadmin so you can test a local copy
+# without OAuth setup. This is set ONLY by the local run script (run_local.command).
+# Render does not set DEV_LOGIN, so on the live site this is always False and the
+# normal Google login is fully enforced.
+DEV_LOGIN = os.environ.get("DEV_LOGIN") == "1"
+
 
 def get_db_connection():
     conn = psycopg2.connect(DATABASE_URL)
@@ -64,6 +72,22 @@ def fo(cursor):
     """fetchone as dict or None"""
     row = cursor.fetchone()
     return dict(row) if row else None
+
+
+# ── LOCAL DEV auto-login (inert unless DEV_LOGIN=1) ──
+
+@app.before_request
+def dev_auto_login():
+    # Guarded by DEV_LOGIN, which is never set on the live site. Auto-signs in
+    # as the superadmin for local development only.
+    if DEV_LOGIN and not session.get("user_email"):
+        session["user_email"] = SUPERADMIN_EMAIL
+        session["user_name"] = "Local Dev"
+        session["is_superadmin"] = True
+        session["can_record_attendance"] = True
+        session["can_manage_billing"] = True
+        session["can_manage_people"] = True
+        session["user_role"] = "superadmin"
 
 
 # ── Refresh permissions from DB on every request ──
@@ -5613,6 +5637,18 @@ def icon_instagram():
 def icon_linkedin():
     return send_from_directory('.', 'icon-linkedin.svg', mimetype='image/svg+xml')
 
+@app.route('/icon-facebook.png')
+def icon_facebook_png():
+    return send_from_directory('.', 'icon-facebook.png', mimetype='image/png')
+
+@app.route('/icon-instagram.png')
+def icon_instagram_png():
+    return send_from_directory('.', 'icon-instagram.png', mimetype='image/png')
+
+@app.route('/icon-linkedin.png')
+def icon_linkedin_png():
+    return send_from_directory('.', 'icon-linkedin.png', mimetype='image/png')
+
 @app.route('/signature')
 @login_required
 def signature_generator():
@@ -5942,4 +5978,6 @@ init_db()
 
 if __name__ == "__main__":
     print("Mizzentop Admin — PostgreSQL mode")
-    app.run(debug=True, host="0.0.0.0", port=5000)
+    # Port defaults to 5000 (unchanged for the live site). The local run script
+    # sets LOCAL_PORT to avoid clashing with macOS AirPlay Receiver on port 5000.
+    app.run(debug=True, host="0.0.0.0", port=int(os.environ.get("LOCAL_PORT", "5000")))
