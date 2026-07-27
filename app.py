@@ -4686,6 +4686,116 @@ def get_household(household_id):
         conn.close()
 
 
+# ============================================
+# FAMILY DIRECTORY
+# ============================================
+
+@app.route("/family-directory")
+@login_required
+def family_directory_page():
+    return send_from_directory(".", "family_directory.html")
+
+
+@app.route("/api/family-directory")
+@login_required
+def get_family_directory():
+    """Active families with full contact info + emergency contacts, for staff lookup
+    and printable per-student emergency sheets. Only includes households that have at
+    least one active student, and lists only the active students within each."""
+    conn = get_db_connection()
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute("""
+                SELECT DISTINCT h.household_id, h.family_name,
+                       h.address_line_1, h.address_line_2, h.city, h.state, h.zip,
+                       h.primary_phone, h.primary_email, h.status
+                FROM households h
+                JOIN student_households sh ON sh.household_id = h.household_id
+                JOIN students s ON s.student_id = sh.student_id
+                WHERE s.status = 'active'
+                ORDER BY h.family_name
+            """)
+            households = fa(cur)
+            for h in households:
+                cur.execute("""
+                    SELECT s.student_id, s.first_name, s.last_name, s.grade, s.status,
+                           s.date_of_birth, s.emergency_contact_name, s.emergency_contact_phone,
+                           sh.is_primary, sh.custody_notes,
+                           hr.first_name  || ' ' || hr.last_name  AS homeroom_teacher_name,
+                           adv.first_name || ' ' || adv.last_name AS advisory_teacher_name
+                    FROM student_households sh
+                    JOIN students s ON s.student_id = sh.student_id
+                    LEFT JOIN staff hr  ON s.homeroom_teacher_id  = hr.staff_id
+                    LEFT JOIN staff adv ON s.advisory_teacher_id  = adv.staff_id
+                    WHERE sh.household_id = %s AND s.status = 'active'
+                    ORDER BY s.grade, s.last_name, s.first_name
+                """, (h["household_id"],))
+                h["students"] = fa(cur)
+                cur.execute("""
+                    SELECT p.parent_id, p.first_name, p.last_name, p.email, p.phone,
+                           p.relationship_type, p.can_pickup, hm.role
+                    FROM household_members hm
+                    JOIN parents p ON p.parent_id = hm.parent_id
+                    WHERE hm.household_id = %s
+                    ORDER BY hm.role, p.last_name, p.first_name
+                """, (h["household_id"],))
+                h["parents"] = fa(cur)
+        return jsonify(households)
+    finally:
+        conn.close()
+
+
+@app.route("/family-manager")
+@people_required
+def family_manager_page():
+    return send_from_directory(".", "family_manager.html")
+
+
+@app.route("/api/family-directory/manage")
+@people_required
+def get_family_directory_manage():
+    """Editable Family Manager data: every household that has at least one student
+    (with billing/status fields), plus its students (incl. emergency contact + custody,
+    active and inactive) and its parents. Superset of /api/family-directory."""
+    conn = get_db_connection()
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute("""
+                SELECT h.household_id, h.family_name,
+                       h.address_line_1, h.address_line_2, h.city, h.state, h.zip,
+                       h.primary_phone, h.primary_email, h.status, h.billing_notes
+                FROM households h
+                WHERE EXISTS (
+                    SELECT 1 FROM student_households sh WHERE sh.household_id = h.household_id
+                )
+                ORDER BY h.family_name
+            """)
+            households = fa(cur)
+            for h in households:
+                cur.execute("""
+                    SELECT s.student_id, s.first_name, s.last_name, s.grade, s.status,
+                           s.date_of_birth, s.emergency_contact_name, s.emergency_contact_phone,
+                           sh.is_primary, sh.custody_notes
+                    FROM student_households sh
+                    JOIN students s ON s.student_id = sh.student_id
+                    WHERE sh.household_id = %s
+                    ORDER BY s.status, s.grade, s.last_name, s.first_name
+                """, (h["household_id"],))
+                h["students"] = fa(cur)
+                cur.execute("""
+                    SELECT p.parent_id, p.first_name, p.last_name, p.email, p.phone,
+                           p.relationship_type, p.can_pickup, p.notes, hm.role
+                    FROM household_members hm
+                    JOIN parents p ON p.parent_id = hm.parent_id
+                    WHERE hm.household_id = %s
+                    ORDER BY hm.role, p.last_name, p.first_name
+                """, (h["household_id"],))
+                h["parents"] = fa(cur)
+        return jsonify(households)
+    finally:
+        conn.close()
+
+
 @app.route("/api/households", methods=["POST"])
 @login_required
 def create_household():

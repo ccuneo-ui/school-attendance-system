@@ -1,0 +1,537 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Family Directory — Mizzentop</title>
+  <link rel="icon" type="image/svg+xml" href="/logo.svg">
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --navy:    #1a2744;
+      --green:   #2d5016;
+      --gold:    #c8992a;
+      --cream:   #f7f3ec;
+      --muted:   #6b7280;
+      --border:  #e5e0d8;
+      --people:  #3a5a7a;
+      --active-bg:   #e8f5e9;
+      --active-txt:  #2d5016;
+    }
+    html, body { min-height: 100%; font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(--navy); }
+
+    /* ── Top Bar ── */
+    .topbar { background: var(--navy); padding: 14px 28px; display: flex; align-items: center; gap: 16px; }
+    .topbar a { color: rgba(255,255,255,0.7); text-decoration: none; font-size: 13px; font-weight: 500; transition: color 0.15s; }
+    .topbar a:hover { color: white; }
+    .topbar-sep { color: rgba(255,255,255,0.3); font-size: 13px; }
+    .topbar-title { color: white; font-size: 13px; font-weight: 600; }
+
+    /* ── Page ── */
+    .page { max-width: 1200px; margin: 0 auto; padding: 40px 28px 80px; }
+    .page-header { display: flex; align-items: flex-end; justify-content: space-between; margin-bottom: 24px; flex-wrap: wrap; gap: 16px; }
+    .page-header h1 { font-family: 'Playfair Display', serif; font-size: 32px; font-weight: 700; color: var(--navy); }
+    .page-header p { font-size: 14px; color: var(--muted); margin-top: 4px; }
+
+    /* ── Controls ── */
+    .controls { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 20px; }
+    .search-box { position: relative; flex: 1; min-width: 240px; max-width: 380px; }
+    .search-box input { width: 100%; padding: 9px 12px 9px 36px; border: 1px solid var(--border); border-radius: 8px; font-family: 'DM Sans', sans-serif; font-size: 14px; background: white; outline: none; }
+    .search-box input:focus { border-color: var(--people); }
+    .search-box svg { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); width: 16px; height: 16px; color: var(--muted); pointer-events: none; }
+
+    /* ── Stats ── */
+    .stats { display: flex; gap: 16px; margin-bottom: 24px; flex-wrap: wrap; }
+    .stat-card { background: white; border: 1px solid var(--border); border-radius: 10px; padding: 14px 20px; min-width: 120px; }
+    .stat-card .num { font-size: 26px; font-weight: 700; color: var(--navy); line-height: 1; }
+    .stat-card .lbl { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; margin-top: 4px; }
+
+    /* ── Table ── */
+    .table-wrap { background: white; border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+    table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    thead th { background: #f4f1eb; padding: 10px 16px; text-align: left; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted); border-bottom: 1px solid var(--border); white-space: nowrap; }
+    tbody tr { border-bottom: 1px solid var(--border); cursor: pointer; transition: background 0.1s; }
+    tbody tr:last-child { border-bottom: none; }
+    tbody tr:hover { background: #f9f7f4; }
+    td { padding: 12px 16px; vertical-align: middle; }
+    .td-family { font-weight: 600; color: var(--navy); }
+    .td-students { font-size: 13px; color: var(--muted); }
+    .td-students .kid { color: var(--navy); }
+    .td-phone { font-family: 'DM Sans', sans-serif; font-size: 13px; color: var(--navy); white-space: nowrap; }
+    .td-place { font-size: 13px; color: var(--muted); }
+    .empty-state { text-align: center; padding: 60px 20px; color: var(--muted); }
+
+    /* ── Buttons ── */
+    .btn { padding: 9px 18px; border-radius: 8px; font-family: 'DM Sans', sans-serif; font-size: 14px; font-weight: 600; cursor: pointer; border: none; transition: all 0.15s; display: inline-flex; align-items: center; gap: 7px; }
+    .btn svg { width: 15px; height: 15px; }
+    .btn-secondary { background: var(--border); color: var(--navy); }
+    .btn-secondary:hover { background: #d5cfc6; }
+    .btn-primary { background: var(--people); color: white; }
+    .btn-primary:hover { background: #2e4a66; }
+    .btn-gold { background: var(--gold); color: white; }
+    .btn-gold:hover { background: #b3861f; }
+
+    /* ── Modal ── */
+    .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 200; display: none; align-items: center; justify-content: center; padding: 20px; }
+    .modal-overlay.open { display: flex; }
+    .modal { background: white; border-radius: 16px; width: 720px; max-width: 100%; max-height: 90vh; overflow-y: auto; box-shadow: 0 24px 80px rgba(0,0,0,0.22); }
+    .modal-header { padding: 24px 28px 0; display: flex; align-items: flex-start; justify-content: space-between; }
+    .modal-header h2 { font-family: 'Playfair Display', serif; font-size: 24px; font-weight: 700; color: var(--navy); }
+    .modal-header p { font-size: 13px; color: var(--muted); margin-top: 3px; }
+    .modal-close { background: none; border: none; cursor: pointer; color: var(--muted); padding: 4px; border-radius: 6px; font-size: 22px; line-height: 1; }
+    .modal-close:hover { background: var(--border); color: var(--navy); }
+    .modal-body { padding: 16px 28px 24px; }
+    .section-title { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: var(--people); margin: 22px 0 12px; padding-bottom: 6px; border-bottom: 1px solid var(--border); }
+    .section-title:first-child { margin-top: 4px; }
+
+    .addr-line { font-size: 14px; color: var(--navy); line-height: 1.5; }
+    .meta-row { display: flex; flex-wrap: wrap; gap: 6px 22px; margin-top: 8px; font-size: 13px; color: var(--muted); }
+    .meta-row b { color: var(--navy); font-weight: 600; }
+
+    .contact-card { border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; margin-bottom: 10px; }
+    .contact-card .cc-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+    .cc-name { font-weight: 600; color: var(--navy); font-size: 15px; }
+    .cc-rel { font-size: 12px; color: var(--muted); text-transform: capitalize; }
+    .cc-lines { margin-top: 6px; font-size: 13px; color: var(--navy); display: flex; flex-wrap: wrap; gap: 4px 20px; }
+    .cc-lines a { color: var(--people); text-decoration: none; }
+    .cc-lines a:hover { text-decoration: underline; }
+    .badge { display: inline-block; padding: 2px 9px; border-radius: 20px; font-size: 10px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; }
+    .badge-pickup { background: var(--active-bg); color: var(--active-txt); }
+    .badge-nopickup { background: #f1eee8; color: var(--muted); }
+
+    .kid-card { border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; margin-bottom: 10px; }
+    .kid-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+    .kid-name { font-weight: 600; color: var(--navy); font-size: 15px; }
+    .kid-grade { font-size: 12px; color: white; background: var(--people); border-radius: 20px; padding: 1px 9px; font-weight: 600; }
+    .kid-meta { margin-top: 6px; font-size: 12.5px; color: var(--muted); display: flex; flex-wrap: wrap; gap: 3px 18px; }
+    .kid-meta b { color: var(--navy); font-weight: 600; }
+    .kid-emrg { margin-top: 8px; padding-top: 8px; border-top: 1px dashed var(--border); font-size: 13px; }
+    .kid-emrg .lbl { font-size: 10px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--gold); }
+
+    .modal-actions { display: flex; gap: 10px; justify-content: flex-end; padding: 16px 28px 24px; border-top: 1px solid var(--border); position: sticky; bottom: 0; background: white; }
+
+    /* ── Toast ── */
+    .toast { position: fixed; bottom: 28px; left: 50%; transform: translateX(-50%) translateY(20px); background: var(--navy); color: white; padding: 10px 20px; border-radius: 8px; font-size: 14px; font-weight: 500; opacity: 0; transition: all 0.25s; pointer-events: none; z-index: 500; white-space: nowrap; }
+    .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+    .toast.error { background: #8a1a1a; }
+
+    /* ============================================
+       PRINT / EMERGENCY SHEET
+       ============================================ */
+    #printArea { display: none; }
+
+    @media print {
+      @page { margin: 0.6in 0.5in; }
+      .screen-only { display: none !important; }
+      #printArea { display: block !important; }
+      body { background: white; }
+    }
+
+    .sheet { page-break-after: always; color: #111; font-size: 12px; padding-bottom: 8px; }
+    .sheet:last-child { page-break-after: auto; }
+    .sheet-header { display: flex; align-items: center; justify-content: space-between; border-bottom: 2px solid var(--navy); padding-bottom: 8px; margin-bottom: 12px; }
+    .sheet-header .brand { font-family: 'Playfair Display', serif; font-size: 18px; font-weight: 700; color: var(--navy); }
+    .sheet-header .doc { font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; color: #444; text-align: right; }
+    .sheet-family { font-family: 'Playfair Display', serif; font-size: 20px; font-weight: 700; margin-bottom: 2px; color: #111; }
+    .sheet-addr { font-size: 12px; color: #333; margin-bottom: 12px; }
+    .sheet h3 { font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--navy); border-bottom: 1px solid #bbb; padding-bottom: 3px; margin: 14px 0 8px; }
+    .sheet table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    .sheet th { text-align: left; font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em; color: #555; border-bottom: 1px solid #999; padding: 4px 8px; }
+    .sheet td { padding: 5px 8px; border-bottom: 1px solid #ddd; vertical-align: top; }
+    .sheet .pickup-yes { color: var(--green); font-weight: 700; }
+    .sheet .pickup-no { color: #999; }
+    .sheet .emrg-note { font-size: 11px; color: #333; }
+    .sheet-foot { margin-top: 10px; font-size: 9px; color: #999; }
+
+    /* ── Compact running directory (Print All) ── */
+    .dir-head { border-bottom: 2px solid var(--navy); padding-bottom: 6px; margin-bottom: 9px; }
+    .dir-brand { font-family: 'Playfair Display', serif; font-size: 17px; font-weight: 700; color: var(--navy); }
+    .dir-title { font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; color: #333; margin-top: 1px; }
+    .dir-sub { font-size: 9px; color: #777; margin-top: 3px; }
+    .fam { break-inside: avoid; page-break-inside: avoid; padding: 4px 0 5px; border-bottom: 1px solid #e2e2e2; font-size: 9px; line-height: 1.42; color: #111; }
+    .fam-name { font-weight: 700; font-size: 10.5px; }
+    .fam-addr { font-weight: 400; font-size: 9px; color: #666; }
+    .fam-line { margin-top: 1px; }
+    .fam .mut { color: #888; }
+    .fam .ok { color: var(--green); font-weight: 700; }
+    .fam .lbl { color: #999; font-weight: 700; text-transform: uppercase; font-size: 8px; letter-spacing: 0.04em; }
+    .fam .nowrap { white-space: nowrap; }
+    @media print {
+      .dir-head { column-span: all; -webkit-column-span: all; }
+      .dir { column-count: 2; column-gap: 24px; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="screen-only">
+  <div class="topbar">
+    <a href="/">← Home</a>
+    <span class="topbar-sep">/</span>
+    <span class="topbar-title">Family Directory</span>
+  </div>
+
+  <div class="page">
+    <div class="page-header">
+      <div>
+        <h1>Family Directory</h1>
+        <p>Look up family contact information and print emergency contact sheets for active students.</p>
+      </div>
+      <button class="btn btn-gold" onclick="printAll()">
+        <svg viewBox="0 0 24 24" fill="none"><path d="M6 9V2h12v7M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2M6 14h12v8H6z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Print All Emergency Sheets
+      </button>
+    </div>
+
+    <div class="stats">
+      <div class="stat-card"><div class="num" id="stat-families">—</div><div class="lbl">Families</div></div>
+      <div class="stat-card"><div class="num" id="stat-students">—</div><div class="lbl">Active Students</div></div>
+    </div>
+
+    <div class="controls">
+      <div class="search-box">
+        <svg viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="2"/><path d="M21 21l-4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        <input type="text" id="search" placeholder="Search by family or student name…" autocomplete="off">
+      </div>
+    </div>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Family</th>
+            <th>Students</th>
+            <th>Primary Phone</th>
+            <th>Location</th>
+          </tr>
+        </thead>
+        <tbody id="tbody">
+          <tr><td colspan="4" class="empty-state">Loading families…</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ── Family detail modal ── -->
+<div class="modal-overlay screen-only" id="modal" onclick="if(event.target===this)closeModal()">
+  <div class="modal">
+    <div class="modal-header">
+      <div>
+        <h2 id="m-family">Family</h2>
+        <p id="m-sub"></p>
+      </div>
+      <button class="modal-close" onclick="closeModal()">&times;</button>
+    </div>
+    <div class="modal-body" id="m-body"></div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeModal()">Close</button>
+      <button class="btn btn-primary" onclick="printCurrent()">
+        <svg viewBox="0 0 24 24" fill="none"><path d="M6 9V2h12v7M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2M6 14h12v8H6z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Print Emergency Sheet
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Print target (populated on demand) ── -->
+<div id="printArea"></div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+  let FAMILIES = [];
+  let currentId = null;
+
+  function esc(s) {
+    return (s == null ? '' : String(s)).replace(/[&<>"']/g, c =>
+      ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+  function toast(msg, isErr) {
+    const t = document.getElementById('toast');
+    t.textContent = msg; t.className = 'toast show' + (isErr ? ' error' : '');
+    setTimeout(() => t.className = 'toast', 2200);
+  }
+  function fullName(p) { return ((p.first_name || '') + ' ' + (p.last_name || '')).trim(); }
+  function gradeLabel(g) {
+    if (g == null || g === '') return '—';
+    if (/^\d+$/.test(String(g))) return 'Grade ' + g;
+    return g;
+  }
+  function cityState(h) {
+    return [h.city, h.state].filter(Boolean).join(', ');
+  }
+  function addressBlock(h) {
+    const l1 = [h.address_line_1, h.address_line_2].filter(Boolean).join(', ');
+    const l2 = [h.city, h.state, h.zip].filter(Boolean).join(' ').replace(/\s+,/g, ',');
+    const parts = [l1, [ [h.city, h.state].filter(Boolean).join(', '), h.zip ].filter(Boolean).join(' ') ].filter(Boolean);
+    return parts.join(' · ');
+  }
+
+  async function load() {
+    try {
+      const res = await fetch('/api/family-directory');
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      FAMILIES = await res.json();
+      render();
+    } catch (e) {
+      document.getElementById('tbody').innerHTML =
+        '<tr><td colspan="4" class="empty-state">Could not load families (' + esc(e.message) + ').</td></tr>';
+    }
+  }
+
+  function render() {
+    const q = document.getElementById('search').value.trim().toLowerCase();
+    let list = FAMILIES;
+    if (q) {
+      list = FAMILIES.filter(h => {
+        if ((h.family_name || '').toLowerCase().includes(q)) return true;
+        return (h.students || []).some(s => fullName(s).toLowerCase().includes(q));
+      });
+    }
+    const totalStudents = FAMILIES.reduce((n, h) => n + (h.students || []).length, 0);
+    document.getElementById('stat-families').textContent = FAMILIES.length;
+    document.getElementById('stat-students').textContent = totalStudents;
+
+    const tb = document.getElementById('tbody');
+    if (!list.length) {
+      tb.innerHTML = '<tr><td colspan="4" class="empty-state">No families match “' + esc(q) + '”.</td></tr>';
+      return;
+    }
+    tb.innerHTML = list.map(h => {
+      const kids = (h.students || []).map(s =>
+        '<span class="kid">' + esc(fullName(s)) + '</span> <span style="opacity:.7">(' + esc(gradeLabel(s.grade)) + ')</span>'
+      ).join(', ');
+      return '<tr onclick="openModal(' + h.household_id + ')">' +
+        '<td class="td-family">' + esc(h.family_name) + '</td>' +
+        '<td class="td-students">' + (kids || '—') + '</td>' +
+        '<td class="td-phone">' + esc(h.primary_phone || '—') + '</td>' +
+        '<td class="td-place">' + esc(cityState(h) || '—') + '</td>' +
+      '</tr>';
+    }).join('');
+  }
+
+  function findFamily(id) { return FAMILIES.find(h => h.household_id === id); }
+
+  function openModal(id) {
+    const h = findFamily(id);
+    if (!h) return;
+    currentId = id;
+    document.getElementById('m-family').textContent = h.family_name;
+    const nKids = (h.students || []).length;
+    document.getElementById('m-sub').textContent =
+      nKids + ' active student' + (nKids === 1 ? '' : 's');
+
+    let html = '';
+
+    // Household
+    html += '<div class="section-title">Household</div>';
+    html += '<div class="addr-line">' + (esc(addressBlock(h)) || '<span style="color:var(--muted)">No address on file</span>') + '</div>';
+    const meta = [];
+    if (h.primary_phone) meta.push('<span><b>Phone:</b> ' + esc(h.primary_phone) + '</span>');
+    if (h.primary_email) meta.push('<span><b>Email:</b> ' + esc(h.primary_email) + '</span>');
+    if (meta.length) html += '<div class="meta-row">' + meta.join('') + '</div>';
+
+    // Parents / guardians
+    html += '<div class="section-title">Parents &amp; Guardians</div>';
+    if (!(h.parents || []).length) {
+      html += '<p style="color:var(--muted);font-size:13px">No parent records on file.</p>';
+    } else {
+      html += h.parents.map(p => {
+        const lines = [];
+        if (p.phone) lines.push('<span>📞 <a href="tel:' + esc(p.phone) + '">' + esc(p.phone) + '</a></span>');
+        if (p.email) lines.push('<span>✉ <a href="mailto:' + esc(p.email) + '">' + esc(p.email) + '</a></span>');
+        const pickup = p.can_pickup
+          ? '<span class="badge badge-pickup">Can pick up</span>'
+          : '<span class="badge badge-nopickup">No pickup</span>';
+        return '<div class="contact-card">' +
+          '<div class="cc-top"><div><span class="cc-name">' + esc(fullName(p)) + '</span>' +
+            (p.relationship_type ? ' <span class="cc-rel">· ' + esc(p.relationship_type) + '</span>' : '') +
+          '</div>' + pickup + '</div>' +
+          (lines.length ? '<div class="cc-lines">' + lines.join('') + '</div>' : '') +
+        '</div>';
+      }).join('');
+    }
+
+    // Students + non-parent emergency contacts
+    html += '<div class="section-title">Students &amp; Emergency Contacts</div>';
+    html += (h.students || []).map(s => {
+      const m = [];
+      if (s.date_of_birth) m.push('<span><b>DOB:</b> ' + esc(s.date_of_birth) + '</span>');
+      if (s.homeroom_teacher_name) m.push('<span><b>Homeroom:</b> ' + esc(s.homeroom_teacher_name) + '</span>');
+      if (s.advisory_teacher_name) m.push('<span><b>Advisory:</b> ' + esc(s.advisory_teacher_name) + '</span>');
+      if (s.custody_notes) m.push('<span><b>Custody:</b> ' + esc(s.custody_notes) + '</span>');
+      let emrg = '';
+      if (s.emergency_contact_name || s.emergency_contact_phone) {
+        emrg = '<div class="kid-emrg"><span class="lbl">Additional emergency contact</span><br>' +
+          esc(s.emergency_contact_name || '—') +
+          (s.emergency_contact_phone ? ' · <a href="tel:' + esc(s.emergency_contact_phone) + '" style="color:var(--people);text-decoration:none">' + esc(s.emergency_contact_phone) + '</a>' : '') +
+        '</div>';
+      }
+      return '<div class="kid-card">' +
+        '<div class="kid-head"><span class="kid-name">' + esc(fullName(s)) + '</span>' +
+          '<span class="kid-grade">' + esc(gradeLabel(s.grade)) + '</span></div>' +
+        (m.length ? '<div class="kid-meta">' + m.join('') + '</div>' : '') +
+        emrg +
+      '</div>';
+    }).join('');
+
+    document.getElementById('m-body').innerHTML = html;
+    document.getElementById('modal').classList.add('open');
+  }
+
+  function closeModal() {
+    document.getElementById('modal').classList.remove('open');
+    currentId = null;
+  }
+
+  // ── Emergency sheet rendering (print) ──
+  function sheetHTML(h) {
+    const today = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+    let s = '<div class="sheet">';
+    s += '<div class="sheet-header"><div class="brand">Mizzentop Day School</div>' +
+         '<div class="doc">Emergency Contact Sheet<br>Generated ' + esc(today) + '</div></div>';
+    s += '<div class="sheet-family">' + esc(h.family_name) + '</div>';
+    const addr = addressBlock(h);
+    const hh = [];
+    if (addr) hh.push(esc(addr));
+    if (h.primary_phone) hh.push('Home: ' + esc(h.primary_phone));
+    if (h.primary_email) hh.push(esc(h.primary_email));
+    s += '<div class="sheet-addr">' + (hh.join(' &nbsp;·&nbsp; ') || 'No household contact on file') + '</div>';
+
+    // Students
+    s += '<h3>Active Students</h3><table><thead><tr><th>Name</th><th>Grade</th><th>Date of Birth</th><th>Homeroom</th></tr></thead><tbody>';
+    (h.students || []).forEach(st => {
+      s += '<tr><td>' + esc(fullName(st)) + '</td><td>' + esc(gradeLabel(st.grade)) + '</td><td>' +
+           esc(st.date_of_birth || '—') + '</td><td>' + esc(st.homeroom_teacher_name || '—') + '</td></tr>';
+    });
+    s += '</tbody></table>';
+
+    // Parents / guardians
+    s += '<h3>Parents &amp; Guardians</h3><table><thead><tr><th>Name</th><th>Relationship</th><th>Phone</th><th>Email</th><th>Pickup</th></tr></thead><tbody>';
+    if ((h.parents || []).length) {
+      h.parents.forEach(p => {
+        s += '<tr><td>' + esc(fullName(p)) + '</td><td style="text-transform:capitalize">' + esc(p.relationship_type || '—') +
+             '</td><td>' + esc(p.phone || '—') + '</td><td>' + esc(p.email || '—') + '</td><td class="' +
+             (p.can_pickup ? 'pickup-yes">Yes' : 'pickup-no">No') + '</td></tr>';
+      });
+    } else {
+      s += '<tr><td colspan="5">No parent records on file.</td></tr>';
+    }
+    s += '</tbody></table>';
+
+    // Additional (non-parent) emergency contacts, per student
+    const extra = (h.students || []).filter(st => st.emergency_contact_name || st.emergency_contact_phone);
+    if (extra.length) {
+      s += '<h3>Additional Emergency Contacts</h3><table><thead><tr><th>For Student</th><th>Contact Name</th><th>Phone</th></tr></thead><tbody>';
+      extra.forEach(st => {
+        s += '<tr><td>' + esc(fullName(st)) + '</td><td>' + esc(st.emergency_contact_name || '—') +
+             '</td><td>' + esc(st.emergency_contact_phone || '—') + '</td></tr>';
+      });
+      s += '</tbody></table>';
+    }
+
+    // Custody notes if any
+    const custody = (h.students || []).filter(st => st.custody_notes);
+    if (custody.length) {
+      s += '<h3>Custody Notes</h3><table><tbody>';
+      custody.forEach(st => {
+        s += '<tr><td style="width:30%">' + esc(fullName(st)) + '</td><td class="emrg-note">' + esc(st.custody_notes) + '</td></tr>';
+      });
+      s += '</tbody></table>';
+    }
+
+    s += '<div class="sheet-foot">Mizzentop Day School · Confidential · For staff emergency use only.</div>';
+    s += '</div>';
+    return s;
+  }
+
+  function gradeShort(g) {
+    if (g == null || g === '') return '—';
+    if (/^\d+$/.test(String(g))) return 'Gr ' + g;
+    return g;
+  }
+  function dirAddr(h) {
+    return [h.address_line_1, [h.city, h.state].filter(Boolean).join(' ')].filter(Boolean).join(', ');
+  }
+
+  // Compact continuous directory (used for "Print All Emergency Sheets")
+  function directoryHTML(families) {
+    const today = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+    const nStudents = families.reduce((n, h) => n + (h.students || []).length, 0);
+    let s = '<div class="dir">';
+    s += '<div class="dir-head">' +
+         '<div class="dir-brand">Mizzentop Day School</div>' +
+         '<div class="dir-title">Emergency Contact Directory</div>' +
+         '<div class="dir-sub">' + families.length + ' families · ' + nStudents +
+           ' active students · Generated ' + esc(today) + ' · ✓ = authorized for pickup</div>' +
+         '</div>';
+    families.forEach(h => {
+      s += '<div class="fam">';
+      s += '<div class="fam-name">' + esc(h.family_name) +
+           (dirAddr(h) ? ' <span class="fam-addr">' + esc(dirAddr(h)) + '</span>' : '') + '</div>';
+
+      const kids = (h.students || []).map(st =>
+        esc(fullName(st)) + ' <span class="mut">(' + esc(gradeShort(st.grade)) + ')</span>').join(' · ');
+      if (kids) s += '<div class="fam-line">' + kids + '</div>';
+
+      if ((h.parents || []).length) {
+        const par = h.parents.map(p => {
+          const rel = p.relationship_type ? ' <span class="mut">' + esc(p.relationship_type) + '</span>' : '';
+          const ph = p.phone ? ' ' + esc(p.phone) : '';
+          const pick = p.can_pickup ? ' <span class="ok">✓</span>' : ' <span class="mut">(no pickup)</span>';
+          return '<span class="nowrap">' + esc(fullName(p)) + rel + ph + pick + '</span>';
+        }).join(' &nbsp;·&nbsp; ');
+        s += '<div class="fam-line">' + par + '</div>';
+      }
+
+      const hh = [];
+      if (h.primary_phone) hh.push('Home ' + esc(h.primary_phone));
+      if (h.primary_email) hh.push(esc(h.primary_email));
+      if (hh.length) s += '<div class="fam-line mut">' + hh.join(' · ') + '</div>';
+
+      const extra = (h.students || []).filter(st => st.emergency_contact_name || st.emergency_contact_phone);
+      if (extra.length) {
+        const e = extra.map(st =>
+          esc(st.emergency_contact_name || '—') +
+          (st.emergency_contact_phone ? ' ' + esc(st.emergency_contact_phone) : '') +
+          ' <span class="mut">(' + esc(st.first_name) + ')</span>').join(' · ');
+        s += '<div class="fam-line"><span class="lbl">Emerg:</span> ' + e + '</div>';
+      }
+
+      const cust = (h.students || []).filter(st => st.custody_notes);
+      if (cust.length) {
+        const c = cust.map(st => esc(st.first_name) + ': ' + esc(st.custody_notes)).join(' · ');
+        s += '<div class="fam-line"><span class="lbl">Custody:</span> ' + c + '</div>';
+      }
+
+      s += '</div>';
+    });
+    s += '</div>';
+    return s;
+  }
+
+  function doPrint(html) {
+    document.getElementById('printArea').innerHTML = html;
+    window.print();
+  }
+
+  function printCurrent() {
+    const h = findFamily(currentId);
+    if (h) doPrint(sheetHTML(h));
+  }
+
+  function printAll() {
+    if (!FAMILIES.length) { toast('Nothing to print.', true); return; }
+    doPrint(directoryHTML(FAMILIES));
+  }
+
+  document.getElementById('search').addEventListener('input', render);
+  window.addEventListener('afterprint', () => { document.getElementById('printArea').innerHTML = ''; });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+
+  load();
+</script>
+</body>
+</html>

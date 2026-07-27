@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Family Manager — Mizzentop</title>
+  <link rel="icon" type="image/svg+xml" href="/logo.svg">
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --navy:    #1a2744;
+      --green:   #2d5016;
+      --gold:    #c8992a;
+      --cream:   #f7f3ec;
+      --muted:   #6b7280;
+      --border:  #e5e0d8;
+      --people:  #3a5a7a;
+      --active-bg:   #e8f5e9;
+      --active-txt:  #2d5016;
+      --inactive-bg: #fce8e8;
+      --inactive-txt:#8a1a1a;
+    }
+    html, body { min-height: 100%; font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(--navy); }
+
+    .topbar { background: var(--navy); padding: 14px 28px; display: flex; align-items: center; gap: 16px; }
+    .topbar a { color: rgba(255,255,255,0.7); text-decoration: none; font-size: 13px; font-weight: 500; transition: color 0.15s; }
+    .topbar a:hover { color: white; }
+    .topbar-sep { color: rgba(255,255,255,0.3); font-size: 13px; }
+    .topbar-title { color: white; font-size: 13px; font-weight: 600; }
+
+    .page { max-width: 1200px; margin: 0 auto; padding: 40px 28px 80px; }
+    .page-header { margin-bottom: 24px; }
+    .page-header h1 { font-family: 'Playfair Display', serif; font-size: 32px; font-weight: 700; color: var(--navy); }
+    .page-header p { font-size: 14px; color: var(--muted); margin-top: 4px; }
+
+    .controls { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 20px; }
+    .search-box { position: relative; flex: 1; min-width: 240px; max-width: 380px; }
+    .search-box input { width: 100%; padding: 9px 12px 9px 36px; border: 1px solid var(--border); border-radius: 8px; font-family: 'DM Sans', sans-serif; font-size: 14px; background: white; outline: none; }
+    .search-box input:focus { border-color: var(--people); }
+    .search-box svg { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); width: 16px; height: 16px; color: var(--muted); pointer-events: none; }
+
+    .stats { display: flex; gap: 16px; margin-bottom: 24px; flex-wrap: wrap; }
+    .stat-card { background: white; border: 1px solid var(--border); border-radius: 10px; padding: 14px 20px; min-width: 120px; }
+    .stat-card .num { font-size: 26px; font-weight: 700; color: var(--navy); line-height: 1; }
+    .stat-card .lbl { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; margin-top: 4px; }
+
+    .table-wrap { background: white; border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+    table.list { width: 100%; border-collapse: collapse; font-size: 14px; }
+    table.list thead th { background: #f4f1eb; padding: 10px 16px; text-align: left; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted); border-bottom: 1px solid var(--border); white-space: nowrap; }
+    table.list tbody tr { border-bottom: 1px solid var(--border); cursor: pointer; transition: background 0.1s; }
+    table.list tbody tr:last-child { border-bottom: none; }
+    table.list tbody tr:hover { background: #f9f7f4; }
+    table.list td { padding: 12px 16px; vertical-align: middle; }
+    .td-family { font-weight: 600; color: var(--navy); }
+    .td-students { font-size: 13px; color: var(--muted); }
+    .td-phone { font-size: 13px; color: var(--navy); white-space: nowrap; }
+    .td-place { font-size: 13px; color: var(--muted); }
+    .edit-hint { color: var(--people); font-size: 12px; font-weight: 600; white-space: nowrap; }
+    .empty-state { text-align: center; padding: 60px 20px; color: var(--muted); }
+
+    .btn { padding: 9px 18px; border-radius: 8px; font-family: 'DM Sans', sans-serif; font-size: 14px; font-weight: 600; cursor: pointer; border: none; transition: all 0.15s; display: inline-flex; align-items: center; gap: 7px; }
+    .btn svg { width: 15px; height: 15px; }
+    .btn-secondary { background: var(--border); color: var(--navy); }
+    .btn-secondary:hover { background: #d5cfc6; }
+    .btn-primary { background: var(--people); color: white; }
+    .btn-primary:hover { background: #2e4a66; }
+    .btn:disabled { opacity: 0.55; cursor: not-allowed; }
+
+    .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 200; display: none; align-items: center; justify-content: center; padding: 20px; }
+    .modal-overlay.open { display: flex; }
+    .modal { background: white; border-radius: 16px; width: 760px; max-width: 100%; max-height: 92vh; overflow-y: auto; box-shadow: 0 24px 80px rgba(0,0,0,0.22); }
+    .modal-header { padding: 24px 28px 0; display: flex; align-items: flex-start; justify-content: space-between; }
+    .modal-header h2 { font-family: 'Playfair Display', serif; font-size: 24px; font-weight: 700; color: var(--navy); }
+    .modal-header p { font-size: 13px; color: var(--muted); margin-top: 3px; }
+    .modal-close { background: none; border: none; cursor: pointer; color: var(--muted); padding: 4px; border-radius: 6px; font-size: 22px; line-height: 1; }
+    .modal-close:hover { background: var(--border); color: var(--navy); }
+    .modal-body { padding: 16px 28px 24px; }
+
+    .section-title { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: var(--people); margin: 22px 0 12px; padding-bottom: 6px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+    .section-title:first-child { margin-top: 4px; }
+
+    .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .form-grid.three { grid-template-columns: 1.4fr 0.8fr 0.8fr; }
+    .form-grid.full { grid-template-columns: 1fr; }
+    .field { display: flex; flex-direction: column; gap: 5px; }
+    .field.span2 { grid-column: span 2; }
+    .field label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted); }
+    .field input, .field select, .field textarea {
+      padding: 9px 12px; border: 1px solid var(--border); border-radius: 8px;
+      font-family: 'DM Sans', sans-serif; font-size: 14px; color: var(--navy);
+      background: white; outline: none; transition: border-color 0.15s;
+    }
+    .field input:focus, .field select:focus, .field textarea:focus { border-color: var(--people); }
+    .field textarea { resize: vertical; min-height: 56px; }
+
+    .card-edit { border: 1px solid var(--border); border-radius: 10px; padding: 14px; margin-bottom: 12px; background: #fcfbf9; }
+    .card-edit .card-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
+    .card-edit .card-name { font-weight: 600; color: var(--navy); font-size: 14px; }
+    .kid-grade { font-size: 12px; color: white; background: var(--people); border-radius: 20px; padding: 1px 9px; font-weight: 600; }
+    .pill { display: inline-block; padding: 2px 9px; border-radius: 20px; font-size: 10px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; }
+    .pill-active { background: var(--active-bg); color: var(--active-txt); }
+    .pill-inactive { background: var(--inactive-bg); color: var(--inactive-txt); }
+    .checkbox-row { display: flex; align-items: center; gap: 9px; padding-top: 22px; }
+    .checkbox-row input { width: 16px; height: 16px; accent-color: var(--people); cursor: pointer; }
+    .checkbox-row label { font-size: 13px; color: var(--navy); cursor: pointer; font-weight: 500; }
+    .muted-note { font-size: 12px; color: var(--muted); margin-top: -2px; }
+
+    .modal-actions { display: flex; gap: 10px; justify-content: flex-end; padding: 16px 28px 24px; border-top: 1px solid var(--border); position: sticky; bottom: 0; background: white; }
+
+    .toast { position: fixed; bottom: 28px; left: 50%; transform: translateX(-50%) translateY(20px); background: var(--navy); color: white; padding: 10px 20px; border-radius: 8px; font-size: 14px; font-weight: 500; opacity: 0; transition: all 0.25s; pointer-events: none; z-index: 500; white-space: nowrap; }
+    .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+    .toast.error { background: #8a1a1a; }
+  </style>
+</head>
+<body>
+
+<div class="topbar">
+  <a href="/">← Home</a>
+  <span class="topbar-sep">/</span>
+  <span class="topbar-title">Family Manager</span>
+</div>
+
+<div class="page">
+  <div class="page-header">
+    <h1>Family Manager</h1>
+    <p>Edit household contact information and parents &amp; guardians. Changes save to the live records. Student details, including each student’s emergency contact, are edited in the Student Directory.</p>
+  </div>
+
+  <div class="stats">
+    <div class="stat-card"><div class="num" id="stat-families">—</div><div class="lbl">Families</div></div>
+    <div class="stat-card"><div class="num" id="stat-students">—</div><div class="lbl">Students</div></div>
+  </div>
+
+  <div class="controls">
+    <div class="search-box">
+      <svg viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="2"/><path d="M21 21l-4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      <input type="text" id="search" placeholder="Search by family or student name…" autocomplete="off">
+    </div>
+  </div>
+
+  <div class="table-wrap">
+    <table class="list">
+      <thead>
+        <tr><th>Family</th><th>Students</th><th>Primary Phone</th><th>Location</th><th></th></tr>
+      </thead>
+      <tbody id="tbody">
+        <tr><td colspan="5" class="empty-state">Loading families…</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Edit modal -->
+<div class="modal-overlay" id="modal" onclick="if(event.target===this)closeModal()">
+  <div class="modal">
+    <div class="modal-header">
+      <div>
+        <h2 id="m-family">Edit Family</h2>
+        <p id="m-sub"></p>
+      </div>
+      <button class="modal-close" onclick="closeModal()">&times;</button>
+    </div>
+    <div class="modal-body" id="m-body"></div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" id="saveBtn" onclick="saveFamily()">
+        <svg viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4L19 7" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Save Changes
+      </button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+  let FAMILIES = [];
+  let currentId = null;
+
+  function esc(s) {
+    return (s == null ? '' : String(s)).replace(/[&<>"']/g, c =>
+      ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+  function attr(s) { return esc(s); }
+  function toast(msg, isErr) {
+    const t = document.getElementById('toast');
+    t.textContent = msg; t.className = 'toast show' + (isErr ? ' error' : '');
+    setTimeout(() => t.className = 'toast', 2400);
+  }
+  function fullName(p) { return ((p.first_name || '') + ' ' + (p.last_name || '')).trim(); }
+  function gradeLabel(g) {
+    if (g == null || g === '') return '—';
+    if (/^\d+$/.test(String(g))) return 'Grade ' + g;
+    return g;
+  }
+  function cityState(h) { return [h.city, h.state].filter(Boolean).join(', '); }
+  function val(id) { const el = document.getElementById(id); return el ? el.value.trim() : ''; }
+
+  async function load() {
+    try {
+      const res = await fetch('/api/family-directory/manage');
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      FAMILIES = await res.json();
+      render();
+    } catch (e) {
+      document.getElementById('tbody').innerHTML =
+        '<tr><td colspan="5" class="empty-state">Could not load families (' + esc(e.message) + ').</td></tr>';
+    }
+  }
+
+  function render() {
+    const q = document.getElementById('search').value.trim().toLowerCase();
+    let list = FAMILIES;
+    if (q) {
+      list = FAMILIES.filter(h => {
+        if ((h.family_name || '').toLowerCase().includes(q)) return true;
+        return (h.students || []).some(s => fullName(s).toLowerCase().includes(q));
+      });
+    }
+    const totalStudents = FAMILIES.reduce((n, h) => n + (h.students || []).length, 0);
+    document.getElementById('stat-families').textContent = FAMILIES.length;
+    document.getElementById('stat-students').textContent = totalStudents;
+
+    const tb = document.getElementById('tbody');
+    if (!list.length) {
+      tb.innerHTML = '<tr><td colspan="5" class="empty-state">No families match “' + esc(q) + '”.</td></tr>';
+      return;
+    }
+    tb.innerHTML = list.map(h => {
+      const kids = (h.students || []).map(s =>
+        esc(fullName(s)) + ' <span style="opacity:.7">(' + esc(gradeLabel(s.grade)) + ')</span>').join(', ');
+      return '<tr onclick="openModal(' + h.household_id + ')">' +
+        '<td class="td-family">' + esc(h.family_name) + '</td>' +
+        '<td class="td-students">' + (kids || '—') + '</td>' +
+        '<td class="td-phone">' + esc(h.primary_phone || '—') + '</td>' +
+        '<td class="td-place">' + esc(cityState(h) || '—') + '</td>' +
+        '<td class="edit-hint">Edit →</td>' +
+      '</tr>';
+    }).join('');
+  }
+
+  function findFamily(id) { return FAMILIES.find(h => h.household_id === id); }
+
+  function openModal(id) {
+    const h = findFamily(id);
+    if (!h) return;
+    currentId = id;
+    document.getElementById('m-family').textContent = 'Edit — ' + h.family_name;
+    const nKids = (h.students || []).length;
+    document.getElementById('m-sub').textContent = nKids + ' student' + (nKids === 1 ? '' : 's') + ' on file';
+
+    let html = '';
+
+    // Household
+    html += '<div class="section-title">Household</div>';
+    html += '<div class="form-grid">';
+    html += field('Family Name', 'f_family_name', h.family_name, 'span2');
+    html += '<div class="field span2"><label>Status</label><select id="f_status">' +
+              '<option value="active"' + (h.status === 'active' ? ' selected' : '') + '>Active</option>' +
+              '<option value="inactive"' + (h.status === 'inactive' ? ' selected' : '') + '>Inactive</option>' +
+            '</select></div>';
+    html += field('Address Line 1', 'f_addr1', h.address_line_1, 'span2');
+    html += field('Address Line 2', 'f_addr2', h.address_line_2, 'span2');
+    html += field('City', 'f_city', h.city);
+    html += '<div class="form-grid" style="grid-column:span 2;grid-template-columns:1fr 1fr;gap:12px">' +
+              field('State', 'f_state', h.state) + field('ZIP', 'f_zip', h.zip) + '</div>';
+    html += field('Primary Phone', 'f_phone', h.primary_phone);
+    html += field('Primary Email', 'f_email', h.primary_email);
+    html += '<div class="field span2"><label>Billing Notes</label><textarea id="f_billing">' + esc(h.billing_notes || '') + '</textarea></div>';
+    html += '</div>';
+
+    // Parents
+    html += '<div class="section-title">Parents &amp; Guardians</div>';
+    if (!(h.parents || []).length) {
+      html += '<p class="muted-note">No parent records on file. Add parents from the Student Directory.</p>';
+    } else {
+      html += h.parents.map(p => {
+        const id = p.parent_id;
+        return '<div class="card-edit">' +
+          '<div class="card-top"><span class="card-name">' + esc(fullName(p) || 'Parent') + '</span>' +
+            (p.role ? '<span class="muted-note" style="text-transform:capitalize">' + esc(p.role) + '</span>' : '') +
+          '</div>' +
+          '<div class="form-grid">' +
+            field('First Name', 'p_first_' + id, p.first_name) +
+            field('Last Name', 'p_last_' + id, p.last_name) +
+            field('Relationship', 'p_rel_' + id, p.relationship_type) +
+            field('Phone', 'p_phone_' + id, p.phone) +
+            '<div class="field span2"><label>Email</label><input type="text" id="p_email_' + id + '" value="' + attr(p.email || '') + '"></div>' +
+            '<div class="checkbox-row"><input type="checkbox" id="p_pickup_' + id + '"' + (p.can_pickup ? ' checked' : '') + '>' +
+              '<label for="p_pickup_' + id + '">Authorized for pickup</label></div>' +
+            '<div class="field"><label>Notes</label><input type="text" id="p_notes_' + id + '" value="' + attr(p.notes || '') + '"></div>' +
+          '</div>' +
+        '</div>';
+      }).join('');
+    }
+
+    // Students — read-only context. Student details, incl. the per-student emergency
+    // contact, are edited in the Student Directory (kept on the student because
+    // half-siblings in one family can have different emergency contacts).
+    html += '<div class="section-title">Students <span class="muted-note" style="text-transform:none;letter-spacing:0">edit in Student Directory</span></div>';
+    html += (h.students || []).map(s => {
+      const statusPill = s.status === 'active'
+        ? '<span class="pill pill-active">Active</span>'
+        : '<span class="pill pill-inactive">' + esc(s.status || 'inactive') + '</span>';
+      return '<div class="card-edit" style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px">' +
+        '<span class="card-name">' + esc(fullName(s)) +
+          ' <span class="kid-grade">' + esc(gradeLabel(s.grade)) + '</span></span>' + statusPill +
+      '</div>';
+    }).join('');
+    html += '<p class="muted-note" style="margin-top:4px">To edit a student’s details or emergency contact, open the ' +
+            '<a href="/students" target="_blank" style="color:var(--people);text-decoration:none">Student Directory</a>.</p>';
+
+    document.getElementById('m-body').innerHTML = html;
+    document.getElementById('modal').classList.add('open');
+  }
+
+  function field(label, id, value, extraClass) {
+    return '<div class="field ' + (extraClass || '') + '"><label>' + esc(label) + '</label>' +
+      '<input type="text" id="' + id + '" value="' + attr(value || '') + '"></div>';
+  }
+
+  function closeModal() {
+    document.getElementById('modal').classList.remove('open');
+    currentId = null;
+  }
+
+  async function saveFamily() {
+    const h = findFamily(currentId);
+    if (!h) return;
+    if (!val('f_family_name')) { toast('Family name cannot be empty.', true); return; }
+
+    const btn = document.getElementById('saveBtn');
+    btn.disabled = true;
+
+    const jreq = (url, body) => fetch(url, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+
+    const calls = [];
+
+    // Household
+    calls.push(jreq('/api/households/' + currentId, {
+      family_name: val('f_family_name'),
+      status: val('f_status'),
+      address_line_1: val('f_addr1'),
+      address_line_2: val('f_addr2'),
+      city: val('f_city'),
+      state: val('f_state'),
+      zip: val('f_zip'),
+      primary_phone: val('f_phone'),
+      primary_email: val('f_email'),
+      billing_notes: val('f_billing')
+    }));
+
+    // Parents
+    (h.parents || []).forEach(p => {
+      const id = p.parent_id;
+      const pickupEl = document.getElementById('p_pickup_' + id);
+      calls.push(jreq('/api/parents/' + id, {
+        first_name: val('p_first_' + id),
+        last_name: val('p_last_' + id),
+        relationship_type: val('p_rel_' + id),
+        phone: val('p_phone_' + id),
+        email: val('p_email_' + id),
+        can_pickup: pickupEl ? pickupEl.checked : null,
+        notes: val('p_notes_' + id)
+      }));
+    });
+
+    try {
+      const results = await Promise.all(calls);
+      const bad = results.find(r => !r.ok);
+      if (bad) throw new Error('HTTP ' + bad.status);
+      toast('Saved ✓');
+      closeModal();
+      await load();
+    } catch (e) {
+      toast('Save failed (' + e.message + '). No partial data lost.', true);
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
+  document.getElementById('search').addEventListener('input', render);
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+
+  load();
+</script>
+</body>
+</html>

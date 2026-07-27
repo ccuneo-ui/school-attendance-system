@@ -36,6 +36,8 @@ Each page is self-contained with inline `<style>` and `<script>` tags.
 | `bus_dashboard.html` | Students grouped by bus route | `@login_required` |
 | `mcard_tracker.html` | Snack cart charge tracker | `@login_required` |
 | `students.html` | Student directory & profiles | `@people_required` |
+| `family_directory.html` | Family directory & printable emergency contact sheets (read-only, all staff) | `@login_required` |
+| `family_manager.html` | Editable family records — household contact + parents/guardians (student details, incl. emergency contact, live in Student Directory) | `@people_required` |
 | `people.html` | Staff directory & permissions | `@people_required` |
 | `program_attendance.html` | Billable program attendance | `@login_required` |
 | `aftercare_attendance.html` | Before/aftercare check-in/out | `@login_required` |
