@@ -268,6 +268,11 @@
     html += field('Primary Phone', 'f_phone', h.primary_phone);
     html += field('Primary Email', 'f_email', h.primary_email);
     html += '<div class="field span2"><label>Billing Notes</label><textarea id="f_billing">' + esc(h.billing_notes || '') + '</textarea></div>';
+    html += '<div class="checkbox-row span2" style="grid-column:span 2;padding-top:6px;align-items:flex-start">' +
+              '<input type="checkbox" id="f_optout"' + (h.directory_opt_out ? ' checked' : '') + '>' +
+              '<label for="f_optout">Opt out of the shared Family Directory<br>' +
+                '<span class="muted-note" style="font-weight:400">Hidden from the printable/shared contact directory. Still visible to staff here and on emergency sheets.</span>' +
+              '</label></div>';
     html += '</div>';
 
     // Parents
@@ -352,7 +357,8 @@
       zip: val('f_zip'),
       primary_phone: val('f_phone'),
       primary_email: val('f_email'),
-      billing_notes: val('f_billing')
+      billing_notes: val('f_billing'),
+      directory_opt_out: document.getElementById('f_optout') ? document.getElementById('f_optout').checked : false
     }));
 
     // Parents

@@ -56,6 +56,7 @@
     tbody tr:hover { background: #f9f7f4; }
     td { padding: 12px 16px; vertical-align: middle; }
     .td-family { font-weight: 600; color: var(--navy); }
+    .unlisted-tag { display: inline-block; margin-left: 6px; padding: 1px 8px; border-radius: 20px; font-size: 10px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; background: #f1eee8; color: #9a8f7a; vertical-align: middle; }
     .td-students { font-size: 13px; color: var(--muted); }
     .td-students .kid { color: var(--navy); }
     .td-phone { font-family: 'DM Sans', sans-serif; font-size: 13px; color: var(--navy); white-space: nowrap; }
@@ -176,12 +177,18 @@
     <div class="page-header">
       <div>
         <h1>Family Directory</h1>
-        <p>Look up family contact information and print emergency contact sheets for active students.</p>
+        <p>Look up family contact information, print emergency sheets, or print a shared family contact directory.</p>
       </div>
-      <button class="btn btn-gold" onclick="printAll()">
-        <svg viewBox="0 0 24 24" fill="none"><path d="M6 9V2h12v7M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2M6 14h12v8H6z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        Print All Emergency Sheets
-      </button>
+      <div style="display:flex;gap:10px;flex-wrap:wrap">
+        <button class="btn btn-primary" onclick="printContactDirectory()">
+          <svg viewBox="0 0 24 24" fill="none"><path d="M4 5h16M4 12h16M4 19h10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+          Print Contact Directory
+        </button>
+        <button class="btn btn-gold" onclick="printAll()">
+          <svg viewBox="0 0 24 24" fill="none"><path d="M6 9V2h12v7M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2M6 14h12v8H6z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          Print All Emergency Sheets
+        </button>
+      </div>
     </div>
 
     <div class="stats">
@@ -304,7 +311,8 @@
         '<span class="kid">' + esc(fullName(s)) + '</span> <span style="opacity:.7">(' + esc(gradeLabel(s.grade)) + ')</span>'
       ).join(', ');
       return '<tr onclick="openModal(' + h.household_id + ')">' +
-        '<td class="td-family">' + esc(h.family_name) + '</td>' +
+        '<td class="td-family">' + esc(h.family_name) +
+          (h.directory_opt_out ? ' <span class="unlisted-tag">Unlisted</span>' : '') + '</td>' +
         '<td class="td-students">' + (kids || '—') + '</td>' +
         '<td class="td-phone">' + esc(h.primary_phone || '—') + '</td>' +
         '<td class="td-place">' + esc(cityState(h) || '—') + '</td>' +
@@ -321,7 +329,8 @@
     document.getElementById('m-family').textContent = h.family_name;
     const nKids = (h.students || []).length;
     document.getElementById('m-sub').textContent =
-      nKids + ' active student' + (nKids === 1 ? '' : 's');
+      nKids + ' active student' + (nKids === 1 ? '' : 's') +
+      (h.directory_opt_out ? ' · Unlisted (excluded from the shared contact directory)' : '');
 
     let html = '';
 
@@ -512,6 +521,44 @@
     return s;
   }
 
+  // Shareable family contact directory (parents' names/phones/emails + address).
+  // Excludes families who opted out; NO emergency-contact info.
+  function contactDirectoryHTML(families) {
+    const listed = families.filter(h => !h.directory_opt_out);
+    const today = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+    let s = '<div class="dir">';
+    s += '<div class="dir-head">' +
+         '<div class="dir-brand">Mizzentop Day School</div>' +
+         '<div class="dir-title">Family Directory</div>' +
+         '<div class="dir-sub">' + listed.length + ' families · Generated ' + esc(today) + '</div>' +
+         '</div>';
+    listed.forEach(h => {
+      s += '<div class="fam">';
+      s += '<div class="fam-name">' + esc(h.family_name) +
+           (dirAddr(h) ? ' <span class="fam-addr">' + esc(dirAddr(h)) + '</span>' : '') + '</div>';
+      const kids = (h.students || []).map(st =>
+        esc(fullName(st)) + ' <span class="mut">(' + esc(gradeShort(st.grade)) + ')</span>').join(' · ');
+      if (kids) s += '<div class="fam-line mut">' + kids + '</div>';
+      if ((h.parents || []).length) {
+        h.parents.forEach(p => {
+          const bits = [];
+          if (p.relationship_type) bits.push('<span class="mut">' + esc(p.relationship_type) + '</span>');
+          if (p.phone) bits.push(esc(p.phone));
+          if (p.email) bits.push(esc(p.email));
+          s += '<div class="fam-line">' + esc(fullName(p)) + (bits.length ? ' — ' + bits.join(' · ') : '') + '</div>';
+        });
+      } else {
+        const hh = [];
+        if (h.primary_phone) hh.push(esc(h.primary_phone));
+        if (h.primary_email) hh.push(esc(h.primary_email));
+        if (hh.length) s += '<div class="fam-line">' + hh.join(' · ') + '</div>';
+      }
+      s += '</div>';
+    });
+    s += '</div>';
+    return s;
+  }
+
   function doPrint(html) {
     document.getElementById('printArea').innerHTML = html;
     window.print();
@@ -525,6 +572,12 @@
   function printAll() {
     if (!FAMILIES.length) { toast('Nothing to print.', true); return; }
     doPrint(directoryHTML(FAMILIES));
+  }
+
+  function printContactDirectory() {
+    const listed = FAMILIES.filter(h => !h.directory_opt_out);
+    if (!listed.length) { toast('No listed families to print.', true); return; }
+    doPrint(contactDirectoryHTML(FAMILIES));
   }
 
   document.getElementById('search').addEventListener('input', render);

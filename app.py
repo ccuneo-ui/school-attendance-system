@@ -468,6 +468,10 @@ def init_db():
                     PRIMARY KEY (student_id, household_id)
                 )
             """)
+            # Migrate: add directory opt-out flag to households. Families who opt out are
+            # excluded from the shareable/public Family Directory PDF only — they remain
+            # visible to staff on the directory page and on staff emergency sheets.
+            cur.execute("ALTER TABLE households ADD COLUMN IF NOT EXISTS directory_opt_out BOOLEAN NOT NULL DEFAULT FALSE")
             # Migrate: add parent_id to staff if missing (for staff who are also parents)
             cur.execute("""
                 SELECT column_name FROM information_schema.columns
@@ -4708,7 +4712,7 @@ def get_family_directory():
             cur.execute("""
                 SELECT DISTINCT h.household_id, h.family_name,
                        h.address_line_1, h.address_line_2, h.city, h.state, h.zip,
-                       h.primary_phone, h.primary_email, h.status
+                       h.primary_phone, h.primary_email, h.status, h.directory_opt_out
                 FROM households h
                 JOIN student_households sh ON sh.household_id = h.household_id
                 JOIN students s ON s.student_id = sh.student_id
@@ -4763,7 +4767,8 @@ def get_family_directory_manage():
             cur.execute("""
                 SELECT h.household_id, h.family_name,
                        h.address_line_1, h.address_line_2, h.city, h.state, h.zip,
-                       h.primary_phone, h.primary_email, h.status, h.billing_notes
+                       h.primary_phone, h.primary_email, h.status, h.billing_notes,
+                       h.directory_opt_out
                 FROM households h
                 WHERE EXISTS (
                     SELECT 1 FROM student_households sh WHERE sh.household_id = h.household_id
@@ -4851,6 +4856,7 @@ def update_household(household_id):
                     primary_email  = COALESCE(%s, primary_email),
                     status         = COALESCE(%s, status),
                     billing_notes  = COALESCE(%s, billing_notes),
+                    directory_opt_out = COALESCE(%s, directory_opt_out),
                     updated_at     = CURRENT_TIMESTAMP
                 WHERE household_id = %s
                 RETURNING *
@@ -4865,6 +4871,7 @@ def update_household(household_id):
                 data.get("primary_email"),
                 data.get("status"),
                 data.get("billing_notes"),
+                data.get("directory_opt_out"),
                 household_id,
             ))
             household = fo(cur)

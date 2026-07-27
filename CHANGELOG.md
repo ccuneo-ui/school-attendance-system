@@ -1,5 +1,7 @@
 # Changelog
 
+2026-07-27: Family Directory now prints a shareable Family Contact Directory (family, address, parents' names/phones/emails), and families can be opted out of it via a checkbox in Family Manager (opted-out families stay visible to staff and on emergency sheets, marked "Unlisted"). Backfilled student emergency contacts from Finalsite.
+
 2026-07-21: New Family Manager page (People silo) — staff with People access can edit household contact info and parents/guardians (phone, email, relationship, pickup authorization), saving to the live records. Student details, including each student's emergency contact, stay in the Student Directory.
 2026-07-21: New Family Directory page (Reference silo, read-only, all staff) — search families by family or student name, view full household contact info, parents/guardians with phones and pickup authorization, and each student's emergency contact, and print a per-family Emergency Sheet or a compact all-active-students Emergency Contact Directory.
 2026-05-31: New Lunch Billing module — Lunch Dashboard for entering monthly enrollment and pizza counts, lunch rates on the Billing Rates page, and lunch charges now flow into the existing Monthly Billing Report as a per-student "Lunch" line item (column, summary, CSV export, and dispute-lookup detail).
