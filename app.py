@@ -3248,11 +3248,14 @@ def api_billing_report():
                 """, (first_day, last_day))
                 store_totals = {r["student_id"]: float(r["store_total"]) for r in cur.fetchall()}
 
-                # 6. All active students
+                # 6. All active + guest students
+                #    Guests (non-enrolled students who attend programs like tutoring)
+                #    are included so their charges appear on the full-school report;
+                #    the frontend groups them into their own "Guests" section.
                 cur.execute("""
-                    SELECT student_id, first_name, last_name, grade
+                    SELECT student_id, first_name, last_name, grade, status
                     FROM   students
-                    WHERE  status = 'active'
+                    WHERE  status IN ('active', 'guest')
                     ORDER  BY grade, last_name, first_name
                 """)
                 student_rows = cur.fetchall()
@@ -3325,6 +3328,7 @@ def api_billing_report():
                 "student_id":       sid,
                 "name":             f"{s['last_name']}, {s['first_name']}",
                 "grade":            str(s["grade"]),
+                "is_guest":         (s.get("status") == "guest"),
                 "mcard":            round(mcard_amt, 2),
                 "mcard_qty":        mc_qty,
                 "beforecare":       round(before_amt, 2),

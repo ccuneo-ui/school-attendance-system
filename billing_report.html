@@ -758,13 +758,20 @@
   }
 
   function buildGradePills(students) {
-    const grades = [...new Set(students.map(s=>s.grade))].sort((a,b)=>(parseInt(a)||0)-(parseInt(b)||0));
+    // Grade pills come from enrolled students only; guests get a single "Guests" pill.
+    const grades = [...new Set(students.filter(s=>!s.is_guest).map(s=>s.grade))]
+                     .sort((a,b)=>(parseInt(a)||0)-(parseInt(b)||0));
+    const hasGuests = students.some(s=>s.is_guest);
     const c = document.getElementById('gradePills');
     c.innerHTML = '<div class="grade-pill active" data-grade="all" onclick="filterGrade(\'all\',this)">All Grades</div>';
     grades.forEach(g => {
       const d=document.createElement('div'); d.className='grade-pill'; d.dataset.grade=g;
       d.textContent=`Grade ${g}`; d.onclick=()=>filterGrade(g,d); c.appendChild(d);
     });
+    if(hasGuests){
+      const d=document.createElement('div'); d.className='grade-pill'; d.dataset.grade='guest';
+      d.textContent='Guests'; d.onclick=()=>filterGrade('guest',d); c.appendChild(d);
+    }
     activeGrade='all';
   }
 
@@ -772,7 +779,9 @@
     activeGrade=grade;
     document.querySelectorAll('.grade-pill').forEach(p=>p.classList.remove('active'));
     el.classList.add('active');
-    const filtered = grade==='all' ? reportData : reportData.filter(s=>s.grade===grade);
+    const filtered = grade==='all' ? reportData
+                   : grade==='guest' ? reportData.filter(s=>s.is_guest)
+                   : reportData.filter(s=>!s.is_guest && s.grade===grade);
     renderTable(filtered); renderSummary(filtered);
   }
 
@@ -814,20 +823,26 @@
       tbody.innerHTML='<tr><td colspan="11" style="text-align:center;padding:2rem;color:var(--muted);">No billing activity for this period.</td></tr>';
       return;
     }
-    const byGrade={};
-    students.forEach(s=>{ if(!byGrade[s.grade]) byGrade[s.grade]=[]; byGrade[s.grade].push(s); });
+    // Enrolled students group by grade; guests go in their own "Guests" section at the bottom.
+    const byGrade={}; const guests=[];
+    students.forEach(s=>{
+      if(s.is_guest){ guests.push(s); return; }
+      if(!byGrade[s.grade]) byGrade[s.grade]=[]; byGrade[s.grade].push(s);
+    });
     const sortedGrades=Object.keys(byGrade).sort((a,b)=>(parseInt(a)||0)-(parseInt(b)||0));
+    const sections=sortedGrades.map(g=>({label:`Grade ${g}`, list:byGrade[g]}));
+    if(guests.length) sections.push({label:'Guests', list:guests});
     let gm=0,gbc=0,gac=0,gog=0,ghw=0,goo=0,gss=0,gls=0;
 
-    sortedGrades.forEach(grade => {
+    sections.forEach(sec => {
       const hr=document.createElement('tr'); hr.className='grade-hdr';
-      hr.innerHTML=`<td colspan="11">Grade ${grade}</td>`; tbody.appendChild(hr);
-      byGrade[grade].forEach(s => {
+      hr.innerHTML=`<td colspan="11">${sec.label}</td>`; tbody.appendChild(hr);
+      sec.list.forEach(s => {
         gm+=s.mcard||0; gbc+=s.beforecare||0; gac+=s.aftercare||0;
         gog+=s.og_tutoring||0; ghw+=s.homework_center||0; goo+=s.one_on_one||0; gss+=s.school_store||0; gls+=s.lunch||0;
         const t=(s.mcard||0)+(s.beforecare||0)+(s.aftercare||0)+(s.og_tutoring||0)+(s.homework_center||0)+(s.one_on_one||0)+(s.school_store||0)+(s.lunch||0);
         const tr=document.createElement('tr');
-        tr.innerHTML=`<td class="student-name">${esc(s.name)}</td><td>${esc(s.grade)}</td><td class="r">${money(s.mcard)}</td><td class="r">${money(s.beforecare)}</td><td class="r">${money(s.aftercare)}</td><td class="r">${money(s.og_tutoring)}</td><td class="r">${money(s.homework_center)}</td><td class="r">${money(s.one_on_one)}</td><td class="r">${money(s.school_store)}</td><td class="r">${money(s.lunch)}</td><td class="r" style="font-weight:600;">${t>0?'$'+t.toFixed(2):'<span class="zero">—</span>'}</td>`;
+        tr.innerHTML=`<td class="student-name">${esc(s.name)}</td><td>${s.is_guest?'Guest':esc(s.grade)}</td><td class="r">${money(s.mcard)}</td><td class="r">${money(s.beforecare)}</td><td class="r">${money(s.aftercare)}</td><td class="r">${money(s.og_tutoring)}</td><td class="r">${money(s.homework_center)}</td><td class="r">${money(s.one_on_one)}</td><td class="r">${money(s.school_store)}</td><td class="r">${money(s.lunch)}</td><td class="r" style="font-weight:600;">${t>0?'$'+t.toFixed(2):'<span class="zero">—</span>'}</td>`;
         tbody.appendChild(tr);
       });
     });
@@ -854,11 +869,13 @@
   function exportCSV() {
     const months=['January','February','March','April','May','June','July','August','September','October','November','December'];
     const label=`${months[curMonth-1]}_${curYear}`;
-    const filtered=activeGrade==='all'?reportData:reportData.filter(s=>s.grade===activeGrade);
+    const filtered = activeGrade==='all' ? reportData
+                   : activeGrade==='guest' ? reportData.filter(s=>s.is_guest)
+                   : reportData.filter(s=>!s.is_guest && s.grade===activeGrade);
     const rows=[['Student','Grade','M Card','Before Care','Aftercare','OG Tutoring','Homework Center','1-on-1 Tutoring','School Store','Lunch','Total']];
     filtered.forEach(s=>{
       const t=(s.mcard||0)+(s.beforecare||0)+(s.aftercare||0)+(s.og_tutoring||0)+(s.homework_center||0)+(s.one_on_one||0)+(s.school_store||0)+(s.lunch||0);
-      rows.push([s.name,s.grade,(s.mcard||0).toFixed(2),(s.beforecare||0).toFixed(2),(s.aftercare||0).toFixed(2),(s.og_tutoring||0).toFixed(2),(s.homework_center||0).toFixed(2),(s.one_on_one||0).toFixed(2),(s.school_store||0).toFixed(2),(s.lunch||0).toFixed(2),t.toFixed(2)]);
+      rows.push([s.name,(s.is_guest?'Guest':s.grade),(s.mcard||0).toFixed(2),(s.beforecare||0).toFixed(2),(s.aftercare||0).toFixed(2),(s.og_tutoring||0).toFixed(2),(s.homework_center||0).toFixed(2),(s.one_on_one||0).toFixed(2),(s.school_store||0).toFixed(2),(s.lunch||0).toFixed(2),t.toFixed(2)]);
     });
     const csv=rows.map(r=>r.map(c=>`"${c}"`).join(',')).join('\n');
     const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));

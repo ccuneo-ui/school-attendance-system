@@ -1,5 +1,7 @@
 # Changelog
 
+2026-07-29: Monthly Billing Report (full-school view) now includes guest students — non-enrolled students who attend programs like tutoring. They appear in their own "Guests" section at the bottom of the report, with a "Guests" filter pill, and are included in the CSV export. Previously the full-school report only showed active/enrolled students, though guests already appeared in the single-student dispute lookup.
+
 2026-07-27: Family Directory now prints a shareable Family Contact Directory (family, address, parents' names/phones/emails), and families can be opted out of it via a checkbox in Family Manager (opted-out families stay visible to staff and on emergency sheets, marked "Unlisted"). Backfilled student emergency contacts from Finalsite.
 
 2026-07-21: New Family Manager page (People silo) — staff with People access can edit household contact info and parents/guardians (phone, email, relationship, pickup authorization), saving to the live records. Student details, including each student's emergency contact, stay in the Student Directory.
