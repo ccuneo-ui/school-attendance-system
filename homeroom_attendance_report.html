@@ -188,7 +188,7 @@
 <div class="container">
   <div class="page-header">
     <h1>Homeroom Attendance Report</h1>
-    <p>Full Year · Trimesters 1, 2, and 3 (2025–26)</p>
+    <p>Full Year · Trimesters 1, 2, and 3 · <span id="year-label">—</span></p>
   </div>
 
   <div class="controls">
@@ -197,6 +197,10 @@
       <select id="teacher-select">
         <option value="">— Select —</option>
       </select>
+    </div>
+    <div class="control-group">
+      <label>School Year</label>
+      <select id="year-select"></select>
     </div>
     <div class="controls-spacer"></div>
     <button class="btn btn-secondary" id="download-csv-btn" disabled>Download CSV</button>
@@ -234,6 +238,9 @@
 <script>
 const API = '';
 let currentTeacherId = null;
+let currentSchoolYear = null;  // integer start-year, e.g. 2026 for 2026-27
+
+function syLabel(y) { return `${y}-${String(y + 1).slice(-2)}`; }
 let currentReportData = null;
 
 document.addEventListener('DOMContentLoaded', async () => {
@@ -251,6 +258,27 @@ document.addEventListener('DOMContentLoaded', async () => {
     sel.appendChild(opt);
   });
 
+  // School-year picker — default to the current year from calendar settings.
+  let sy = null;
+  try { sy = await fetch('/api/school-year').then(r => r.json()); } catch (_) {}
+  const now = new Date();
+  const cur = (sy && sy.current_start_year)
+    ? sy.current_start_year
+    : (now.getMonth() >= 6 ? now.getFullYear() : now.getFullYear() - 1);
+  const yearSet = new Set((sy && sy.years ? sy.years.map(y => y.start_year) : []));
+  [cur, cur - 1, cur - 2].forEach(y => yearSet.add(y));
+  const ysel = document.getElementById('year-select');
+  [...yearSet].sort((a, b) => b - a).forEach(y => {
+    const o = document.createElement('option');
+    o.value = y;
+    o.textContent = syLabel(y);
+    if (y === cur) o.selected = true;
+    ysel.appendChild(o);
+  });
+  currentSchoolYear = cur;
+  document.getElementById('year-label').textContent = syLabel(cur);
+  ysel.addEventListener('change', onYearChange);
+
   const match = teachersRes.find(t => t.email === sessionRes.email);
   if (match) {
     sel.value = match.staff_id;
@@ -260,6 +288,13 @@ document.addEventListener('DOMContentLoaded', async () => {
   sel.addEventListener('change', onTeacherChange);
   document.getElementById('download-csv-btn').addEventListener('click', downloadCsv);
 });
+
+function onYearChange() {
+  currentSchoolYear = parseInt(document.getElementById('year-select').value);
+  document.getElementById('year-label').textContent = syLabel(currentSchoolYear);
+  Object.keys(detailCache).forEach(k => delete detailCache[k]);  // details are year-specific
+  if (currentTeacherId) loadReport();
+}
 
 async function onTeacherChange() {
   currentTeacherId = document.getElementById('teacher-select').value;
@@ -275,7 +310,7 @@ async function loadReport() {
   document.getElementById('summary-line').style.display = 'none';
   document.getElementById('table-wrap').innerHTML = '<div class="loading-state">Loading…</div>';
 
-  const res = await fetch(`${API}/api/homeroom-attendance-report?teacher_id=${currentTeacherId}`);
+  const res = await fetch(`${API}/api/homeroom-attendance-report?teacher_id=${currentTeacherId}&school_year=${currentSchoolYear}`);
   currentReportData = await res.json();
 
   if (currentReportData.error) {
@@ -351,7 +386,7 @@ function renderReport(data) {
 
 function downloadCsv() {
   if (!currentTeacherId) return;
-  window.location.href = `/api/homeroom-attendance-report.csv?teacher_id=${currentTeacherId}`;
+  window.location.href = `/api/homeroom-attendance-report.csv?teacher_id=${currentTeacherId}&school_year=${currentSchoolYear}`;
 }
 
 function escapeHtml(str) {
@@ -379,7 +414,7 @@ async function openStudentDetail(studentId) {
   document.getElementById('detail-modal-title').textContent = '';
 
   if (!detailCache[studentId]) {
-    const res = await fetch(`/api/homeroom-attendance-report/student/${studentId}`);
+    const res = await fetch(`/api/homeroom-attendance-report/student/${studentId}?school_year=${currentSchoolYear}`);
     detailCache[studentId] = await res.json();
   }
   renderDetail(detailCache[studentId]);

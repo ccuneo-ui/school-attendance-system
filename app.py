@@ -1816,8 +1816,10 @@ def get_student_attendance_detail(student_id):
             if not student:
                 return jsonify({"error": "Student not found"}), 404
 
-            # Scoped to the current school year's T3 window, from calendar settings.
-            _win = {k: (s, e) for k, _l, s, e in get_trimester_windows()}
+            # Scoped to the T3 window of the requested school year (default current), from calendar settings.
+            _sy = request.args.get("school_year")
+            _sy = int(_sy) if (_sy or "").isdigit() else None
+            _win = {k: (s, e) for k, _l, s, e in get_trimester_windows(_sy)}
             detail_start, detail_end = _win["t3"]
 
             cur.execute("""
