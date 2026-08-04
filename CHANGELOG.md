@@ -1,5 +1,7 @@
 # Changelog
 
+2026-08-04: Homeroom attendance report (trimester tally) and the per-student attendance detail now read trimester dates from the School Year calendar settings for the current year, instead of hard-coded dates. The report can also target a prior year with ?school_year=YYYY. Hard-coded 2025-26 dates remain only as a fallback when a year has no dates set.
+
 2026-08-04: School Calendar page now has a School Year setting where admins define when the year rolls over (defaults to July 1) and each year's first/last day and trimester dates. Pages that default to a school year now roll to the new year on July 1 instead of September, so summer shows the upcoming year (fixes the lunch dashboard showing the prior year in July).
 
 2026-07-29: Monthly Billing Report (full-school view) now includes guest students — non-enrolled students who attend programs like tutoring. They appear in their own "Guests" section at the bottom of the report, with a "Guests" filter pill, and are included in the CSV export. Previously the full-school report only showed active/enrolled students, though guests already appeared in the single-student dispute lookup.

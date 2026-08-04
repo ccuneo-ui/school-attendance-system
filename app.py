@@ -1590,7 +1590,9 @@ def save_homeroom_attendance():
 # HOMEROOM ATTENDANCE REPORT (Trimester tally)
 # ============================================
 
-# Trimester windows for 2025–26 — hard-coded for v1 (no school_calendar table yet)
+# Fallback trimester windows (the original 2025–26 dates). Used ONLY when a
+# school year has no trimester dates set on the calendar page. Going forward,
+# trimester dates come from the school_years table via get_trimester_windows().
 T1_START_DATE = "2025-09-02"
 T1_END_DATE   = "2025-11-21"
 T2_START_DATE = "2025-11-22"
@@ -1598,11 +1600,54 @@ T2_END_DATE   = "2026-02-22"
 T3_START_DATE = "2026-02-23"
 T3_END_DATE   = "2026-06-12"
 
-TRIMESTER_WINDOWS = [
-    ("t1", "Trimester 1", T1_START_DATE, T1_END_DATE),
-    ("t2", "Trimester 2", T2_START_DATE, T2_END_DATE),
-    ("t3", "Trimester 3", T3_START_DATE, T3_END_DATE),
-]
+
+def _fallback_trimester_windows(start_year):
+    """The hard-coded 2025–26 windows, shifted to the requested school year."""
+    shift = start_year - 2025
+    def sh(iso):
+        y, md = iso.split("-", 1)
+        return f"{int(y) + shift}-{md}"
+    return [
+        ("t1", "Trimester 1", sh(T1_START_DATE), sh(T1_END_DATE)),
+        ("t2", "Trimester 2", sh(T2_START_DATE), sh(T2_END_DATE)),
+        ("t3", "Trimester 3", sh(T3_START_DATE), sh(T3_END_DATE)),
+    ]
+
+
+def get_trimester_windows(start_year=None):
+    """
+    Return [(key, label, start_iso, end_iso), ...] for a school year.
+    Reads the school_years table; any window not set falls back to the
+    hard-coded defaults shifted to that year. Defaults to the current year.
+    """
+    if start_year is None:
+        start_year = current_school_year_start()
+    fb = {k: (s, e) for k, _l, s, e in _fallback_trimester_windows(start_year)}
+    row = {}
+    try:
+        conn = get_db_connection()
+        try:
+            with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+                cur.execute("""
+                    SELECT t1_start, t1_end, t2_start, t2_end, t3_start, t3_end
+                    FROM   school_years
+                    WHERE  start_year = %s
+                """, (start_year,))
+                row = fo(cur) or {}
+        finally:
+            conn.close()
+    except Exception:
+        row = {}
+    labels = {"t1": "Trimester 1", "t2": "Trimester 2", "t3": "Trimester 3"}
+    cols   = {"t1": ("t1_start", "t1_end"), "t2": ("t2_start", "t2_end"), "t3": ("t3_start", "t3_end")}
+    out = []
+    for k in ("t1", "t2", "t3"):
+        sc, ec = cols[k]
+        s, e = row.get(sc), row.get(ec)
+        s = s.isoformat() if s else fb[k][0]
+        e = e.isoformat() if e else fb[k][1]
+        out.append((k, labels[k], s, e))
+    return out
 
 
 def _trimester_unexcused_counts(cur, program_id, teacher_id, start_date, end_date):
@@ -1631,15 +1676,17 @@ def _trimester_unexcused_counts(cur, program_id, teacher_id, start_date, end_dat
     return out
 
 
-def _build_homeroom_report(teacher_id):
+def _build_homeroom_report(teacher_id, start_year=None):
     """
     Whole-year homeroom attendance report. Returns one row per active student
     in the homeroom with unexcused absent/tardy/ED counts for each trimester
-    laid out side-by-side.
+    laid out side-by-side. Trimester dates come from the calendar settings
+    (school_years) for the given year, defaulting to the current school year.
 
     One parameterized counts query, invoked once per trimester window. Results
     are merged in Python by student_id.
     """
+    windows = get_trimester_windows(start_year)
     conn = get_db_connection()
     try:
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
@@ -1660,7 +1707,7 @@ def _build_homeroom_report(teacher_id):
             # One counts query per trimester; merge by student_id
             counts_by_trimester = {
                 key: _trimester_unexcused_counts(cur, program_id, teacher_id, start, end)
-                for key, _label, start, end in TRIMESTER_WINDOWS
+                for key, _label, start, end in windows
             }
 
             results = []
@@ -1671,7 +1718,7 @@ def _build_homeroom_report(teacher_id):
                     "first_name": s["first_name"],
                     "last_name":  s["last_name"],
                 }
-                for key, _label, _start, _end in TRIMESTER_WINDOWS:
+                for key, _label, _start, _end in windows:
                     c = counts_by_trimester[key].get(sid, {})
                     row[f"{key}_absent"] = c.get("absent", 0)
                     row[f"{key}_tardy"]  = c.get("tardy",  0)
@@ -1681,7 +1728,7 @@ def _build_homeroom_report(teacher_id):
             return {
                 "trimesters": [
                     {"key": key, "label": label, "start_date": start, "end_date": end}
-                    for key, label, start, end in TRIMESTER_WINDOWS
+                    for key, label, start, end in windows
                 ],
                 "students": results,
             }, 200
@@ -1694,7 +1741,9 @@ def get_homeroom_attendance_report():
     teacher_id = request.args.get("teacher_id")
     if not teacher_id:
         return jsonify({"error": "teacher_id required"}), 400
-    data, code = _build_homeroom_report(teacher_id)
+    sy = request.args.get("school_year")
+    start_year = int(sy) if (sy or "").isdigit() else None
+    data, code = _build_homeroom_report(teacher_id, start_year)
     return jsonify(data), code
 
 @app.route("/api/homeroom-attendance-report.csv")
@@ -1706,7 +1755,9 @@ def get_homeroom_attendance_report_csv():
     if not teacher_id:
         return ("teacher_id required", 400)
 
-    data, code = _build_homeroom_report(teacher_id)
+    sy = request.args.get("school_year")
+    start_year = int(sy) if (sy or "").isdigit() else None
+    data, code = _build_homeroom_report(teacher_id, start_year)
     if code != 200:
         return (data.get("error", "error"), code)
 
@@ -1765,6 +1816,10 @@ def get_student_attendance_detail(student_id):
             if not student:
                 return jsonify({"error": "Student not found"}), 404
 
+            # Scoped to the current school year's T3 window, from calendar settings.
+            _win = {k: (s, e) for k, _l, s, e in get_trimester_windows()}
+            detail_start, detail_end = _win["t3"]
+
             cur.execute("""
                 SELECT a.attendance_date, a.status, a.notes
                 FROM attendance_records a
@@ -1773,7 +1828,7 @@ def get_student_attendance_detail(student_id):
                   AND e.program_id = %s
                   AND a.attendance_date BETWEEN %s AND %s
                 ORDER BY a.attendance_date
-            """, (student_id, program_id, T3_START_DATE, T3_END_DATE))
+            """, (student_id, program_id, detail_start, detail_end))
             records = [
                 {"date": str(r["attendance_date"]), "status": r["status"], "notes": r["notes"] or ""}
                 for r in fa(cur)
@@ -1787,7 +1842,7 @@ def get_student_attendance_detail(student_id):
                 WHERE s.homeroom_teacher_id = %s
                   AND e.program_id = %s
                   AND a.attendance_date BETWEEN %s AND %s
-            """, (student["homeroom_teacher_id"], program_id, T3_START_DATE, T3_END_DATE))
+            """, (student["homeroom_teacher_id"], program_id, detail_start, detail_end))
             school_dates = sorted([str(r["attendance_date"]) for r in fa(cur)])
 
             return jsonify({
@@ -1797,8 +1852,8 @@ def get_student_attendance_detail(student_id):
                     "last_name":  student["last_name"],
                     "grade":      student["grade"],
                 },
-                "start_date":   T3_START_DATE,
-                "end_date":     T3_END_DATE,
+                "start_date":   detail_start,
+                "end_date":     detail_end,
                 "records":      records,
                 "school_dates": school_dates,
             })
