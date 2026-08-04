@@ -1,5 +1,7 @@
 # Changelog
 
+2026-08-04: Lunch dashboard now defaults its year dropdown to the current school year from the calendar settings (rolls over July 1) instead of always assuming the September changeover — so in summer it opens on the upcoming year rather than the prior one.
+
 2026-08-04: Homeroom attendance report (trimester tally) and the per-student attendance detail now read trimester dates from the School Year calendar settings for the current year, instead of hard-coded dates. The report can also target a prior year with ?school_year=YYYY. Hard-coded 2025-26 dates remain only as a fallback when a year has no dates set.
 
 2026-08-04: School Calendar page now has a School Year setting where admins define when the year rolls over (defaults to July 1) and each year's first/last day and trimester dates. Pages that default to a school year now roll to the new year on July 1 instead of September, so summer shows the upcoming year (fixes the lunch dashboard showing the prior year in July).

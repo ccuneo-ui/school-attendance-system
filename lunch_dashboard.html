@@ -491,10 +491,19 @@
   }
 
   // ── Init ──
-  (function init(){
+  (async function init(){
     const sel = document.getElementById('yearSelect');
-    const now = new Date();
-    const startYr = now.getMonth() >= 8 ? now.getFullYear() : now.getFullYear() - 1;
+    // Default to the current school year from calendar settings (rolls over per that
+    // setting — July 1 by default). Falls back to a July-1 calc if the call fails.
+    let startYr;
+    try {
+      const d = await (await fetch('/api/school-year')).json();
+      startYr = parseInt(d.current_start_year);
+    } catch (_) {}
+    if (!startYr) {
+      const now = new Date();
+      startYr = now.getMonth() >= 6 ? now.getFullYear() : now.getFullYear() - 1;
+    }
     for (let y = startYr + 1; y >= startYr - 3; y--){
       const sy = `${y}-${y+1}`;
       const o = new Option(sy, sy);
