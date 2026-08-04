@@ -415,6 +415,50 @@ def init_db():
                 )
             # Retire legacy single 'lunch_day' category — cascades to any tags that were applied to it.
             cur.execute("DELETE FROM calendar_categories WHERE key = 'lunch_day'")
+            # ── App settings (generic key/value) ──
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS app_settings (
+                    key        TEXT PRIMARY KEY,
+                    value      TEXT NOT NULL,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_by TEXT
+                )
+            """)
+            # School year rolls over July 1 by default (MM-DD). Editable on the calendar page.
+            cur.execute("""
+                INSERT INTO app_settings (key, value) VALUES ('school_year_rollover', '07-01')
+                ON CONFLICT (key) DO NOTHING
+            """)
+            # ── School years: single source of truth for "what year is it" + trimester windows ──
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS school_years (
+                    start_year  INTEGER PRIMARY KEY,
+                    first_day   DATE,
+                    last_day    DATE,
+                    t1_start    DATE,
+                    t1_end      DATE,
+                    t2_start    DATE,
+                    t2_end      DATE,
+                    t3_start    DATE,
+                    t3_end      DATE,
+                    created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_by  TEXT
+                )
+            """)
+            # Seed the known 2025-26 windows (previously hard-coded) + a blank 2026-27 to fill in.
+            cur.execute("""
+                INSERT INTO school_years
+                    (start_year, first_day, last_day, t1_start, t1_end, t2_start, t2_end, t3_start, t3_end)
+                VALUES
+                    (2025, '2025-09-02', '2026-06-12',
+                     '2025-09-02', '2025-11-21', '2025-11-22', '2026-02-22', '2026-02-23', '2026-06-12')
+                ON CONFLICT (start_year) DO NOTHING
+            """)
+            cur.execute("""
+                INSERT INTO school_years (start_year) VALUES (2026)
+                ON CONFLICT (start_year) DO NOTHING
+            """)
             # ── Households, Parents, and linking tables ──
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS households (
@@ -2584,11 +2628,58 @@ LUNCH_EC_GRADES = {"JPK", "SPK", "K"}
 LUNCH_STATUSES = {"home", "monthly", "fullYearPaid"}
 
 
-def _lunch_default_year():
+# ============================================
+# SCHOOL YEAR — single source of truth for "what year is it"
+# Rollover date is configurable on the calendar page (default July 1).
+# ============================================
+def get_app_setting(key, default=None):
+    """Read a value from app_settings; returns default on any error (e.g. pre-migration)."""
+    try:
+        conn = get_db_connection()
+        try:
+            with conn.cursor() as cur:
+                cur.execute("SELECT value FROM app_settings WHERE key=%s", (key,))
+                row = cur.fetchone()
+                return row[0] if row else default
+        finally:
+            conn.close()
+    except Exception:
+        return default
+
+
+def _rollover_md():
+    """(month, day) the school year ticks over. Default July 1."""
+    raw = get_app_setting("school_year_rollover", "07-01") or "07-01"
+    try:
+        mm, dd = raw.split("-")
+        mm, dd = int(mm), int(dd)
+        if 1 <= mm <= 12 and 1 <= dd <= 31:
+            return mm, dd
+    except Exception:
+        pass
+    return 7, 1
+
+
+def current_school_year_start(today=None):
+    """Integer start-year of the current school year, per the configured rollover date."""
     from datetime import date as _d
-    t = _d.today()
-    start = t.year if t.month >= 9 else t.year - 1
-    return f"{start}-{start + 1}"
+    t = today or _d.today()
+    rm, rd = _rollover_md()
+    return t.year if (t.month, t.day) >= (rm, rd) else t.year - 1
+
+
+def sy_long(start_year):
+    """e.g. 2026 -> '2026-2027' (lunch/enrollment convention)."""
+    return f"{start_year}-{start_year + 1}"
+
+
+def sy_short(start_year):
+    """e.g. 2026 -> '2026-27' (financial-aid/tuition convention)."""
+    return f"{start_year}-{str(start_year + 1)[-2:]}"
+
+
+def _lunch_default_year():
+    return sy_long(current_school_year_start())
 
 
 def _lunch_school_year_months(school_year):
@@ -5847,6 +5938,112 @@ def api_calendar_categories_update(category_id):
             )
             conn.commit()
             return jsonify({"success": True})
+    except Exception as e:
+        conn.rollback()
+        return jsonify({"error": str(e)}), 500
+    finally:
+        conn.close()
+
+
+# ============================================
+# SCHOOL YEAR SETTINGS  (rollover + per-year dates / trimesters)
+# ============================================
+@app.route("/api/school-year")
+@login_required
+def api_school_year():
+    """Current school year + rollover + all defined years (for the calendar settings panel)."""
+    rm, rd = _rollover_md()
+    cur_start = current_school_year_start()
+    conn = get_db_connection()
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute("""
+                SELECT start_year, first_day, last_day,
+                       t1_start, t1_end, t2_start, t2_end, t3_start, t3_end
+                FROM   school_years
+                ORDER  BY start_year DESC
+            """)
+            rows = cur.fetchall()
+    finally:
+        conn.close()
+
+    date_cols = ("first_day", "last_day", "t1_start", "t1_end",
+                 "t2_start", "t2_end", "t3_start", "t3_end")
+
+    def fmt(r):
+        y = r["start_year"]
+        out = {"start_year": y, "long": sy_long(y), "short": sy_short(y)}
+        for k in date_cols:
+            out[k] = r[k].isoformat() if r[k] else None
+        return out
+
+    return jsonify({
+        "rollover": f"{rm:02d}-{rd:02d}",
+        "current_start_year": cur_start,
+        "current_long": sy_long(cur_start),
+        "current_short": sy_short(cur_start),
+        "years": [fmt(r) for r in rows],
+    })
+
+
+@app.route("/api/school-year/rollover", methods=["POST"])
+@people_required
+def api_school_year_rollover():
+    import re as _re
+    data = request.get_json() or {}
+    raw = (data.get("rollover") or "").strip()
+    if not _re.match(r"^\d{2}-\d{2}$", raw):
+        return jsonify({"error": "rollover must be MM-DD"}), 400
+    mm, dd = int(raw[:2]), int(raw[3:])
+    if not (1 <= mm <= 12 and 1 <= dd <= 31):
+        return jsonify({"error": "invalid month/day"}), 400
+    conn = get_db_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                INSERT INTO app_settings (key, value, updated_by, updated_at)
+                VALUES ('school_year_rollover', %s, %s, CURRENT_TIMESTAMP)
+                ON CONFLICT (key) DO UPDATE
+                    SET value=EXCLUDED.value, updated_by=EXCLUDED.updated_by,
+                        updated_at=CURRENT_TIMESTAMP
+            """, (f"{mm:02d}-{dd:02d}", session.get("user_email")))
+            conn.commit()
+        return jsonify({"success": True, "rollover": f"{mm:02d}-{dd:02d}"})
+    except Exception as e:
+        conn.rollback()
+        return jsonify({"error": str(e)}), 500
+    finally:
+        conn.close()
+
+
+@app.route("/api/school-years", methods=["POST"])
+@people_required
+def api_school_years_upsert():
+    """Create or update one school year's first/last day and trimester windows."""
+    data = request.get_json() or {}
+    try:
+        start_year = int(data.get("start_year"))
+    except (TypeError, ValueError):
+        return jsonify({"error": "start_year (integer) required"}), 400
+    if not (2000 <= start_year <= 2100):
+        return jsonify({"error": "start_year out of range"}), 400
+
+    date_cols = ("first_day", "last_day", "t1_start", "t1_end",
+                 "t2_start", "t2_end", "t3_start", "t3_end")
+    vals = {c: ((data.get(c) or "").strip() or None) for c in date_cols}
+
+    conn = get_db_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(f"""
+                INSERT INTO school_years (start_year, {", ".join(date_cols)}, updated_by, updated_at)
+                VALUES (%s, {", ".join(["%s"] * len(date_cols))}, %s, CURRENT_TIMESTAMP)
+                ON CONFLICT (start_year) DO UPDATE SET
+                    {", ".join(f"{c}=EXCLUDED.{c}" for c in date_cols)},
+                    updated_by=EXCLUDED.updated_by, updated_at=CURRENT_TIMESTAMP
+            """, (start_year, *[vals[c] for c in date_cols], session.get("user_email")))
+            conn.commit()
+        return jsonify({"success": True, "start_year": start_year})
     except Exception as e:
         conn.rollback()
         return jsonify({"error": str(e)}), 500

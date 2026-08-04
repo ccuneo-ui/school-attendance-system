@@ -300,6 +300,16 @@
   <p>Tag days with categories used by billing and reporting</p>
 </div>
 
+<!-- School-year settings bar -->
+<div style="max-width:1200px;margin:0 auto;padding:20px 32px 0;">
+  <div id="syBar" style="display:none;align-items:center;gap:14px;padding:12px 18px;background:var(--white,#fff);border:1px solid #e6e0d6;border-left:4px solid var(--burgundy,#6b1f2e);border-radius:10px;">
+    <span style="font-size:11px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted,#6b7280);">Current school year</span>
+    <span id="syCurrent" style="font-weight:700;font-size:16px;color:#1a2744;">—</span>
+    <span id="syRoll" style="font-size:12px;color:var(--muted,#6b7280);"></span>
+    <button class="btn" id="syEditBtn" style="display:none;margin-left:auto;">Edit school year…</button>
+  </div>
+</div>
+
 <div class="layout" id="layout">
   <aside class="sidebar">
     <h3>Categories</h3>
@@ -387,6 +397,49 @@
     <div class="popover-actions">
       <button class="btn" onclick="closeCopy()">Cancel</button>
       <button class="btn btn-primary" id="copyConfirmBtn" onclick="runCopy()">Copy</button>
+    </div>
+  </div>
+</div>
+
+<!-- School-year settings modal -->
+<div class="popover-overlay" id="syOverlay">
+  <div class="popover" style="max-width:540px;max-height:88vh;overflow-y:auto;">
+    <h4>School year settings</h4>
+    <div class="sub">Sets when the system rolls into a new school year, and the trimester windows used by attendance and report cards.</div>
+
+    <div class="modal-row">
+      <label>School year ticks over on</label>
+      <div class="inline-row">
+        <select id="syRollMonth"></select>
+        <select id="syRollDay"></select>
+      </div>
+    </div>
+
+    <div class="modal-row">
+      <label>Edit dates for year</label>
+      <select id="syYearPick"></select>
+    </div>
+
+    <div class="inline-row">
+      <div class="modal-row"><label>First day of school</label><input type="date" id="sy_first_day"></div>
+      <div class="modal-row"><label>Last day of school</label><input type="date" id="sy_last_day"></div>
+    </div>
+    <div class="inline-row">
+      <div class="modal-row"><label>Trimester 1 start</label><input type="date" id="sy_t1_start"></div>
+      <div class="modal-row"><label>Trimester 1 end</label><input type="date" id="sy_t1_end"></div>
+    </div>
+    <div class="inline-row">
+      <div class="modal-row"><label>Trimester 2 start</label><input type="date" id="sy_t2_start"></div>
+      <div class="modal-row"><label>Trimester 2 end</label><input type="date" id="sy_t2_end"></div>
+    </div>
+    <div class="inline-row">
+      <div class="modal-row"><label>Trimester 3 start</label><input type="date" id="sy_t3_start"></div>
+      <div class="modal-row"><label>Trimester 3 end</label><input type="date" id="sy_t3_end"></div>
+    </div>
+
+    <div class="popover-actions">
+      <button class="btn" onclick="closeSchoolYear()">Cancel</button>
+      <button class="btn btn-primary" id="sySaveBtn" onclick="saveSchoolYear()">Save</button>
     </div>
   </div>
 </div>
@@ -479,8 +532,16 @@
       if (e.target.id === 'copyOverlay') closeCopy();
     });
 
+    // School-year settings panel
+    document.getElementById('syEditBtn').addEventListener('click', openSchoolYear);
+    document.getElementById('syYearPick').addEventListener('change', (e) => syFillYearFields(e.target.value));
+    document.getElementById('syOverlay').addEventListener('click', (e) => {
+      if (e.target.id === 'syOverlay') closeSchoolYear();
+    });
+
     await loadCategories();
     await refresh();
+    await loadSchoolYear();
   }
 
   function shiftMonth(delta) {
@@ -781,6 +842,82 @@
     return String(s).replace(/[&<>"']/g, c => ({
       '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
     }[c]));
+  }
+
+  // ---- School-year settings (self-contained; failures never break the calendar) ----
+  const syState = { data: null };
+  const SY_DATE_FIELDS = ['first_day','last_day','t1_start','t1_end','t2_start','t2_end','t3_start','t3_end'];
+
+  async function loadSchoolYear() {
+    try {
+      const d = await api('/api/school-year');
+      syState.data = d;
+      document.getElementById('syCurrent').textContent = `${d.current_short}  (${d.current_long})`;
+      const [mm, dd] = d.rollover.split('-').map(Number);
+      document.getElementById('syRoll').textContent = `rolls over ${MONTH_NAMES[mm-1]} ${dd}`;
+      document.getElementById('syBar').style.display = 'flex';
+      document.getElementById('syEditBtn').style.display = state.canEdit ? '' : 'none';
+    } catch (e) { /* leave the bar hidden; calendar keeps working */ }
+  }
+
+  function syBuildYearOptions() {
+    const pick = document.getElementById('syYearPick');
+    pick.innerHTML = '';
+    const years = new Set((syState.data.years || []).map(y => y.start_year));
+    const c = syState.data.current_start_year;
+    [c-1, c, c+1, c+2].forEach(y => years.add(y));
+    [...years].sort((a,b) => b-a).forEach(y => {
+      pick.appendChild(new Option(`${y}-${String(y+1).slice(-2)}`, y));
+    });
+    pick.value = c;
+  }
+
+  function syFillYearFields(startYear) {
+    const row = (syState.data.years || []).find(y => y.start_year === parseInt(startYear)) || {};
+    SY_DATE_FIELDS.forEach(k => { document.getElementById('sy_' + k).value = row[k] || ''; });
+  }
+
+  function openSchoolYear() {
+    if (!syState.data) return;
+    const rmSel = document.getElementById('syRollMonth');
+    const rdSel = document.getElementById('syRollDay');
+    rmSel.innerHTML = ''; MONTH_NAMES.forEach((n, i) => rmSel.appendChild(new Option(n, i+1)));
+    rdSel.innerHTML = ''; for (let d = 1; d <= 31; d++) rdSel.appendChild(new Option(d, d));
+    const [mm, dd] = syState.data.rollover.split('-').map(Number);
+    rmSel.value = mm; rdSel.value = dd;
+    syBuildYearOptions();
+    syFillYearFields(document.getElementById('syYearPick').value);
+    document.getElementById('syOverlay').classList.add('open');
+  }
+
+  function closeSchoolYear() {
+    document.getElementById('syOverlay').classList.remove('open');
+  }
+
+  async function saveSchoolYear() {
+    const btn = document.getElementById('sySaveBtn');
+    btn.disabled = true;
+    try {
+      const mm = String(document.getElementById('syRollMonth').value).padStart(2,'0');
+      const dd = String(document.getElementById('syRollDay').value).padStart(2,'0');
+      await api('/api/school-year/rollover', {
+        method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ rollover: `${mm}-${dd}` })
+      });
+      const payload = { start_year: parseInt(document.getElementById('syYearPick').value) };
+      SY_DATE_FIELDS.forEach(k => { payload[k] = document.getElementById('sy_' + k).value || null; });
+      await api('/api/school-years', {
+        method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify(payload)
+      });
+      showToast('School year saved');
+      closeSchoolYear();
+      await loadSchoolYear();
+    } catch (e) {
+      showToast(e.message || 'Could not save', true);
+    } finally {
+      btn.disabled = false;
+    }
   }
 
   init();

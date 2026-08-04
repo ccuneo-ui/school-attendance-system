@@ -1,5 +1,7 @@
 # Changelog
 
+2026-08-04: School Calendar page now has a School Year setting where admins define when the year rolls over (defaults to July 1) and each year's first/last day and trimester dates. Pages that default to a school year now roll to the new year on July 1 instead of September, so summer shows the upcoming year (fixes the lunch dashboard showing the prior year in July).
+
 2026-07-29: Monthly Billing Report (full-school view) now includes guest students — non-enrolled students who attend programs like tutoring. They appear in their own "Guests" section at the bottom of the report, with a "Guests" filter pill, and are included in the CSV export. Previously the full-school report only showed active/enrolled students, though guests already appeared in the single-student dispute lookup.
 
 2026-07-27: Family Directory now prints a shareable Family Contact Directory (family, address, parents' names/phones/emails), and families can be opted out of it via a checkbox in Family Manager (opted-out families stay visible to staff and on emergency sheets, marked "Unlisted"). Backfilled student emergency contacts from Finalsite.
