@@ -1,5 +1,7 @@
 # Changelog
 
+2026-08-04: Financial Aid page now opens on the current school year (from calendar settings) even before any families are entered for it, instead of defaulting to the newest year that happens to have data. Backend financial-aid endpoints also fall back to the current year rather than a hard-coded 2025-26.
+
 2026-08-04: Lunch dashboard now defaults its year dropdown to the current school year from the calendar settings (rolls over July 1) instead of always assuming the September changeover — so in summer it opens on the upcoming year rather than the prior one.
 
 2026-08-04: Homeroom attendance report (trimester tally) and the per-student attendance detail now read trimester dates from the School Year calendar settings for the current year, instead of hard-coded dates. The report can also target a prior year with ?school_year=YYYY. Hard-coded 2025-26 dates remain only as a fallback when a year has no dates set.

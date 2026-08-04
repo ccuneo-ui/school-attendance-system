@@ -4109,7 +4109,7 @@ def api_financial_aid_search_families():
 @login_required
 def api_financial_aid_list():
     """Return all families with their students for a given school year."""
-    school_year = request.args.get('year', '2025-26')
+    school_year = request.args.get('year') or sy_short(current_school_year_start())
     conn = get_db_connection()
     try:
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
@@ -4322,7 +4322,7 @@ def api_financial_aid_add_family():
     data = request.json or {}
     family_name = (data.get('family_name') or '').strip()
     fast_id     = (data.get('fast_id') or '').strip()
-    school_year = (data.get('school_year') or '2025-26').strip()
+    school_year = (data.get('school_year') or sy_short(current_school_year_start())).strip()
     if not family_name:
         return jsonify({'error': 'family_name required'}), 400
     conn = get_db_connection()
@@ -4362,7 +4362,7 @@ def api_financial_aid_upload():
       - Existing FAST ID + active -> skip (protect mid-season edits)
     """
     import csv, io
-    school_year = request.form.get('school_year', '2025-26')
+    school_year = request.form.get('school_year') or sy_short(current_school_year_start())
     file = request.files.get('file')
     if not file:
         return jsonify({'error': 'No file uploaded'}), 400

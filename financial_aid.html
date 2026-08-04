@@ -442,8 +442,17 @@
       const res = await fetch('/api/financial-aid/years');
       allYears = await res.json();
     } catch(e) { allYears = []; }
-    if (!allYears.length) allYears = ['2025-26'];
-    currentYear = allYears[0];
+    // Default to the current school year from calendar settings (e.g. 2026-27),
+    // even if no families have been entered for it yet, so the page opens on the
+    // year we're actually in rather than the newest year that happens to have data.
+    let cur = '';
+    try {
+      const d = await (await fetch('/api/school-year')).json();
+      cur = d.current_short || '';
+    } catch(_) {}
+    if (cur && !allYears.includes(cur)) allYears.unshift(cur);
+    if (!allYears.length) allYears = [cur || '2025-26'];
+    currentYear = (cur && allYears.includes(cur)) ? cur : allYears[0];
     renderYearTabs();
   }
 
