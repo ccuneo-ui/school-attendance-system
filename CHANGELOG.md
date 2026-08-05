@@ -1,5 +1,7 @@
 # Changelog
 
+2026-08-04: Groundwork for a unified "classes/sections" model (Phase 1) — new rooms, sections, and section_enrollments tables. A section is one teacher + room + term + roster, unifying homeroom, advisory, subject classes, and electives. No visible change yet; homeroom still works off its existing field. A one-time script (build_sections_from_homeroom.py) seeds homeroom/advisory sections from current assignments.
+
 2026-08-04: Homeroom Attendance Report now has a School Year picker (defaults to the current year) so you can pull prior years on demand; the report, CSV export, per-student detail, and trimester dates all follow the selected year. The subtitle shows the selected year instead of a fixed 2025-26.
 
 2026-08-04: Financial Aid page now opens on the current school year (from calendar settings) even before any families are entered for it, instead of defaulting to the newest year that happens to have data. Backend financial-aid endpoints also fall back to the current year rather than a hard-coded 2025-26.

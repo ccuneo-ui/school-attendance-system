@@ -459,6 +459,49 @@ def init_db():
                 INSERT INTO school_years (start_year) VALUES (2026)
                 ON CONFLICT (start_year) DO NOTHING
             """)
+            # ── Rooms, Sections (classes), and section rosters ──
+            # A "section" unifies homeroom / advisory / subject class / elective:
+            # one teacher, one room, a term, and a roster. Homeroom stays readable via
+            # students.homeroom_teacher_id (kept as a synced shadow column for now), so
+            # the attendance / dismissal / bus pages keep working while we build this out.
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS rooms (
+                    room_id     SERIAL PRIMARY KEY,
+                    name        TEXT NOT NULL UNIQUE,
+                    active      BOOLEAN NOT NULL DEFAULT TRUE,
+                    sort_order  INTEGER NOT NULL DEFAULT 0,
+                    created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS sections (
+                    section_id        SERIAL PRIMARY KEY,
+                    school_year_start INTEGER NOT NULL,
+                    type              TEXT NOT NULL DEFAULT 'subject',
+                    name              TEXT NOT NULL,
+                    subject           TEXT,
+                    grade             TEXT,
+                    term              TEXT NOT NULL DEFAULT 'year',
+                    teacher_id        INTEGER REFERENCES staff(staff_id) ON DELETE SET NULL,
+                    room_id           INTEGER REFERENCES rooms(room_id) ON DELETE SET NULL,
+                    active            BOOLEAN NOT NULL DEFAULT TRUE,
+                    created_at        TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at        TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_by        TEXT
+                )
+            """)
+            cur.execute("CREATE INDEX IF NOT EXISTS idx_sections_year_type ON sections(school_year_start, type)")
+            cur.execute("CREATE INDEX IF NOT EXISTS idx_sections_teacher ON sections(teacher_id)")
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS section_enrollments (
+                    section_id  INTEGER NOT NULL REFERENCES sections(section_id) ON DELETE CASCADE,
+                    student_id  INTEGER NOT NULL REFERENCES students(student_id) ON DELETE CASCADE,
+                    created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    UNIQUE(section_id, student_id)
+                )
+            """)
+            cur.execute("CREATE INDEX IF NOT EXISTS idx_section_enroll_student ON section_enrollments(student_id)")
+            cur.execute("CREATE INDEX IF NOT EXISTS idx_section_enroll_section ON section_enrollments(section_id)")
             # ── Households, Parents, and linking tables ──
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS households (
