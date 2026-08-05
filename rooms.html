@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Rooms — Mizzentop Day School</title>
+<link rel="icon" type="image/svg+xml" href="/logo.svg">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet"/>
+<style>
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+  :root{--navy:#1a2744;--green:#2d5016;--gold:#c8992a;--cream:#f7f3ec;--muted:#6b7280;--light:#e8e2d9;--danger:#9b1c1c;}
+  html,body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--navy);min-height:100%;}
+  .topnav{background:var(--navy);display:flex;align-items:center;gap:16px;padding:0 28px;height:56px;}
+  .topnav .title{color:#fff;font-size:14px;font-weight:500;}
+  .topnav a.home{margin-left:auto;color:rgba(255,255,255,0.85);text-decoration:none;font-size:13px;font-weight:500;border:1px solid rgba(255,255,255,0.25);padding:7px 14px;border-radius:8px;}
+  .topnav a.home:hover{background:rgba(255,255,255,0.1);}
+  .page{max-width:720px;margin:0 auto;padding:36px 24px 80px;}
+  h1{font-family:'Playfair Display',serif;font-size:30px;margin-bottom:4px;}
+  .sub{color:var(--muted);font-size:14px;margin-bottom:26px;}
+  .addbar{display:flex;gap:10px;margin-bottom:22px;}
+  input[type=text]{flex:1;padding:10px 13px;border:1px solid var(--light);border-radius:8px;font-size:14px;font-family:inherit;background:#fff;color:var(--navy);outline:none;}
+  input[type=text]:focus{border-color:var(--navy);}
+  .btn{display:inline-flex;align-items:center;gap:6px;padding:9px 16px;border-radius:8px;font-size:13px;font-weight:500;font-family:inherit;cursor:pointer;border:none;}
+  .btn-primary{background:var(--navy);color:#fff;}
+  .btn-ghost{background:transparent;color:var(--muted);border:1px solid var(--light);}
+  .btn-sm{padding:5px 11px;font-size:12px;}
+  .table-wrap{background:#fff;border:1px solid var(--light);border-radius:12px;overflow:hidden;}
+  table{width:100%;border-collapse:collapse;}
+  th{background:#f9f7f4;text-align:left;padding:11px 16px;font-size:11px;font-weight:500;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--light);}
+  td{padding:12px 16px;font-size:14px;border-bottom:1px solid #f3f0eb;}
+  tr:last-child td{border-bottom:none;}
+  tr.inactive td{color:var(--muted);}
+  .name-cell{font-weight:500;}
+  .pill{display:inline-block;font-size:11px;font-weight:600;padding:2px 9px;border-radius:12px;}
+  .pill-on{background:rgba(45,80,22,.12);color:var(--green);}
+  .pill-off{background:#eee;color:var(--muted);}
+  .row-actions{display:flex;gap:6px;justify-content:flex-end;}
+  .empty{text-align:center;color:var(--muted);padding:40px;}
+  .toast{position:fixed;bottom:24px;right:24px;background:var(--navy);color:#fff;padding:12px 20px;border-radius:10px;font-size:13px;font-weight:500;transform:translateY(80px);opacity:0;transition:all .3s;pointer-events:none;}
+  .toast.show{transform:translateY(0);opacity:1;}
+  .toast.error{background:var(--danger);}
+</style>
+</head>
+<body>
+<nav class="topnav"><span class="title">Rooms</span><a class="home" href="/">← Home</a></nav>
+<div class="page">
+  <h1>Rooms</h1>
+  <div class="sub">The list of rooms used when assigning classes. Deactivate a room to hide it from the dropdowns without deleting its history.</div>
+
+  <div class="addbar">
+    <input type="text" id="newRoom" placeholder="Add a room, e.g. 124A or Library" onkeydown="if(event.key==='Enter')addRoom()">
+    <button class="btn btn-primary" onclick="addRoom()">Add Room</button>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Room</th><th>Status</th><th style="text-align:right;">Actions</th></tr></thead>
+      <tbody id="rows"><tr><td colspan="3" class="empty">Loading…</td></tr></tbody>
+    </table>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+<script>
+  function toast(m,e){const t=document.getElementById('toast');t.textContent=m;t.className='toast show'+(e?' error':'');clearTimeout(toast._t);toast._t=setTimeout(()=>t.className='toast',2200);}
+  async function api(path,opts){const r=await fetch(path,opts);const d=await r.json().catch(()=>({}));if(!r.ok||d.error)throw new Error(d.error||('HTTP '+r.status));return d;}
+  function esc(s){const d=document.createElement('div');d.textContent=s==null?'':s;return d.innerHTML;}
+
+  let rooms=[];
+  async function load(){
+    try{ rooms=(await api('/api/rooms')).rooms||[]; }catch(e){ toast('Could not load rooms',true); rooms=[]; }
+    render();
+  }
+  function render(){
+    const tb=document.getElementById('rows');
+    if(!rooms.length){tb.innerHTML='<tr><td colspan="3" class="empty">No rooms yet. Add your first one above.</td></tr>';return;}
+    tb.innerHTML=rooms.map(r=>`
+      <tr class="${r.active?'':'inactive'}">
+        <td class="name-cell">${esc(r.name)}</td>
+        <td><span class="pill ${r.active?'pill-on':'pill-off'}">${r.active?'Active':'Inactive'}</span></td>
+        <td><div class="row-actions">
+          <button class="btn btn-ghost btn-sm" onclick="rename(${r.room_id})">Rename</button>
+          <button class="btn btn-ghost btn-sm" onclick="toggle(${r.room_id},${r.active?'false':'true'})">${r.active?'Deactivate':'Reactivate'}</button>
+        </div></td>
+      </tr>`).join('');
+  }
+  async function addRoom(){
+    const el=document.getElementById('newRoom');const name=el.value.trim();
+    if(!name)return;
+    try{ await api('/api/rooms',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name})}); el.value=''; toast('Room added'); load(); }
+    catch(e){ toast(e.message||'Could not add',true); }
+  }
+  async function rename(id){
+    const r=rooms.find(x=>x.room_id===id);
+    const name=prompt('Rename room:',r?r.name:'');
+    if(name==null)return;const v=name.trim();if(!v)return;
+    try{ await api('/api/rooms/'+id,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:v})}); toast('Renamed'); load(); }
+    catch(e){ toast(e.message||'Could not rename',true); }
+  }
+  async function toggle(id,active){
+    try{ await api('/api/rooms/'+id,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({active})}); toast(active?'Reactivated':'Deactivated'); load(); }
+    catch(e){ toast(e.message||'Could not update',true); }
+  }
+  load();
+</script>
+</body>
+</html>

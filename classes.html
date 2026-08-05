@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Classes — Mizzentop Day School</title>
+<link rel="icon" type="image/svg+xml" href="/logo.svg">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet"/>
+<style>
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+  :root{--navy:#1a2744;--green:#2d5016;--gold:#c8992a;--cream:#f7f3ec;--muted:#6b7280;--light:#e8e2d9;--danger:#9b1c1c;}
+  html,body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--navy);min-height:100%;}
+  .topnav{background:var(--navy);display:flex;align-items:center;gap:16px;padding:0 28px;height:56px;}
+  .topnav .title{color:#fff;font-size:14px;font-weight:500;}
+  .topnav .right{margin-left:auto;display:flex;gap:10px;}
+  .topnav a{color:rgba(255,255,255,0.85);text-decoration:none;font-size:13px;font-weight:500;border:1px solid rgba(255,255,255,0.25);padding:7px 14px;border-radius:8px;}
+  .topnav a:hover{background:rgba(255,255,255,0.1);}
+  .page{max-width:1120px;margin:0 auto;padding:28px 24px 80px;}
+  h1{font-family:'Playfair Display',serif;font-size:30px;margin-bottom:2px;}
+  .sub{color:var(--muted);font-size:14px;margin-bottom:20px;}
+  .toolbar{display:flex;align-items:center;gap:12px;margin-bottom:18px;flex-wrap:wrap;}
+  select,input[type=text]{padding:9px 12px;border:1px solid var(--light);border-radius:8px;font-size:13px;font-family:inherit;background:#fff;color:var(--navy);outline:none;}
+  select:focus,input:focus{border-color:var(--navy);}
+  label.fld{font-size:11px;font-weight:500;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:5px;}
+  .btn{display:inline-flex;align-items:center;gap:6px;padding:9px 16px;border-radius:8px;font-size:13px;font-weight:500;font-family:inherit;cursor:pointer;border:none;}
+  .btn-primary{background:var(--navy);color:#fff;}
+  .btn-ghost{background:transparent;color:var(--muted);border:1px solid var(--light);}
+  .btn-danger{background:transparent;color:var(--danger);border:1px solid #fca5a5;}
+  .btn-sm{padding:5px 11px;font-size:12px;}
+  .spacer{flex:1;}
+  .layout{display:grid;grid-template-columns:320px 1fr;gap:20px;}
+  @media(max-width:840px){.layout{grid-template-columns:1fr;}}
+  .list{background:#fff;border:1px solid var(--light);border-radius:12px;overflow:hidden;max-height:70vh;overflow-y:auto;}
+  .sec-item{padding:12px 15px;border-bottom:1px solid #f3f0eb;cursor:pointer;}
+  .sec-item:hover{background:#faf8f5;}
+  .sec-item.active{background:#eef2f8;border-left:3px solid var(--navy);}
+  .sec-item.inactive .sec-name{color:var(--muted);}
+  .sec-name{font-weight:500;font-size:14px;}
+  .sec-meta{font-size:12px;color:var(--muted);margin-top:2px;}
+  .type-tag{display:inline-block;font-size:10px;font-weight:600;padding:1px 7px;border-radius:10px;text-transform:uppercase;letter-spacing:.03em;margin-right:6px;}
+  .t-homeroom{background:rgba(26,39,68,.1);color:var(--navy);}
+  .t-advisory{background:rgba(45,80,22,.12);color:var(--green);}
+  .t-subject{background:rgba(200,153,42,.16);color:#7a5a10;}
+  .t-elective{background:#efe6f7;color:#5b2a86;}
+  .panel{background:#fff;border:1px solid var(--light);border-radius:12px;padding:22px;}
+  .panel .empty{color:var(--muted);text-align:center;padding:60px 20px;}
+  .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:18px;}
+  .form-grid .full{grid-column:1/-1;}
+  .form-grid select,.form-grid input{width:100%;}
+  .panel-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;}
+  .panel-head h2{font-family:'Playfair Display',serif;font-size:20px;}
+  .roster{margin-top:8px;}
+  .roster-head{display:flex;align-items:center;justify-content:space-between;margin:20px 0 10px;padding-top:16px;border-top:1px solid var(--light);}
+  .roster-head h3{font-size:14px;font-weight:600;}
+  .chip{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 12px;border:1px solid var(--light);border-radius:8px;margin-bottom:6px;font-size:13px;}
+  .chip .x{cursor:pointer;color:var(--danger);font-weight:600;border:none;background:none;font-size:15px;}
+  .muted{color:var(--muted);font-size:13px;}
+  .modal-ov{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:100;align-items:center;justify-content:center;}
+  .modal-ov.open{display:flex;}
+  .modal{background:#fff;border-radius:16px;width:100%;max-width:480px;padding:26px;margin:20px;max-height:90vh;overflow-y:auto;}
+  .modal h2{font-family:'Playfair Display',serif;font-size:20px;margin-bottom:16px;}
+  .modal-foot{display:flex;gap:10px;justify-content:flex-end;margin-top:20px;padding-top:16px;border-top:1px solid var(--light);}
+  .picker-list{max-height:340px;overflow-y:auto;border:1px solid var(--light);border-radius:8px;margin-top:10px;}
+  .picker-item{display:flex;align-items:center;gap:10px;padding:8px 12px;border-bottom:1px solid #f3f0eb;font-size:13px;}
+  .picker-item:last-child{border-bottom:none;}
+  .picker-item input{width:15px;height:15px;accent-color:var(--navy);}
+  .toast{position:fixed;bottom:24px;right:24px;background:var(--navy);color:#fff;padding:12px 20px;border-radius:10px;font-size:13px;font-weight:500;transform:translateY(80px);opacity:0;transition:all .3s;pointer-events:none;z-index:200;}
+  .toast.show{transform:translateY(0);opacity:1;}
+  .toast.error{background:var(--danger);}
+</style>
+</head>
+<body>
+<nav class="topnav">
+  <span class="title">Classes</span>
+  <div class="right"><a href="/rooms">Rooms</a><a href="/">← Home</a></div>
+</nav>
+<div class="page">
+  <h1>Classes</h1>
+  <div class="sub">Every homeroom, advisory, and subject class in one place. Open one to set its teacher and room and manage its roster. <span id="yearLabel"></span></div>
+
+  <div class="toolbar">
+    <div>
+      <label class="fld">Type</label>
+      <select id="typeFilter" onchange="loadSections()">
+        <option value="">All types</option>
+        <option value="homeroom">Homeroom</option>
+        <option value="advisory">Advisory</option>
+        <option value="subject">Subject class</option>
+        <option value="elective">Elective</option>
+      </select>
+    </div>
+    <div class="spacer"></div>
+    <button class="btn btn-primary" onclick="openNew()">+ New Class</button>
+  </div>
+
+  <div class="layout">
+    <div class="list" id="secList"><div class="sec-item"><span class="muted">Loading…</span></div></div>
+    <div class="panel" id="panel"><div class="empty">Select a class on the left, or create a new one.</div></div>
+  </div>
+</div>
+
+<!-- New class modal -->
+<div class="modal-ov" id="newOv">
+  <div class="modal">
+    <h2>New Class</h2>
+    <div class="form-grid">
+      <div class="full"><label class="fld">Name</label><input type="text" id="n-name" placeholder="e.g. 7th Grade Math, or Homeroom - Smith"></div>
+      <div><label class="fld">Type</label><select id="n-type">
+        <option value="subject">Subject class</option><option value="homeroom">Homeroom</option>
+        <option value="advisory">Advisory</option><option value="elective">Elective</option></select></div>
+      <div><label class="fld">Term</label><select id="n-term">
+        <option value="year">Full year</option><option value="t1">Trimester 1</option>
+        <option value="t2">Trimester 2</option><option value="t3">Trimester 3</option></select></div>
+      <div><label class="fld">Teacher</label><select id="n-teacher"></select></div>
+      <div><label class="fld">Room</label><select id="n-room"></select></div>
+      <div><label class="fld">Grade (optional)</label><select id="n-grade"></select></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" onclick="closeNew()">Cancel</button>
+      <button class="btn btn-primary" id="n-save" onclick="createSection()">Create</button>
+    </div>
+  </div>
+</div>
+
+<!-- Add students modal -->
+<div class="modal-ov" id="addOv">
+  <div class="modal">
+    <h2>Add Students</h2>
+    <div style="display:flex;gap:10px;align-items:flex-end;">
+      <div style="flex:1;"><label class="fld">Filter by grade</label><select id="a-grade" onchange="loadPicker()"></select></div>
+      <button class="btn btn-ghost btn-sm" onclick="pickAll(true)">Select all</button>
+      <button class="btn btn-ghost btn-sm" onclick="pickAll(false)">Clear</button>
+    </div>
+    <div class="picker-list" id="pickerList"></div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" onclick="closeAdd()">Cancel</button>
+      <button class="btn btn-primary" id="a-save" onclick="addSelected()">Add selected</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+<script>
+  function toast(m,e){const t=document.getElementById('toast');t.textContent=m;t.className='toast show'+(e?' error':'');clearTimeout(toast._t);toast._t=setTimeout(()=>t.className='toast',2200);}
+  async function api(path,opts){const r=await fetch(path,opts);const d=await r.json().catch(()=>({}));if(!r.ok||d.error)throw new Error(d.error||('HTTP '+r.status));return d;}
+  function esc(s){const d=document.createElement('div');d.textContent=s==null?'':s;return d.innerHTML;}
+  const TYPES={homeroom:'Homeroom',advisory:'Advisory',subject:'Subject',elective:'Elective'};
+  const TERMS={year:'Full year',t1:'Trimester 1',t2:'Trimester 2',t3:'Trimester 3'};
+
+  const S={opts:null,sections:[],selId:null,roster:[]};
+
+  function teacherOptions(sel){return '<option value="">— none —</option>'+S.opts.teachers.map(t=>`<option value="${t.staff_id}" ${t.staff_id==sel?'selected':''}>${esc(t.name)}</option>`).join('');}
+  function roomOptions(sel){return '<option value="">— none —</option>'+S.opts.rooms.map(r=>`<option value="${r.room_id}" ${r.room_id==sel?'selected':''}>${esc(r.name)}</option>`).join('');}
+  function gradeOptions(sel,allLabel){return `<option value="">${allLabel||'— none —'}</option>`+S.opts.grades.map(g=>`<option value="${esc(g)}" ${g==sel?'selected':''}>${esc(g)}</option>`).join('');}
+
+  async function init(){
+    try{ S.opts=await api('/api/sections/options'); }
+    catch(e){ toast('Could not load options',true); S.opts={teachers:[],rooms:[],grades:[],current_school_year_start:''}; }
+    const y=S.opts.current_school_year_start;
+    document.getElementById('yearLabel').textContent = y? `School year ${y}-${String(y+1).slice(-2)}.`:'';
+    document.getElementById('n-teacher').innerHTML=teacherOptions();
+    document.getElementById('n-room').innerHTML=roomOptions();
+    document.getElementById('n-grade').innerHTML=gradeOptions('','— none —');
+    await loadSections();
+  }
+
+  async function loadSections(){
+    const type=document.getElementById('typeFilter').value;
+    try{ S.sections=(await api('/api/sections'+(type?('?type='+type):''))).sections||[]; }
+    catch(e){ S.sections=[]; toast('Could not load classes',true); }
+    renderList();
+  }
+
+  function renderList(){
+    const el=document.getElementById('secList');
+    if(!S.sections.length){el.innerHTML='<div class="sec-item"><span class="muted">No classes yet. Click “+ New Class”.</span></div>';return;}
+    el.innerHTML=S.sections.map(s=>`
+      <div class="sec-item ${s.section_id==S.selId?'active':''} ${s.active?'':'inactive'}" onclick="select(${s.section_id})">
+        <div class="sec-name"><span class="type-tag t-${s.type}">${TYPES[s.type]||s.type}</span>${esc(s.name)}</div>
+        <div class="sec-meta">${esc(s.teacher_name||'No teacher')}${s.room_name?' · '+esc(s.room_name):''} · ${s.roster_count} student${s.roster_count==1?'':'s'}</div>
+      </div>`).join('');
+  }
+
+  async function select(id){
+    S.selId=id; renderList();
+    const s=S.sections.find(x=>x.section_id===id);
+    if(!s)return;
+    try{ S.roster=(await api('/api/sections/'+id+'/roster')).roster||[]; }catch(e){ S.roster=[]; }
+    renderPanel(s);
+  }
+
+  function renderPanel(s){
+    document.getElementById('panel').innerHTML=`
+      <div class="panel-head"><h2>${esc(s.name)}</h2>
+        <button class="btn btn-danger btn-sm" onclick="delSection()">Delete</button></div>
+      <div class="form-grid">
+        <div class="full"><label class="fld">Name</label><input type="text" id="e-name" value="${esc(s.name)}"></div>
+        <div><label class="fld">Type</label><select id="e-type">${Object.entries(TYPES).map(([k,v])=>`<option value="${k}" ${k===s.type?'selected':''}>${v}</option>`).join('')}</select></div>
+        <div><label class="fld">Term</label><select id="e-term">${Object.entries(TERMS).map(([k,v])=>`<option value="${k}" ${k===s.term?'selected':''}>${v}</option>`).join('')}</select></div>
+        <div><label class="fld">Teacher</label><select id="e-teacher">${teacherOptions(s.teacher_id)}</select></div>
+        <div><label class="fld">Room</label><select id="e-room">${roomOptions(s.room_id)}</select></div>
+        <div><label class="fld">Grade</label><select id="e-grade">${gradeOptions(s.grade,'— none —')}</select></div>
+        <div><label class="fld">Status</label><select id="e-active"><option value="true" ${s.active?'selected':''}>Active</option><option value="false" ${s.active?'':'selected'}>Inactive</option></select></div>
+      </div>
+      <button class="btn btn-primary" onclick="saveSection()">Save changes</button>
+      <div class="roster">
+        <div class="roster-head"><h3>Roster (${S.roster.length})</h3>
+          <button class="btn btn-ghost btn-sm" onclick="openAdd()">+ Add students</button></div>
+        <div id="rosterList">${renderRoster()}</div>
+      </div>`;
+    if(s.type==='homeroom'||s.type==='advisory'){
+      document.getElementById('rosterList').insertAdjacentHTML('beforebegin',
+        `<div class="muted" style="margin-bottom:8px;">Adding or removing students here also updates their ${s.type} on their student record.</div>`);
+    }
+  }
+  function renderRoster(){
+    if(!S.roster.length)return '<div class="muted">No students yet. Use “+ Add students”.</div>';
+    return S.roster.map(r=>`<div class="chip"><span>${esc(r.last_name)}, ${esc(r.first_name)} ${r.grade?('· '+esc(r.grade)):''}</span>
+      <button class="x" title="Remove" onclick="removeStudent(${r.student_id})">✕</button></div>`).join('');
+  }
+
+  async function saveSection(){
+    const body={
+      name:document.getElementById('e-name').value.trim(),
+      type:document.getElementById('e-type').value,
+      term:document.getElementById('e-term').value,
+      teacher_id:document.getElementById('e-teacher').value||null,
+      room_id:document.getElementById('e-room').value||null,
+      grade:document.getElementById('e-grade').value||null,
+      active:document.getElementById('e-active').value==='true'
+    };
+    if(!body.name){toast('Name is required',true);return;}
+    try{ await api('/api/sections/'+S.selId,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+      toast('Saved'); await loadSections(); await select(S.selId); }
+    catch(e){ toast(e.message||'Could not save',true); }
+  }
+  async function delSection(){
+    if(!confirm('Delete this class and its roster? This cannot be undone.'))return;
+    try{ await api('/api/sections/'+S.selId,{method:'DELETE'}); toast('Deleted'); S.selId=null;
+      document.getElementById('panel').innerHTML='<div class="empty">Select a class on the left, or create a new one.</div>';
+      await loadSections(); }
+    catch(e){ toast(e.message||'Could not delete',true); }
+  }
+
+  // New class
+  function openNew(){document.getElementById('n-name').value='';document.getElementById('newOv').classList.add('open');}
+  function closeNew(){document.getElementById('newOv').classList.remove('open');}
+  async function createSection(){
+    const body={
+      name:document.getElementById('n-name').value.trim(),
+      type:document.getElementById('n-type').value,
+      term:document.getElementById('n-term').value,
+      teacher_id:document.getElementById('n-teacher').value||null,
+      room_id:document.getElementById('n-room').value||null,
+      grade:document.getElementById('n-grade').value||null,
+      school_year_start:S.opts.current_school_year_start
+    };
+    if(!body.name){toast('Name is required',true);return;}
+    try{ const r=await api('/api/sections',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+      closeNew(); toast('Class created'); await loadSections(); await select(r.section_id); }
+    catch(e){ toast(e.message||'Could not create',true); }
+  }
+
+  // Roster add/remove
+  let pickCache=[];
+  function openAdd(){
+    document.getElementById('a-grade').innerHTML=gradeOptions('','All grades');
+    document.getElementById('addOv').classList.add('open');
+    loadPicker();
+  }
+  function closeAdd(){document.getElementById('addOv').classList.remove('open');}
+  async function loadPicker(){
+    const g=document.getElementById('a-grade').value;
+    try{ pickCache=(await api('/api/sections/students'+(g?('?grade='+encodeURIComponent(g)):''))).students||[]; }
+    catch(e){ pickCache=[]; }
+    const inRoster=new Set(S.roster.map(r=>r.student_id));
+    const list=document.getElementById('pickerList');
+    const avail=pickCache.filter(s=>!inRoster.has(s.student_id));
+    if(!avail.length){list.innerHTML='<div class="picker-item muted">Everyone in this grade is already on the roster.</div>';return;}
+    list.innerHTML=avail.map(s=>`<label class="picker-item"><input type="checkbox" value="${s.student_id}"> ${esc(s.last_name)}, ${esc(s.first_name)} ${s.grade?('· '+esc(s.grade)):''}</label>`).join('');
+  }
+  function pickAll(v){document.querySelectorAll('#pickerList input[type=checkbox]').forEach(c=>c.checked=v);}
+  async function addSelected(){
+    const ids=[...document.querySelectorAll('#pickerList input:checked')].map(c=>parseInt(c.value));
+    if(!ids.length){toast('No students selected',true);return;}
+    try{ await api('/api/sections/'+S.selId+'/roster',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({student_ids:ids})});
+      closeAdd(); toast('Added '+ids.length); await select(S.selId); await loadSections(); }
+    catch(e){ toast(e.message||'Could not add',true); }
+  }
+  async function removeStudent(sid){
+    try{ await api('/api/sections/'+S.selId+'/roster/'+sid,{method:'DELETE'}); await select(S.selId); await loadSections(); }
+    catch(e){ toast(e.message||'Could not remove',true); }
+  }
+
+  document.getElementById('newOv').addEventListener('click',e=>{if(e.target.id==='newOv')closeNew();});
+  document.getElementById('addOv').addEventListener('click',e=>{if(e.target.id==='addOv')closeAdd();});
+  init();
+</script>
+</body>
+</html>

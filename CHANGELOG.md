@@ -1,5 +1,7 @@
 # Changelog
 
+2026-08-05: New Classes page (People section) — create and manage homeroom, advisory, subject, and elective classes in one place: set each class's teacher (active staff only), room, term, and grade, and build its roster (add students filtered by grade, or remove them). Adding/removing students on a homeroom or advisory class also updates that student's homeroom/advisory on their record. New Rooms page manages the room list that feeds the class dropdowns (add, rename, activate/deactivate).
+
 2026-08-04: Groundwork for a unified "classes/sections" model (Phase 1) — new rooms, sections, and section_enrollments tables. A section is one teacher + room + term + roster, unifying homeroom, advisory, subject classes, and electives. No visible change yet; homeroom still works off its existing field. A one-time script (build_sections_from_homeroom.py) seeds homeroom/advisory sections from current assignments.
 
 2026-08-04: Homeroom Attendance Report now has a School Year picker (defaults to the current year) so you can pull prior years on demand; the report, CSV export, per-student detail, and trimester dates all follow the selected year. The subtitle shows the selected year instead of a fixed 2025-26.

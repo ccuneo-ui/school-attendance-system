@@ -777,6 +777,16 @@ def mcard():
 def students():
     return send_from_directory(".", "students.html")
 
+@app.route("/classes")
+@people_required
+def classes_page():
+    return send_from_directory(".", "classes.html")
+
+@app.route("/rooms")
+@people_required
+def rooms_page():
+    return send_from_directory(".", "rooms.html")
+
 @app.route("/staff")
 @app.route("/people")
 @people_required
@@ -6147,6 +6157,311 @@ def api_school_years_upsert():
     except Exception as e:
         conn.rollback()
         return jsonify({"error": str(e)}), 500
+    finally:
+        conn.close()
+
+
+# ============================================
+# ROOMS + SECTIONS (classes) + ROSTERS
+# A section = one teacher + room + term + roster. Homeroom/advisory sections keep
+# students.homeroom_teacher_id / advisory_teacher_id synced (the "shadow column"),
+# so the attendance / dismissal / bus pages keep working off those fields.
+# ============================================
+_SHADOW_COL = {"homeroom": "homeroom_teacher_id", "advisory": "advisory_teacher_id"}
+
+
+def _sync_shadow_for_section(cur, section_id):
+    """Homeroom/advisory only: set each enrolled student's shadow column to this
+    section's teacher. No-op for other section types or a section with no teacher."""
+    cur.execute("SELECT type, teacher_id FROM sections WHERE section_id=%s", (section_id,))
+    s = fo(cur)
+    if not s:
+        return
+    col = _SHADOW_COL.get(s["type"])
+    if not col or not s["teacher_id"]:
+        return
+    cur.execute(
+        f"""UPDATE students SET {col}=%s, updated_at=NOW()
+            WHERE student_id IN (SELECT student_id FROM section_enrollments WHERE section_id=%s)""",
+        (s["teacher_id"], section_id),
+    )
+
+
+# ---- Rooms ----
+@app.route("/api/rooms")
+@login_required
+def api_rooms():
+    active_only = request.args.get("active") in ("1", "true")
+    conn = get_db_connection()
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute(f"""SELECT room_id, name, active, sort_order FROM rooms
+                            {'WHERE active' if active_only else ''}
+                            ORDER BY sort_order, name""")
+            return jsonify({"rooms": fa(cur)})
+    finally:
+        conn.close()
+
+
+@app.route("/api/rooms", methods=["POST"])
+@people_required
+def api_rooms_create():
+    name = (request.get_json() or {}).get("name", "").strip()
+    if not name:
+        return jsonify({"error": "name required"}), 400
+    conn = get_db_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""INSERT INTO rooms (name) VALUES (%s)
+                           ON CONFLICT (name) DO UPDATE SET active=TRUE
+                           RETURNING room_id""", (name,))
+            conn.commit()
+            return jsonify({"success": True, "room_id": cur.fetchone()[0]})
+    except Exception as e:
+        conn.rollback()
+        return jsonify({"error": str(e)}), 500
+    finally:
+        conn.close()
+
+
+@app.route("/api/rooms/<int:room_id>", methods=["PUT"])
+@people_required
+def api_rooms_update(room_id):
+    data = request.get_json() or {}
+    fields, vals = [], []
+    for col in ("name", "active", "sort_order"):
+        if col in data:
+            fields.append(f"{col}=%s")
+            vals.append(data[col])
+    if not fields:
+        return jsonify({"error": "no fields"}), 400
+    vals.append(room_id)
+    conn = get_db_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(f"UPDATE rooms SET {', '.join(fields)} WHERE room_id=%s", vals)
+            conn.commit()
+            return jsonify({"success": True})
+    except Exception as e:
+        conn.rollback()
+        return jsonify({"error": str(e)}), 500
+    finally:
+        conn.close()
+
+
+# ---- Section dropdown options (active teachers, active rooms, grades, current year) ----
+@app.route("/api/sections/options")
+@login_required
+def api_sections_options():
+    conn = get_db_connection()
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute("""SELECT staff_id, first_name, last_name
+                           FROM staff WHERE status='active'
+                           ORDER BY last_name, first_name""")
+            teachers = [{"staff_id": r["staff_id"],
+                         "name": f'{r["first_name"]} {r["last_name"]}'.strip()} for r in fa(cur)]
+            cur.execute("SELECT room_id, name FROM rooms WHERE active ORDER BY sort_order, name")
+            rooms = fa(cur)
+            cur.execute("""SELECT DISTINCT grade FROM students
+                           WHERE status='active' AND grade IS NOT NULL AND grade<>''
+                           ORDER BY grade""")
+            grades = [r["grade"] for r in fa(cur)]
+        return jsonify({"teachers": teachers, "rooms": rooms, "grades": grades,
+                        "current_school_year_start": current_school_year_start()})
+    finally:
+        conn.close()
+
+
+# ---- Sections ----
+@app.route("/api/sections")
+@login_required
+def api_sections_list():
+    year = request.args.get("school_year")
+    year = int(year) if (year or "").isdigit() else current_school_year_start()
+    stype = request.args.get("type")
+    conn = get_db_connection()
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            q = """SELECT s.section_id, s.school_year_start, s.type, s.name, s.subject,
+                          s.grade, s.term, s.teacher_id, s.room_id, s.active,
+                          (st.first_name || ' ' || st.last_name) AS teacher_name,
+                          r.name AS room_name,
+                          (SELECT COUNT(*) FROM section_enrollments e WHERE e.section_id=s.section_id) AS roster_count
+                   FROM sections s
+                   LEFT JOIN staff st ON st.staff_id = s.teacher_id
+                   LEFT JOIN rooms r ON r.room_id = s.room_id
+                   WHERE s.school_year_start=%s"""
+            params = [year]
+            if stype:
+                q += " AND s.type=%s"
+                params.append(stype)
+            q += " ORDER BY s.type, s.name"
+            cur.execute(q, params)
+            return jsonify({"school_year_start": year, "sections": fa(cur)})
+    finally:
+        conn.close()
+
+
+@app.route("/api/sections", methods=["POST"])
+@people_required
+def api_sections_create():
+    d = request.get_json() or {}
+    name = (d.get("name") or "").strip()
+    if not name:
+        return jsonify({"error": "name required"}), 400
+    year = d.get("school_year_start") or current_school_year_start()
+    conn = get_db_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""INSERT INTO sections
+                           (school_year_start, type, name, subject, grade, term, teacher_id, room_id, updated_by, updated_at)
+                           VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,NOW()) RETURNING section_id""",
+                        (int(year), d.get("type") or "subject", name, d.get("subject") or None,
+                         d.get("grade") or None, d.get("term") or "year",
+                         d.get("teacher_id") or None, d.get("room_id") or None,
+                         session.get("user_email")))
+            sid = cur.fetchone()[0]
+            _sync_shadow_for_section(cur, sid)
+            conn.commit()
+            return jsonify({"success": True, "section_id": sid})
+    except Exception as e:
+        conn.rollback()
+        return jsonify({"error": str(e)}), 500
+    finally:
+        conn.close()
+
+
+@app.route("/api/sections/<int:section_id>", methods=["PUT"])
+@people_required
+def api_sections_update(section_id):
+    d = request.get_json() or {}
+    fields, vals = [], []
+    for col in ("name", "subject", "grade", "term", "type", "teacher_id", "room_id", "active"):
+        if col in d:
+            fields.append(f"{col}=%s")
+            vals.append(d[col] if d[col] != "" else None)
+    if not fields:
+        return jsonify({"error": "no fields"}), 400
+    fields.append("updated_at=NOW()")
+    fields.append("updated_by=%s")
+    vals.append(session.get("user_email"))
+    vals.append(section_id)
+    conn = get_db_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(f"UPDATE sections SET {', '.join(fields)} WHERE section_id=%s", vals)
+            # if teacher/type changed, re-sync the shadow column for the whole roster
+            _sync_shadow_for_section(cur, section_id)
+            conn.commit()
+            return jsonify({"success": True})
+    except Exception as e:
+        conn.rollback()
+        return jsonify({"error": str(e)}), 500
+    finally:
+        conn.close()
+
+
+@app.route("/api/sections/<int:section_id>", methods=["DELETE"])
+@people_required
+def api_sections_delete(section_id):
+    conn = get_db_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM sections WHERE section_id=%s", (section_id,))
+            conn.commit()
+            return jsonify({"success": True})
+    except Exception as e:
+        conn.rollback()
+        return jsonify({"error": str(e)}), 500
+    finally:
+        conn.close()
+
+
+# ---- Section rosters ----
+@app.route("/api/sections/<int:section_id>/roster")
+@login_required
+def api_section_roster(section_id):
+    conn = get_db_connection()
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute("""SELECT s.student_id, s.first_name, s.last_name, s.grade
+                           FROM section_enrollments e
+                           JOIN students s ON s.student_id = e.student_id
+                           WHERE e.section_id=%s
+                           ORDER BY s.last_name, s.first_name""", (section_id,))
+            return jsonify({"roster": fa(cur)})
+    finally:
+        conn.close()
+
+
+@app.route("/api/sections/<int:section_id>/roster", methods=["POST"])
+@people_required
+def api_section_roster_add(section_id):
+    ids = (request.get_json() or {}).get("student_ids") or []
+    if not isinstance(ids, list) or not ids:
+        return jsonify({"error": "student_ids (list) required"}), 400
+    conn = get_db_connection()
+    try:
+        with conn.cursor() as cur:
+            added = 0
+            for sid in ids:
+                cur.execute("""INSERT INTO section_enrollments (section_id, student_id)
+                               VALUES (%s,%s) ON CONFLICT (section_id, student_id) DO NOTHING""",
+                            (section_id, sid))
+                added += cur.rowcount
+            _sync_shadow_for_section(cur, section_id)
+            conn.commit()
+            return jsonify({"success": True, "added": added})
+    except Exception as e:
+        conn.rollback()
+        return jsonify({"error": str(e)}), 500
+    finally:
+        conn.close()
+
+
+@app.route("/api/sections/<int:section_id>/roster/<int:student_id>", methods=["DELETE"])
+@people_required
+def api_section_roster_remove(section_id, student_id):
+    conn = get_db_connection()
+    try:
+        with conn.cursor() as cur:
+            # For homeroom/advisory, clear the student's shadow column when removed.
+            cur.execute("SELECT type, teacher_id FROM sections WHERE section_id=%s", (section_id,))
+            s = fo(cur)
+            cur.execute("DELETE FROM section_enrollments WHERE section_id=%s AND student_id=%s",
+                        (section_id, student_id))
+            if s:
+                col = _SHADOW_COL.get(s["type"])
+                if col:
+                    cur.execute(f"UPDATE students SET {col}=NULL, updated_at=NOW() WHERE student_id=%s",
+                                (student_id,))
+            conn.commit()
+            return jsonify({"success": True})
+    except Exception as e:
+        conn.rollback()
+        return jsonify({"error": str(e)}), 500
+    finally:
+        conn.close()
+
+
+# ---- Active students for roster-building (optional grade filter) ----
+@app.route("/api/sections/students")
+@login_required
+def api_sections_students():
+    grade = request.args.get("grade")
+    conn = get_db_connection()
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            q = """SELECT student_id, first_name, last_name, grade
+                   FROM students WHERE status='active'"""
+            params = []
+            if grade and grade != "all":
+                q += " AND grade=%s"
+                params.append(grade)
+            q += " ORDER BY last_name, first_name"
+            cur.execute(q, params)
+            return jsonify({"students": fa(cur)})
     finally:
         conn.close()
 
