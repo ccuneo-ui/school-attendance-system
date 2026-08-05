@@ -6172,18 +6172,20 @@ _SHADOW_COL = {"homeroom": "homeroom_teacher_id", "advisory": "advisory_teacher_
 
 def _sync_shadow_for_section(cur, section_id):
     """Homeroom/advisory only: set each enrolled student's shadow column to this
-    section's teacher. No-op for other section types or a section with no teacher."""
+    section's teacher. No-op for other section types or a section with no teacher.
+    Reads by index so it works with the plain (non-dict) cursors the write endpoints use."""
     cur.execute("SELECT type, teacher_id FROM sections WHERE section_id=%s", (section_id,))
-    s = fo(cur)
-    if not s:
+    row = cur.fetchone()
+    if not row:
         return
-    col = _SHADOW_COL.get(s["type"])
-    if not col or not s["teacher_id"]:
+    stype, teacher_id = row[0], row[1]
+    col = _SHADOW_COL.get(stype)
+    if not col or not teacher_id:
         return
     cur.execute(
         f"""UPDATE students SET {col}=%s, updated_at=NOW()
             WHERE student_id IN (SELECT student_id FROM section_enrollments WHERE section_id=%s)""",
-        (s["teacher_id"], section_id),
+        (teacher_id, section_id),
     )
 
 
@@ -6427,15 +6429,15 @@ def api_section_roster_remove(section_id, student_id):
     try:
         with conn.cursor() as cur:
             # For homeroom/advisory, clear the student's shadow column when removed.
-            cur.execute("SELECT type, teacher_id FROM sections WHERE section_id=%s", (section_id,))
-            s = fo(cur)
+            cur.execute("SELECT type FROM sections WHERE section_id=%s", (section_id,))
+            row = cur.fetchone()
+            stype = row[0] if row else None
             cur.execute("DELETE FROM section_enrollments WHERE section_id=%s AND student_id=%s",
                         (section_id, student_id))
-            if s:
-                col = _SHADOW_COL.get(s["type"])
-                if col:
-                    cur.execute(f"UPDATE students SET {col}=NULL, updated_at=NOW() WHERE student_id=%s",
-                                (student_id,))
+            col = _SHADOW_COL.get(stype)
+            if col:
+                cur.execute(f"UPDATE students SET {col}=NULL, updated_at=NOW() WHERE student_id=%s",
+                            (student_id,))
             conn.commit()
             return jsonify({"success": True})
     except Exception as e:
