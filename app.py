@@ -10,6 +10,7 @@ import psycopg2
 import psycopg2.extras
 from datetime import datetime
 import os
+import json
 
 def parse_time_to_minutes(time_str):
     """Parse 'HH:MM', 'H:MM PM', etc. into total minutes since midnight."""
@@ -43,6 +44,99 @@ google = oauth.register(
 )
 
 SUPERADMIN_EMAIL = "ccuneo@mizzentop.org"
+
+# ============================================
+# PERMISSION MODEL — fine-grained, per-page
+# ============================================
+# Every gated page has a stable permission KEY. A staff member's `permissions`
+# column stores a JSON list of the keys they hold. Keys are grouped into silos
+# purely for display (the "select all" tick in the staff editor toggles a silo).
+#
+# Two tiers sit above per-page keys:
+#   * SUPERADMIN_EMAIL  — the hardcoded root; always holds every key. Its own
+#     permissions can never be edited away.
+#   * can_manage_permissions ("effective superadmin") — granted only by the
+#     superadmin. Holders implicitly hold every page key AND may edit other
+#     people's permissions (but not their own, and not the superadmin's).
+#
+# The Reference silo (family directory, dismissal staff view, bus dashboard,
+# attendance report) is intentionally NOT gated: it is read-only and open to any
+# signed-in staff member.
+
+PERMISSION_SILOS = [
+    {"key": "daily_input", "label": "Daily Input", "pages": [
+        {"key": "homeroom_attendance", "label": "Homeroom Attendance"},
+        {"key": "daily_ops",           "label": "Daily Ops"},
+        {"key": "mcard",               "label": "M Card Snack Tracker"},
+        {"key": "program_attendance",  "label": "Program Attendance"},
+        {"key": "aftercare",           "label": "Before & Aftercare"},
+        {"key": "school_store",        "label": "School Store"},
+        {"key": "dismissal_options",   "label": "Activities & Bus Routes"},
+    ]},
+    {"key": "people", "label": "People", "pages": [
+        {"key": "students",        "label": "Student Directory"},
+        {"key": "family_manager",  "label": "Family Manager"},
+        {"key": "staff_directory", "label": "Staff Directory"},
+        {"key": "classes",         "label": "Classes"},
+        {"key": "rooms",           "label": "Rooms"},
+    ]},
+    {"key": "billing", "label": "Billing", "pages": [
+        {"key": "billing_rates",   "label": "Billing Rates"},
+        {"key": "school_calendar", "label": "School Calendar"},
+        {"key": "lunch_dashboard", "label": "Lunch Dashboard"},
+        {"key": "billing_report",  "label": "Billing Reports"},
+        {"key": "financial_aid",   "label": "Financial Aid"},
+    ]},
+]
+
+ALL_PERMISSION_KEYS = [p["key"] for silo in PERMISSION_SILOS for p in silo["pages"]]
+SILO_KEYS = {silo["key"]: [p["key"] for p in silo["pages"]] for silo in PERMISSION_SILOS}
+
+
+def permissions_for_staff(staff):
+    """Return the list of permission keys a staff row holds.
+
+    Prefers the JSON `permissions` column; falls back to deriving keys from the
+    legacy boolean flags for any row not yet migrated. Always filtered to known
+    keys so a stale/renamed key can never leak through.
+    """
+    raw = staff.get("permissions")
+    if raw:
+        try:
+            keys = json.loads(raw) if isinstance(raw, str) else list(raw)
+            if isinstance(keys, list):
+                return [k for k in keys if k in ALL_PERMISSION_KEYS]
+        except Exception:
+            pass
+    # Fallback for a row with no permissions list yet. Mirrors the init_db
+    # backfill: the everyday daily-input pages were reachable by all staff, so
+    # everyone keeps them; the People and Billing silos follow the old flags.
+    keys = [k for k in SILO_KEYS["daily_input"] if k != "dismissal_options"]
+    if staff.get("can_manage_people"):
+        keys += SILO_KEYS["people"] + ["dismissal_options"]
+    if staff.get("can_manage_billing"):
+        keys += SILO_KEYS["billing"]
+    return sorted(set(keys))
+
+
+def legacy_flags_from_keys(keys):
+    """Derive the legacy silo booleans from a permission-key list, so old code
+    paths (people_required, billing back-dating, the recorder dropdown) stay
+    consistent with the fine-grained model."""
+    ks = set(keys)
+    return {
+        "can_record_attendance": 1 if ks & set(SILO_KEYS["daily_input"]) else 0,
+        "can_manage_people":     1 if ks & set(SILO_KEYS["people"]) else 0,
+        "can_manage_billing":    1 if ks & set(SILO_KEYS["billing"]) else 0,
+    }
+
+
+def has_perm(key):
+    """True if the current session may access the given permission key."""
+    if session.get("is_superadmin") or session.get("can_manage_permissions"):
+        return True
+    return key in (session.get("permissions") or [])
+
 
 DATABASE_URL = os.environ.get("DATABASE_URL", "")
 if DATABASE_URL.startswith("postgres://"):
@@ -87,6 +181,8 @@ def dev_auto_login():
         session["can_record_attendance"] = True
         session["can_manage_billing"] = True
         session["can_manage_people"] = True
+        session["can_manage_permissions"] = True
+        session["permissions"] = list(ALL_PERMISSION_KEYS)
         session["user_role"] = "superadmin"
 
 
@@ -99,6 +195,8 @@ def refresh_session_permissions():
         return
     if email == SUPERADMIN_EMAIL:
         session["is_superadmin"] = True
+        session["can_manage_permissions"] = True
+        session["permissions"] = list(ALL_PERMISSION_KEYS)
         session["can_record_attendance"] = True
         session["can_manage_billing"] = True
         session["can_manage_people"] = True
@@ -106,13 +204,17 @@ def refresh_session_permissions():
     try:
         conn = get_db_connection()
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
-            cur.execute("SELECT can_record_attendance, can_manage_billing, can_manage_people, role FROM staff WHERE email=%s AND status='active'", (email,))
+            cur.execute("SELECT can_record_attendance, can_manage_billing, can_manage_people, can_manage_permissions, permissions, role FROM staff WHERE email=%s AND status='active'", (email,))
             staff = fo(cur)
         conn.close()
         if staff:
-            session["can_record_attendance"] = bool(staff.get("can_record_attendance"))
-            session["can_manage_billing"] = bool(staff.get("can_manage_billing"))
-            session["can_manage_people"] = bool(staff.get("can_manage_people"))
+            perms = permissions_for_staff(staff)
+            flags = legacy_flags_from_keys(perms)
+            session["permissions"] = perms
+            session["can_manage_permissions"] = bool(staff.get("can_manage_permissions"))
+            session["can_record_attendance"] = bool(flags["can_record_attendance"])
+            session["can_manage_billing"] = bool(flags["can_manage_billing"])
+            session["can_manage_people"] = bool(flags["can_manage_people"])
             session["user_role"] = staff.get("role")
         else:
             session.clear()
@@ -150,6 +252,25 @@ def people_required(f):
             return redirect("/?error=unauthorized")
         return f(*args, **kwargs)
     return decorated
+
+
+def require_perm(key):
+    """Gate a route on a single per-page permission key. Returns a JSON 403 for
+    API routes (path starts with /api/) and a redirect for page routes."""
+    def deco(f):
+        @wraps(f)
+        def decorated(*args, **kwargs):
+            if not session.get("user_email"):
+                if request.path.startswith("/api/"):
+                    return jsonify({"error": "Not signed in"}), 401
+                return redirect("/login")
+            if not has_perm(key):
+                if request.path.startswith("/api/"):
+                    return jsonify({"error": "You don't have permission for this."}), 403
+                return redirect("/?error=unauthorized")
+            return f(*args, **kwargs)
+        return decorated
+    return deco
 
 
 # ============================================
@@ -566,6 +687,40 @@ def init_db():
             """)
             if not cur.fetchone():
                 cur.execute("ALTER TABLE staff ADD COLUMN parent_id INTEGER REFERENCES parents(parent_id) ON DELETE SET NULL")
+            # Migrate: fine-grained per-page permissions.
+            #   - `permissions` holds a JSON list of page keys (source of truth).
+            #   - `can_manage_permissions` marks an "effective superadmin".
+            cur.execute("""
+                SELECT column_name FROM information_schema.columns
+                WHERE table_name='staff' AND column_name='permissions'
+            """)
+            has_permissions_col = cur.fetchone()
+            if not has_permissions_col:
+                cur.execute("ALTER TABLE staff ADD COLUMN permissions TEXT")
+            cur.execute("""
+                SELECT column_name FROM information_schema.columns
+                WHERE table_name='staff' AND column_name='can_manage_permissions'
+            """)
+            if not cur.fetchone():
+                cur.execute("ALTER TABLE staff ADD COLUMN can_manage_permissions INTEGER NOT NULL DEFAULT 0")
+            # Backfill: for any staff row without a permissions list yet, derive one
+            # from the legacy booleans so nobody loses the access they have today.
+            # Daily-input pages (except Activities & Bus Routes) were reachable by
+            # every signed-in staff member, so they are granted to everyone here.
+            cur.execute("""
+                SELECT staff_id, can_record_attendance, can_manage_people, can_manage_billing
+                FROM staff WHERE permissions IS NULL OR permissions = ''
+            """)
+            rows_to_backfill = cur.fetchall()
+            for sid, rec_att, man_ppl, man_bill in rows_to_backfill:
+                keys = [k for k in SILO_KEYS["daily_input"] if k != "dismissal_options"]
+                if man_ppl:
+                    keys += SILO_KEYS["people"] + ["dismissal_options"]
+                if man_bill:
+                    keys += SILO_KEYS["billing"]
+                keys = sorted(set(keys))
+                cur.execute("UPDATE staff SET permissions=%s WHERE staff_id=%s",
+                            (json.dumps(keys), sid))
             # Migrate: add household_id to financial_aid_families if missing
             cur.execute("""
                 SELECT column_name FROM information_schema.columns
@@ -708,12 +863,18 @@ def auth_callback():
         session["user_email"] = email
         session["user_name"] = user_info.get("name", "")
         session["is_superadmin"] = (email == SUPERADMIN_EMAIL)
-        if staff:
-            session["can_record_attendance"] = bool(staff.get("can_record_attendance"))
-            session["can_manage_billing"]    = bool(staff.get("can_manage_billing"))
-            session["can_manage_people"]     = bool(staff.get("can_manage_people"))
+        if staff and email != SUPERADMIN_EMAIL:
+            perms = permissions_for_staff(staff)
+            flags = legacy_flags_from_keys(perms)
+            session["permissions"]           = perms
+            session["can_manage_permissions"] = bool(staff.get("can_manage_permissions"))
+            session["can_record_attendance"] = bool(flags["can_record_attendance"])
+            session["can_manage_billing"]    = bool(flags["can_manage_billing"])
+            session["can_manage_people"]     = bool(flags["can_manage_people"])
             session["user_role"]             = staff.get("role")
         else:
+            session["permissions"]           = list(ALL_PERMISSION_KEYS)
+            session["can_manage_permissions"] = True
             session["can_record_attendance"] = True
             session["can_manage_billing"]    = True
             session["can_manage_people"]     = True
@@ -737,6 +898,8 @@ def get_session():
         "email": session.get("user_email"),
         "name": session.get("user_name"),
         "is_superadmin": session.get("is_superadmin", False),
+        "can_manage_permissions": session.get("can_manage_permissions", False),
+        "permissions": session.get("permissions", []),
         "can_record_attendance": session.get("can_record_attendance", False),
         "can_manage_billing": session.get("can_manage_billing", False),
         "can_manage_people": session.get("can_manage_people", False),
@@ -753,7 +916,7 @@ def attendance():
     return send_from_directory(".", "attendance_form.html")
 
 @app.route("/dismissal")
-@login_required
+@require_perm("daily_ops")
 def dismissal():
     return send_from_directory(".", "dismissal_planner.html")
 
@@ -768,38 +931,38 @@ def bus_dashboard():
     return send_from_directory(".", "bus_dashboard.html")
 
 @app.route("/mcard")
-@login_required
+@require_perm("mcard")
 def mcard():
     return send_from_directory(".", "mcard_tracker.html")
 
 @app.route("/students")
-@people_required
+@require_perm("students")
 def students():
     return send_from_directory(".", "students.html")
 
 @app.route("/classes")
-@people_required
+@require_perm("classes")
 def classes_page():
     return send_from_directory(".", "classes.html")
 
 @app.route("/rooms")
-@people_required
+@require_perm("rooms")
 def rooms_page():
     return send_from_directory(".", "rooms.html")
 
 @app.route("/staff")
 @app.route("/people")
-@people_required
+@require_perm("staff_directory")
 def people():
     return send_from_directory(".", "people.html")
 
 @app.route("/dismissal-options")
-@people_required
+@require_perm("dismissal_options")
 def dismissal_options_page():
     return send_from_directory(".", "dismissal_options.html")
 
 @app.route("/homeroom-attendance")
-@login_required
+@require_perm("homeroom_attendance")
 def homeroom_attendance_page():
     return send_from_directory(".", "homeroom_attendance.html")
 
@@ -809,32 +972,32 @@ def homeroom_attendance_report_page():
     return send_from_directory(".", "homeroom_attendance_report.html")
 
 @app.route("/program-attendance")
-@login_required
+@require_perm("program_attendance")
 def program_attendance():
     return send_from_directory(".", "program_attendance.html")
 
 @app.route("/aftercare")
-@login_required
+@require_perm("aftercare")
 def aftercare():
     return send_from_directory(".", "aftercare_attendance.html")
 
 @app.route("/school-store")
-@login_required
+@require_perm("school_store")
 def school_store():
     return send_from_directory(".", "school_store.html")
 
 @app.route("/billing-rates")
-@login_required
+@require_perm("billing_rates")
 def billing_rates():
     return send_from_directory(".", "billing_rates.html")
 
 @app.route("/financial-aid")
-@login_required
+@require_perm("financial_aid")
 def financial_aid_page():
     return send_from_directory(".", "financial_aid.html")
 
 @app.route("/school-calendar")
-@login_required
+@require_perm("school_calendar")
 def school_calendar_page():
     return send_from_directory(".", "school_calendar.html")
 
@@ -2215,31 +2378,57 @@ def update_student(student_id):
 # ============================================
 
 @app.route("/api/people/staff")
-@login_required
+@require_perm("staff_directory")
 def get_people_staff():
     conn = get_db_connection()
     try:
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
-            cur.execute("SELECT staff_id,first_name,last_name,email,role,status,can_record_attendance,can_manage_billing,can_manage_people,title FROM staff ORDER BY last_name,first_name")
-            return jsonify(fa(cur))
+            cur.execute("SELECT staff_id,first_name,last_name,email,role,status,can_record_attendance,can_manage_billing,can_manage_people,can_manage_permissions,permissions,title FROM staff ORDER BY last_name,first_name")
+            rows = fa(cur)
+        # Normalize permissions to a resolved key list for the frontend, so the
+        # editor shows the right boxes even for legacy rows.
+        for r in rows:
+            r["permissions"] = permissions_for_staff(r)
+            r["can_manage_permissions"] = bool(r.get("can_manage_permissions"))
+        return jsonify(rows)
     finally:
         conn.close()
 
+
+def _editor_perm_context():
+    """Return (is_super, can_manage_perms, editor_email) for the current session."""
+    is_super = bool(session.get("is_superadmin"))
+    return (is_super,
+            is_super or bool(session.get("can_manage_permissions")),
+            (session.get("user_email") or "").lower())
+
+
 @app.route("/api/people/staff", methods=["POST"])
-@people_required
+@require_perm("staff_directory")
 def add_people_staff():
-    data = request.get_json()
+    data = request.get_json() or {}
+    is_super, can_manage_perms, _ = _editor_perm_context()
+    # Permissions on a new staff member may only be set by someone who can manage
+    # permissions. Everyone else creates the person with a safe default (the
+    # everyday daily-input pages), then a permissions manager grants the rest.
+    if can_manage_perms and isinstance(data.get("permissions"), list):
+        keys = sorted(set(k for k in data["permissions"] if k in ALL_PERMISSION_KEYS))
+    else:
+        keys = [k for k in SILO_KEYS["daily_input"] if k != "dismissal_options"]
+    flags = legacy_flags_from_keys(keys)
+    cmp_flag = 1 if (can_manage_perms and data.get("can_manage_permissions")) else 0
     conn = get_db_connection()
     try:
         with conn.cursor() as cur:
             cur.execute("""
                 INSERT INTO staff (first_name,last_name,email,role,title,status,
-                                   can_record_attendance,can_manage_billing,can_manage_people,hire_date)
-                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                                   can_record_attendance,can_manage_billing,can_manage_people,
+                                   can_manage_permissions,permissions,hire_date)
+                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
             """, (data.get("first_name"),data.get("last_name"),data.get("email"),
                   data.get("role","staff"),data.get("title",""),data.get("status","active"),
-                  data.get("can_record_attendance",0),data.get("can_manage_billing",0),
-                  data.get("can_manage_people",0),"2025-09-01"))
+                  flags["can_record_attendance"],flags["can_manage_billing"],flags["can_manage_people"],
+                  cmp_flag,json.dumps(keys),"2025-09-01"))
         conn.commit()
         return jsonify({"success":True}),201
     except Exception as e:
@@ -2249,17 +2438,52 @@ def add_people_staff():
         conn.close()
 
 @app.route("/api/people/staff/<int:staff_id>", methods=["PUT"])
-@people_required
+@require_perm("staff_directory")
 def update_people_staff(staff_id):
-    data = request.get_json()
-    allowed = ["first_name","last_name","email","role","title","status",
-               "can_record_attendance","can_manage_billing","can_manage_people"]
-    fields = [f + " = %s" for f in allowed if f in data]
-    values = [data[f] for f in allowed if f in data]
-    if not fields:
-        return jsonify({"error":"No fields"}),400
+    data = request.get_json() or {}
+    is_super, can_manage_perms, editor_email = _editor_perm_context()
     conn = get_db_connection()
     try:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute("SELECT email FROM staff WHERE staff_id=%s", (staff_id,))
+            target = fo(cur)
+        if not target:
+            return jsonify({"error":"Staff member not found"}),404
+        target_email = (target.get("email") or "").lower()
+
+        # Profile fields: editable by anyone with staff-directory access.
+        profile_fields = ["first_name","last_name","email","role","title","status"]
+        fields = [f + " = %s" for f in profile_fields if f in data]
+        values = [data[f] for f in profile_fields if f in data]
+
+        # Permission changes are privileged and never allowed on your own account
+        # or on the superadmin. This is the server-side guard that stops someone
+        # with staff access from granting themselves (or anyone) new powers.
+        wants_perm_change = ("permissions" in data) or ("can_manage_permissions" in data)
+        if wants_perm_change:
+            if not can_manage_perms:
+                return jsonify({"error":"You don't have permission to change access permissions."}),403
+            if target_email and target_email == editor_email:
+                return jsonify({"error":"You can't change your own permissions."}),403
+            if target_email == SUPERADMIN_EMAIL:
+                return jsonify({"error":"The superadmin's permissions can't be modified."}),403
+            if "permissions" in data:
+                keys = data["permissions"] if isinstance(data["permissions"], list) else []
+                keys = sorted(set(k for k in keys if k in ALL_PERMISSION_KEYS))
+                flags = legacy_flags_from_keys(keys)
+                fields += ["permissions = %s","can_record_attendance = %s",
+                           "can_manage_billing = %s","can_manage_people = %s"]
+                values += [json.dumps(keys),flags["can_record_attendance"],
+                           flags["can_manage_billing"],flags["can_manage_people"]]
+            if "can_manage_permissions" in data:
+                # Any permission-manager may grant or revoke effective-superadmin
+                # on other people (self-edits and the superadmin row are already
+                # blocked above).
+                fields.append("can_manage_permissions = %s")
+                values.append(1 if data["can_manage_permissions"] else 0)
+
+        if not fields:
+            return jsonify({"error":"No changes"}),400
         with conn.cursor() as cur:
             values.append(staff_id)
             cur.execute("UPDATE staff SET " + ", ".join(fields) + " WHERE staff_id=%s", values)
@@ -2272,10 +2496,16 @@ def update_people_staff(staff_id):
         conn.close()
 
 @app.route("/api/people/staff/<int:staff_id>", methods=["DELETE"])
-@people_required
+@require_perm("staff_directory")
 def delete_people_staff(staff_id):
     conn = get_db_connection()
     try:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute("SELECT email FROM staff WHERE staff_id=%s",(staff_id,))
+            target = fo(cur)
+        # Never allow deleting the superadmin row.
+        if target and (target.get("email") or "").lower() == SUPERADMIN_EMAIL:
+            return jsonify({"error":"The superadmin account can't be deleted."}),403
         with conn.cursor() as cur:
             cur.execute("DELETE FROM staff WHERE staff_id=%s",(staff_id,))
         conn.commit()
@@ -2897,7 +3127,7 @@ def _lunch_year_total(grade, months_doc, day_counts_by_month, rates, month_keys)
 
 
 @app.route("/lunch-dashboard")
-@login_required
+@require_perm("lunch_dashboard")
 def lunch_dashboard_page():
     return send_from_directory(".", "lunch_dashboard.html")
 
@@ -3318,7 +3548,7 @@ def send_backup_email():
 # ============================================
 
 @app.route("/billing-report")
-@login_required
+@require_perm("billing_report")
 def billing_report():
     """Billing report page (billing silo)."""
     return send_from_directory(".", "billing_report.html")
@@ -4955,7 +5185,7 @@ def get_family_directory():
 
 
 @app.route("/family-manager")
-@people_required
+@require_perm("family_manager")
 def family_manager_page():
     return send_from_directory(".", "family_manager.html")
 
@@ -6172,20 +6402,18 @@ _SHADOW_COL = {"homeroom": "homeroom_teacher_id", "advisory": "advisory_teacher_
 
 def _sync_shadow_for_section(cur, section_id):
     """Homeroom/advisory only: set each enrolled student's shadow column to this
-    section's teacher. No-op for other section types or a section with no teacher.
-    Reads by index so it works with the plain (non-dict) cursors the write endpoints use."""
+    section's teacher. No-op for other section types or a section with no teacher."""
     cur.execute("SELECT type, teacher_id FROM sections WHERE section_id=%s", (section_id,))
-    row = cur.fetchone()
-    if not row:
+    s = fo(cur)
+    if not s:
         return
-    stype, teacher_id = row[0], row[1]
-    col = _SHADOW_COL.get(stype)
-    if not col or not teacher_id:
+    col = _SHADOW_COL.get(s["type"])
+    if not col or not s["teacher_id"]:
         return
     cur.execute(
         f"""UPDATE students SET {col}=%s, updated_at=NOW()
             WHERE student_id IN (SELECT student_id FROM section_enrollments WHERE section_id=%s)""",
-        (teacher_id, section_id),
+        (s["teacher_id"], section_id),
     )
 
 
@@ -6429,15 +6657,15 @@ def api_section_roster_remove(section_id, student_id):
     try:
         with conn.cursor() as cur:
             # For homeroom/advisory, clear the student's shadow column when removed.
-            cur.execute("SELECT type FROM sections WHERE section_id=%s", (section_id,))
-            row = cur.fetchone()
-            stype = row[0] if row else None
+            cur.execute("SELECT type, teacher_id FROM sections WHERE section_id=%s", (section_id,))
+            s = fo(cur)
             cur.execute("DELETE FROM section_enrollments WHERE section_id=%s AND student_id=%s",
                         (section_id, student_id))
-            col = _SHADOW_COL.get(stype)
-            if col:
-                cur.execute(f"UPDATE students SET {col}=NULL, updated_at=NOW() WHERE student_id=%s",
-                            (student_id,))
+            if s:
+                col = _SHADOW_COL.get(s["type"])
+                if col:
+                    cur.execute(f"UPDATE students SET {col}=NULL, updated_at=NOW() WHERE student_id=%s",
+                                (student_id,))
             conn.commit()
             return jsonify({"success": True})
     except Exception as e:

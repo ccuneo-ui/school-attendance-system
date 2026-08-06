@@ -1,5 +1,7 @@
 # Changelog
 
+2026-08-05: Staff permissions are now per-page within each silo. In the staff editor, tick a whole silo ("select all") or individual pages, and page access is enforced on the server (not just hidden on the home screen). Added an "effective superadmin" tier: holders can access every page and manage everyone's permissions, and can promote/demote other effective superadmins. Closed a privilege-escalation gap — changing permissions now requires permission-management authority, no one can change their own permissions, and the superadmin account can't be modified or deleted. Existing staff are auto-migrated from the old three flags so no one loses access (daily-input pages, which were open to all staff, stay that way and can now be restricted per person; billing pages are now properly enforced).
+
 2026-08-05: Fixed an error ("dictionary update sequence element…") when creating a class or editing a roster — the homeroom/advisory sync now reads the section correctly on the write path.
 
 2026-08-05: New Classes page (People section) — create and manage homeroom, advisory, subject, and elective classes in one place: set each class's teacher (active staff only), room, term, and grade, and build its roster (add students filtered by grade, or remove them). Adding/removing students on a homeroom or advisory class also updates that student's homeroom/advisory on their record. New Rooms page manages the room list that feeds the class dropdowns (add, rename, activate/deactivate).

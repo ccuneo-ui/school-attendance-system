@@ -79,13 +79,28 @@
     label { font-size: 12px; font-weight: 500; color: var(--muted); letter-spacing: 0.04em; text-transform: uppercase; }
     input[type=text], input[type=email], select, textarea { padding: 9px 12px; border: 1px solid var(--light); border-radius: 8px; font-size: 13px; font-family: 'DM Sans', sans-serif; color: var(--navy); background: #fff; outline: none; transition: border-color 0.15s; }
     input:focus, select:focus, textarea:focus { border-color: var(--navy); }
-    .permissions-group { display: flex; flex-direction: column; gap: 10px; margin-top: 4px; }
+    .permissions-group { display: flex; flex-direction: column; gap: 14px; margin-top: 4px; }
     .perm-item { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid var(--light); border-radius: 8px; cursor: pointer; }
     .perm-item:hover { border-color: var(--navy); background: #faf8f5; }
     .perm-item input[type=checkbox] { width: 15px; height: 15px; accent-color: var(--navy); cursor: pointer; }
     .perm-label { flex: 1; }
     .perm-label strong { font-size: 13px; font-weight: 500; display: block; }
     .perm-label span { font-size: 11px; color: var(--muted); }
+    /* Per-page permission silos */
+    .perm-silo { border: 1px solid var(--light); border-radius: 10px; overflow: hidden; }
+    .perm-silo-head { display: flex; align-items: center; gap: 10px; padding: 10px 12px; background: #f9f7f4; border-bottom: 1px solid var(--light); cursor: pointer; }
+    .perm-silo-head input[type=checkbox] { width: 15px; height: 15px; accent-color: var(--navy); cursor: pointer; }
+    .perm-silo-head strong { font-size: 12px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--navy); }
+    .perm-silo-head .perm-silo-hint { margin-left: auto; font-size: 11px; color: var(--muted); }
+    .perm-pages { display: flex; flex-direction: column; padding: 6px 12px 10px 34px; gap: 2px; }
+    .perm-page { display: flex; align-items: center; gap: 9px; padding: 6px 4px; font-size: 13px; cursor: pointer; border-radius: 6px; }
+    .perm-page:hover { background: #faf8f5; }
+    .perm-page input[type=checkbox] { width: 14px; height: 14px; accent-color: var(--navy); cursor: pointer; }
+    .perm-admin { display: flex; align-items: flex-start; gap: 10px; padding: 12px; border: 1px solid #d9c48a; background: #fbf6e8; border-radius: 10px; cursor: pointer; }
+    .perm-admin input[type=checkbox] { width: 16px; height: 16px; margin-top: 1px; accent-color: var(--gold); cursor: pointer; }
+    .perm-admin .perm-label strong { color: #7a5a10; }
+    .perm-locked-note { font-size: 12px; color: var(--muted); background: #f9f7f4; border: 1px dashed var(--light); border-radius: 8px; padding: 10px 12px; }
+    .permissions-group[data-locked="1"] { opacity: 0.65; }
     .modal-footer { display: flex; gap: 10px; justify-content: flex-end; margin-top: 28px; padding-top: 20px; border-top: 1px solid var(--light); }
     .toast { position: fixed; bottom: 24px; right: 24px; background: var(--navy); color: #fff; padding: 12px 20px; border-radius: 10px; font-size: 13px; font-weight: 500; z-index: 200; transform: translateY(80px); opacity: 0; transition: all 0.3s ease; pointer-events: none; }
     .toast.show { transform: translateY(0); opacity: 1; }
@@ -198,30 +213,8 @@
           <input type="text" id="staffRole" placeholder="e.g. Fourth Grade Homeroom Teacher">
         </div>
         <div class="form-group full">
-          <label>Permissions</label>
-          <div class="permissions-group">
-            <label class="perm-item">
-              <input type="checkbox" id="permAttendance">
-              <div class="perm-label">
-                <strong>Record Attendance</strong>
-                <span>Can access Daily Ops (dismissal planner)</span>
-              </div>
-            </label>
-            <label class="perm-item">
-              <input type="checkbox" id="permPeople">
-              <div class="perm-label">
-                <strong>Manage People</strong>
-                <span>Can access the People / Staff Management section</span>
-              </div>
-            </label>
-            <label class="perm-item">
-              <input type="checkbox" id="permBilling">
-              <div class="perm-label">
-                <strong>Manage Billing</strong>
-                <span>Can access billing reports and financial data</span>
-              </div>
-            </label>
-          </div>
+          <label>Permissions <span style="text-transform:none;letter-spacing:0;font-weight:400;">— tick a whole silo, or individual pages</span></label>
+          <div class="permissions-group" id="permsContainer"></div>
         </div>
       </div>
       <div class="modal-footer">
@@ -237,6 +230,129 @@
 <script>
   let allStaff = [];
   let editingId = null;
+  let ME = { is_superadmin:false, can_manage_permissions:false, email:'' };
+
+  // Mirrors PERMISSION_SILOS in app.py. Keep in sync if pages are added.
+  const PERM_SILOS = [
+    { key:'daily_input', label:'Daily Input', pages:[
+      ['homeroom_attendance','Homeroom Attendance'],
+      ['daily_ops','Daily Ops'],
+      ['mcard','M Card Snack Tracker'],
+      ['program_attendance','Program Attendance'],
+      ['aftercare','Before & Aftercare'],
+      ['school_store','School Store'],
+      ['dismissal_options','Activities & Bus Routes'],
+    ]},
+    { key:'people', label:'People', pages:[
+      ['students','Student Directory'],
+      ['family_manager','Family Manager'],
+      ['staff_directory','Staff Directory'],
+      ['classes','Classes'],
+      ['rooms','Rooms'],
+    ]},
+    { key:'billing', label:'Billing', pages:[
+      ['billing_rates','Billing Rates'],
+      ['school_calendar','School Calendar'],
+      ['lunch_dashboard','Lunch Dashboard'],
+      ['billing_report','Billing Reports'],
+      ['financial_aid','Financial Aid'],
+    ]},
+  ];
+  const DAILY_BASICS = PERM_SILOS[0].pages.map(p=>p[0]).filter(k=>k!=='dismissal_options');
+
+  async function loadMe() {
+    try {
+      const r = await fetch('/api/session');
+      if (r.ok) {
+        const s = await r.json();
+        ME.is_superadmin = !!s.is_superadmin;
+        ME.can_manage_permissions = !!s.can_manage_permissions;
+        ME.email = (s.email || '').toLowerCase();
+      }
+    } catch(e) {}
+  }
+
+  function buildPermsUI() {
+    const c = document.getElementById('permsContainer');
+    let html = '';
+    PERM_SILOS.forEach(silo => {
+      html += `<div class="perm-silo">
+        <label class="perm-silo-head">
+          <input type="checkbox" class="perm-silo-check" data-silo="${silo.key}" onchange="onSiloToggle('${silo.key}')">
+          <strong>${silo.label}</strong>
+          <span class="perm-silo-hint">select all</span>
+        </label>
+        <div class="perm-pages">
+          ${silo.pages.map(p => `<label class="perm-page">
+            <input type="checkbox" class="perm-page-check" data-silo="${silo.key}" data-key="${p[0]}" onchange="onPageToggle('${silo.key}')">
+            ${p[1]}
+          </label>`).join('')}
+        </div>
+      </div>`;
+    });
+    html += `<label class="perm-admin" id="permAdminWrap" style="display:none;">
+      <input type="checkbox" id="permAdmin">
+      <div class="perm-label">
+        <strong>Effective Superadmin</strong>
+        <span>Can access every page and manage everyone's permissions. Grant only to trusted admins.</span>
+      </div>
+    </label>`;
+    html += `<div class="perm-locked-note" id="permLockedNote" style="display:none;"></div>`;
+    c.innerHTML = html;
+  }
+
+  function onSiloToggle(siloKey) {
+    const master = document.querySelector(`.perm-silo-check[data-silo="${siloKey}"]`);
+    document.querySelectorAll(`.perm-page-check[data-silo="${siloKey}"]`).forEach(cb => cb.checked = master.checked);
+    master.indeterminate = false;
+  }
+  function onPageToggle(siloKey) {
+    const pages = [...document.querySelectorAll(`.perm-page-check[data-silo="${siloKey}"]`)];
+    const master = document.querySelector(`.perm-silo-check[data-silo="${siloKey}"]`);
+    master.checked = pages.every(cb => cb.checked);
+    master.indeterminate = !master.checked && pages.some(cb => cb.checked);
+  }
+
+  function setPermsUI(keys, canManagePerms, lockReason) {
+    const set = new Set(keys || []);
+    document.querySelectorAll('.perm-page-check').forEach(cb => { cb.checked = set.has(cb.dataset.key); });
+    PERM_SILOS.forEach(s => onPageToggle(s.key));
+    document.getElementById('permAdmin').checked = !!canManagePerms;
+    // Anyone who can manage permissions may grant/revoke effective-superadmin.
+    const canGrantAdmin = ME.is_superadmin || ME.can_manage_permissions;
+    document.getElementById('permAdminWrap').style.display = canGrantAdmin ? '' : 'none';
+    applyPermLock(lockReason);
+  }
+
+  function applyPermLock(reason) {
+    const grp = document.getElementById('permsContainer');
+    const note = document.getElementById('permLockedNote');
+    const canEdit = (ME.is_superadmin || ME.can_manage_permissions) && !reason;
+    grp.querySelectorAll('input[type=checkbox]').forEach(cb => { cb.disabled = !canEdit; });
+    const adminBox = document.getElementById('permAdmin');
+    if (adminBox) adminBox.disabled = !canEdit;
+    grp.dataset.locked = canEdit ? '0' : '1';
+    if (!canEdit) {
+      note.style.display = '';
+      note.textContent = reason || 'Only the superadmin or an effective-superadmin can change permissions. You can still edit profile details.';
+    } else {
+      note.style.display = 'none';
+    }
+  }
+
+  function getSelectedPerms() {
+    return [...document.querySelectorAll('.perm-page-check')].filter(cb => cb.checked).map(cb => cb.dataset.key);
+  }
+
+  function permSummary(s) {
+    if (s.can_manage_permissions) return '<span style="color:#7a5a10;font-weight:500;">Effective Superadmin</span>';
+    const keys = new Set(s.permissions || []);
+    const parts = PERM_SILOS.map(silo => {
+      const n = silo.pages.filter(p => keys.has(p[0])).length;
+      return n ? `${silo.label} (${n}/${silo.pages.length})` : null;
+    }).filter(Boolean);
+    return parts.length ? parts.join(', ') : '—';
+  }
 
   async function loadStaff() {
     try {
@@ -262,8 +378,8 @@
         <td><span class="role-badge role-${s.role || 'staff'}">${capitalize(s.role || 'staff')}</span></td>
         <td style="font-size:12px;color:var(--muted);max-width:200px;">${s.title || '—'}</td>
         <td><span class="status-dot status-${s.status}"></span>${capitalize(s.status)}</td>
-        <td style="font-size:12px;color:var(--muted);">
-          ${[s.can_record_attendance ? 'Attendance' : '', s.can_manage_people ? 'People' : '', s.can_manage_billing ? 'Billing' : ''].filter(Boolean).join(', ') || '—'}
+        <td style="font-size:12px;color:var(--muted);max-width:240px;">
+          ${permSummary(s)}
         </td>
         <td>
           <div class="actions">
@@ -297,6 +413,8 @@
     document.getElementById('submitBtn').textContent = 'Add Staff Member';
     document.getElementById('staffForm').reset();
     document.getElementById('staffId').value = '';
+    // New staff default to the everyday daily-input pages; an admin can adjust.
+    setPermsUI(DAILY_BASICS, false, null);
     document.getElementById('modalOverlay').classList.add('open');
   }
 
@@ -313,9 +431,15 @@
     document.getElementById('role').value = s.role || 'staff';
     document.getElementById('status').value = s.status || 'active';
     document.getElementById('staffRole').value = s.title || '';
-    document.getElementById('permAttendance').checked = !!s.can_record_attendance;
-    document.getElementById('permPeople').checked = !!s.can_manage_people;
-    document.getElementById('permBilling').checked = !!s.can_manage_billing;
+    // Decide whether the permission controls are editable for this row.
+    const targetEmail = (s.email || '').toLowerCase();
+    let lockReason = null;
+    if (targetEmail && targetEmail === ME.email) {
+      lockReason = "You can't change your own permissions. Ask another admin or the superadmin.";
+    } else if (targetEmail === 'ccuneo@mizzentop.org') {
+      lockReason = 'The superadmin always has full access; these can\'t be changed here.';
+    }
+    setPermsUI(s.permissions, s.can_manage_permissions, lockReason);
     document.getElementById('modalOverlay').classList.add('open');
   }
 
@@ -344,10 +468,17 @@
       role: document.getElementById('role').value,
       status: document.getElementById('status').value,
       title: document.getElementById('staffRole').value.trim(),
-      can_record_attendance: document.getElementById('permAttendance').checked ? 1 : 0,
-      can_manage_people: document.getElementById('permPeople').checked ? 1 : 0,
-      can_manage_billing: document.getElementById('permBilling').checked ? 1 : 0,
     };
+    // Only send permission fields when they're unlocked (editor may manage
+    // permissions, and it isn't their own row or the superadmin). The server
+    // enforces the same rules regardless.
+    const permsUnlocked = document.getElementById('permsContainer').dataset.locked === '0';
+    if (permsUnlocked) {
+      payload.permissions = getSelectedPerms();
+      if (ME.is_superadmin || ME.can_manage_permissions) {
+        payload.can_manage_permissions = document.getElementById('permAdmin').checked ? 1 : 0;
+      }
+    }
     const url = id ? `/api/people/staff/${id}` : '/api/people/staff';
     const method = id ? 'PUT' : 'POST';
     try {
@@ -393,7 +524,11 @@
     setTimeout(() => t.className = 'toast', 3000);
   }
 
-  loadStaff();
+  (async function init() {
+    await loadMe();
+    buildPermsUI();
+    loadStaff();
+  })();
 </script>
 </body>
 </html>

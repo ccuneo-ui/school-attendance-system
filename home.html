@@ -56,7 +56,7 @@
 
   <div class="cards">
     <!-- ADMIN -->
-    <div class="card card-admin">
+    <div class="card card-admin" data-silo="daily_input">
       <span class="card-badge">Staff Input</span>
       <svg class="card-icon" viewBox="0 0 24 24" fill="none">
         <rect x="3" y="4" width="18" height="16" rx="2" stroke="white" stroke-width="1.5"/>
@@ -67,31 +67,31 @@
       <h2>Daily Input</h2>
       <p>Daily input tools for recording attendance, snack cart charges, and managing dismissal plans.</p>
       <div class="card-links">
-        <a class="card-link" href="/homeroom-attendance">
+        <a class="card-link" href="/homeroom-attendance" data-perm="homeroom_attendance">
           <svg viewBox="0 0 24 24" fill="none"><path d="M9 11l3 3L22 4" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
           Homeroom Attendance
         </a>
-        <a class="card-link" href="/dismissal">
+        <a class="card-link" href="/dismissal" data-perm="daily_ops">
           <svg viewBox="0 0 24 24" fill="none"><path d="M3 12h18M3 6h18M3 18h12" stroke="white" stroke-width="2" stroke-linecap="round"/></svg>
           Daily Ops
         </a>
-        <a class="card-link" href="/mcard">
+        <a class="card-link" href="/mcard" data-perm="mcard">
           <svg viewBox="0 0 24 24" fill="none"><rect x="2" y="5" width="20" height="14" rx="2" stroke="white" stroke-width="2"/><path d="M2 10h20" stroke="white" stroke-width="2"/></svg>
           M Card Snack Tracker
         </a>
-        <a class="card-link" href="/program-attendance">
+        <a class="card-link" href="/program-attendance" data-perm="program_attendance">
           <svg viewBox="0 0 24 24" fill="none"><path d="M4 19.5A2.5 2.5 0 016.5 17H20" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M9 7h6M9 11h4" stroke="white" stroke-width="2" stroke-linecap="round"/></svg>
           Program Attendance
         </a>
-        <a class="card-link" href="/aftercare">
+        <a class="card-link" href="/aftercare" data-perm="aftercare">
           <svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="white" stroke-width="2"/><path d="M12 6v6l4 2" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
           Before &amp; Aftercare
         </a>
-        <a class="card-link" href="/school-store">
+        <a class="card-link" href="/school-store" data-perm="school_store">
           <svg viewBox="0 0 24 24" fill="none"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M3 6h18" stroke="white" stroke-width="2"/><path d="M16 10a4 4 0 01-8 0" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
           School Store
         </a>
-        <a class="card-link" href="/dismissal-options">
+        <a class="card-link" href="/dismissal-options" data-perm="dismissal_options">
           <svg viewBox="0 0 24 24" fill="none"><path d="M3 12h18M3 6h18M3 18h12" stroke="white" stroke-width="2" stroke-linecap="round"/></svg>
           Activities & Bus Routes
         </a>
@@ -129,7 +129,7 @@
 
 
     <!-- PEOPLE -->
-    <div class="card" id="card-people" style="background-color:#3a5a7a; display:none;">
+    <div class="card" id="card-people" data-silo="people" style="background-color:#3a5a7a; display:none;">
       <span class="card-badge">Records</span>
       <svg class="card-icon" viewBox="0 0 24 24" fill="none">
         <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" stroke="white" stroke-width="1.5" stroke-linecap="round"/>
@@ -139,23 +139,23 @@
       <h2>People</h2>
       <p>Manage student and staff records, roles, and system permissions. Edit profiles, update status, and control access levels.</p>
       <div class="card-links">
-        <a class="card-link" href="/students">
+        <a class="card-link" href="/students" data-perm="students">
           <svg viewBox="0 0 24 24" fill="none"><path d="M12 14l9-5-9-5-9 5 9 5z" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 14l6.16-3.422a12 12 0 01.84 5.772A12 12 0 0112 21a12 12 0 01-7-4.65 12 12 0 01.84-5.772L12 14z" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
           Student Directory
         </a>
-        <a class="card-link" href="/family-manager">
+        <a class="card-link" href="/family-manager" data-perm="family_manager">
           <svg viewBox="0 0 24 24" fill="none"><path d="M3 21v-2a4 4 0 014-4h4a4 4 0 014 4v2" stroke="white" stroke-width="2" stroke-linecap="round"/><circle cx="9" cy="7" r="3.5" stroke="white" stroke-width="2"/><path d="M17.5 10.5l1.8 1.8 3-3.2" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
           Family Manager
         </a>
-        <a class="card-link" href="/staff">
+        <a class="card-link" href="/staff" data-perm="staff_directory">
           <svg viewBox="0 0 24 24" fill="none"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" stroke="white" stroke-width="2" stroke-linecap="round"/><circle cx="9" cy="7" r="4" stroke="white" stroke-width="2"/></svg>
           Staff Directory
         </a>
-        <a class="card-link" href="/classes">
+        <a class="card-link" href="/classes" data-perm="classes">
           <svg viewBox="0 0 24 24" fill="none"><path d="M4 19.5A2.5 2.5 0 016.5 17H20" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
           Classes
         </a>
-        <a class="card-link" href="/rooms">
+        <a class="card-link" href="/rooms" data-perm="rooms">
           <svg viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="18" height="18" rx="2" stroke="white" stroke-width="2"/><path d="M3 9h18M9 21V9" stroke="white" stroke-width="2" stroke-linecap="round"/></svg>
           Rooms
         </a>
@@ -163,7 +163,7 @@
     </div>
 
     <!-- BILLING -->
-    <div class="card card-billing" id="card-billing" style="display:none;">
+    <div class="card card-billing" id="card-billing" data-silo="billing" style="display:none;">
       <span class="card-badge">Finance Access</span>
       <svg class="card-icon" viewBox="0 0 24 24" fill="none">
         <path d="M12 2v20M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
@@ -171,23 +171,23 @@
       <h2>Billing</h2>
       <p>Configure billing rates and generate reports for M Card charges, program attendance, and before &amp; aftercare.</p>
       <div class="card-links">
-        <a class="card-link" href="/billing-rates">
+        <a class="card-link" href="/billing-rates" data-perm="billing_rates">
           <svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="white" stroke-width="2"/><path d="M12 6v12M15 9.5H10.5a2.5 2.5 0 000 5H14a2.5 2.5 0 010 5H9" stroke="white" stroke-width="2" stroke-linecap="round"/></svg>
           Billing Rates
         </a>
-        <a class="card-link" href="/school-calendar">
+        <a class="card-link" href="/school-calendar" data-perm="school_calendar">
           <svg viewBox="0 0 24 24" fill="none"><rect x="3" y="5" width="18" height="16" rx="2" stroke="white" stroke-width="2"/><path d="M3 9h18M8 3v4M16 3v4" stroke="white" stroke-width="2" stroke-linecap="round"/></svg>
           School Calendar
         </a>
-        <a class="card-link" href="/lunch-dashboard">
+        <a class="card-link" href="/lunch-dashboard" data-perm="lunch_dashboard">
           <svg viewBox="0 0 24 24" fill="none"><path d="M3 11h18M5 11V7a2 2 0 012-2h10a2 2 0 012 2v4M4 11h16v2a6 6 0 01-6 6h-4a6 6 0 01-6-6v-2z" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
           Lunch Dashboard
         </a>
-        <a class="card-link" href="/billing-report">
+        <a class="card-link" href="/billing-report" data-perm="billing_report">
           <svg viewBox="0 0 24 24" fill="none"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" stroke="white" stroke-width="2"/><polyline points="14 2 14 8 20 8" stroke="white" stroke-width="2"/></svg>
           Billing Reports
         </a>
-        <a class="card-link" href="/financial-aid">
+        <a class="card-link" href="/financial-aid" data-perm="financial_aid">
           <svg viewBox="0 0 24 24" fill="none"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
           Financial Aid
         </a>
@@ -202,9 +202,20 @@
 </div>
 <script>
 fetch('/api/session').then(r=>r.json()).then(s=>{
-  if(s.can_manage_people||s.is_superadmin) document.getElementById('card-people').style.display='';
-  if(s.can_manage_billing||s.is_superadmin) document.getElementById('card-billing').style.display='';
-});
+  const all = !!(s.is_superadmin || s.can_manage_permissions);
+  const perms = new Set(s.permissions || []);
+  const can = k => all || perms.has(k);
+  // Hide individual page links the user can't access.
+  document.querySelectorAll('.card-link[data-perm]').forEach(a=>{
+    if(!can(a.dataset.perm)) a.style.display='none';
+  });
+  // Show or hide each gated silo card based on whether any link remains.
+  document.querySelectorAll('.card[data-silo]').forEach(card=>{
+    const links = [...card.querySelectorAll('.card-link[data-perm]')];
+    const anyVisible = links.some(a=>a.style.display!=='none');
+    card.style.display = anyVisible ? '' : 'none';
+  });
+}).catch(()=>{});
 </script>
 </body>
 </html>
