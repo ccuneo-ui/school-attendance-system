@@ -67,6 +67,15 @@
   .toast{position:fixed;bottom:24px;right:24px;background:var(--navy);color:#fff;padding:12px 20px;border-radius:10px;font-size:13px;font-weight:500;transform:translateY(80px);opacity:0;transition:all .3s;pointer-events:none;z-index:200;}
   .toast.show{transform:translateY(0);opacity:1;}
   .toast.error{background:var(--danger);}
+  .tabs{display:flex;gap:2px;margin-bottom:18px;border-bottom:1px solid var(--light);}
+  .tab{background:none;border:none;font-family:inherit;font-size:14px;font-weight:500;color:var(--muted);padding:10px 16px;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;}
+  .tab.active{color:var(--navy);border-bottom-color:var(--navy);}
+  .cohort-warn{background:#fff8e6;border:1px solid #f0d98a;color:#7a5a10;padding:10px 14px;border-radius:8px;font-size:12.5px;margin-bottom:12px;line-height:1.5;}
+  .co-list{background:#fff;border:1px solid var(--light);border-radius:12px;padding:10px;max-height:62vh;overflow-y:auto;}
+  .co-row{border-left:4px solid var(--light);}
+  .co-row.co-gold{border-left-color:var(--gold);}
+  .co-row.co-blue{border-left-color:#2f6fb0;}
+  .co-row select{padding:4px 8px;}
 </style>
 </head>
 <body>
@@ -78,6 +87,12 @@
   <h1>Classes</h1>
   <div class="sub">Every homeroom, advisory, and subject class in one place. Open one to set its teacher and room and manage its roster. <span id="yearLabel"></span></div>
 
+  <div class="tabs">
+    <button class="tab active" id="tab-classes" onclick="showView('classes')">Classes</button>
+    <button class="tab" id="tab-cohorts" onclick="showView('cohorts')">Gold &amp; Blue</button>
+  </div>
+
+  <div id="view-classes">
   <div class="toolbar">
     <div>
       <label class="fld">Type</label>
@@ -96,6 +111,30 @@
   <div class="layout">
     <div class="list" id="secList"><div class="sec-item"><span class="muted">Loading…</span></div></div>
     <div class="panel" id="panel"><div class="empty">Select a class on the left, or create a new one.</div></div>
+  </div>
+  </div><!-- /view-classes -->
+
+  <div id="view-cohorts" style="display:none;">
+    <div class="toolbar">
+      <div>
+        <label class="fld">Grade</label>
+        <select id="co-grade" onchange="loadCohort()"></select>
+      </div>
+      <div class="spacer"></div>
+      <button class="btn btn-ghost btn-sm" onclick="setAllColor('gold')">All Gold</button>
+      <button class="btn btn-ghost btn-sm" onclick="setAllColor('blue')">All Blue</button>
+      <button class="btn btn-ghost btn-sm" onclick="setAllColor('')">All None</button>
+      <button class="btn btn-ghost" onclick="saveColors()">Save colors</button>
+      <button class="btn btn-primary" onclick="populate()">Auto-populate rosters</button>
+    </div>
+    <div class="cohort-warn">
+      <b>Set each student's color for the grade, then Auto-populate.</b> Gold students fill every Gold class,
+      Blue fill every Blue class, and whole-grade or ungrouped classes get the whole grade. Auto-populate
+      <b>overwrites</b> the rosters of this grade's subject classes, so any by-hand roster edits made since the
+      last run are replaced. 7th White math is left untouched. Use <b>None</b> for grades that don't split.
+    </div>
+    <div id="co-summary" class="muted" style="margin:0 2px 12px;"></div>
+    <div class="co-list" id="coList"><div class="muted" style="padding:10px;">Pick a grade to begin.</div></div>
   </div>
 </div>
 
@@ -148,6 +187,68 @@
   const TERMS={year:'Full year',t1:'Trimester 1',t2:'Trimester 2',t3:'Trimester 3'};
 
   const S={opts:null,sections:[],selId:null,roster:[]};
+  const CO={inited:false};
+
+  // ---- Tabs ----
+  let currentView='classes';
+  function showView(v){
+    currentView=v;
+    document.getElementById('view-classes').style.display = v==='classes'?'':'none';
+    document.getElementById('view-cohorts').style.display = v==='cohorts'?'':'none';
+    document.getElementById('tab-classes').classList.toggle('active', v==='classes');
+    document.getElementById('tab-cohorts').classList.toggle('active', v==='cohorts');
+    if(v==='cohorts' && !CO.inited){ CO.inited=true; initCohorts(); }
+  }
+
+  // ---- Gold & Blue ----
+  function initCohorts(){
+    document.getElementById('co-grade').innerHTML =
+      '<option value="">Select…</option>'+(S.opts.grades||[]).map(g=>`<option value="${esc(g)}">${esc(g)}</option>`).join('');
+  }
+  async function loadCohort(){
+    const g=document.getElementById('co-grade').value;
+    const list=document.getElementById('coList'), sum=document.getElementById('co-summary');
+    if(!g){ list.innerHTML='<div class="muted" style="padding:10px;">Pick a grade to begin.</div>'; sum.textContent=''; return; }
+    let data;
+    try{ data=await api('/api/cohorts/'+encodeURIComponent(g)); }
+    catch(e){ list.innerHTML='<div class="muted" style="padding:10px;">Could not load.</div>'; return; }
+    const b=data.sections||{}, parts=[];
+    if((b.gold||[]).length||(b.blue||[]).length) parts.push(`${(b.gold||[]).length} Gold / ${(b.blue||[]).length} Blue`);
+    if((b.whole||[]).length) parts.push(`${b.whole.length} whole-grade`);
+    if((b.plain||[]).length) parts.push(`${b.plain.length} ungrouped`);
+    if((b.white||[]).length) parts.push(`${b.white.length} White (left as-is)`);
+    sum.textContent = `${data.students.length} students · ${parts.join(' · ')||'no subject classes for this grade yet'}`;
+    list.innerHTML = data.students.length
+      ? data.students.map(coRow).join('')
+      : '<div class="muted" style="padding:10px;">No active students in this grade.</div>';
+  }
+  function coRow(s){
+    const v=s.cohort_color||'';
+    return `<div class="chip co-row co-${v||'none'}">
+      <span>${esc(s.last_name)}, ${esc(s.first_name)}</span>
+      <select class="co-pick" data-sid="${s.student_id}" onchange="onPick(this)">
+        <option value="" ${v===''?'selected':''}>None</option>
+        <option value="gold" ${v==='gold'?'selected':''}>Gold</option>
+        <option value="blue" ${v==='blue'?'selected':''}>Blue</option>
+      </select></div>`;
+  }
+  function onPick(sel){ sel.closest('.co-row').className='chip co-row co-'+(sel.value||'none'); }
+  function setAllColor(v){ document.querySelectorAll('#coList .co-pick').forEach(s=>{s.value=v;onPick(s);}); }
+  function collectColors(){ const o={}; document.querySelectorAll('#coList .co-pick').forEach(s=>{o[s.dataset.sid]=s.value||null;}); return o; }
+  async function saveColors(){
+    const g=document.getElementById('co-grade').value; if(!g){toast('Pick a grade',true);return;}
+    try{ await api('/api/cohorts/'+encodeURIComponent(g),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({colors:collectColors()})});
+      toast('Colors saved'); }
+    catch(e){ toast(e.message||'Could not save',true); }
+  }
+  async function populate(){
+    const g=document.getElementById('co-grade').value; if(!g){toast('Pick a grade',true);return;}
+    if(!confirm(`Auto-populate ${g}-grade rosters from these colors?\n\nThis OVERWRITES the rosters of this grade's subject classes. Any by-hand roster changes since the last populate will be replaced. 7th White math is left untouched.`)) return;
+    try{ const r=await api('/api/cohorts/'+encodeURIComponent(g)+'/populate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({colors:collectColors()})});
+      toast(`Populated ${r.sections_updated} classes · ${r.placements} placements`);
+      if(currentView==='classes') loadSections();
+    }catch(e){ toast(e.message||'Could not populate',true); }
+  }
 
   function teacherOptions(sel){return '<option value="">— none —</option>'+S.opts.teachers.map(t=>`<option value="${t.staff_id}" ${t.staff_id==sel?'selected':''}>${esc(t.name)}</option>`).join('');}
   function roomOptions(sel){return '<option value="">— none —</option>'+S.opts.rooms.map(r=>`<option value="${r.room_id}" ${r.room_id==sel?'selected':''}>${esc(r.name)}</option>`).join('');}

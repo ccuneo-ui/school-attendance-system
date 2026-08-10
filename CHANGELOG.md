@@ -1,5 +1,7 @@
 # Changelog
 
+2026-08-10: Classes page has a new "Gold & Blue" tab for assigning each student a grade split color (Gold, Blue, or None) and auto-populating rosters from it in one step — Gold students fill every Gold class, Blue every Blue class, and whole-grade/ungrouped classes get the whole grade. Populate overwrites the grade's subject-class rosters (a start-of-year setup action); 7th White math and homeroom/advisory classes are left untouched. Individual rosters remain hand-editable for exceptions.
+
 2026-08-05: Staff permissions are now per-page within each silo. In the staff editor, tick a whole silo ("select all") or individual pages, and page access is enforced on the server (not just hidden on the home screen). Added an "effective superadmin" tier: holders can access every page and manage everyone's permissions, and can promote/demote other effective superadmins. Closed a privilege-escalation gap — changing permissions now requires permission-management authority, no one can change their own permissions, and the superadmin account can't be modified or deleted. Existing staff are auto-migrated from the old three flags so no one loses access (daily-input pages, which were open to all staff, stay that way and can now be restricted per person; billing pages are now properly enforced).
 
 2026-08-05: Fixed an error ("dictionary update sequence element…") when creating a class or editing a roster — the homeroom/advisory sync now reads the section correctly on the write path.

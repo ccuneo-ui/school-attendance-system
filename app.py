@@ -747,6 +747,37 @@ def init_db():
             if not cur.fetchone():
                 cur.execute("ALTER TABLE students ADD COLUMN advisory_teacher_id INTEGER REFERENCES staff(staff_id)")
 
+            # Add cohort_color to students if missing. Holds a per-student Gold/Blue split
+            # assignment ('gold' | 'blue' | NULL) used by the "Gold & Blue" tab on the
+            # Classes page to bulk-populate subject-class rosters. Convenience default only —
+            # section_enrollments stays the source of truth, so any roster can still be
+            # hand-edited afterward.
+            cur.execute("ALTER TABLE students ADD COLUMN IF NOT EXISTS cohort_color TEXT")
+
+            # Add student health/safety + emergency-contact fields if missing (teacher dashboard)
+            for col, typedef in [('allergies', 'TEXT'), ('medical_alert', 'TEXT'),
+                                 ('medications', 'TEXT'), ('dietary', 'TEXT'),
+                                 ('emergency_contact_name', 'TEXT'), ('emergency_contact_phone', 'TEXT')]:
+                cur.execute("""
+                    SELECT column_name FROM information_schema.columns
+                    WHERE table_name='students' AND column_name=%s
+                """, (col,))
+                if not cur.fetchone():
+                    cur.execute(f"ALTER TABLE students ADD COLUMN {col} {typedef}")
+
+            # Student notes (teacher dashboard)
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS student_notes (
+                    note_id         SERIAL PRIMARY KEY,
+                    student_id      INTEGER NOT NULL REFERENCES students(student_id) ON DELETE CASCADE,
+                    author_staff_id INTEGER REFERENCES staff(staff_id) ON DELETE SET NULL,
+                    author_name     TEXT,
+                    body            TEXT NOT NULL,
+                    created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+            cur.execute("CREATE INDEX IF NOT EXISTS idx_student_notes_student ON student_notes(student_id)")
+
             # Add trimester, instructor_id, division columns to electives if missing
             for col, typedef in [('trimester', 'INTEGER'), ('instructor_id', 'INTEGER REFERENCES staff(staff_id)'), ('division', 'TEXT')]:
                 cur.execute("""
@@ -831,6 +862,10 @@ def init_db():
 @app.route("/")
 @login_required
 def index():
+    # Teachers (anyone with an assigned section or a homeroom this year) land on
+    # their own dashboard. Superadmin and office staff keep the portal home.
+    if not session.get("is_superadmin") and _staff_is_teacher(session.get("user_email")):
+        return redirect("/my-classroom")
     return send_from_directory(".", "home.html")
 
 @app.route("/login")
@@ -1801,6 +1836,232 @@ def save_homeroom_attendance():
         return jsonify({"error": str(e)}), 500
     finally:
         conn.close()
+
+# ============================================
+# TEACHER DASHBOARD ("My Classroom")
+# ============================================
+
+def _staff_row_for_email(cur, email):
+    cur.execute("SELECT staff_id, first_name, last_name FROM staff WHERE email=%s AND status='active'", (email,))
+    return fo(cur)
+
+
+def _staff_is_teacher(email):
+    """True if this staff member has any assigned section this year or a homeroom."""
+    if not email:
+        return False
+    conn = get_db_connection()
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            row = _staff_row_for_email(cur, email)
+            if not row:
+                return False
+            sid = row["staff_id"]
+            year = current_school_year_start()
+            cur.execute("SELECT 1 FROM sections WHERE teacher_id=%s AND school_year_start=%s AND active=TRUE LIMIT 1", (sid, year))
+            if cur.fetchone():
+                return True
+            cur.execute("SELECT 1 FROM students WHERE homeroom_teacher_id=%s AND status='active' LIMIT 1", (sid,))
+            return cur.fetchone() is not None
+    except Exception:
+        return False
+    finally:
+        conn.close()
+
+
+@app.route("/my-classroom")
+@login_required
+def my_classroom_page():
+    return send_from_directory(".", "teacher_dashboard.html")
+
+
+@app.route("/portal")
+@login_required
+def staff_portal_page():
+    # Always serves the portal home, even for teachers (who are redirected off "/").
+    return send_from_directory(".", "home.html")
+
+
+@app.route("/api/my-classroom")
+@login_required
+def api_my_classroom():
+    email = session.get("user_email")
+    today = request.args.get("date") or datetime.now().strftime("%Y-%m-%d")
+    conn = get_db_connection()
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            staff = _staff_row_for_email(cur, email)
+            if not staff:
+                return jsonify({"error": "No staff record found for your account."}), 404
+            sid = staff["staff_id"]
+            year = current_school_year_start()
+
+            cur.execute("SELECT program_id FROM programs WHERE program_name='General Attendance' AND status='active' LIMIT 1")
+            prog = fo(cur)
+            prog_id = prog["program_id"] if prog else None
+
+            from datetime import date as _d
+            day_col_map = {"Monday": "dismissal_mon", "Tuesday": "dismissal_tue",
+                           "Wednesday": "dismissal_wed", "Thursday": "dismissal_thu", "Friday": "dismissal_fri"}
+            try:
+                day_name = _d.fromisoformat(today).strftime("%A")
+            except Exception:
+                day_name = "Monday"
+            dcol = day_col_map.get(day_name, "dismissal_mon")
+
+            # Homeroom roster — keyed by homeroom_teacher_id so it matches the attendance system.
+            cur.execute(f"""
+                SELECT s.student_id, s.first_name, s.last_name, s.grade,
+                       s.allergies, s.medical_alert, s.medications, s.dietary,
+                       s.emergency_contact_name, s.emergency_contact_phone,
+                       att.status AS att_status,
+                       COALESCE(d.dismissal_type, s.{dcol}) AS dismissal,
+                       d.destination AS dismissal_dest,
+                       (SELECT COUNT(*) FROM student_notes n WHERE n.student_id = s.student_id) AS note_count
+                FROM students s
+                LEFT JOIN daily_dismissal d ON d.student_id = s.student_id AND d.dismissal_date = %s
+                LEFT JOIN (
+                    SELECT e.student_id, a.status
+                    FROM attendance_records a
+                    JOIN enrollments e ON a.enrollment_id = e.enrollment_id
+                    WHERE e.program_id = %s AND a.attendance_date = %s
+                ) att ON att.student_id = s.student_id
+                WHERE s.homeroom_teacher_id = %s AND s.status = 'active'
+                ORDER BY s.last_name, s.first_name
+            """, (today, prog_id, today, sid))
+            hr_rows = fa(cur)
+
+            homeroom_students = []
+            attendance_taken = False
+            for r in hr_rows:
+                if r.get("att_status"):
+                    attendance_taken = True
+                homeroom_students.append({
+                    "student_id": r["student_id"],
+                    "name": f'{r["first_name"]} {r["last_name"]}',
+                    "grade": r.get("grade") or "",
+                    "allergies": r.get("allergies") or "",
+                    "medical_alert": r.get("medical_alert") or "",
+                    "medications": r.get("medications") or "",
+                    "dietary": r.get("dietary") or "",
+                    "emergency_contact_name": r.get("emergency_contact_name") or "",
+                    "emergency_contact_phone": r.get("emergency_contact_phone") or "",
+                    "att_status": r.get("att_status") or "",
+                    "dismissal": r.get("dismissal") or "",
+                    "dismissal_dest": r.get("dismissal_dest") or "",
+                    "note_count": r.get("note_count") or 0,
+                })
+
+            # Homeroom section meta (name / room), if one is defined in sections.
+            cur.execute("""
+                SELECT sec.name, r.name AS room
+                FROM sections sec LEFT JOIN rooms r ON r.room_id = sec.room_id
+                WHERE sec.teacher_id=%s AND sec.school_year_start=%s AND sec.type='homeroom' AND sec.active=TRUE
+                LIMIT 1
+            """, (sid, year))
+            hm = fo(cur) or {}
+
+            # Non-homeroom sections this teacher is assigned to.
+            cur.execute("""
+                SELECT sec.section_id, sec.name, sec.subject, sec.grade, sec.term, sec.type, r.name AS room
+                FROM sections sec LEFT JOIN rooms r ON r.room_id = sec.room_id
+                WHERE sec.teacher_id=%s AND sec.school_year_start=%s AND sec.active=TRUE AND sec.type <> 'homeroom'
+                ORDER BY sec.type, sec.name
+            """, (sid, year))
+            sec_rows = fa(cur)
+            sections = []
+            for sec in sec_rows:
+                cur.execute("""
+                    SELECT s.student_id, s.first_name, s.last_name, s.grade, s.allergies, s.medical_alert
+                    FROM section_enrollments se JOIN students s ON s.student_id = se.student_id
+                    WHERE se.section_id=%s AND s.status='active'
+                    ORDER BY s.last_name, s.first_name
+                """, (sec["section_id"],))
+                roster = [{
+                    "student_id": x["student_id"],
+                    "name": f'{x["first_name"]} {x["last_name"]}',
+                    "grade": x.get("grade") or "",
+                    "allergies": x.get("allergies") or "",
+                    "medical_alert": x.get("medical_alert") or "",
+                } for x in fa(cur)]
+                sections.append({
+                    "section_id": sec["section_id"],
+                    "name": sec["name"],
+                    "subject": sec.get("subject") or "",
+                    "grade": sec.get("grade") or "",
+                    "term": sec.get("term") or "",
+                    "type": sec.get("type") or "subject",
+                    "room": sec.get("room") or "",
+                    "students": roster,
+                })
+
+            return jsonify({
+                "teacher": {"staff_id": sid, "name": f'{staff["first_name"]} {staff["last_name"]}'},
+                "date": today,
+                "day_name": day_name,
+                "school_year": sy_long(year),
+                "has_homeroom": len(homeroom_students) > 0,
+                "homeroom": {
+                    "name": hm.get("name") or "Homeroom",
+                    "room": hm.get("room") or "",
+                    "attendance_taken": attendance_taken,
+                    "students": homeroom_students,
+                },
+                "sections": sections,
+            })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    finally:
+        conn.close()
+
+
+@app.route("/api/student-notes")
+@login_required
+def api_get_student_notes():
+    student_id = request.args.get("student_id")
+    if not student_id:
+        return jsonify({"error": "student_id required"}), 400
+    conn = get_db_connection()
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute("""
+                SELECT note_id, author_name, body, created_at
+                FROM student_notes WHERE student_id=%s
+                ORDER BY created_at DESC
+            """, (student_id,))
+            return jsonify(fa(cur))
+    finally:
+        conn.close()
+
+
+@app.route("/api/student-notes", methods=["POST"])
+@login_required
+def api_add_student_note():
+    data = request.json or {}
+    student_id = data.get("student_id")
+    body = (data.get("body") or "").strip()
+    if not student_id or not body:
+        return jsonify({"error": "student_id and body are required"}), 400
+    conn = get_db_connection()
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            staff = _staff_row_for_email(cur, session.get("user_email"))
+            author_id = staff["staff_id"] if staff else None
+            author_name = f'{staff["first_name"]} {staff["last_name"]}' if staff else (session.get("user_name") or "")
+            cur.execute("""
+                INSERT INTO student_notes (student_id, author_staff_id, author_name, body)
+                VALUES (%s, %s, %s, %s)
+                RETURNING note_id, author_name, body, created_at
+            """, (student_id, author_id, author_name, body))
+            row = fo(cur)
+            conn.commit()
+            return jsonify({"success": True, "note": row}), 201
+    except Exception as e:
+        conn.rollback()
+        return jsonify({"error": str(e)}), 500
+    finally:
+        conn.close()
+
 
 # ============================================
 # HOMEROOM ATTENDANCE REPORT (Trimester tally)
@@ -6693,6 +6954,124 @@ def api_sections_students():
             q += " ORDER BY last_name, first_name"
             cur.execute(q, params)
             return jsonify({"students": fa(cur)})
+    finally:
+        conn.close()
+
+
+# ============================================
+# Gold / Blue cohorts — bulk color assignment + roster auto-populate
+# --------------------------------------------
+# A student carries a per-grade split color (students.cohort_color: 'gold'|'blue'|NULL).
+# The "Gold & Blue" tab on the Classes page sets those colors and then bulk-fills the
+# grade's SUBJECT-class rosters from them: Gold classes get the Gold kids, Blue classes
+# the Blue kids, and whole-grade / ungrouped classes get everyone in the grade. The
+# third math group ("… White") is left untouched. Populate fully overwrites each
+# affected roster — this is a once-a-year setup action, so hand edits since the last run
+# are intentionally replaced. Homeroom / advisory / elective sections are never touched.
+# ============================================
+def _classify_section_split(name):
+    """Map a subject-section name to who it should hold:
+       'gold'/'blue' -> that color; 'whole'/'plain' -> everyone in the grade;
+       'white' -> skip (manual third math group)."""
+    n = (name or "").strip().lower()
+    if n.endswith(" white"):
+        return "white"
+    if n.endswith(" gold"):
+        return "gold"
+    if n.endswith(" blue"):
+        return "blue"
+    if n.endswith(" whole grade"):
+        return "whole"
+    return "plain"
+
+
+def _save_cohort_colors(cur, grade, colors):
+    """colors = {student_id: 'gold'|'blue'|falsy}. Scoped to the grade for safety."""
+    for sid, color in (colors or {}).items():
+        c = color if color in ("gold", "blue") else None
+        cur.execute("UPDATE students SET cohort_color=%s WHERE student_id=%s AND grade=%s",
+                    (c, int(sid), grade))
+
+
+@app.route("/api/cohorts/<grade>")
+@login_required
+def api_cohorts_get(grade):
+    year = current_school_year_start()
+    conn = get_db_connection()
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute("""SELECT student_id, first_name, last_name, cohort_color
+                           FROM students WHERE status='active' AND grade=%s
+                           ORDER BY last_name, first_name""", (grade,))
+            students = fa(cur)
+            cur.execute("""SELECT section_id, name FROM sections
+                           WHERE school_year_start=%s AND type='subject' AND active AND grade=%s
+                           ORDER BY name""", (year, grade))
+            buckets = {"gold": [], "blue": [], "whole": [], "plain": [], "white": []}
+            for r in fa(cur):
+                buckets[_classify_section_split(r["name"])].append(r["name"])
+        return jsonify({"students": students, "sections": buckets})
+    finally:
+        conn.close()
+
+
+@app.route("/api/cohorts/<grade>", methods=["POST"])
+@people_required
+def api_cohorts_save(grade):
+    colors = (request.get_json() or {}).get("colors") or {}
+    conn = get_db_connection()
+    try:
+        with conn.cursor() as cur:
+            _save_cohort_colors(cur, grade, colors)
+            conn.commit()
+            return jsonify({"success": True})
+    except Exception as e:
+        conn.rollback()
+        return jsonify({"error": str(e)}), 500
+    finally:
+        conn.close()
+
+
+@app.route("/api/cohorts/<grade>/populate", methods=["POST"])
+@people_required
+def api_cohorts_populate(grade):
+    """Overwrite this grade's subject-class rosters from students' cohort_color.
+       Optionally accepts fresh {colors} and saves them first. White sections are skipped."""
+    colors = (request.get_json() or {}).get("colors")
+    year = current_school_year_start()
+    conn = get_db_connection()
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            if colors:
+                _save_cohort_colors(cur, grade, colors)
+            cur.execute("""SELECT student_id, cohort_color FROM students
+                           WHERE status='active' AND grade=%s""", (grade,))
+            studs = fa(cur)
+            all_ids = [s["student_id"] for s in studs]
+            gold_ids = [s["student_id"] for s in studs if s["cohort_color"] == "gold"]
+            blue_ids = [s["student_id"] for s in studs if s["cohort_color"] == "blue"]
+            cur.execute("""SELECT section_id, name FROM sections
+                           WHERE school_year_start=%s AND type='subject' AND active AND grade=%s""",
+                        (year, grade))
+            report = {"sections_updated": 0, "skipped_white": 0, "placements": 0}
+            for sec in fa(cur):
+                kind = _classify_section_split(sec["name"])
+                if kind == "white":
+                    report["skipped_white"] += 1
+                    continue
+                target = gold_ids if kind == "gold" else blue_ids if kind == "blue" else all_ids
+                cur.execute("DELETE FROM section_enrollments WHERE section_id=%s", (sec["section_id"],))
+                for st in target:
+                    cur.execute("""INSERT INTO section_enrollments (section_id, student_id)
+                                   VALUES (%s,%s) ON CONFLICT DO NOTHING""",
+                                (sec["section_id"], st))
+                report["sections_updated"] += 1
+                report["placements"] += len(target)
+            conn.commit()
+            return jsonify({"success": True, **report})
+    except Exception as e:
+        conn.rollback()
+        return jsonify({"error": str(e)}), 500
     finally:
         conn.close()
 
