@@ -78,6 +78,7 @@ PERMISSION_SILOS = [
         {"key": "family_manager",  "label": "Family Manager"},
         {"key": "staff_directory", "label": "Staff Directory"},
         {"key": "classes",         "label": "Classes"},
+        {"key": "scheduler",       "label": "Scheduler"},
         {"key": "rooms",           "label": "Rooms"},
     ]},
     {"key": "billing", "label": "Billing", "pages": [
@@ -623,6 +624,18 @@ def init_db():
             """)
             cur.execute("CREATE INDEX IF NOT EXISTS idx_section_enroll_student ON section_enrollments(student_id)")
             cur.execute("CREATE INDEX IF NOT EXISTS idx_section_enroll_section ON section_enrollments(section_id)")
+            # ── Scheduler state ──
+            # The master-schedule generator (Scheduler page) persists its full working
+            # state — inputs, the generated grid, and manual edits — as one JSON blob per
+            # school year, so it lives on the server instead of downloaded files.
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS scheduler_state (
+                    school_year_start INTEGER PRIMARY KEY,
+                    data              TEXT,
+                    updated_at        TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_by        TEXT
+                )
+            """)
             # ── Households, Parents, and linking tables ──
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS households (
@@ -979,6 +992,11 @@ def students():
 @require_perm("classes")
 def classes_page():
     return send_from_directory(".", "classes.html")
+
+@app.route("/scheduler")
+@require_perm("scheduler")
+def scheduler_page():
+    return send_from_directory(".", "scheduler.html")
 
 @app.route("/rooms")
 @require_perm("rooms")
@@ -7069,6 +7087,57 @@ def api_cohorts_populate(grade):
                 report["placements"] += len(target)
             conn.commit()
             return jsonify({"success": True, **report})
+    except Exception as e:
+        conn.rollback()
+        return jsonify({"error": str(e)}), 500
+    finally:
+        conn.close()
+
+
+# ============================================
+# Scheduler — server-side state for the master-schedule generator.
+# One JSON blob per school year (inputs + generated grid + manual edits).
+# ============================================
+@app.route("/api/scheduler")
+@require_perm("scheduler")
+def api_scheduler_get():
+    year = current_school_year_start()
+    conn = get_db_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT data, updated_at, updated_by FROM scheduler_state WHERE school_year_start=%s", (year,))
+            row = cur.fetchone()
+        data = None
+        if row and row[0]:
+            try:
+                data = json.loads(row[0])
+            except Exception:
+                data = None
+        return jsonify({"school_year_start": year, "data": data,
+                        "updated_at": (row[1].isoformat() if row and row[1] else None) if row else None,
+                        "updated_by": row[2] if row else None})
+    finally:
+        conn.close()
+
+
+@app.route("/api/scheduler", methods=["POST"])
+@require_perm("scheduler")
+def api_scheduler_save():
+    body = request.get_json(silent=True) or {}
+    data = body.get("data")
+    if data is None:
+        return jsonify({"error": "data required"}), 400
+    year = current_school_year_start()
+    conn = get_db_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""INSERT INTO scheduler_state (school_year_start, data, updated_at, updated_by)
+                           VALUES (%s,%s,NOW(),%s)
+                           ON CONFLICT (school_year_start)
+                           DO UPDATE SET data=EXCLUDED.data, updated_at=NOW(), updated_by=EXCLUDED.updated_by""",
+                        (year, json.dumps(data), session.get("user_email")))
+            conn.commit()
+        return jsonify({"success": True})
     except Exception as e:
         conn.rollback()
         return jsonify({"error": str(e)}), 500
