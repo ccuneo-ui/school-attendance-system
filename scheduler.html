@@ -465,7 +465,11 @@ function seed(){
   S.pins = [
     {groupId:"SPK",subject:"PE",slots:[["Wed","P1"],["Fri","P1"]]},
     {groupId:"JPK",subject:"PE",slots:[["Wed","P2"],["Fri","P2"]]},
-    {groupId:"K",subject:"PE",slots:[["Wed","P3"],["Fri","P3"]]}
+    {groupId:"K",subject:"PE",slots:[["Wed","P3"],["Fri","P3"]]},
+    // 7th-grade Science pinned to the last two periods every day: 7A at P7, 7B at P8
+    // (both are Alvarez, taught back-to-back). Alvarez works P2-P8, so this fits.
+    {groupId:"7A",subject:"SCIENCE",slots:[["Mon","P7"],["Tue","P7"],["Wed","P7"],["Thu","P7"],["Fri","P7"]]},
+    {groupId:"7B",subject:"SCIENCE",slots:[["Mon","P8"],["Tue","P8"],["Wed","P8"],["Thu","P8"],["Fri","P8"]]}
   ];
   return S;
 }
@@ -533,11 +537,12 @@ const RULES = [
   ["enf","6th-grade Music merged","Per Eileen, 6th Gold + Blue take Music together as one whole-grade class with Sclafani (frees two periods and reduces his load)."],
   ["adv","Keenan / Jordan division clustering (now optimised)","After the hard schedule is found, the tool re-arranges Keenan's PE and Jordan's Art so classes are grouped by division (EC / Lower / Middle) within each day — no 7th → JPK → 3rd bouncing. See the Preferences check. Note: JPK/SPK/K specials are pinned to fixed times, so a few jumps around those are unavoidable."],
   ["adv","Lunch, preps &amp; balanced load — all teachers (optimised)","Every teacher gets a free period in the lunch window (P4–P6) each day, full-timers aim for 2 more preps, and each teacher's daily class count is balanced across the week (no lopsided days). Keenan in particular never ends up with zero free periods on Friday. See the Preferences check."],
-  ["adv","7th White math aligned with Blue (optimised)","7th grade splits into three math sections only for math. White (Alvarez) is scheduled at the same period as Blue (Duthie) every day so the three sections run together."],
+  ["enf","7th Science pinned to P7 &amp; P8 daily","7A Science is locked to 7th period and 7B Science to 8th period every day (both taught by Alvarez, back-to-back). This can tighten the lunch window for a few teachers on some days — adjust individual lunches by hand if needed."],
+  ["adv","Split math sections aligned each day (6th, 7th, 8th)","For each of 6th, 7th and 8th grade, the split math sections are pulled to the same period as that grade\u2019s Blue (Duthie) section as much as possible \u2014 6A=6B, 7A=7B=7C, 8A=8B \u2014 so a grade does math all at once. Blue is the anchor because Duthie only works P3\u2013P6, which keeps every section inside his window. Some days can\u2019t align without breaking a hard rule; the tool aligns what it can."],
   ["adv","Jordan 8th-grade Art double block (now optimised)","The tool tries to place both 8th-grade Art periods back-to-back on Friday."],
   ["adv","Colbert double prep Friday PM & split adjacency","Prefer a Friday-afternoon double prep; keep her split sections consecutive or a prep/lunch apart at least once a week."],
   ["adv","Murphy consolidation","Part-time; consolidate her 8 Spanish classes into 2–3 mornings. Pre-loaded as mornings-only availability."],
-  ["adv","Duthie / McLeod counter-math alignment","Prefer 6A (McLeod) and 6B (Duthie) math at the same time; likewise 7A math aligns with 7C (Alvarez)."],
+  ["adv","2 preps/day &amp; PE/Art clustering kept as preferences","Full-time middle-school teachers still aim for 2 spaced preps a day, and PE (Keenan) and Art (Jordan) are still grouped by division \u201cas much as possible.\u201d These stay soft, so the solver honors the science pin and math alignment first, then optimizes these."],
   ["adv","Full-time MS teachers: 2 spaced preps/day","Preferred prep distribution; not yet enforced."],
   ["adv","Even splits","Splits may come out uneven (a slot for 7A but none for 7B); your workbook flags this. The tool will simply leave the gap and report it so you can consolidate or re-split."]
 ];
@@ -958,12 +963,16 @@ function softCost(sessions, assign, detail){
     }
   });
 
-  // 7th White math (7C/Alvarez) must run at the SAME period as 7th Blue math (7B/Duthie) each day
-  const b7={}, c7={};
-  sessions.forEach((s,i)=>{ const v=assign[i]; if(!v)return;
-    if(s.groupId==="7B"&&s.subject==="MATH") b7[v.day]=v.period;
-    if(s.groupId==="7C"&&s.subject==="MATH") c7[v.day]=v.period; });
-  DAYS.forEach(day=>{ if(c7[day] && b7[day]!==c7[day]){ cost+=25; d.mathAlign++; } });
+  // Split math sections should meet at the SAME period as the grade's Blue (Duthie) section
+  // each day, as much as possible. Blue is the anchor because Duthie is the tightest window
+  // (P3-P6), so aligning to it keeps every section inside his schedule.
+  //   6th: 6A=6B ; 7th: 7A=7B=7C ; 8th: 8A=8B.
+  const MATH_ALIGN=[{blue:"6B",others:["6A"]},{blue:"7B",others:["7A","7C"]},{blue:"8B",others:["8A"]}];
+  const mathP={};
+  sessions.forEach((s,i)=>{ const v=assign[i]; if(!v||s.subject!=="MATH")return;
+    (mathP[s.groupId]=mathP[s.groupId]||{})[v.day]=v.period; });
+  MATH_ALIGN.forEach(g=>{ DAYS.forEach(day=>{ const bp=(mathP[g.blue]||{})[day]; if(!bp)return;
+    g.others.forEach(o=>{ const op=(mathP[o]||{})[day]; if(op && op!==bp){ cost+=25; d.mathAlign++; } }); }); });
 
   // avoid Alvarez teaching Tech at the same time Petralia teaches STEAM
   const alvT={}, petS={};
