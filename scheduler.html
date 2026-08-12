@@ -104,7 +104,7 @@
   table.mp td.dragover{outline:3px dashed var(--gold);outline-offset:-3px;background:#fffdf0}
   table.mp td.dropfail{outline:3px solid var(--red);outline-offset:-3px;animation:mpshake .25s}
   @keyframes mpshake{0%,100%{transform:translateX(0)}25%{transform:translateX(-2px)}75%{transform:translateX(2px)}}
-  .mp-hold{border:2px dashed #c9c0a8;border-radius:9px;background:#faf8f2;padding:7px 11px;margin-bottom:10px;transition:background .15s,border-color .15s}
+  .mp-hold{border:2px dashed #c9c0a8;border-radius:9px;background:#faf8f2;padding:7px 11px;margin-bottom:10px;transition:background .15s,border-color .15s;position:sticky;top:0;z-index:6;box-shadow:0 2px 6px rgba(0,0,0,.06)}
   .mp-hold.has{border-color:var(--gold);background:#fffdf4}
   .mp-hold.dragover{border-color:var(--gold);background:#fff8e6}
   .mp-hold-lbl{font-size:11px;font-weight:700;color:var(--navy);text-transform:uppercase;letter-spacing:.03em}
@@ -538,6 +538,7 @@ const RULES = [
   ["adv","Keenan / Jordan division clustering (now optimised)","After the hard schedule is found, the tool re-arranges Keenan's PE and Jordan's Art so classes are grouped by division (EC / Lower / Middle) within each day — no 7th → JPK → 3rd bouncing. See the Preferences check. Note: JPK/SPK/K specials are pinned to fixed times, so a few jumps around those are unavoidable."],
   ["adv","Lunch, preps &amp; balanced load — all teachers (optimised)","Every teacher gets a free period in the lunch window (P4–P6) each day, full-timers aim for 2 more preps, and each teacher's daily class count is balanced across the week (no lopsided days). Keenan in particular never ends up with zero free periods on Friday. See the Preferences check."],
   ["enf","7th Science pinned to P7 &amp; P8 daily","7A Science is locked to 7th period and 7B Science to 8th period every day (both taught by Alvarez, back-to-back). This can tighten the lunch window for a few teachers on some days — adjust individual lunches by hand if needed."],
+  ["enf","No STEAM in 7th or 8th period","STEAM (Petralia) is never placed in P7 or P8 — the last two periods stay clear of STEAM. Enforced on Generate and on manual drag-moves."],
   ["adv","Split math sections aligned each day (6th, 7th, 8th)","For each of 6th, 7th and 8th grade, the split math sections are pulled to the same period as that grade\u2019s Blue (Duthie) section as much as possible \u2014 6A=6B, 7A=7B=7C, 8A=8B \u2014 so a grade does math all at once. Blue is the anchor because Duthie only works P3\u2013P6, which keeps every section inside his window. Some days can\u2019t align without breaking a hard rule; the tool aligns what it can."],
   ["adv","Jordan 8th-grade Art double block (now optimised)","The tool tries to place both 8th-grade Art periods back-to-back on Friday."],
   ["adv","Colbert double prep Friday PM & split adjacency","Prefer a Friday-afternoon double prep; keep her split sections consecutive or a prep/lunch apart at least once a week."],
@@ -800,6 +801,7 @@ function openSlotsFor(sess){
     // Kindergarten specials (except Art) are the only thing allowed in the free Wed P3 slot
     const kExc = isWedP3 && sp && sp.includes("P3") && sess.subject!=="ART";
     if(isWedP3 && !kExc) return;          // free period for everyone else
+    if(sess.subject==="STEAM" && (p.id==="P7"||p.id==="P8")) return; // Hard rule: no STEAM in 7th/8th period
     if(sp && !sp.includes(p.id)) return;  // restrict EC/K specials to their fixed periods
     if(blocked.has(d+"|"+p.id)) return;
     if(!kExc && !(av[d]||[]).includes(p.id)) return; // K exception overrides the Wed-P3 availability strip
@@ -1635,7 +1637,10 @@ function renderMaster(){
   } else { h+=`<span class="mp-hold-empty">empty — nothing parked</span>`; }
   h+=`</div></div>`;
   h+=`<div class="mp-scroll">`+masterTableHTML(true)+`</div>`;
+  // preserve the grid's scroll position across re-renders (e.g. after parking a class)
+  const _prev=document.querySelector("#schedwrap .mp-scroll"); const _st=_prev?_prev.scrollTop:0, _sl=_prev?_prev.scrollLeft:0;
   $("#schedwrap").innerHTML=h;
+  const _ns=document.querySelector("#schedwrap .mp-scroll"); if(_ns){ _ns.scrollTop=_st; _ns.scrollLeft=_sl; }
 
   // unplaced note (excludes parked classes — those live in the holding area on purpose)
   const un=[]; RESULT.sessions.forEach((s,i)=>{ if(!RESULT.assign[i] && !parkedSet.has(i)) un.push(s); });
