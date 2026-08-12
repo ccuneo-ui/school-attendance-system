@@ -774,6 +774,13 @@ function buildSessions(){
       const s={rid:ri, groupId:r.groupId, subject:r.subject, teacherId:r.teacherId, aide:r.aide,
                 room:(tchr(r.teacherId)||{}).room||r.teacherId, conflicts:conflictSet(r.groupId)};
       if(pin && pin.slots[k]) s.pin={day:pin.slots[k][0],period:pin.slots[k][1]};
+      // Hard rule, independent of any saved state: 7th Science is locked to the last two
+      // periods every day — 7A at P7, 7B at P8 — one session per weekday. This is enforced
+      // in code (not just seed pins) so it always applies on Generate even for schedules
+      // that were saved before this rule existed.
+      if(r.subject==="SCIENCE" && (r.groupId==="7A"||r.groupId==="7B") && k<DAYS.length){
+        s.pin={day:DAYS[k], period:(r.groupId==="7A"?"P7":"P8")};
+      }
       out.push(s);
     }
   });
