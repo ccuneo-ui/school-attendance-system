@@ -1,6 +1,6 @@
 # Changelog
 
-2026-08-10: Scheduler board — the Holding area is now a sticky panel on the right side instead of across the top, so you can drop a class into it without the grid auto-scrolling upward; auto-scroll is also paused while the cursor is over it.
+2026-08-10: Scheduler board — the Holding area is now a floating panel pinned to the vertical middle of the right edge (instead of across the top), so you drag a class straight out to the side to park it, never toward the top edge that auto-scrolls the grid; auto-scroll is also paused while the cursor is over it.
 
 2026-08-10: Scheduler master board — you can now combine two split sections into a whole-grade class: drag one half (e.g. 5th Blue Spanish) onto the other half of the same grade, subject, and teacher, and confirm, and that period becomes a single whole-grade block (both halves together). Blocked with a clear message if it would create a conflict; Undo reverses it, and it's saved with the schedule.
 

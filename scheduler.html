@@ -104,8 +104,8 @@
   table.mp td.dragover{outline:3px dashed var(--gold);outline-offset:-3px;background:#fffdf0}
   table.mp td.dropfail{outline:3px solid var(--red);outline-offset:-3px;animation:mpshake .25s}
   @keyframes mpshake{0%,100%{transform:translateX(0)}25%{transform:translateX(-2px)}75%{transform:translateX(2px)}}
-  .mp-layout{display:flex;gap:12px;align-items:flex-start}
-  .mp-hold{border:2px dashed #c9c0a8;border-radius:9px;background:#faf8f2;padding:8px 9px;transition:background .15s,border-color .15s;position:sticky;top:8px;z-index:6;flex:0 0 176px;width:176px;max-height:82vh;overflow:auto;box-shadow:0 1px 4px rgba(0,0,0,.06)}
+  .mp-layout{display:flex;gap:12px;align-items:flex-start;padding-right:204px}
+  .mp-hold{border:2px dashed #c9a24e;border-radius:11px;background:#fbf9f3;padding:9px 10px;transition:background .15s,border-color .15s;position:fixed;right:16px;top:50%;transform:translateY(-50%);z-index:20;width:184px;max-height:76vh;overflow:auto;box-shadow:0 6px 22px rgba(0,0,0,.16)}
   .mp-hold.has{border-color:var(--gold);background:#fffdf4}
   .mp-hold.dragover{border-color:var(--gold);background:#fff8e6}
   .mp-hold-lbl{font-size:11px;font-weight:700;color:var(--navy);text-transform:uppercase;letter-spacing:.03em}
