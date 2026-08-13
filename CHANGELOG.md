@@ -1,5 +1,7 @@
 # Changelog
 
+2026-08-10: Scheduler master board — you can now combine two split sections into a whole-grade class: drag one half (e.g. 5th Blue Spanish) onto the other half of the same grade, subject, and teacher, and confirm, and that period becomes a single whole-grade block (both halves together). Blocked with a clear message if it would create a conflict; Undo reverses it, and it's saved with the schedule.
+
 2026-08-10: Scheduler — new rule: no STEAM in 7th or 8th period (enforced on generate and manual moves). Master-board fixes: the Holding area now stays pinned on screen while you scroll, and the grid keeps its scroll position when you park a class instead of jumping back to the top.
 
 2026-08-10: Scheduler rules updated — 7th-grade Science is now pinned to periods 7 and 8 every day (7A then 7B, both with Alvarez), and each grade's split math sections (6th, 7th, 8th) are pulled to the same period as that grade's Blue/Duthie section as much as possible, so a grade does math together. Two-preps-a-day and PE/Art division clustering stay as soft preferences. Verified a full conflict-free draft still generates.

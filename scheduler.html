@@ -1101,6 +1101,7 @@ function runSolve(){
 function showResult(){
   invalidateLunchPlan();
   if(typeof parkedSet!=="undefined") parkedSet.clear();
+  if(typeof mergedSet!=="undefined") mergedSet.clear();
   if(typeof resetUndo==="function") resetUndo();
   $("#resultcard").style.display="block";
   const r=RESULT;
@@ -1500,13 +1501,52 @@ function occState(){
 let parkedSet=new Set();
 function parkSession(i){ if(RESULT.assign[i]==null && !parkedSet.has(i)) return; pushUndo(); parkedSet.add(i); RESULT.assign[i]=null; afterEdit(); }
 
+// ---- Merge two same-grade/subject/teacher sections into one whole-grade block ----
+// Normally the two halves can't share a period (same teacher = "occupied"). But when they
+// ARE the same class (same grade, subject, teacher), that's a whole-grade class: one teacher
+// teaching both halves together. Dragging one half onto the other offers to combine them.
+let mergedSet=new Set();          // sessions absorbed into a whole-grade block (hidden)
+function wholeGroupFor(cohort){ const c=S.classes.find(x=>x.cohort===cohort && x.part==="AB"); return c?c.id:null; }
+function canMerge(i,j){
+  if(i===j) return false;
+  const a=RESULT.sessions[i], b=RESULT.sessions[j]; if(!a||!b) return false;
+  const ga=grp(a.groupId), gb=grp(b.groupId); if(!ga||!gb) return false;
+  if(ga.cohort!==gb.cohort) return false;
+  if(a.subject!==b.subject || a.teacherId!==b.teacherId) return false;
+  if(ga.part==="AB" || gb.part==="AB") return false;   // one is already whole-grade
+  if(!RESULT.assign[j]) return false;                   // target must be placed
+  return !!wholeGroupFor(ga.cohort);
+}
+// Merge dragged session i INTO target j: j becomes the whole-grade block at its slot, i is absorbed.
+function mergeSections(i,j){
+  if(!canMerge(i,j)) return false;
+  const b=RESULT.sessions[j], coh=grp(b.groupId).cohort, wholeId=wholeGroupFor(coh);
+  const slot=RESULT.assign[j], slotKey=slot.day+"|"+slot.period;
+  // Safety: the other half must be free at this period (no double-booking its students).
+  const st=occState(); st.remO(i); st.remO(j);
+  const probe={teacherId:b.teacherId, room:b.room, aide:b.aide, subject:b.subject,
+               groupId:wholeId, conflicts:conflictSet(wholeId)};
+  if(!st.feas(probe, slotKey)){
+    alert("Can't combine these here — it would create a conflict at "+slot.day+" "+slot.period+" (the other half is busy then, or that grade already has "+subjLabel(b.subject)+" that day). Free up the other half at that period first.");
+    return false;
+  }
+  pushUndo();
+  b.groupId=wholeId; b.conflicts=conflictSet(wholeId);   // target becomes the whole-grade block
+  mergedSet.add(i); parkedSet.delete(i); RESULT.assign[i]=null;  // absorb the dragged half
+  afterEdit();
+  return true;
+}
+
 // ---- undo stack (covers every manual edit: move, swap, park, lunch, homeroom) ----
 let undoStack=[];
-function snapState(){ return { assign: RESULT?RESULT.assign.map(v=>v?{...v}:null):null, parked:[...parkedSet], lunch:JSON.stringify(lunchOverrides), homeroom:JSON.stringify(homeroomEdits) }; }
+function snapState(){ return { assign: RESULT?RESULT.assign.map(v=>v?{...v}:null):null, parked:[...parkedSet], merged:[...mergedSet],
+  sess: RESULT?RESULT.sessions.map(s=>({g:s.groupId,c:s.conflicts})):null,
+  lunch:JSON.stringify(lunchOverrides), homeroom:JSON.stringify(homeroomEdits) }; }
 function pushUndo(){ undoStack.push(snapState()); if(undoStack.length>200) undoStack.shift(); updateUndoBtn(); }
 function undo(){ const st=undoStack.pop(); if(!st) return;
   if(st.assign && RESULT) RESULT.assign=st.assign.map(v=>v?{...v}:null);
-  parkedSet=new Set(st.parked); lunchOverrides=JSON.parse(st.lunch); homeroomEdits=JSON.parse(st.homeroom);
+  if(st.sess && RESULT) st.sess.forEach((o,k)=>{ if(RESULT.sessions[k]){ RESULT.sessions[k].groupId=o.g; RESULT.sessions[k].conflicts=o.c; } });
+  parkedSet=new Set(st.parked); mergedSet=new Set(st.merged||[]); lunchOverrides=JSON.parse(st.lunch); homeroomEdits=JSON.parse(st.homeroom);
   invalidateLunchPlan(); renderKPI(); renderSchedule(); if($("#panel-availability").classList.contains("active")) renderAvailability();
   updateUndoBtn();
 }
@@ -1570,6 +1610,14 @@ function stopDragScroll(){ if(_dsRAF){ cancelAnimationFrame(_dsRAF); _dsRAF=null
 function posterDrop(ev,td){ ev.preventDefault(); td.classList.remove("dragover");
   const i=posterDragI; if(i==null) return;
   const day=td.dataset.day, period=td.dataset.period, occ=td.dataset.occ!=null&&td.dataset.occ!==""?+td.dataset.occ:-1;
+  // Same grade + subject + teacher dropped onto each other → offer to combine into a whole-grade class.
+  if(occ>=0 && occ!==i && canMerge(i,occ)){
+    const a=RESULT.sessions[i], b=RESULT.sessions[occ];
+    if(confirm(`Combine ${grpName(a.groupId)} and ${grpName(b.groupId)} ${subjLabel(a.subject)} (${a.teacherId}) into one whole-grade class at ${day} ${period}?`)){
+      if(!mergeSections(i,occ)){ td.classList.add("dropfail"); setTimeout(()=>td.classList.remove("dropfail"),500); }
+    }
+    return;
+  }
   let ok = (occ>=0 && occ!==i) ? posterSwap(i,occ) : posterMove(i,day,period);
   if(!ok){ td.classList.add("dropfail"); setTimeout(()=>td.classList.remove("dropfail"),500); }
 }
@@ -1643,7 +1691,7 @@ function renderMaster(){
   const _ns=document.querySelector("#schedwrap .mp-scroll"); if(_ns){ _ns.scrollTop=_st; _ns.scrollLeft=_sl; }
 
   // unplaced note (excludes parked classes — those live in the holding area on purpose)
-  const un=[]; RESULT.sessions.forEach((s,i)=>{ if(!RESULT.assign[i] && !parkedSet.has(i)) un.push(s); });
+  const un=[]; RESULT.sessions.forEach((s,i)=>{ if(!RESULT.assign[i] && !parkedSet.has(i) && !mergedSet.has(i)) un.push(s); });
   if(un.length){ const byg={}; un.forEach(s=>{ (byg[s.groupId]=byg[s.groupId]||[]).push(subjLabel(s.subject)); });
     $("#schedwrap").insertAdjacentHTML("afterend",'<div id="unplacedbox"><div class="status err" style="margin-top:14px"><b>Unplaced ('+un.length+'):</b> '+Object.entries(byg).map(([g,ss])=>`${g}: ${ss.join(", ")}`).join(" · ")+'</div></div>'); }
 }
@@ -2046,7 +2094,7 @@ function saveSchedule(){
   const stamp=new Date();
   const pack={
     _type:"mizzentop_schedule", _version:1, savedAt:stamp.toISOString(),
-    S, homeroomEdits, lunchOverrides, parked:[...parkedSet],
+    S, homeroomEdits, lunchOverrides, parked:[...parkedSet], merged:[...mergedSet],
     result:{ sessions:RESULT.sessions, assign:RESULT.assign, placed:RESULT.placed, total:RESULT.total,
              complete:RESULT.complete, ms:RESULT.ms, restarts:RESULT.restarts, soft0:RESULT.soft0, soft1:RESULT.soft1 }
   };
@@ -2063,6 +2111,7 @@ function loadSchedule(e){ const f=e.target.files[0]; if(!f) return; const rd=new
     renderAll();                       // rebuild filters/labels from restored inputs
     showResult();                      // show the card + KPIs (this clears parked + undo)
     parkedSet=new Set(p.parked||[]);   // restore parking AFTER showResult cleared it
+    mergedSet=new Set(p.merged||[]);   // restore merged whole-grade blocks
     resetUndo();
     renderSchedule();                  // re-render so any parked chips reappear
   }catch(err){ alert("Could not read that schedule file."); } };
@@ -2073,7 +2122,7 @@ function loadSchedule(e){ const f=e.target.files[0]; if(!f) return; const rd=new
 let _booting=true, _saveT=null;
 function setSaveStatus(t){ const el=document.getElementById('saveStatus'); if(el) el.textContent=t; }
 function serverPack(){
-  const pack={_type:"mizzentop_schedule",_version:1, S, homeroomEdits, lunchOverrides, parked:[...parkedSet]};
+  const pack={_type:"mizzentop_schedule",_version:1, S, homeroomEdits, lunchOverrides, parked:[...parkedSet], merged:[...mergedSet]};
   if(typeof RESULT!=="undefined" && RESULT){
     pack.result={sessions:RESULT.sessions,assign:RESULT.assign,placed:RESULT.placed,total:RESULT.total,
       complete:RESULT.complete,ms:RESULT.ms,restarts:RESULT.restarts,soft0:RESULT.soft0,soft1:RESULT.soft1};
@@ -2085,7 +2134,7 @@ function applyPack(p){
   S=p.S; if(!S.rules)S.rules=RULES; if(!S.pins)S.pins=[];
   homeroomEdits=p.homeroomEdits||{}; lunchOverrides=p.lunchOverrides||{};
   invalidateLunchPlan();
-  if(p.result){ RESULT=p.result; renderAll(); showResult(); parkedSet=new Set(p.parked||[]); resetUndo(); renderSchedule(); }
+  if(p.result){ RESULT=p.result; renderAll(); showResult(); parkedSet=new Set(p.parked||[]); mergedSet=new Set(p.merged||[]); resetUndo(); renderSchedule(); }
   else { renderAll(); }
   return true;
 }
