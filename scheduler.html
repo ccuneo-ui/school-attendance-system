@@ -466,7 +466,7 @@ function seed(){
   S.pins = [
     {groupId:"SPK",subject:"PE",slots:[["Wed","P1"],["Fri","P1"]]},
     {groupId:"JPK",subject:"PE",slots:[["Wed","P2"],["Fri","P2"]]},
-    {groupId:"K",subject:"PE",slots:[["Wed","P3"],["Fri","P3"]]},
+    {groupId:"K",subject:"PE",slots:[["Wed","P3"],["Fri","P7"]]},
     // 7th-grade Science pinned to the last two periods every day: 7A at P7, 7B at P8
     // (both are Alvarez, taught back-to-back). Alvarez works P2-P8, so this fits.
     {groupId:"7A",subject:"SCIENCE",slots:[["Mon","P7"],["Tue","P7"],["Wed","P7"],["Thu","P7"],["Fri","P7"]]},
@@ -527,7 +527,7 @@ const RULES = [
   ["enf","Staggered lunches","PreK P5 · Kindergarten P6 · Lower school (1–4) P6 · 5th &amp; 6th P5 · 7th &amp; 8th P4. (Your note: 7/8 could swap to P5 on a given day if needed.)"],
   ["enf","3rd-grade Spanish → Fermin","3rd-grade Spanish moved from Murphy to Fermin (Eileen). Murphy now covers JPK–2 Spanish only."],
   ["enf","7th grade mostly split, merged 1×/week","7th grade is scheduled as Gold/Blue for every subject, except Ballard teaches one whole-grade (7AB) Social Studies once a week and Jakobsen one whole-grade ELA once a week. 7th Math keeps three sections: Gold (McLeod), Blue (Duthie), White (Alvarez)."],
-  ["enf","Keenan early-childhood block (Wed &amp; Fri)","On Wednesdays and Fridays Keenan takes SPK (P1), JPK (P2), then Kindergarten (P3) for PE — pinned in that order."],
+  ["enf","Keenan early-childhood block (Wed &amp; Fri)","Keenan takes SPK (P1) then JPK (P2) for PE on Wednesdays and Fridays. Kindergarten PE is Wednesday P3, but <b>Friday Kindergarten PE is P7</b> (moved off P3 so Kindergarten can place Spanish in a 3rd-period slot — Murphy teaches Spanish mornings only)."],
   ["enf","Grades 1–4 common specials block","Once a week, grades 1, 2, 3 and 4 all have a special at the same period, so the lower school can run a shared specials block."],
   ["adv","PREP, lunch &amp; lunch duty labels","Teacher grids show PREP in open periods and one LUNCH per day (only P4/P5/P6). A teacher with 2+ preps gets LUNCH DUTY; fewer than 2 preps gets LUNCH NO DUTY. Everyone aims for 2 preps/day where possible. Keenan &amp; Jordan are never on lunch duty. Lunches are distributed so at least 3 teachers are on duty at both the P4 and P5 lunches. Click any lunch cell on a teacher's grid to move that lunch or toggle duty on/off. Each teacher grid also tallies classes / preps / lunch per day; the Prep schedule view shows the whole staff."],
   ["adv","Alvarez Tech vs. Petralia STEAM","Where possible, Alvarez isn't teaching Tech at the same time Petralia is teaching STEAM."],
@@ -782,6 +782,12 @@ function buildSessions(){
       // that were saved before this rule existed.
       if(r.subject==="SCIENCE" && (r.groupId==="7A"||r.groupId==="7B") && k<DAYS.length){
         s.pin={day:DAYS[k], period:(r.groupId==="7A"?"P7":"P8")};
+      }
+      // Hard rule, independent of saved state: Kindergarten PE is Wed P3 and Fri P7.
+      // (Friday moved off P3 so Kindergarten Spanish can take a P3 slot — Murphy is mornings-only.)
+      if(r.subject==="PE" && r.groupId==="K"){
+        const kp=[["Wed","P3"],["Fri","P7"]];
+        if(kp[k]) s.pin={day:kp[k][0], period:kp[k][1]};
       }
       out.push(s);
     }
