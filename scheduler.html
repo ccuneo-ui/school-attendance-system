@@ -81,7 +81,7 @@
   table.sched td .co{display:block;font-size:9px;color:var(--green);font-weight:600}
   /* ---- master poster ---- */
   .mp-help{font-size:12px;color:var(--muted);background:#f6f4ee;border:1px solid var(--border);border-radius:8px;padding:8px 11px;margin-bottom:10px;line-height:1.45}
-  .mp-scroll{overflow:auto;border:1px solid var(--border);border-radius:8px;max-height:82vh}
+  .mp-scroll{overflow:auto;border:1px solid var(--border);border-radius:8px;max-height:82vh;flex:1;min-width:0}
   table.mp{border-collapse:separate;border-spacing:0;width:100%;table-layout:fixed}
   table.mp th,table.mp td{border-right:1px solid #e7e3d8;border-bottom:1px solid #e7e3d8}
   table.mp thead th{position:sticky;top:0;z-index:5;background:var(--navy);color:#fff;font-size:11px;padding:4px 3px}
@@ -104,12 +104,13 @@
   table.mp td.dragover{outline:3px dashed var(--gold);outline-offset:-3px;background:#fffdf0}
   table.mp td.dropfail{outline:3px solid var(--red);outline-offset:-3px;animation:mpshake .25s}
   @keyframes mpshake{0%,100%{transform:translateX(0)}25%{transform:translateX(-2px)}75%{transform:translateX(2px)}}
-  .mp-hold{border:2px dashed #c9c0a8;border-radius:9px;background:#faf8f2;padding:7px 11px;margin-bottom:10px;transition:background .15s,border-color .15s;position:sticky;top:0;z-index:6;box-shadow:0 2px 6px rgba(0,0,0,.06)}
+  .mp-layout{display:flex;gap:12px;align-items:flex-start}
+  .mp-hold{border:2px dashed #c9c0a8;border-radius:9px;background:#faf8f2;padding:8px 9px;transition:background .15s,border-color .15s;position:sticky;top:8px;z-index:6;flex:0 0 176px;width:176px;max-height:82vh;overflow:auto;box-shadow:0 1px 4px rgba(0,0,0,.06)}
   .mp-hold.has{border-color:var(--gold);background:#fffdf4}
   .mp-hold.dragover{border-color:var(--gold);background:#fff8e6}
   .mp-hold-lbl{font-size:11px;font-weight:700;color:var(--navy);text-transform:uppercase;letter-spacing:.03em}
-  .mp-hold-hint{font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted)}
-  .mp-hold-items{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;min-height:26px;align-items:center}
+  .mp-hold-hint{display:block;margin-top:3px;font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted);font-size:10px;line-height:1.35}
+  .mp-hold-items{display:flex;flex-direction:column;gap:6px;margin-top:7px;min-height:40px;align-items:stretch}
   .mp-hold-empty{font-size:11px;color:#b3ac99;font-style:italic}
   .mp-chip{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:700;padding:4px 9px;border-radius:14px;cursor:grab;box-shadow:0 1px 2px rgba(0,0,0,.18)}
   .mp-chip small{font-weight:500;opacity:.85}
@@ -1593,16 +1594,23 @@ let _dsRAF=null,_dsX=0,_dsY=0;
 function _dsTrack(e){ _dsX=e.clientX; _dsY=e.clientY; }
 function _dsTick(){
   const M=64, SP=22;                 // edge margin (px) and max scroll speed
-  const sc=document.querySelector("#schedwrap .mp-scroll");
-  if(sc){ const r=sc.getBoundingClientRect();
-    if(_dsY<r.top+M)      sc.scrollTop -= SP*Math.min(1,(r.top+M-_dsY)/M);
-    else if(_dsY>r.bottom-M) sc.scrollTop += SP*Math.min(1,(_dsY-(r.bottom-M))/M);
-    if(_dsX<r.left+M)     sc.scrollLeft -= SP*Math.min(1,(r.left+M-_dsX)/M);
-    else if(_dsX>r.right-M)  sc.scrollLeft += SP*Math.min(1,(_dsX-(r.right-M))/M);
+  // Don't auto-scroll while the cursor is over the holding area — you're dropping there,
+  // not trying to reach another part of the grid.
+  const hz=document.querySelector("#schedwrap .mp-hold");
+  let overHold=false;
+  if(hz){ const hr=hz.getBoundingClientRect(); overHold=(_dsX>=hr.left && _dsX<=hr.right && _dsY>=hr.top && _dsY<=hr.bottom); }
+  if(!overHold){
+    const sc=document.querySelector("#schedwrap .mp-scroll");
+    if(sc){ const r=sc.getBoundingClientRect();
+      if(_dsY<r.top+M)      sc.scrollTop -= SP*Math.min(1,(r.top+M-_dsY)/M);
+      else if(_dsY>r.bottom-M) sc.scrollTop += SP*Math.min(1,(_dsY-(r.bottom-M))/M);
+      if(_dsX<r.left+M)     sc.scrollLeft -= SP*Math.min(1,(r.left+M-_dsX)/M);
+      else if(_dsX>r.right-M)  sc.scrollLeft += SP*Math.min(1,(_dsX-(r.right-M))/M);
+    }
+    const H=window.innerHeight;        // also scroll the whole page near the window edges
+    if(_dsY<M)        window.scrollBy(0,-SP*Math.min(1,(M-_dsY)/M));
+    else if(_dsY>H-M) window.scrollBy(0, SP*Math.min(1,(_dsY-(H-M))/M));
   }
-  const H=window.innerHeight;        // also scroll the whole page near the window edges
-  if(_dsY<M)        window.scrollBy(0,-SP*Math.min(1,(M-_dsY)/M));
-  else if(_dsY>H-M) window.scrollBy(0, SP*Math.min(1,(_dsY-(H-M))/M));
   _dsRAF=requestAnimationFrame(_dsTick);
 }
 function startDragScroll(){ if(_dsRAF) return; window.addEventListener("dragover",_dsTrack,true); _dsRAF=requestAnimationFrame(_dsTick); }
@@ -1675,16 +1683,17 @@ function renderMaster(){
   const old=document.getElementById("unplacedbox"); if(old) old.remove();
 
   let h=`<div class="mp-help">Everything at once, the way the printed master looks — cells are coloured by <b>teacher</b> (your teacher colour key). <b>Click</b> any class for its legal move/swap list, or <b>drag</b> it onto an empty slot to move or onto another class to swap. Only conflict-free changes are accepted (an illegal drop flashes red). Rows are the class groups; each period band spans all five days. Use <b>One-page board</b> to save the whole week as a single big page (days across, periods down) for a large display.</div>`;
-  // holding zone (parking) for multi-way swaps
+  // holding zone (parking) for multi-way swaps — lives on the RIGHT side so you can drop a
+  // class into it without dragging past the top edge (which auto-scrolls the grid).
   const parked=[...parkedSet].filter(i=>i>=0 && i<RESULT.sessions.length);
-  h+=`<div class="mp-hold${parked.length?' has':''}" ondragover="event.preventDefault();this.classList.add('dragover')" ondragleave="this.classList.remove('dragover')" ondrop="posterPark(event,this)">
-      <div class="mp-hold-lbl">Holding area<span class="mp-hold-hint"> — drag a class here to lift it out, then drag it back to any open slot (handy for 3-way swaps a direct swap won't allow)</span></div>
+  let hold=`<div class="mp-hold${parked.length?' has':''}" ondragover="event.preventDefault();this.classList.add('dragover')" ondragleave="this.classList.remove('dragover')" ondrop="posterPark(event,this)">
+      <div class="mp-hold-lbl">Holding area<span class="mp-hold-hint">drop a class here to lift it out, then drag it back to any open slot</span></div>
       <div class="mp-hold-items">`;
-  if(parked.length){ h+=parked.map(i=>{ const s=RESULT.sessions[i]; const gp=TEACHER_PALETTE[s.teacherId]||{bg:"#ececec",fg:"#333"};
+  if(parked.length){ hold+=parked.map(i=>{ const s=RESULT.sessions[i]; const gp=TEACHER_PALETTE[s.teacherId]||{bg:"#ececec",fg:"#333"};
       return `<span class="mp-chip" draggable="true" ondragstart="posterDragStart(event,${i})" ondragend="posterDragEnd()" style="background:${gp.bg};color:${gp.fg}" title="${grpName(s.groupId)} · ${subjLabel(s.subject)} · ${s.teacherId} — drag onto an open slot to place it">${grpName(s.groupId)} · ${subjLabel(s.subject)} <small>${s.teacherId}</small></span>`; }).join("");
-  } else { h+=`<span class="mp-hold-empty">empty — nothing parked</span>`; }
-  h+=`</div></div>`;
-  h+=`<div class="mp-scroll">`+masterTableHTML(true)+`</div>`;
+  } else { hold+=`<span class="mp-hold-empty">empty — nothing parked</span>`; }
+  hold+=`</div></div>`;
+  h+=`<div class="mp-layout"><div class="mp-scroll">`+masterTableHTML(true)+`</div>`+hold+`</div>`;
   // preserve the grid's scroll position across re-renders (e.g. after parking a class)
   const _prev=document.querySelector("#schedwrap .mp-scroll"); const _st=_prev?_prev.scrollTop:0, _sl=_prev?_prev.scrollLeft:0;
   $("#schedwrap").innerHTML=h;
