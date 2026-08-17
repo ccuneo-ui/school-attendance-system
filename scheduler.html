@@ -540,7 +540,7 @@ const RULES = [
   ["adv","Lunch, preps &amp; balanced load — all teachers (optimised)","Every teacher gets a free period in the lunch window (P4–P6) each day, full-timers aim for 2 more preps, and each teacher's daily class count is balanced across the week (no lopsided days). Keenan in particular never ends up with zero free periods on Friday. See the Preferences check."],
   ["enf","7th Science pinned to P7 &amp; P8 daily","7A Science is locked to 7th period and 7B Science to 8th period every day (both taught by Alvarez, back-to-back). This can tighten the lunch window for a few teachers on some days — adjust individual lunches by hand if needed."],
   ["enf","No STEAM in 7th or 8th period","STEAM (Petralia) is never placed in P7 or P8 — the last two periods stay clear of STEAM. Enforced on Generate and on manual drag-moves."],
-  ["adv","Split math sections aligned each day (6th, 7th, 8th)","For each of 6th, 7th and 8th grade, the split math sections are pulled to the same period as that grade\u2019s Blue (Duthie) section as much as possible \u2014 6A=6B, 7A=7B=7C, 8A=8B \u2014 so a grade does math all at once. Blue is the anchor because Duthie only works P3\u2013P6, which keeps every section inside his window. Some days can\u2019t align without breaking a hard rule; the tool aligns what it can."],
+  ["adv","Split math sections aligned each day (6th, 7th, 8th)","For each of 6th, 7th and 8th grade, the split math sections are pulled to the same period as that grade\u2019s Blue (Duthie) section as much as possible \u2014 6A=6B, 7A=7B=7C, 8A=8B \u2014 so a grade does math all at once. Blue is the anchor because Duthie only works P3\u2013P6, which keeps every section inside his window. Some days can\u2019t align without breaking a hard rule; the tool aligns what it can. <b>Friday exception:</b> 7th Gold may run at a different time than 7th Blue/White on Fridays (Blue and White stay together), so McLeod isn\u2019t booked straight through the Friday lunch window."],
   ["adv","Jordan 8th-grade Art double block (now optimised)","The tool tries to place both 8th-grade Art periods back-to-back on Friday."],
   ["adv","Colbert double prep Friday PM & split adjacency","Prefer a Friday-afternoon double prep; keep her split sections consecutive or a prep/lunch apart at least once a week."],
   ["adv","Murphy consolidation","Part-time; consolidate her 8 Spanish classes into 2–3 mornings. Pre-loaded as mornings-only availability."],
@@ -988,7 +988,11 @@ function softCost(sessions, assign, detail){
   sessions.forEach((s,i)=>{ const v=assign[i]; if(!v||s.subject!=="MATH")return;
     (mathP[s.groupId]=mathP[s.groupId]||{})[v.day]=v.period; });
   MATH_ALIGN.forEach(g=>{ DAYS.forEach(day=>{ const bp=(mathP[g.blue]||{})[day]; if(!bp)return;
-    g.others.forEach(o=>{ const op=(mathP[o]||{})[day]; if(op && op!==bp){ cost+=25; d.mathAlign++; } }); }); });
+    g.others.forEach(o=>{
+      // Friday exception: 7th Gold (7A) may run at a different time than 7th Blue/White on
+      // Fridays, so McLeod isn't pulled across the whole lunch window. Blue & White stay aligned.
+      if(o==="7A" && day==="Fri") return;
+      const op=(mathP[o]||{})[day]; if(op && op!==bp){ cost+=25; d.mathAlign++; } }); }); });
 
   // avoid Alvarez teaching Tech at the same time Petralia teaches STEAM
   const alvT={}, petS={};
