@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>My Classroom — Mizzentop</title>
+  <link rel="icon" type="image/svg+xml" href="/logo.svg">
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --navy: #1a2744; --cream: #f7f3ec; --muted: #6b7280; --white: #ffffff;
+      --border: #e5e1da; --light-bg: #f0ece4; --green: #2e7d32; --red: #c0392b;
+      --gold: #b8860b; --blue: #2563eb; --amber-bg: #fbf3e0; --amber-tx: #8a6100;
+      --red-bg: #fbe9e7; --red-tx: #a4322a; --green-bg: #e8f0e7; --green-tx: #2d5a27;
+    }
+    html, body { min-height: 100vh; font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(--navy); }
+    .topbar { display: flex; align-items: center; justify-content: space-between; padding: 14px 28px; background: var(--navy); color: var(--white); }
+    .topbar a { color: rgba(255,255,255,0.75); text-decoration: none; font-size: 13px; font-weight: 500; }
+    .topbar a:hover { color: var(--white); }
+    .topbar-title { font-family: 'Playfair Display', serif; font-size: 18px; font-weight: 700; }
+    .container { max-width: 760px; margin: 0 auto; padding: 32px 24px 90px; }
+
+    .page-header { margin-bottom: 22px; }
+    .page-header h1 { font-family: 'Playfair Display', serif; font-size: 30px; font-weight: 700; margin-bottom: 4px; }
+    .page-header p { color: var(--muted); font-size: 14px; }
+
+    .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; margin-bottom: 24px; }
+    .stat { background: var(--white); border: 1px solid var(--border); border-radius: 10px; padding: 12px 16px; }
+    .stat .label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--muted); font-weight: 600; }
+    .stat .value { font-size: 24px; font-weight: 600; margin-top: 3px; }
+    .stat.warn { background: var(--amber-bg); border-color: #efe0bd; }
+    .stat.warn .label, .stat.warn .value { color: var(--amber-tx); }
+    .stat.ok { background: var(--green-bg); border-color: #cfe0cd; }
+    .stat.ok .label, .stat.ok .value { color: var(--green-tx); }
+    .stat .value.small { font-size: 15px; margin-top: 8px; }
+
+    .card { background: var(--white); border: 1px solid var(--border); border-radius: 12px; padding: 18px 20px; margin-bottom: 16px; }
+    .card-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 8px; flex-wrap: wrap; }
+    .card-title { font-size: 17px; font-weight: 600; }
+    .card-sub { font-size: 13px; color: var(--muted); margin-left: 8px; font-weight: 400; }
+
+    .btn { padding: 9px 16px; border: none; border-radius: 8px; font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.15s ease; }
+    .btn-primary { background: var(--navy); color: var(--white); }
+    .btn-primary:hover { opacity: 0.9; }
+    .btn-green { background: var(--green); color: var(--white); }
+    .btn-green:hover { opacity: 0.9; }
+    .btn-secondary { background: var(--white); color: var(--navy); border: 1px solid var(--border); }
+    .btn-secondary:hover { background: var(--light-bg); }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .roster { display: flex; flex-direction: column; }
+    .srow { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-top: 1px solid var(--border); }
+    .srow:first-child { border-top: none; }
+    .avatar { width: 30px; height: 30px; border-radius: 50%; background: #e7ecf5; color: var(--navy); display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; flex-shrink: 0; }
+    .sname { font-weight: 500; font-size: 14px; }
+    .sgrade { font-size: 12px; color: var(--muted); }
+    .sname-wrap { flex: 1; min-width: 0; }
+    .chips { display: flex; gap: 5px; align-items: center; flex-wrap: wrap; }
+    .chip { font-size: 11px; padding: 2px 8px; border-radius: 20px; white-space: nowrap; font-weight: 500; }
+    .chip-allergy { background: var(--red-bg); color: var(--red-tx); }
+    .chip-medical { background: var(--amber-bg); color: var(--amber-tx); }
+    .chip-neutral { background: var(--light-bg); color: var(--muted); }
+    .icon-btn { background: none; border: none; cursor: pointer; color: var(--muted); font-size: 15px; padding: 4px; line-height: 1; }
+    .icon-btn:hover { color: var(--navy); }
+
+    .att-btns { display: flex; gap: 4px; }
+    .att-btn { padding: 6px 11px; border: 1px solid var(--border); border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; background: var(--white); color: var(--muted); }
+    .att-btn.on-present { background: var(--green); color: #fff; border-color: var(--green); }
+    .att-btn.on-absent { background: var(--red); color: #fff; border-color: var(--red); }
+    .att-btn.on-nsd { background: #64748b; color: #fff; border-color: #64748b; }
+
+    .quick { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; margin-top: 8px; }
+    .qtile { border: 1px solid var(--border); border-radius: 8px; padding: 14px; text-align: center; font-size: 13px; font-weight: 500; background: var(--white); cursor: pointer; }
+    .qtile:hover { background: var(--light-bg); }
+    .qtile.disabled { border-style: dashed; color: var(--muted); cursor: default; background: transparent; }
+    .qtile small { display: block; font-size: 11px; color: var(--muted); font-weight: 400; }
+
+    .section-label { font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--muted); font-weight: 600; margin: 22px 0 8px; }
+    .empty { color: var(--muted); font-size: 14px; padding: 8px 0; }
+    .saved-badge { font-size: 12px; font-weight: 600; color: var(--green-tx); display: none; }
+    .saved-badge.show { display: inline; }
+
+    .overlay { position: fixed; inset: 0; background: rgba(20,30,50,0.45); display: none; align-items: center; justify-content: center; padding: 20px; z-index: 50; }
+    .overlay.open { display: flex; }
+    .modal { background: var(--white); border-radius: 12px; max-width: 460px; width: 100%; max-height: 85vh; overflow-y: auto; padding: 22px 24px; }
+    .modal h2 { font-family: 'Playfair Display', serif; font-size: 22px; margin-bottom: 2px; }
+    .modal .msub { color: var(--muted); font-size: 13px; margin-bottom: 16px; }
+    .frow { display: flex; justify-content: space-between; gap: 12px; padding: 8px 0; border-top: 1px solid var(--border); font-size: 13px; }
+    .frow .k { color: var(--muted); }
+    .frow .v { text-align: right; font-weight: 500; }
+    .frow .v.alert { color: var(--red-tx); }
+    .notes-head { font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--muted); font-weight: 600; margin: 18px 0 8px; }
+    .note { background: var(--cream); border-radius: 8px; padding: 8px 10px; font-size: 13px; margin-bottom: 6px; }
+    .note .meta { font-size: 11px; color: var(--muted); margin-top: 3px; }
+    textarea { width: 100%; border: 1px solid var(--border); border-radius: 8px; padding: 10px; font-family: 'DM Sans', sans-serif; font-size: 13px; resize: vertical; min-height: 60px; }
+    .modal-actions { display: flex; justify-content: space-between; gap: 8px; margin-top: 12px; align-items: center; }
+    .loading { text-align: center; color: var(--muted); padding: 60px 0; font-size: 14px; }
+  </style>
+</head>
+<body>
+<div class="topbar">
+  <span class="topbar-title">My Classroom</span>
+  <a href="/portal">Staff portal →</a>
+</div>
+
+<div class="container">
+  <div id="root"><div class="loading">Loading your classroom…</div></div>
+</div>
+
+<div class="overlay" id="overlay" onclick="if(event.target===this)closeModal()">
+  <div class="modal" id="modal"></div>
+</div>
+
+<script>
+const API = '';
+let DATA = null;
+let attendance = {};   // student_id -> {status, note}
+
+function esc(s){ return (s==null?'':String(s)).replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+function initials(name){ return name.split(/\s+/).map(w=>w[0]||'').slice(0,2).join('').toUpperCase(); }
+
+async function load(){
+  let res;
+  try { res = await fetch(`${API}/api/my-classroom`); }
+  catch(e){ document.getElementById('root').innerHTML = '<div class="empty">Could not reach the server.</div>'; return; }
+  if (res.status === 401 || res.status === 403){ window.location = '/login'; return; }
+  DATA = await res.json();
+  if (DATA.error){ document.getElementById('root').innerHTML = `<div class="empty">${esc(DATA.error)}</div>`; return; }
+  DATA.homeroom.students.forEach(s => { if (s.att_status) attendance[s.student_id] = { status: s.att_status, note: '' }; });
+  render();
+}
+
+function studentIndex(){
+  const map = {};
+  DATA.homeroom.students.forEach(s => map[s.student_id] = s);
+  DATA.sections.forEach(sec => sec.students.forEach(s => { if(!map[s.student_id]) map[s.student_id] = s; }));
+  return map;
+}
+
+function render(){
+  const t = DATA.teacher.name;
+  const hour = new Date().getHours();
+  const greet = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
+  const idx = studentIndex();
+  const distinct = Object.keys(idx).length;
+  const flagged = Object.values(idx).filter(s => s.allergies || s.medical_alert).length;
+
+  let html = `<div class="page-header">
+    <h1>${esc(greet)}, ${esc(t.split(' ')[0])}</h1>
+    <p>${esc(DATA.day_name)} · ${esc(fmtDate(DATA.date))} · ${esc(DATA.school_year)}</p>
+  </div>`;
+
+  html += `<div class="stats">
+    <div class="stat"><div class="label">My sections</div><div class="value">${DATA.sections.length + (DATA.has_homeroom?1:0)}</div></div>
+    <div class="stat"><div class="label">Students</div><div class="value">${distinct}</div></div>`;
+  if (DATA.has_homeroom){
+    const done = DATA.homeroom.attendance_taken;
+    html += `<div class="stat ${done?'ok':'warn'}"><div class="label">Attendance</div><div class="value small">${done?'Taken':'Not taken'}</div></div>`;
+  }
+  html += `<div class="stat"><div class="label">Health flags</div><div class="value">${flagged}</div></div></div>`;
+
+  if (DATA.has_homeroom){
+    const hr = DATA.homeroom;
+    html += `<div class="card">
+      <div class="card-head">
+        <div><span class="card-title">${esc(hr.name)}</span><span class="card-sub">${hr.room?esc(hr.room)+' · ':''}homeroom · ${hr.students.length} students</span></div>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <span class="saved-badge" id="saved-badge">✓ Saved</span>
+          <button class="btn btn-secondary" onclick="markAllPresent()">Mark all present</button>
+          <button class="btn btn-green" id="save-att" onclick="saveAttendance()">Save attendance</button>
+        </div>
+      </div>
+      <div class="roster">${hr.students.map(s => homeroomRow(s)).join('')}</div>
+    </div>`;
+  }
+
+  DATA.sections.forEach(sec => {
+    html += `<div class="card">
+      <div class="card-head"><div><span class="card-title">${esc(sec.name)}</span><span class="card-sub">${sec.room?esc(sec.room)+' · ':''}${esc(sec.type)} · ${sec.students.length} students</span></div></div>
+      <div class="roster">${sec.students.length ? sec.students.map(s => subjectRow(s)).join('') : '<div class="empty">No students enrolled yet.</div>'}</div>
+    </div>`;
+  });
+
+  html += `<div class="section-label">Quick actions</div><div class="quick">`;
+  if (DATA.has_homeroom) html += `<div class="qtile" onclick="document.getElementById('save-att').scrollIntoView({behavior:'smooth'})">Take attendance</div>`;
+  html += `<div class="qtile disabled">Grades<small>with report cards</small></div></div>`;
+
+  document.getElementById('root').innerHTML = html;
+}
+
+function healthChips(s){
+  let c = '';
+  if (s.allergies) c += `<span class="chip chip-allergy" title="${esc(s.allergies)}">Allergy</span>`;
+  if (s.medical_alert) c += `<span class="chip chip-medical" title="${esc(s.medical_alert)}">Medical</span>`;
+  return c;
+}
+
+function homeroomRow(s){
+  const a = attendance[s.student_id] || {};
+  const st = a.status || '';
+  const dis = s.dismissal ? `<span class="chip chip-neutral">${esc(s.dismissal)}${s.dismissal_dest? ' · '+esc(s.dismissal_dest):''}</span>` : '';
+  return `<div class="srow">
+    <div class="avatar">${esc(initials(s.name))}</div>
+    <div class="sname-wrap"><div class="sname">${esc(s.name)}</div><div class="sgrade">Grade ${esc(s.grade||'—')}</div></div>
+    <div class="chips">${healthChips(s)}${dis}</div>
+    <div class="att-btns">
+      <button class="att-btn ${st==='present'?'on-present':''}" onclick="setStatus(${s.student_id},'present')">P</button>
+      <button class="att-btn ${st==='absent'?'on-absent':''}" onclick="setStatus(${s.student_id},'absent')">A</button>
+      <button class="att-btn ${st==='nsd'?'on-nsd':''}" onclick="setStatus(${s.student_id},'nsd')" title="No School Day – PreK">NSD</button>
+    </div>
+    <button class="icon-btn" title="Notes${s.note_count?` (${s.note_count})`:''}" onclick="openStudent(${s.student_id})">✎</button>
+  </div>`;
+}
+
+function subjectRow(s){
+  return `<div class="srow">
+    <div class="avatar">${esc(initials(s.name))}</div>
+    <div class="sname-wrap"><div class="sname">${esc(s.name)}</div><div class="sgrade">Grade ${esc(s.grade||'—')}</div></div>
+    <div class="chips">${healthChips(s)}</div>
+    <button class="icon-btn" title="Details" onclick="openStudent(${s.student_id})">›</button>
+  </div>`;
+}
+
+function setStatus(id, status){
+  const cur = attendance[id];
+  if (cur && cur.status === status) delete attendance[id];
+  else attendance[id] = { status, note: (cur&&cur.note)||'' };
+  document.getElementById('saved-badge').classList.remove('show');
+  render();
+}
+function markAllPresent(){
+  DATA.homeroom.students.forEach(s => { if(!attendance[s.student_id]) attendance[s.student_id] = { status:'present', note:'' }; });
+  document.getElementById('saved-badge').classList.remove('show');
+  render();
+}
+async function saveAttendance(){
+  const payload = {};
+  DATA.homeroom.students.forEach(s => { const a = attendance[s.student_id]; if (a && a.status) payload[s.student_id] = { status:a.status, note:a.note||'' }; });
+  const btn = document.getElementById('save-att'); btn.disabled = true; btn.textContent = 'Saving…';
+  try {
+    const res = await fetch(`${API}/api/homeroom-attendance`, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ date: DATA.date, staff_id: DATA.teacher.staff_id, attendance: payload })
+    });
+    const j = await res.json();
+    if (j.success){ DATA.homeroom.attendance_taken = true; document.getElementById('saved-badge').classList.add('show'); render(); }
+    else alert(j.error || 'Could not save attendance.');
+  } catch(e){ alert('Could not save attendance.'); }
+  finally { const b = document.getElementById('save-att'); if(b){ b.disabled=false; b.textContent='Save attendance'; } }
+}
+
+async function openStudent(id){
+  const s = studentIndex()[id];
+  if (!s) return;
+  const ov = document.getElementById('overlay'), m = document.getElementById('modal');
+  m.innerHTML = `<h2>${esc(s.name)}</h2><div class="msub">Grade ${esc(s.grade||'—')}</div><div class="loading" style="padding:20px 0;">Loading…</div>`;
+  ov.classList.add('open');
+  let notes = [];
+  try { notes = await (await fetch(`${API}/api/student-notes?student_id=${id}`)).json(); } catch(e){}
+  const f = [];
+  if (s.allergies) f.push(`<div class="frow"><span class="k">Allergies</span><span class="v alert">${esc(s.allergies)}</span></div>`);
+  if (s.medical_alert) f.push(`<div class="frow"><span class="k">Medical alert</span><span class="v alert">${esc(s.medical_alert)}</span></div>`);
+  if (s.medications) f.push(`<div class="frow"><span class="k">Medications</span><span class="v">${esc(s.medications)}</span></div>`);
+  if (s.dietary) f.push(`<div class="frow"><span class="k">Dietary</span><span class="v">${esc(s.dietary)}</span></div>`);
+  if (s.dismissal) f.push(`<div class="frow"><span class="k">Dismissal today</span><span class="v">${esc(s.dismissal)}${s.dismissal_dest?' · '+esc(s.dismissal_dest):''}</span></div>`);
+  if (s.emergency_contact_name) f.push(`<div class="frow"><span class="k">Emergency contact</span><span class="v">${esc(s.emergency_contact_name)}${s.emergency_contact_phone?' · '+esc(s.emergency_contact_phone):''}</span></div>`);
+  if (!f.length) f.push(`<div class="frow"><span class="k">No health or contact details on file</span><span class="v"></span></div>`);
+  const notesHtml = (Array.isArray(notes)&&notes.length) ? notes.map(n => `<div class="note">${esc(n.body)}<div class="meta">${esc(n.author_name||'Staff')} · ${esc(fmtStamp(n.created_at))}</div></div>`).join('') : '<div class="empty" style="padding:2px 0;">No notes yet.</div>';
+  m.innerHTML = `<h2>${esc(s.name)}</h2><div class="msub">Grade ${esc(s.grade||'—')}</div>
+    ${f.join('')}
+    <div class="notes-head">Notes</div>
+    <div id="notes-list">${notesHtml}</div>
+    <textarea id="note-input" placeholder="Add a note about ${esc(s.name.split(' ')[0])}…"></textarea>
+    <div class="modal-actions">
+      <a href="/students" style="font-size:13px;color:var(--blue);text-decoration:none;">Open full profile →</a>
+      <div style="display:flex;gap:8px;">
+        <button class="btn btn-secondary" onclick="closeModal()">Close</button>
+        <button class="btn btn-primary" onclick="addNote(${id})">Add note</button>
+      </div>
+    </div>`;
+}
+function closeModal(){ document.getElementById('overlay').classList.remove('open'); }
+async function addNote(id){
+  const ta = document.getElementById('note-input'); const body = ta.value.trim();
+  if (!body) return;
+  try {
+    const res = await fetch(`${API}/api/student-notes`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ student_id:id, body }) });
+    const j = await res.json();
+    if (j.success){
+      const s = studentIndex()[id]; if (s) s.note_count = (s.note_count||0)+1;
+      openStudent(id); render();
+    } else alert(j.error || 'Could not add note.');
+  } catch(e){ alert('Could not add note.'); }
+}
+
+function fmtDate(iso){ try { const d = new Date(iso+'T00:00:00'); return d.toLocaleDateString(undefined,{month:'long',day:'numeric'}); } catch(e){ return iso; } }
+function fmtStamp(ts){ if(!ts) return ''; const d = new Date(ts); return isNaN(d) ? '' : d.toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'}); }
+
+load();
+</script>
+</body>
+</html>
