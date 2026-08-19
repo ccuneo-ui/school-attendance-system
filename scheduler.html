@@ -2145,6 +2145,16 @@ function setSaveStatus(t){ const el=document.getElementById('saveStatus'); if(el
 function applyEditMode(){
   const b=document.getElementById('btnSave'); if(b) b.style.display = CAN_EDIT?'':'none';
   const bn=document.getElementById('viewBanner'); if(bn) bn.style.display = CAN_EDIT?'none':'block';
+  // View-only staff see only the Generate tab (the rules/inputs tabs are hidden so
+  // there's nothing to second-guess), and the stats/KPI row is hidden too.
+  const kpi=document.getElementById('kpi'); if(kpi) kpi.style.display = CAN_EDIT?'':'none';
+  document.querySelectorAll('#tabs button').forEach(btn=>{
+    if(btn.dataset.tab!=='generate') btn.style.display = CAN_EDIT?'':'none';
+  });
+  if(!CAN_EDIT){
+    const gen=document.querySelector('#tabs button[data-tab="generate"]');
+    if(gen) gen.click();   // land straight on Generate for view-only staff
+  }
 }
 function serverPack(){
   const pack={_type:"mizzentop_schedule",_version:1, S, homeroomEdits, lunchOverrides, parked:[...parkedSet], merged:[...mergedSet]};

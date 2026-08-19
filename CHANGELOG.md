@@ -1,5 +1,7 @@
 # Changelog
 
+2026-08-19: Read-only scheduler is now streamlined for general staff — the view-only copy (staff without the scheduler permission) shows only the Generate tab and hides the summary stats row (Sessions Placed, Unplaced, Busiest, Belmonte Classes, Arrangements). The Rules, Classes, Teachers, Requirements, Availability, and Fixed & Lunch tabs are hidden so staff just see and explore the schedule without the underlying setup. Editors with the scheduler permission still see every tab and the stats.
+
 2026-08-19: Staff editor now exposes a "Scheduler" permission under the People silo, so an admin can grant a specific staff member save/edit access to the scheduler (the checkbox was missing even though the backend already recognized the key). Ticking it lets that person hard-save the live schedule; leaving it off keeps them in the read-only sandbox.
 
 2026-08-19: Scheduler is now open to all signed-in staff as a read-only sandbox — anyone can open it and explore (generate, drag, swap, merge), but for staff without the scheduler permission saving is fully off: the Save button is hidden, autosave is disabled, and the save endpoint rejects them on the server, so nothing they do touches the live schedule. A "view only" banner makes that clear; a refresh returns the live schedule. Editors with the scheduler permission are unchanged. A "Schedule" link now appears in the Reference menu so all staff can find it.
