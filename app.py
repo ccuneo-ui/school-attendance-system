@@ -105,6 +105,7 @@ NAV_REFERENCE = {"key": "reference", "label": "Reference", "pages": [
     {"key": "dismissal_staff",    "label": "Dismissal Staff View", "href": "/dismissal-staff"},
     {"key": "bus_dashboard",      "label": "Bus Dashboard",       "href": "/bus-dashboard"},
     {"key": "attendance_report",  "label": "Attendance Report",   "href": "/homeroom-attendance-report"},
+    {"key": "schedule",           "label": "Schedule",            "href": "/scheduler"},
 ]}
 
 # Order the menus appear in the bar.
@@ -1065,8 +1066,10 @@ def classes_page():
     return send_from_directory(".", "classes.html")
 
 @app.route("/scheduler")
-@require_perm("scheduler")
+@login_required
 def scheduler_page():
+    # Viewable by any signed-in staff (read-only sandbox). Saving is gated separately by the
+    # "scheduler" permission, enforced on the POST endpoint and reflected via /api/scheduler's can_edit.
     return send_from_directory(".", "scheduler.html")
 
 @app.route("/rooms")
@@ -7170,8 +7173,9 @@ def api_cohorts_populate(grade):
 # One JSON blob per school year (inputs + generated grid + manual edits).
 # ============================================
 @app.route("/api/scheduler")
-@require_perm("scheduler")
+@login_required
 def api_scheduler_get():
+    # Any signed-in staff can read the schedule; can_edit tells the page whether to allow saving.
     year = current_school_year_start()
     conn = get_db_connection()
     try:
@@ -7185,6 +7189,7 @@ def api_scheduler_get():
             except Exception:
                 data = None
         return jsonify({"school_year_start": year, "data": data,
+                        "can_edit": has_perm("scheduler"),
                         "updated_at": (row[1].isoformat() if row and row[1] else None) if row else None,
                         "updated_by": row[2] if row else None})
     finally:

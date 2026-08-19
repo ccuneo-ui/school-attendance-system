@@ -188,7 +188,7 @@
   </div>
   <div class="toprow">
     <span id="saveStatus" style="font-size:12px;color:#6b7280;margin-right:6px;align-self:center;">…</span>
-    <button class="ghost sm" onclick="saveServer(true)" title="Save the whole schedule to the server">💾 Save</button>
+    <button id="btnSave" class="ghost sm" onclick="saveServer(true)" title="Save the whole schedule to the server">💾 Save</button>
     <button class="ghost sm" onclick="saveData()" title="Download an inputs backup file">⭳ Export inputs</button>
     <button class="ghost sm" onclick="document.getElementById('loadfile').click()" title="Import an inputs backup file">⭱ Import inputs</button>
     <input type="file" id="loadfile" accept=".json" style="display:none" onchange="loadData(event)">
@@ -196,6 +196,7 @@
     <a class="ghost sm" href="/" style="text-decoration:none;align-self:center;padding:6px 11px;">← Home</a>
   </div>
 </header>
+<div id="viewBanner" style="display:none;background:#eef4ff;border-bottom:1px solid #c7d8f5;color:#1a3a6b;font-size:13px;font-weight:500;padding:8px 22px;">👁 View only — you can explore, generate, and rearrange freely, but nothing you change here is saved. Refresh to return to the live schedule.</div>
 
 <nav class="tabs" id="tabs">
   <button data-tab="rules" class="active">Rules</button>
@@ -2139,7 +2140,12 @@ function loadSchedule(e){ const f=e.target.files[0]; if(!f) return; const rd=new
 
 /* ==================== SERVER PERSISTENCE (Admin Portal) ==================== */
 let _booting=true, _saveT=null;
+let CAN_EDIT=true;   // set from the server: staff without the scheduler permission get a read-only sandbox
 function setSaveStatus(t){ const el=document.getElementById('saveStatus'); if(el) el.textContent=t; }
+function applyEditMode(){
+  const b=document.getElementById('btnSave'); if(b) b.style.display = CAN_EDIT?'':'none';
+  const bn=document.getElementById('viewBanner'); if(bn) bn.style.display = CAN_EDIT?'none':'block';
+}
 function serverPack(){
   const pack={_type:"mizzentop_schedule",_version:1, S, homeroomEdits, lunchOverrides, parked:[...parkedSet], merged:[...mergedSet]};
   if(typeof RESULT!=="undefined" && RESULT){
@@ -2158,6 +2164,7 @@ function applyPack(p){
   return true;
 }
 async function saveServer(manual){
+  if(!CAN_EDIT){ if(manual) alert('This is a view-only copy — changes are not saved.'); return; }
   try{
     setSaveStatus('Saving…');
     const r=await fetch('/api/scheduler',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({data:serverPack()})});
@@ -2166,13 +2173,16 @@ async function saveServer(manual){
     const now=new Date(); setSaveStatus('Saved '+now.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}));
   }catch(e){ setSaveStatus('Save failed'); if(manual) alert('Could not save to the server: '+e.message); }
 }
-function scheduleAutosave(){ if(_booting) return; if(_saveT) clearTimeout(_saveT); _saveT=setTimeout(()=>saveServer(false),1500); }
+function scheduleAutosave(){ if(!CAN_EDIT || _booting) return; if(_saveT) clearTimeout(_saveT); _saveT=setTimeout(()=>saveServer(false),1500); }
 async function loadServer(){
   _booting=true;
   try{
     const r=await fetch('/api/scheduler',{headers:{'Accept':'application/json'}});
-    if(r.ok){ const d=await r.json(); if(d && d.data && applyPack(d.data)){ setSaveStatus('Loaded saved schedule'); return; } }
-    S=seed(); renderAll(); setSaveStatus('New — from workbook');
+    let d=null; if(r.ok){ d=await r.json().catch(()=>null); }
+    if(d && typeof d.can_edit==='boolean') CAN_EDIT=d.can_edit;
+    applyEditMode();
+    if(d && d.data && applyPack(d.data)){ setSaveStatus(CAN_EDIT?'Loaded saved schedule':'View only — changes are not saved'); return; }
+    S=seed(); renderAll(); setSaveStatus(CAN_EDIT?'New — from workbook':'View only — changes are not saved');
   }catch(e){ S=seed(); renderAll(); setSaveStatus('New — from workbook'); }
   finally{ _booting=false; }
 }

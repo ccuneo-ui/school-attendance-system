@@ -1,5 +1,7 @@
 # Changelog
 
+2026-08-19: Scheduler is now open to all signed-in staff as a read-only sandbox — anyone can open it and explore (generate, drag, swap, merge), but for staff without the scheduler permission saving is fully off: the Save button is hidden, autosave is disabled, and the save endpoint rejects them on the server, so nothing they do touches the live schedule. A "view only" banner makes that clear; a refresh returns the live schedule. Editors with the scheduler permission are unchanged. A "Schedule" link now appears in the Reference menu so all staff can find it.
+
 2026-08-18: Site-wide dropdown navigation bar added to every page — Daily Input, Reference, People and Billing menus (permission-filtered) let staff jump between pages directly instead of routing back through the home screen; the old per-page "Home" buttons are now hidden.
 
 2026-08-10: Scheduler — Friday exception to 7th-grade math alignment: 7th Gold may now run at a different period than 7th Blue/White on Fridays (Blue and White stay aligned). This stops McLeod from being booked straight through the Friday lunch window, so he gets a real midday lunch instead of a mislabeled 1st-period one. Verified drafts stay complete.
