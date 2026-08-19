@@ -1,5 +1,7 @@
 # Changelog
 
+2026-08-18: Site-wide dropdown navigation bar added to every page — Daily Input, Reference, People and Billing menus (permission-filtered) let staff jump between pages directly instead of routing back through the home screen; the old per-page "Home" buttons are now hidden.
+
 2026-08-10: Scheduler — Friday exception to 7th-grade math alignment: 7th Gold may now run at a different period than 7th Blue/White on Fridays (Blue and White stay aligned). This stops McLeod from being booked straight through the Friday lunch window, so he gets a real midday lunch instead of a mislabeled 1st-period one. Verified drafts stay complete.
 
 2026-08-10: Scheduler rule change — Friday Kindergarten PE moved from 3rd period to 7th period (Wednesday stays P3), which frees a 3rd-period slot for Kindergarten Spanish (Murphy teaches Spanish mornings only, so P3 is its only option). Fixes a previously unplaceable Kindergarten Spanish class; drafts now generate complete.

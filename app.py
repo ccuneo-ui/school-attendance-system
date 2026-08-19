@@ -65,33 +65,50 @@ SUPERADMIN_EMAIL = "ccuneo@mizzentop.org"
 
 PERMISSION_SILOS = [
     {"key": "daily_input", "label": "Daily Input", "pages": [
-        {"key": "homeroom_attendance", "label": "Homeroom Attendance"},
-        {"key": "daily_ops",           "label": "Daily Ops"},
-        {"key": "mcard",               "label": "M Card Snack Tracker"},
-        {"key": "program_attendance",  "label": "Program Attendance"},
-        {"key": "aftercare",           "label": "Before & Aftercare"},
-        {"key": "school_store",        "label": "School Store"},
-        {"key": "dismissal_options",   "label": "Activities & Bus Routes"},
+        {"key": "homeroom_attendance", "label": "Homeroom Attendance",   "href": "/homeroom-attendance"},
+        {"key": "daily_ops",           "label": "Daily Ops",             "href": "/dismissal"},
+        {"key": "mcard",               "label": "M Card Snack Tracker",  "href": "/mcard"},
+        {"key": "program_attendance",  "label": "Program Attendance",    "href": "/program-attendance"},
+        {"key": "aftercare",           "label": "Before & Aftercare",    "href": "/aftercare"},
+        {"key": "school_store",        "label": "School Store",          "href": "/school-store"},
+        {"key": "dismissal_options",   "label": "Activities & Bus Routes","href": "/dismissal-options"},
     ]},
     {"key": "people", "label": "People", "pages": [
-        {"key": "students",        "label": "Student Directory"},
-        {"key": "family_manager",  "label": "Family Manager"},
-        {"key": "staff_directory", "label": "Staff Directory"},
-        {"key": "classes",         "label": "Classes"},
-        {"key": "scheduler",       "label": "Scheduler"},
-        {"key": "rooms",           "label": "Rooms"},
+        {"key": "students",        "label": "Student Directory", "href": "/students"},
+        {"key": "family_manager",  "label": "Family Manager",    "href": "/family-manager"},
+        {"key": "staff_directory", "label": "Staff Directory",   "href": "/staff"},
+        {"key": "classes",         "label": "Classes",           "href": "/classes"},
+        {"key": "scheduler",       "label": "Scheduler",         "href": "/scheduler"},
+        {"key": "rooms",           "label": "Rooms",             "href": "/rooms"},
     ]},
     {"key": "billing", "label": "Billing", "pages": [
-        {"key": "billing_rates",   "label": "Billing Rates"},
-        {"key": "school_calendar", "label": "School Calendar"},
-        {"key": "lunch_dashboard", "label": "Lunch Dashboard"},
-        {"key": "billing_report",  "label": "Billing Reports"},
-        {"key": "financial_aid",   "label": "Financial Aid"},
+        {"key": "billing_rates",   "label": "Billing Rates",   "href": "/billing-rates"},
+        {"key": "school_calendar", "label": "School Calendar", "href": "/school-calendar"},
+        {"key": "lunch_dashboard", "label": "Lunch Dashboard", "href": "/lunch-dashboard"},
+        {"key": "billing_report",  "label": "Billing Reports", "href": "/billing-report"},
+        {"key": "financial_aid",   "label": "Financial Aid",   "href": "/financial-aid"},
     ]},
 ]
 
 ALL_PERMISSION_KEYS = [p["key"] for silo in PERMISSION_SILOS for p in silo["pages"]]
 SILO_KEYS = {silo["key"]: [p["key"] for p in silo["pages"]] for silo in PERMISSION_SILOS}
+
+# ── Global navigation menu ───────────────────────────────────────────────────
+# The dropdown bar on every page (served by /nav.js, fed by /api/nav) is built
+# from PERMISSION_SILOS above, so a new gated page shows up in the menu the
+# moment it gets a permission key + href — no HTML edits anywhere.
+#
+# The Reference group lives here instead of in PERMISSION_SILOS because those
+# pages are read-only and deliberately open to any signed-in staff member.
+NAV_REFERENCE = {"key": "reference", "label": "Reference", "pages": [
+    {"key": "family_directory",   "label": "Family Directory",    "href": "/family-directory"},
+    {"key": "dismissal_staff",    "label": "Dismissal Staff View", "href": "/dismissal-staff"},
+    {"key": "bus_dashboard",      "label": "Bus Dashboard",       "href": "/bus-dashboard"},
+    {"key": "attendance_report",  "label": "Attendance Report",   "href": "/homeroom-attendance-report"},
+]}
+
+# Order the menus appear in the bar.
+NAV_GROUP_ORDER = ["daily_input", "reference", "people", "billing"]
 
 
 def permissions_for_staff(staff):
@@ -957,6 +974,60 @@ def get_session():
 @app.route("/logo.svg")
 def serve_logo():
     return send_from_directory(".", "logo.svg")
+
+
+# ============================================
+# GLOBAL NAV BAR
+# ============================================
+
+@app.route("/nav.js")
+def serve_nav_js():
+    """The shared dropdown navigation bar. Included by every portal page."""
+    return send_from_directory(".", "nav.js", mimetype="application/javascript")
+
+
+@app.route("/api/nav")
+def api_nav():
+    """Menu structure for the global nav, filtered to what this user may open.
+
+    Built from PERMISSION_SILOS + NAV_REFERENCE so the menu can never drift
+    away from the permission model.
+    """
+    if not session.get("user_email"):
+        return jsonify({"logged_in": False}), 401
+
+    by_key = {silo["key"]: silo for silo in PERMISSION_SILOS}
+    by_key[NAV_REFERENCE["key"]] = NAV_REFERENCE
+
+    groups = []
+    for group_key in NAV_GROUP_ORDER:
+        silo = by_key.get(group_key)
+        if not silo:
+            continue
+        if group_key == "reference":
+            pages = [dict(p) for p in silo["pages"]]          # ungated
+        else:
+            pages = [dict(p) for p in silo["pages"] if has_perm(p["key"])]
+        if pages:
+            groups.append({"key": silo["key"], "label": silo["label"], "pages": pages})
+
+    # Teachers get a direct link back to their own classroom dashboard.
+    try:
+        is_teacher = _staff_is_teacher(session.get("user_email"))
+    except Exception:
+        is_teacher = False
+    if is_teacher:
+        groups.insert(0, {"key": "teaching", "label": "My Classroom", "pages": [
+            {"key": "my_classroom", "label": "My Classroom", "href": "/my-classroom"},
+        ]})
+
+    return jsonify({
+        "groups": groups,
+        "user": {
+            "name": session.get("user_name"),
+            "email": session.get("user_email"),
+        },
+    })
 
 @app.route("/attendance")
 @login_required

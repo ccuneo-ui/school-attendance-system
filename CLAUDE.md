@@ -20,6 +20,7 @@ All files live in the repo root. No subdirectories besides `static/brand/`.
 
 ### Core
 - `app.py` — All routes, API endpoints, auth, DB schema, business logic
+- `nav.js` — Global dropdown navigation bar, injected into every page by a single `<script src="/nav.js" defer>` tag. Its menu comes from `GET /api/nav`, which the server builds from `PERMISSION_SILOS` + `NAV_REFERENCE` and filters by the signed-in user's permissions. **To add a page to the site-wide menu, add its key/label/href to `PERMISSION_SILOS` in `app.py` — never edit the HTML files.** The script also hides each page's legacy "← Home" link.
 - `requirements.txt` — Flask, flask-cors, authlib, requests, psycopg2-binary, gunicorn
 - `render.yaml` — Render deployment config
 
