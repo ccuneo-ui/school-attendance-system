@@ -80,7 +80,7 @@ PERMISSION_SILOS = [
         {"key": "classes",         "label": "Classes",           "href": "/classes"},
         {"key": "scheduler",       "label": "Scheduler",         "href": "/scheduler"},
         {"key": "rooms",           "label": "Rooms",             "href": "/rooms"},
-        {"key": "report_card_templates", "label": "Report Card Templates"},
+        {"key": "report_card_templates", "label": "Report Card Templates", "href": "/report-card-templates"},
     ]},
     {"key": "billing", "label": "Billing", "pages": [
         {"key": "billing_rates",   "label": "Billing Rates",   "href": "/billing-rates"},
