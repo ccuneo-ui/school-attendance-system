@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Report Card Templates — Mizzentop Day School</title>
+<link rel="icon" type="image/svg+xml" href="/logo.svg">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet"/>
+<style>
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+  :root{--navy:#1a2744;--green:#2d5016;--gold:#c8992a;--cream:#f7f3ec;--muted:#6b7280;--light:#e8e2d9;--danger:#9b1c1c;}
+  html,body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--navy);min-height:100%;}
+  .topnav{background:var(--navy);display:flex;align-items:center;gap:16px;padding:0 28px;height:56px;}
+  .topnav .title{color:#fff;font-size:14px;font-weight:500;}
+  .topnav a{margin-left:auto;color:rgba(255,255,255,0.85);text-decoration:none;font-size:13px;font-weight:500;border:1px solid rgba(255,255,255,0.25);padding:7px 14px;border-radius:8px;}
+  .topnav a:hover{background:rgba(255,255,255,0.1);}
+  .page{max-width:1120px;margin:0 auto;padding:26px 24px 80px;}
+  h1{font-family:'Playfair Display',serif;font-size:30px;margin-bottom:2px;}
+  .sub{color:var(--muted);font-size:14px;margin-bottom:20px;}
+  .btn{display:inline-flex;align-items:center;gap:6px;padding:8px 15px;border-radius:8px;font-size:13px;font-weight:500;font-family:inherit;cursor:pointer;border:none;}
+  .btn-primary{background:var(--navy);color:#fff;}
+  .btn-ghost{background:transparent;color:var(--muted);border:1px solid var(--light);}
+  .btn-sm{padding:4px 9px;font-size:12px;}
+  .btn-x{background:none;border:none;color:var(--danger);cursor:pointer;font-size:14px;padding:2px 6px;}
+  .layout{display:grid;grid-template-columns:280px 1fr;gap:20px;}
+  @media(max-width:840px){.layout{grid-template-columns:1fr;}}
+  .list{background:#fff;border:1px solid var(--light);border-radius:12px;overflow:hidden;}
+  .tpl-item{padding:12px 15px;border-bottom:1px solid #f3f0eb;cursor:pointer;}
+  .tpl-item:hover{background:#faf8f5;}
+  .tpl-item.active{background:#eef2f8;border-left:3px solid var(--navy);}
+  .tpl-name{font-weight:500;font-size:14px;}
+  .tpl-meta{font-size:12px;color:var(--muted);margin-top:2px;}
+  .tag{display:inline-block;font-size:10px;font-weight:600;padding:1px 7px;border-radius:10px;text-transform:uppercase;letter-spacing:.03em;background:rgba(200,153,42,.16);color:#7a5a10;}
+  .panel{background:#fff;border:1px solid var(--light);border-radius:12px;padding:22px;}
+  .panel .empty{color:var(--muted);text-align:center;padding:60px 20px;}
+  .hdr{display:flex;gap:14px;align-items:flex-end;flex-wrap:wrap;margin-bottom:16px;}
+  label.fld{font-size:11px;font-weight:500;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:4px;}
+  input[type=text]{padding:8px 11px;border:1px solid var(--light);border-radius:7px;font-size:13px;font-family:inherit;background:#fff;color:var(--navy);outline:none;}
+  input[type=text]:focus,select:focus{border-color:var(--navy);}
+  select{padding:7px 10px;border:1px solid var(--light);border-radius:7px;font-size:13px;font-family:inherit;background:#fff;color:var(--navy);}
+  .keybar{background:#faf8f4;border:1px solid var(--light);border-radius:8px;padding:8px 12px;font-size:12px;color:var(--muted);margin-bottom:16px;}
+  .keybar b{color:var(--navy);}
+  .section{border:1px solid var(--light);border-radius:10px;margin-bottom:12px;overflow:hidden;}
+  .sec-head{background:#f9f7f4;padding:9px 13px;display:flex;align-items:center;gap:10px;}
+  .sec-head input.sectitle{font-weight:600;flex:1;border:1px solid transparent;background:transparent;font-size:13px;padding:4px 6px;}
+  .sec-head input.sectitle:hover,.sec-head input.sectitle:focus{border-color:var(--light);background:#fff;}
+  .kindtag{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.03em;color:var(--muted);}
+  .sec-body{padding:8px 13px 12px;}
+  .grp-head{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--gold);margin:8px 0 4px;}
+  .row{display:flex;align-items:center;gap:8px;padding:2px 0;}
+  .row input.rowlabel{flex:1;padding:6px 9px;font-size:13px;}
+  .row .ord{display:flex;flex-direction:column;}
+  .row .ord button{border:none;background:none;color:var(--muted);cursor:pointer;font-size:9px;line-height:1;padding:1px;}
+  .addrow{margin-top:6px;}
+  .chips-field{margin-top:6px;}
+  .save-bar{position:sticky;bottom:0;background:#fff;border-top:1px solid var(--light);padding:12px 0 2px;margin-top:14px;display:flex;gap:10px;align-items:center;}
+  .save-bar .note{color:var(--muted);font-size:12px;}
+  .toast{position:fixed;bottom:24px;right:24px;background:var(--navy);color:#fff;padding:12px 20px;border-radius:10px;font-size:13px;font-weight:500;transform:translateY(80px);opacity:0;transition:all .3s;pointer-events:none;z-index:200;}
+  .toast.show{transform:translateY(0);opacity:1;}
+  .toast.error{background:var(--danger);}
+</style>
+</head>
+<body>
+<nav class="topnav"><span class="title">Report Card Templates</span><a href="/">← Home</a></nav>
+<div class="page">
+  <h1>Report Card Templates</h1>
+  <div class="sub">The definitions behind each report card — subjects, skills, and grading scales. Edit these as the drafts get feedback; the report cards teachers fill in and print are generated from them.</div>
+  <div class="layout">
+    <div>
+      <div class="list" id="tplList"><div class="tpl-item"><span class="tpl-meta">Loading…</span></div></div>
+      <button class="btn btn-ghost btn-sm" style="margin-top:10px;" onclick="newTemplate()">+ New template</button>
+    </div>
+    <div class="panel" id="panel"><div class="empty">Select a template to review or edit it.</div></div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+<script>
+  function toast(m,e){const t=document.getElementById('toast');t.textContent=m;t.className='toast show'+(e?' error':'');clearTimeout(toast._t);toast._t=setTimeout(()=>t.className='toast',2200);}
+  async function api(p,o){const r=await fetch(p,o);const d=await r.json().catch(()=>({}));if(!r.ok||d.error)throw new Error(d.error||('HTTP '+r.status));return d;}
+  function esc(s){const d=document.createElement('div');d.textContent=s==null?'':s;return d.innerHTML;}
+
+  const S={list:[],scales:[],scaleMap:{},sel:null,tpl:null};
+
+  async function init(){
+    try{
+      const sc=await api('/api/report/scales'); S.scales=sc.scales||[];
+      S.scaleMap={}; S.scales.forEach(s=>S.scaleMap[s.key]=s);
+    }catch(e){ S.scales=[]; }
+    await loadList();
+  }
+  async function loadList(){
+    try{ S.list=(await api('/api/report/templates')).templates||[]; }catch(e){ S.list=[]; toast('Could not load templates',true); }
+    renderList();
+  }
+  function renderList(){
+    const el=document.getElementById('tplList');
+    if(!S.list.length){el.innerHTML='<div class="tpl-item"><span class="tpl-meta">No templates yet.</span></div>';return;}
+    el.innerHTML=S.list.map(t=>`<div class="tpl-item ${t.template_id==S.sel?'active':''}" onclick="select(${t.template_id})">
+      <div class="tpl-name">${esc(t.name)}</div>
+      <div class="tpl-meta"><span class="tag">${t.layout}</span> Grades: ${(t.grades||[]).join(', ')||'—'}</div></div>`).join('');
+  }
+  async function select(id){
+    S.sel=id; renderList();
+    try{ S.tpl=await api('/api/report/templates/'+id); }catch(e){ toast('Could not load',true); return; }
+    if(!S.tpl.structure||!S.tpl.structure.sections) S.tpl.structure={sections:[]};
+    renderEditor();
+  }
+
+  function scaleOptions(sel){return S.scales.map(s=>`<option value="${s.key}" ${s.key===sel?'selected':''}>${esc(s.name)}</option>`).join('');}
+  function scaleKeyLine(key){const s=S.scaleMap[key];if(!s)return '';return s.levels.map(l=>`<b>${esc(l.code)}</b> ${esc(l.label||l.range||'')}`).join(' &nbsp; ');}
+
+  function renderEditor(){
+    const t=S.tpl, st=t.structure;
+    const scalesUsed=[...new Set(st.sections.filter(s=>s.scale).map(s=>s.scale))];
+    let html=`
+      <div class="hdr">
+        <div style="flex:1;min-width:220px;"><label class="fld">Template name</label><input type="text" id="t-name" value="${esc(t.name)}" style="width:100%;"></div>
+        <div><label class="fld">Grades (comma-sep)</label><input type="text" id="t-grades" value="${esc((t.grades||[]).join(', '))}" style="width:160px;"></div>
+        <div><label class="fld">Layout</label><div style="padding:8px 4px;font-size:13px;"><span class="tag">${t.layout}</span></div></div>
+      </div>`;
+    scalesUsed.forEach(k=>{ html+=`<div class="keybar"><b>${esc(S.scaleMap[k]?S.scaleMap[k].name:k)}:</b> ${scaleKeyLine(k)}</div>`; });
+    st.sections.forEach((sec,si)=>{ html+=renderSection(sec,si); });
+    html+=`<button class="btn btn-ghost btn-sm" onclick="addSection()">+ Add section</button>
+      <div class="save-bar"><button class="btn btn-primary" onclick="save()">Save template</button>
+        <span class="note">Edits apply to future report cards generated from this template.</span></div>`;
+    document.getElementById('panel').innerHTML=html;
+  }
+
+  function renderSection(sec,si){
+    let inner='';
+    const scaleSel = (sec.kind==='skills'||sec.kind==='subjects'||sec.kind==='behavior_matrix')
+      ? `<select onchange="setScale(${si},this.value)">${scaleOptions(sec.scale)}</select>` : '';
+    if(sec.kind==='skills'){
+      if(sec.groups){ sec.groups.forEach((g,gi)=>{ inner+=`<input type="text" class="rowlabel" style="width:60%;margin:8px 0 2px;font-weight:600;" value="${esc(g.heading)}" onchange="S.tpl.structure.sections[${si}].groups[${gi}].heading=this.value" placeholder="(sub-heading)">`; inner+=rowsBlock(g.rows,`${si},'g',${gi}`); }); }
+      else { inner+=rowsBlock(sec.rows||[],`${si}`); }
+    } else if(sec.kind==='subjects'){
+      inner+=`<div class="note" style="font-size:12px;color:var(--muted);margin-bottom:6px;">Columns: ${(sec.columns||[]).map(esc).join(' · ')}</div>`;
+      inner+=rowsBlock(sec.rows||[],`${si}`);
+      if(sec.note) inner+=`<div class="note" style="font-size:12px;color:var(--muted);margin-top:6px;">${esc(sec.note)}</div>`;
+    } else if(sec.kind==='behavior_matrix'){
+      inner+=`<div class="chips-field"><label class="fld">Subjects (comma-sep)</label><input type="text" value="${esc((sec.subjects||[]).join(', '))}" style="width:100%;" onchange="setList(${si},'subjects',this.value)"></div>`;
+      inner+=`<label class="fld" style="margin-top:8px;">Behaviors</label>`+rowsBlock(sec.rows||[],`${si}`);
+    } else if(sec.kind==='attendance'){
+      inner+=`<div class="chips-field"><label class="fld">Fields (comma-sep)</label><input type="text" value="${esc((sec.fields||[]).join(', '))}" style="width:100%;" onchange="setList(${si},'fields',this.value)"></div>`;
+    }
+    return `<div class="section"><div class="sec-head">
+        <input class="sectitle" value="${esc(sec.title)}" onchange="S.tpl.structure.sections[${si}].title=this.value">
+        <span class="kindtag">${esc(sec.kind)}</span>${scaleSel}
+        <button class="btn-x" title="Remove section" onclick="delSection(${si})">✕</button>
+      </div><div class="sec-body">${inner}</div></div>`;
+  }
+
+  function rowsBlock(rows,path){
+    let h='';
+    rows.forEach((r,ri)=>{ h+=`<div class="row">
+      <input class="rowlabel" value="${esc(r)}" onchange="setRow('${path}',${ri},this.value)">
+      <span class="ord"><button onclick="moveRow('${path}',${ri},-1)">▲</button><button onclick="moveRow('${path}',${ri},1)">▼</button></span>
+      <button class="btn-x" onclick="delRow('${path}',${ri})">✕</button></div>`; });
+    h+=`<button class="btn btn-ghost btn-sm addrow" onclick="addRow('${path}')">+ Add row</button>`;
+    return h;
+  }
+
+  // path is either "si" (section rows) or "si,'g',gi" (group rows)
+  function rowsArr(path){
+    const p=path.split(',');const si=+p[0];const sec=S.tpl.structure.sections[si];
+    if(p.length===1) return sec.rows||(sec.rows=[]);
+    const gi=+p[2]; return sec.groups[gi].rows||(sec.groups[gi].rows=[]);
+  }
+  function setRow(path,ri,v){ rowsArr(path)[ri]=v; }
+  function addRow(path){ rowsArr(path).push('New item'); renderEditor(); }
+  function delRow(path,ri){ rowsArr(path).splice(ri,1); renderEditor(); }
+  function moveRow(path,ri,d){ const a=rowsArr(path);const j=ri+d;if(j<0||j>=a.length)return;[a[ri],a[j]]=[a[j],a[ri]];renderEditor(); }
+  function setScale(si,v){ S.tpl.structure.sections[si].scale=v; renderEditor(); }
+  function setList(si,field,v){ S.tpl.structure.sections[si][field]=v.split(',').map(x=>x.trim()).filter(Boolean); }
+  function delSection(si){ if(!confirm('Remove this whole section?'))return; S.tpl.structure.sections.splice(si,1); renderEditor(); }
+  function addSection(){ S.tpl.structure.sections.push({title:'New Section',kind:'skills',scale:S.scales[0]?S.scales[0].key:'',rows:['New item']}); renderEditor(); }
+
+  async function save(){
+    S.tpl.name=document.getElementById('t-name').value.trim();
+    S.tpl.grades=document.getElementById('t-grades').value.split(',').map(x=>x.trim()).filter(Boolean);
+    try{
+      await api('/api/report/templates/'+S.tpl.template_id,{method:'PUT',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({name:S.tpl.name,grades:S.tpl.grades,structure:S.tpl.structure})});
+      toast('Saved'); await loadList();
+    }catch(e){ toast(e.message||'Could not save',true); }
+  }
+
+  async function newTemplate(){
+    const name=prompt('New template name (e.g. First Grade Report Card):'); if(!name)return;
+    const layout=confirm('Is this a MIDDLE-SCHOOL style card (letter grades by subject)?\\nOK = middle-school/departmental, Cancel = skills/standards checklist')?'departmental':'checklist';
+    const structure=layout==='departmental'
+      ? {sections:[{title:'Subjects',kind:'subjects',scale:'letter',columns:['Trimester 1','Trimester 2','Trimester 3','Final Exam','Final Average'],rows:['Subject']},{title:'Attendance',kind:'attendance',fields:['Absences','Lates','Early Dismissals']}]}
+      : {sections:[{title:'New Section',kind:'skills',scale:(S.scales[0]?S.scales[0].key:'standards_4'),rows:['New item']},{title:'Attendance',kind:'attendance',fields:['Absences','Lates','Early Dismissals']}]};
+    try{ const r=await api('/api/report/templates',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,layout,structure,grades:[]})});
+      await loadList(); select(r.template_id); }
+    catch(e){ toast(e.message||'Could not create',true); }
+  }
+  init();
+</script>
+</body>
+</html>

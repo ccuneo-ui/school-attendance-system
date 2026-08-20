@@ -2190,6 +2190,10 @@ async function loadServer(){
     const r=await fetch('/api/scheduler',{headers:{'Accept':'application/json'}});
     let d=null; if(r.ok){ d=await r.json().catch(()=>null); }
     if(d && typeof d.can_edit==='boolean') CAN_EDIT=d.can_edit;
+    // Preview override: /scheduler?readonly=1 lets an editor see exactly what view-only
+    // staff see (only the Generate tab, no stats, no Save). It only ever removes edit
+    // access for this page view — saving stays server-enforced — so it's safe.
+    if(new URLSearchParams(location.search).has('readonly')) CAN_EDIT=false;
     applyEditMode();
     if(d && d.data && applyPack(d.data)){ setSaveStatus(CAN_EDIT?'Loaded saved schedule':'View only — changes are not saved'); return; }
     S=seed(); renderAll(); setSaveStatus(CAN_EDIT?'New — from workbook':'View only — changes are not saved');

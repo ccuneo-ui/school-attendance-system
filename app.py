@@ -80,6 +80,7 @@ PERMISSION_SILOS = [
         {"key": "classes",         "label": "Classes",           "href": "/classes"},
         {"key": "scheduler",       "label": "Scheduler",         "href": "/scheduler"},
         {"key": "rooms",           "label": "Rooms",             "href": "/rooms"},
+        {"key": "report_card_templates", "label": "Report Card Templates"},
     ]},
     {"key": "billing", "label": "Billing", "pages": [
         {"key": "billing_rates",   "label": "Billing Rates",   "href": "/billing-rates"},
@@ -654,6 +655,7 @@ def init_db():
                     updated_by        TEXT
                 )
             """)
+            _seed_report_cards(cur)
             # ── Households, Parents, and linking tables ──
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS households (
@@ -7214,6 +7216,244 @@ def api_scheduler_save():
                         (year, json.dumps(data), session.get("user_email")))
             conn.commit()
         return jsonify({"success": True})
+    except Exception as e:
+        conn.rollback()
+        return jsonify({"error": str(e)}), 500
+    finally:
+        conn.close()
+
+
+
+
+# ============================================
+# REPORT CARDS — Phase 1: template config (grading scales + editable templates)
+# A template's whole structure lives in a JSON `structure` column so it stays
+# editable as the drafts get feedback, without schema changes. Two layouts:
+#   "checklist"    — sections of skill rows, one mark per trimester (skills/standards scales)
+#   "departmental" — subject rows with letter grades + a per-subject behavior matrix (middle school)
+# ============================================
+REPORT_SCALES = {
+    "skills_dev": {"name": "Skills — PreK & Kindergarten", "levels": [
+        {"code": "N", "label": "Not introduced", "desc": "skill not yet introduced"},
+        {"code": "I", "label": "Introduced", "desc": "skill introduced, not yet developing"},
+        {"code": "D", "label": "Developing", "desc": "beginning understanding"},
+        {"code": "P", "label": "Practicing", "desc": "growing understanding"},
+        {"code": "S", "label": "Secure", "desc": "grade-level understanding"},
+        {"code": "E", "label": "Enriched", "desc": "enriched understanding"},
+    ]},
+    "standards_4": {"name": "Standards 1–4", "levels": [
+        {"code": "1", "label": "Does Not Meet Standards"},
+        {"code": "2", "label": "Approaches Standards"},
+        {"code": "3", "label": "Meets Standards"},
+        {"code": "4", "label": "Exceeds Standards"},
+    ]},
+    "letter": {"name": "Letter Grades", "levels": [
+        {"code": "A+", "range": "97+"}, {"code": "A", "range": "93–96"}, {"code": "A-", "range": "90–92"},
+        {"code": "B+", "range": "87–89"}, {"code": "B", "range": "83–86"}, {"code": "B-", "range": "80–82"},
+        {"code": "C+", "range": "77–79"}, {"code": "C", "range": "73–76"}, {"code": "C-", "range": "70–72"},
+        {"code": "D", "range": "65–69"}, {"code": "F", "range": "0–64"},
+    ]},
+    "behavior_4": {"name": "Behavior 4–1", "levels": [
+        {"code": "4", "label": "Always"}, {"code": "3", "label": "Usually"},
+        {"code": "2", "label": "Sometimes"}, {"code": "1", "label": "Rarely"},
+    ]},
+}
+
+REPORT_TEMPLATE_SEEDS = [
+    {
+        "key": "kindergarten_skills", "name": "Kindergarten Skills Report",
+        "grades": ["K"], "layout": "checklist",
+        "structure": {"sections": [
+            {"title": "Math Skills", "kind": "skills", "scale": "skills_dev", "groups": [
+                {"heading": "Numeration", "rows": ["Demonstrates oral counting skills", "Counts using 1:1 correspondence", "Identifies and names numbers", "Demonstrates understanding of place value", "Identifies fractional parts", "Reads and represents data in graphs"]},
+                {"heading": "Operations", "rows": ["Solves addition problems", "Solves subtraction problems", "Solves story problems"]},
+                {"heading": "Measurement, Money, and Time", "rows": ["Demonstrates measurement skills", "Identifies and counts coins", "Reads calendar", "Reads clock"]},
+                {"heading": "Geometry / Attributes", "rows": ["Demonstrates a growing understanding of shapes", "Demonstrates patterning skills"]},
+            ]},
+            {"title": "Learning Behaviors / Social Skills", "kind": "skills", "scale": "skills_dev", "rows": ["Follows classroom routines", "Transitions efficiently between learning activities", "Able to attend during instruction", "Follows visual and verbal directions", "Completes independent work", "Listens to and is attentive to peers", "Participates during group instruction", "Works cooperatively with others", "Solves problems with peers"]},
+            {"title": "Reading Skills", "kind": "skills", "scale": "skills_dev", "rows": ["Identifies upper / lower case letters", "Knows letter sounds", "Demonstrates phonemic awareness skills", "Reads basic sight vocabulary", "Blends letters into words", "Attends to text when reading", "Uses a variety of decoding skills"]},
+            {"title": "Writing Skills", "kind": "skills", "scale": "skills_dev", "rows": ["Generates / develops writing ideas", "Represents ideas using pictures", "Writes complete sentences", "Writes using invented spelling", "Uses conventional spelling for sight words", "Applies writing conventions correctly"]},
+            {"title": "Handwriting Skills", "kind": "skills", "scale": "skills_dev", "rows": ["Forms letters and numbers correctly", "Fine motor development"]},
+            {"title": "Science / Social Studies", "kind": "skills", "scale": "skills_dev", "rows": ["Shows interest in subject matter", "Follows activity directions", "Connects activities and concepts"]},
+            {"title": "Attendance", "kind": "attendance", "fields": ["Absences", "Days Late"]},
+        ]},
+    },
+    {
+        "key": "third_grade", "name": "Third Grade Report Card",
+        "grades": ["3"], "layout": "checklist",
+        "structure": {"sections": [
+            {"title": "Academic Development", "kind": "skills", "scale": "standards_4", "rows": ["Follows directions", "Works well independently", "Is neat and organized", "Listens attentively", "Completes homework", "Displays effort", "Focuses on and completes the task at hand", "Works well in groups", "Participates in class"]},
+            {"title": "Personal Development", "kind": "skills", "scale": "standards_4", "rows": ["Follows the rules", "Exercises self-control", "Cooperates with others", "Has a positive attitude", "Shows respect"]},
+            {"title": "Reading", "kind": "skills", "scale": "standards_4", "rows": ["Reading on grade level", "Applies reading strategies", "Comprehends material", "Reads with fluency", "Recalls sight words", "Self-corrects", "Displays an understanding of vocabulary in text"]},
+            {"title": "Spelling", "kind": "skills", "scale": "standards_4", "rows": ["Consistently spells grade level words", "Applies spelling patterns", "Uses a variety of strategies to spell words correctly"]},
+            {"title": "Grammar", "kind": "skills", "scale": "standards_4", "rows": ["Comprehends terminology and concepts", "Applies concepts"]},
+            {"title": "Social Studies", "kind": "skills", "scale": "standards_4", "rows": ["Recognizes the importance of traditions, values and beliefs in the countries that we study", "Uses map skills to locate landmarks and geographic features", "Demonstrates understanding of concepts"]},
+            {"title": "Writing Skills", "kind": "skills", "scale": "standards_4", "rows": ["Forms letters correctly", "Spaces words correctly", "Applies the rules of capitalization", "Uses punctuation correctly", "Writes using complete sentences", "Arranges ideas in a logical order", "Adds details", "Writes independently", "Follows the steps in the writing process", "Writes neatly and takes care with presentation"]},
+            {"title": "Math", "kind": "skills", "scale": "standards_4", "groups": [
+                {"heading": "", "rows": ["Basic knowledge of math facts (addition/subtraction)", "Multiplication", "Division", "Completes class work independently", "Uses a variety of problem-solving techniques"]},
+                {"heading": "Understands and applies concepts in", "rows": ["Word Problems", "Money", "Fractions", "Time", "Measurement / Data", "Geometry"]},
+            ]},
+            {"title": "Science", "kind": "skills", "scale": "standards_4", "rows": ["Asks questions, analyzes and makes observations", "Applies vocabulary to explain understanding of content", "Demonstrates understanding of concepts"]},
+            {"title": "Attendance", "kind": "attendance", "fields": ["Absences", "Lates", "Early Dismissals"]},
+        ]},
+    },
+    {
+        "key": "middle_school", "name": "Middle School Report Card",
+        "grades": ["5", "6", "7", "8"], "layout": "departmental",
+        "structure": {"sections": [
+            {"title": "Subjects", "kind": "subjects", "scale": "letter",
+             "columns": ["Trimester 1", "Trimester 2", "Trimester 3", "Final Exam", "Final Average"],
+             "note": "Subjects come from the student's scheduled classes; this list is the default order.",
+             "rows": ["English Language Arts", "Math", "Social Studies", "World Language", "Science"]},
+            {"title": "Behaviors that Support Learning", "kind": "behavior_matrix", "scale": "behavior_4",
+             "note": "Marked per subject, per trimester.",
+             "rows": ["Comes to class prepared", "Organizes self and materials", "Exhibits positive attitudes", "Seeks help when appropriate", "Accepts constructive feedback", "Maintains focus during class", "Follows classroom rules", "Puts forth effort", "Manages time efficiently", "Follows directions", "Completes work with care", "Participates in class discussions"]},
+            {"title": "Attendance", "kind": "attendance", "fields": ["Absences", "Lates", "Early Dismissals"]},
+        ]},
+    },
+]
+
+
+def _seed_report_cards(cur):
+    """Create report-card config tables + seed grading scales and starter templates.
+    Idempotent: ON CONFLICT DO NOTHING, so admin edits made later are never clobbered."""
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS report_grading_scales (
+            scale_id   SERIAL PRIMARY KEY,
+            key        TEXT NOT NULL UNIQUE,
+            name       TEXT NOT NULL,
+            levels     TEXT NOT NULL,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS report_templates (
+            template_id       SERIAL PRIMARY KEY,
+            key               TEXT NOT NULL UNIQUE,
+            name              TEXT NOT NULL,
+            grades            TEXT NOT NULL DEFAULT '[]',
+            layout            TEXT NOT NULL DEFAULT 'checklist',
+            structure         TEXT NOT NULL DEFAULT '{"sections":[]}',
+            active            BOOLEAN NOT NULL DEFAULT TRUE,
+            created_at        TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at        TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_by        TEXT
+        )
+    """)
+    for key, sc in REPORT_SCALES.items():
+        cur.execute("INSERT INTO report_grading_scales (key, name, levels) VALUES (%s,%s,%s) ON CONFLICT (key) DO NOTHING",
+                    (key, sc["name"], json.dumps(sc["levels"])))
+    for t in REPORT_TEMPLATE_SEEDS:
+        cur.execute("""INSERT INTO report_templates (key, name, grades, layout, structure)
+                       VALUES (%s,%s,%s,%s,%s) ON CONFLICT (key) DO NOTHING""",
+                    (t["key"], t["name"], json.dumps(t["grades"]), t["layout"], json.dumps(t["structure"])))
+
+
+@app.route("/report-card-templates")
+@require_perm("report_card_templates")
+def report_card_templates_page():
+    return send_from_directory(".", "report_card_templates.html")
+
+
+@app.route("/api/report/scales")
+@login_required
+def api_report_scales():
+    conn = get_db_connection()
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute("SELECT key, name, levels FROM report_grading_scales ORDER BY name")
+            out = []
+            for r in fa(cur):
+                out.append({"key": r["key"], "name": r["name"], "levels": json.loads(r["levels"] or "[]")})
+            return jsonify({"scales": out})
+    finally:
+        conn.close()
+
+
+@app.route("/api/report/templates")
+@login_required
+def api_report_templates_list():
+    conn = get_db_connection()
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute("SELECT template_id, key, name, grades, layout, active FROM report_templates ORDER BY name")
+            out = []
+            for r in fa(cur):
+                r = dict(r)
+                r["grades"] = json.loads(r["grades"] or "[]")
+                out.append(r)
+            return jsonify({"templates": out})
+    finally:
+        conn.close()
+
+
+@app.route("/api/report/templates/<int:template_id>")
+@login_required
+def api_report_template_get(template_id):
+    conn = get_db_connection()
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute("SELECT template_id, key, name, grades, layout, structure, active FROM report_templates WHERE template_id=%s", (template_id,))
+            r = fo(cur)
+            if not r:
+                return jsonify({"error": "not found"}), 404
+            r["grades"] = json.loads(r["grades"] or "[]")
+            r["structure"] = json.loads(r["structure"] or '{"sections":[]}')
+            return jsonify(r)
+    finally:
+        conn.close()
+
+
+@app.route("/api/report/templates", methods=["POST"])
+@require_perm("report_card_templates")
+def api_report_template_create():
+    d = request.get_json() or {}
+    name = (d.get("name") or "").strip()
+    key = (d.get("key") or name).strip().lower().replace(" ", "_")
+    if not name:
+        return jsonify({"error": "name required"}), 400
+    conn = get_db_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""INSERT INTO report_templates (key, name, grades, layout, structure, updated_by, updated_at)
+                           VALUES (%s,%s,%s,%s,%s,%s,NOW()) RETURNING template_id""",
+                        (key, name, json.dumps(d.get("grades") or []), d.get("layout") or "checklist",
+                         json.dumps(d.get("structure") or {"sections": []}), session.get("user_email")))
+            tid = cur.fetchone()[0]
+            conn.commit()
+            return jsonify({"success": True, "template_id": tid})
+    except Exception as e:
+        conn.rollback()
+        return jsonify({"error": str(e)}), 500
+    finally:
+        conn.close()
+
+
+@app.route("/api/report/templates/<int:template_id>", methods=["PUT"])
+@require_perm("report_card_templates")
+def api_report_template_update(template_id):
+    d = request.get_json() or {}
+    sets, vals = [], []
+    if "name" in d:
+        sets.append("name=%s"); vals.append((d["name"] or "").strip())
+    if "grades" in d:
+        sets.append("grades=%s"); vals.append(json.dumps(d["grades"] or []))
+    if "layout" in d:
+        sets.append("layout=%s"); vals.append(d["layout"] or "checklist")
+    if "structure" in d:
+        sets.append("structure=%s"); vals.append(json.dumps(d["structure"] or {"sections": []}))
+    if "active" in d:
+        sets.append("active=%s"); vals.append(bool(d["active"]))
+    if not sets:
+        return jsonify({"error": "no fields"}), 400
+    sets.append("updated_at=NOW()"); sets.append("updated_by=%s"); vals.append(session.get("user_email"))
+    vals.append(template_id)
+    conn = get_db_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(f"UPDATE report_templates SET {', '.join(sets)} WHERE template_id=%s", vals)
+            conn.commit()
+            return jsonify({"success": True})
     except Exception as e:
         conn.rollback()
         return jsonify({"error": str(e)}), 500
