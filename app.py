@@ -7313,6 +7313,82 @@ REPORT_TEMPLATE_SEEDS = [
             {"title": "Attendance", "kind": "attendance", "fields": ["Absences", "Lates", "Early Dismissals"]},
         ]},
     },
+    {
+        "key": "junior_prek", "name": "Junior Pre-Kindergarten Skills Report",
+        "grades": ["JPK"], "layout": "checklist",
+        "structure": {"sections": [
+            {"title": "Learning Behaviors / Social Skills", "kind": "skills", "scale": "skills_dev", "rows": ["Uses appropriate body space", "Engages in cooperative play", "Verbally expresses needs and desires", "Accepts responsibility for actions", "Handles transitions from one activity to another", "Listens to and is attentive to speaker", "Follows 1-2 step oral directions", "Can sit for an appropriate length of time", "Exhibits control of impulses", "Follows safety rules"]},
+            {"title": "Readiness Skills", "kind": "skills", "scale": "skills_dev", "rows": ["Grips writing tools correctly", "Uses scissors correctly", "Demonstrates appropriate fine motor skills", "Uses the bathroom independently", "Puts on coat and outdoor clothing independently"]},
+            {"title": "Language Arts", "kind": "skills", "scale": "skills_dev", "rows": ["Recognizes first name", "Can recite the alphabet", "Identifies uppercase letters", "Knows letter sound association", "Beginning to rhyme in context", "Participates in stories, songs and poems", "Recognizes colors"]},
+            {"title": "Math", "kind": "skills", "scale": "skills_dev", "rows": ["Counts to:", "Counts using 1:1 correspondence", "Identifies and names numbers 1-5", "Recognizes sets of objects 1-5", "Recognizes and labels shapes", "Sorts and classifies objects"]},
+            {"title": "Science / Social Studies", "kind": "skills", "scale": "skills_dev", "rows": ["Makes connections between activity and concepts", "Participates in group activities and discussions"]},
+            {"title": "Attendance", "kind": "attendance", "fields": ["Absences", "Days Late"]},
+        ]},
+    },
+    {
+        "key": "senior_prek", "name": "Senior Pre-Kindergarten Skills Report",
+        "grades": ["SPK"], "layout": "checklist",
+        "structure": {"sections": [
+            {"title": "Learning Behaviors / Social Skills", "kind": "skills", "scale": "skills_dev", "rows": ["Uses appropriate body space", "Engages in cooperative play", "Verbally expresses needs and desires", "Accepts responsibility for actions", "Handles transitions from one activity to another", "Listens to and is attentive to speaker", "Follows 2-3 step oral directions", "Can sit for appropriate length of time", "Exhibits control of impulses", "Follows safety rules"]},
+            {"title": "Readiness Skills", "kind": "skills", "scale": "skills_dev", "rows": ["Grips writing tools correctly", "Uses scissors correctly", "Demonstrates appropriate fine motor skills", "Puts on coat and outdoor clothing independently"]},
+            {"title": "Language Arts", "kind": "skills", "scale": "skills_dev", "rows": ["Recognizes first name", "Can recite the alphabet", "Identifies uppercase letters", "Identifies lowercase letters", "Knows letter sound association", "Responds to journal prompts successfully", "Beginning to rhyme in context", "Participates in stories, songs and poems", "Recognizes colors"]},
+            {"title": "Math", "kind": "skills", "scale": "skills_dev", "rows": ["Counts to:", "Counts using 1:1 correspondence", "Identifies and names numbers 1-10", "Recognizes sets of objects 1-10", "Recognizes and labels shapes", "Sorts and classifies objects"]},
+            {"title": "Science / Social Studies", "kind": "skills", "scale": "skills_dev", "rows": ["Makes connections between activity and concepts", "Participates in group activities and discussions"]},
+            {"title": "Attendance", "kind": "attendance", "fields": ["Absences", "Days Late"]},
+        ]},
+    },
+    {
+        "key": "first_grade", "name": "First Grade Report Card",
+        "grades": ["1"], "layout": "checklist",
+        "structure": {"sections": [
+            {"title": "Academic Development", "kind": "skills", "scale": "standards_4", "rows": ["Follows directions", "Works well independently", "Is neat and organized", "Listens attentively", "Completes homework", "Displays effort", "Focuses on and completes the task at hand", "Works well in groups", "Participates in class"]},
+            {"title": "Personal Development", "kind": "skills", "scale": "standards_4", "rows": ["Follows the rules", "Exercises self-control", "Cooperates with others", "Has a positive attitude", "Shows respect"]},
+            {"title": "Reading", "kind": "skills", "scale": "standards_4", "rows": ["Reading on grade level", "Applies reading strategies", "Comprehends material", "Reads with fluency", "Recalls sight words", "Self-corrects", "Displays an understanding of vocabulary in text"]},
+            {"title": "Spelling", "kind": "skills", "scale": "standards_4", "rows": ["Consistently spells grade level words", "Applies spelling patterns", "Uses a variety of strategies to spell words correctly"]},
+            {"title": "Science", "kind": "skills", "scale": "standards_4", "rows": ["Comprehends terminology and concepts"]},
+            {"title": "Social Studies", "kind": "skills", "scale": "standards_4", "rows": ["Comprehends terminology and concepts"]},
+            {"title": "Writing Skills", "kind": "skills", "scale": "standards_4", "rows": ["Forms letters correctly", "Spaces words correctly", "Applies the rules of capitalization", "Uses punctuation correctly", "Writes using complete sentences", "Arranges ideas in a logical order", "Adds details", "Writes independently", "Follows the steps in the writing process", "Writes neatly and takes care with presentation"]},
+            {"title": "Math", "kind": "skills", "scale": "standards_4", "groups": [
+                {"heading": "", "rows": ["Uses a variety of problem-solving techniques", "Completes class work independently"]},
+                {"heading": "Understands and applies concepts in", "rows": ["Addition", "Subtraction", "Place Value", "Double digit addition", "Double digit subtraction", "Data and Graphs", "Measurement", "Time", "Geometry/Fractions"]},
+            ]},
+            {"title": "Attendance", "kind": "attendance", "fields": ["Absences", "Lates", "Early Dismissals"]},
+        ]},
+    },
+    {
+        "key": "second_grade", "name": "Second Grade Report Card",
+        "grades": ["2"], "layout": "checklist",
+        "structure": {"sections": [
+            {"title": "Academic Development", "kind": "skills", "scale": "standards_4", "rows": ["Follows directions", "Works well independently", "Is neat and organized", "Listens attentively", "Completes homework", "Displays effort", "Focuses on and completes the task at hand", "Works well in groups", "Participates in class"]},
+            {"title": "Personal Development", "kind": "skills", "scale": "standards_4", "rows": ["Follows the rules", "Exercises self-control", "Cooperates with others", "Has a positive attitude", "Shows respect"]},
+            {"title": "Reading", "kind": "skills", "scale": "standards_4", "rows": ["Reading on grade level", "Applies reading strategies", "Comprehends material", "Reads with fluency", "Recalls sight words", "Self-corrects", "Displays an understanding of vocabulary in text"]},
+            {"title": "Spelling", "kind": "skills", "scale": "standards_4", "rows": ["Consistently spells grade level words", "Applies spelling patterns", "Uses a variety of strategies to spell words correctly"]},
+            {"title": "Science", "kind": "skills", "scale": "standards_4", "rows": ["Comprehends terminology and concepts"]},
+            {"title": "Social Studies", "kind": "skills", "scale": "standards_4", "rows": ["Comprehends terminology and concepts"]},
+            {"title": "Writing Skills", "kind": "skills", "scale": "standards_4", "rows": ["Forms letters correctly", "Spaces words correctly", "Applies the rules of capitalization", "Uses punctuation correctly", "Writes using complete sentences", "Arranges ideas in a logical order", "Adds details", "Writes independently", "Follows the steps in the writing process", "Writes neatly and takes care with presentation"]},
+            {"title": "Math", "kind": "skills", "scale": "standards_4", "groups": [
+                {"heading": "", "rows": ["Uses a variety of problem-solving techniques", "Completes class work independently"]},
+                {"heading": "Understands and applies concepts in", "rows": ["Addition", "Subtraction", "Number Patterns", "Place Value", "Money", "Data & Graphs", "Time", "Measurement", "Geometry/Fractions"]},
+            ]},
+            {"title": "Attendance", "kind": "attendance", "fields": ["Absences", "Lates", "Early Dismissals"]},
+        ]},
+    },
+    {
+        "key": "fourth_grade", "name": "Fourth Grade Report Card",
+        "grades": ["4"], "layout": "checklist",
+        "structure": {"sections": [
+            {"title": "Behaviors That Support Learning", "kind": "skills", "scale": "standards_4", "rows": ["Comes to class prepared", "Organizes self and materials", "Exhibits positive attitudes", "Seeks help when appropriate", "Accepts suggestions and corrections", "Maintains focus during class", "Follows school rules", "Puts forth effort", "Manages time and projects effectively", "Follows directions", "Completes work with care", "Participates in class discussions"]},
+            {"title": "Reading", "kind": "skills", "scale": "standards_4", "rows": ["Reading on grade level", "Applies reading strategies", "Comprehends material", "Reads with fluency"]},
+            {"title": "Spelling", "kind": "skills", "scale": "standards_4", "rows": ["Consistently spells grade level words", "Uses a variety of strategies to spell words correctly"]},
+            {"title": "Grammar", "kind": "skills", "scale": "standards_4", "rows": ["Comprehends concepts", "Applies concepts"]},
+            {"title": "Writing Skills", "kind": "skills", "scale": "standards_4", "rows": ["Applies the rules of capitalization", "Uses punctuation correctly", "Writes using complete sentences", "Arranges ideas in a logical order", "Adds details", "Writes independently", "Follows the steps in the writing process"]},
+            {"title": "Subject Grades", "kind": "subjects", "scale": "letter",
+             "columns": ["Trimester 1", "Trimester 2", "Trimester 3"],
+             "note": "Overall letter grade per subject.",
+             "rows": ["Grammar", "Morphology/Vocabulary", "Spelling", "Writing", "Science", "Math", "Social Studies"]},
+            {"title": "Attendance", "kind": "attendance", "fields": ["Absences", "Lates", "Early Dismissals"]},
+        ]},
+    },
 ]
 
 
