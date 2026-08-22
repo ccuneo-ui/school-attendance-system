@@ -81,6 +81,7 @@ PERMISSION_SILOS = [
         {"key": "scheduler",       "label": "Scheduler",         "href": "/scheduler"},
         {"key": "rooms",           "label": "Rooms",             "href": "/rooms"},
         {"key": "report_card_templates", "label": "Report Card Templates", "href": "/report-card-templates"},
+        {"key": "report_cards",          "label": "Report Cards",          "href": "/report-cards"},
     ]},
     {"key": "billing", "label": "Billing", "pages": [
         {"key": "billing_rates",   "label": "Billing Rates",   "href": "/billing-rates"},
@@ -1022,6 +1023,7 @@ def api_nav():
     if is_teacher:
         groups.insert(0, {"key": "teaching", "label": "My Classroom", "pages": [
             {"key": "my_classroom", "label": "My Classroom", "href": "/my-classroom"},
+            {"key": "my_report_cards", "label": "Report Cards", "href": "/report-cards"},
         ]})
 
     return jsonify({
@@ -7340,6 +7342,22 @@ def _seed_report_cards(cur):
             updated_by        TEXT
         )
     """)
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS report_entries (
+            entry_id          SERIAL PRIMARY KEY,
+            student_id        INTEGER NOT NULL REFERENCES students(student_id) ON DELETE CASCADE,
+            template_id       INTEGER NOT NULL REFERENCES report_templates(template_id),
+            school_year_start INTEGER NOT NULL,
+            term              TEXT NOT NULL,
+            data              TEXT NOT NULL DEFAULT '{}',
+            status            TEXT NOT NULL DEFAULT 'draft',
+            updated_by        TEXT,
+            created_at        TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at        TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(student_id, template_id, school_year_start, term)
+        )
+    """)
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_report_entries_lookup ON report_entries(school_year_start, term)")
     for key, sc in REPORT_SCALES.items():
         cur.execute("INSERT INTO report_grading_scales (key, name, levels) VALUES (%s,%s,%s) ON CONFLICT (key) DO NOTHING",
                     (key, sc["name"], json.dumps(sc["levels"])))
@@ -7454,6 +7472,233 @@ def api_report_template_update(template_id):
             cur.execute(f"UPDATE report_templates SET {', '.join(sets)} WHERE template_id=%s", vals)
             conn.commit()
             return jsonify({"success": True})
+    except Exception as e:
+        conn.rollback()
+        return jsonify({"error": str(e)}), 500
+    finally:
+        conn.close()
+
+
+# ============================================
+# REPORT CARDS — TEACHER ENTRY (Phase 2)
+# ============================================
+# A student's report card = the active template whose `grades` list contains the
+# student's grade. Homeroom teachers fill the whole card for each homeroom student
+# (decided with Colin, 2026-08). Admins (superadmin / can_manage_people) may fill
+# for anyone. One report_entries row per (student, template, school_year, term);
+# all marks + comments live in its `data` JSON, keyed by section/row index so it
+# maps straight back onto the template structure.
+
+def _report_current_term(year=None):
+    from datetime import date as _d
+    wins = get_trimester_windows(year)
+    today = _d.today().isoformat()
+    for k, _l, st, en in wins:
+        if st <= today <= en:
+            return k
+    if today < wins[0][2]:
+        return "t1"
+    return "t3"
+
+def _report_term_label(term):
+    return {"t1": "Trimester 1", "t2": "Trimester 2", "t3": "Trimester 3"}.get(term, term)
+
+def _active_templates(cur):
+    cur.execute("SELECT template_id, name, layout, grades FROM report_templates WHERE active=TRUE ORDER BY name")
+    out = []
+    for r in fa(cur):
+        out.append({"template_id": r["template_id"], "name": r["name"], "layout": r["layout"],
+                    "grades": [str(x).strip().lower() for x in json.loads(r["grades"] or "[]")]})
+    return out
+
+def _match_template(templates, grade):
+    g = (grade or "").strip().lower()
+    if not g:
+        return None
+    for t in templates:
+        if g in t["grades"]:
+            return t
+    return None
+
+def _report_can_edit_student(cur, email, student_id):
+    """Homeroom teacher of the student, or an admin, may edit."""
+    if session.get("is_superadmin") or session.get("can_manage_people"):
+        return True
+    staff = _staff_row_for_email(cur, email)
+    if not staff:
+        return False
+    cur.execute("SELECT homeroom_teacher_id FROM students WHERE student_id=%s", (student_id,))
+    row = fo(cur)
+    return bool(row and row.get("homeroom_teacher_id") == staff["staff_id"])
+
+
+@app.route("/report-cards")
+@login_required
+def report_cards_entry_page():
+    return send_from_directory(".", "report_card_entry.html")
+
+
+@app.route("/api/report/entry/context")
+@login_required
+def api_report_entry_context():
+    email = session.get("user_email")
+    year = current_school_year_start()
+    is_admin = bool(session.get("is_superadmin") or session.get("can_manage_people"))
+    conn = get_db_connection()
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            staff = _staff_row_for_email(cur, email)
+            teacher = None
+            if staff:
+                teacher = {"staff_id": staff["staff_id"], "name": f'{staff["first_name"]} {staff["last_name"]}'}
+            homerooms = []
+            if is_admin:
+                cur.execute("""
+                    SELECT st.staff_id, st.first_name, st.last_name, COUNT(s.student_id) AS n
+                    FROM staff st JOIN students s ON s.homeroom_teacher_id = st.staff_id AND s.status='active'
+                    GROUP BY st.staff_id, st.first_name, st.last_name
+                    ORDER BY st.last_name, st.first_name
+                """)
+                homerooms = [{"staff_id": r["staff_id"], "name": f'{r["first_name"]} {r["last_name"]}', "count": r["n"]} for r in fa(cur)]
+            cur_term = _report_current_term(year)
+            terms = [{"key": k, "label": l, "current": (k == cur_term)} for k, l, st, en in get_trimester_windows(year)]
+            return jsonify({
+                "school_year": sy_long(year),
+                "is_admin": is_admin,
+                "teacher": teacher,
+                "homerooms": homerooms,
+                "terms": terms,
+                "current_term": cur_term,
+            })
+    finally:
+        conn.close()
+
+
+@app.route("/api/report/entry/roster")
+@login_required
+def api_report_entry_roster():
+    email = session.get("user_email")
+    year = current_school_year_start()
+    term = (request.args.get("term") or _report_current_term(year)).strip()
+    is_admin = bool(session.get("is_superadmin") or session.get("can_manage_people"))
+    conn = get_db_connection()
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            staff = _staff_row_for_email(cur, email)
+            teacher_id = request.args.get("teacher_id", type=int)
+            if teacher_id and not is_admin:
+                teacher_id = staff["staff_id"] if staff else None
+            if not teacher_id:
+                teacher_id = staff["staff_id"] if staff else None
+            if not teacher_id:
+                return jsonify({"error": "No homeroom is linked to your account. An admin can pick a homeroom to enter for."}), 404
+            templates = _active_templates(cur)
+            cur.execute("""
+                SELECT student_id, first_name, last_name, grade
+                FROM students WHERE homeroom_teacher_id=%s AND status='active'
+                ORDER BY last_name, first_name
+            """, (teacher_id,))
+            students = fa(cur)
+            cur.execute("""
+                SELECT e.student_id, e.template_id, e.status
+                FROM report_entries e JOIN students s ON s.student_id=e.student_id
+                WHERE s.homeroom_teacher_id=%s AND e.school_year_start=%s AND e.term=%s
+            """, (teacher_id, year, term))
+            emap = {r["student_id"]: r for r in fa(cur)}
+            out = []
+            for stu in students:
+                tpl = _match_template(templates, stu.get("grade"))
+                ent = emap.get(stu["student_id"])
+                out.append({
+                    "student_id": stu["student_id"],
+                    "name": f'{stu["first_name"]} {stu["last_name"]}',
+                    "grade": stu.get("grade") or "",
+                    "template_id": tpl["template_id"] if tpl else None,
+                    "template_name": tpl["name"] if tpl else None,
+                    "status": (ent["status"] if ent else "none"),
+                })
+            cur.execute("SELECT first_name, last_name FROM staff WHERE staff_id=%s", (teacher_id,))
+            tr = fo(cur) or {}
+            return jsonify({
+                "term": term, "term_label": _report_term_label(term),
+                "school_year": sy_long(year),
+                "teacher": {"staff_id": teacher_id, "name": f'{tr.get("first_name","")} {tr.get("last_name","")}'.strip()},
+                "students": out,
+            })
+    finally:
+        conn.close()
+
+
+@app.route("/api/report/entry/student")
+@login_required
+def api_report_entry_student():
+    email = session.get("user_email")
+    year = current_school_year_start()
+    student_id = request.args.get("student_id", type=int)
+    term = (request.args.get("term") or _report_current_term(year)).strip()
+    if not student_id:
+        return jsonify({"error": "student_id required"}), 400
+    conn = get_db_connection()
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute("SELECT student_id, first_name, last_name, grade FROM students WHERE student_id=%s", (student_id,))
+            stu = fo(cur)
+            if not stu:
+                return jsonify({"error": "student not found"}), 404
+            can_edit = _report_can_edit_student(cur, email, student_id)
+            templates = _active_templates(cur)
+            tpl = _match_template(templates, stu.get("grade"))
+            if not tpl:
+                return jsonify({"error": 'No report card template exists yet for grade "%s".' % (stu.get("grade") or "?")}), 404
+            cur.execute("SELECT template_id, name, layout, structure FROM report_templates WHERE template_id=%s", (tpl["template_id"],))
+            trow = fo(cur)
+            structure = json.loads(trow["structure"] or '{"sections":[]}')
+            cur.execute("SELECT key, name, levels FROM report_grading_scales")
+            scales = {r["key"]: {"name": r["name"], "levels": json.loads(r["levels"] or "[]")} for r in fa(cur)}
+            cur.execute("""SELECT data, status FROM report_entries
+                           WHERE student_id=%s AND template_id=%s AND school_year_start=%s AND term=%s""",
+                        (student_id, trow["template_id"], year, term))
+            ent = fo(cur)
+            return jsonify({
+                "student": {"student_id": stu["student_id"], "name": f'{stu["first_name"]} {stu["last_name"]}', "grade": stu.get("grade") or ""},
+                "term": term, "term_label": _report_term_label(term), "school_year": sy_long(year),
+                "template": {"template_id": trow["template_id"], "name": trow["name"], "layout": trow["layout"], "structure": structure},
+                "scales": scales,
+                "entry": {"data": (json.loads(ent["data"] or "{}") if ent else {}), "status": (ent["status"] if ent else "none")},
+                "can_edit": can_edit,
+            })
+    finally:
+        conn.close()
+
+
+@app.route("/api/report/entry/save", methods=["POST"])
+@login_required
+def api_report_entry_save():
+    email = session.get("user_email")
+    year = current_school_year_start()
+    d = request.get_json() or {}
+    student_id = d.get("student_id")
+    template_id = d.get("template_id")
+    term = (d.get("term") or "").strip()
+    data = d.get("data")
+    status = (d.get("status") or "draft").strip()
+    if not (student_id and template_id and term):
+        return jsonify({"error": "student_id, template_id, term required"}), 400
+    if status not in ("draft", "complete"):
+        status = "draft"
+    conn = get_db_connection()
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            if not _report_can_edit_student(cur, email, student_id):
+                return jsonify({"error": "You can only enter report cards for your own homeroom students."}), 403
+            cur.execute("""
+                INSERT INTO report_entries (student_id, template_id, school_year_start, term, data, status, updated_by, updated_at)
+                VALUES (%s,%s,%s,%s,%s,%s,%s,NOW())
+                ON CONFLICT (student_id, template_id, school_year_start, term)
+                DO UPDATE SET data=EXCLUDED.data, status=EXCLUDED.status, updated_by=EXCLUDED.updated_by, updated_at=NOW()
+            """, (student_id, template_id, year, term, json.dumps(data or {}), status, email))
+            conn.commit()
+            return jsonify({"success": True, "status": status})
     except Exception as e:
         conn.rollback()
         return jsonify({"error": str(e)}), 500

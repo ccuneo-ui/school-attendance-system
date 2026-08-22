@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Report Cards — Mizzentop Day School</title>
+<link rel="icon" type="image/svg+xml" href="/logo.svg">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet"/>
+<style>
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+  :root{--navy:#1a2744;--green:#2d5016;--gold:#c8992a;--cream:#f7f3ec;--muted:#6b7280;--light:#e8e2d9;--danger:#9b1c1c;}
+  html,body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--navy);min-height:100%;}
+  .topnav{background:var(--navy);display:flex;align-items:center;gap:16px;padding:0 28px;height:56px;}
+  .topnav .title{color:#fff;font-size:14px;font-weight:500;}
+  .topnav a{margin-left:auto;color:rgba(255,255,255,0.85);text-decoration:none;font-size:13px;font-weight:500;border:1px solid rgba(255,255,255,0.25);padding:7px 14px;border-radius:8px;}
+  .topnav a:hover{background:rgba(255,255,255,0.1);}
+  .page{max-width:1120px;margin:0 auto;padding:26px 24px 90px;}
+  h1{font-family:'Playfair Display',serif;font-size:30px;margin-bottom:2px;}
+  .sub{color:var(--muted);font-size:14px;margin-bottom:18px;}
+  .btn{display:inline-flex;align-items:center;gap:6px;padding:8px 15px;border-radius:8px;font-size:13px;font-weight:500;font-family:inherit;cursor:pointer;border:none;}
+  .btn-primary{background:var(--navy);color:#fff;}
+  .btn-green{background:var(--green);color:#fff;}
+  .btn-ghost{background:transparent;color:var(--muted);border:1px solid var(--light);}
+  .btn-sm{padding:5px 11px;font-size:12px;}
+  .btn:disabled{opacity:.5;cursor:default;}
+  .controls{display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin-bottom:16px;}
+  .term-tabs{display:inline-flex;border:1px solid var(--light);border-radius:9px;overflow:hidden;background:#fff;}
+  .term-tabs button{border:none;background:#fff;font-family:inherit;font-size:13px;font-weight:500;color:var(--muted);padding:8px 15px;cursor:pointer;border-right:1px solid var(--light);}
+  .term-tabs button:last-child{border-right:none;}
+  .term-tabs button.on{background:var(--navy);color:#fff;}
+  select.pick{padding:8px 11px;border:1px solid var(--light);border-radius:8px;font-size:13px;font-family:inherit;background:#fff;color:var(--navy);}
+  .ctx{color:var(--muted);font-size:13px;margin-left:auto;}
+  .layout{display:grid;grid-template-columns:300px 1fr;gap:20px;}
+  @media(max-width:860px){.layout{grid-template-columns:1fr;}}
+  .list{background:#fff;border:1px solid var(--light);border-radius:12px;overflow:hidden;}
+  .stu-item{padding:11px 14px;border-bottom:1px solid #f3f0eb;cursor:pointer;display:flex;align-items:center;gap:10px;}
+  .stu-item:last-child{border-bottom:none;}
+  .stu-item:hover{background:#faf8f5;}
+  .stu-item.active{background:#eef2f8;border-left:3px solid var(--navy);}
+  .stu-item.notpl{cursor:default;opacity:.65;}
+  .stu-name{font-weight:500;font-size:14px;flex:1;}
+  .stu-grade{font-size:12px;color:var(--muted);}
+  .chip{font-size:10px;font-weight:600;padding:2px 8px;border-radius:10px;text-transform:uppercase;letter-spacing:.03em;white-space:nowrap;}
+  .chip.none{background:#eee;color:#777;}
+  .chip.draft{background:rgba(200,153,42,.18);color:#7a5a10;}
+  .chip.complete{background:rgba(45,80,22,.15);color:#2d5016;}
+  .panel{background:#fff;border:1px solid var(--light);border-radius:12px;padding:22px;min-height:200px;}
+  .panel .empty{color:var(--muted);text-align:center;padding:70px 20px;}
+  .form-head{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;border-bottom:1px solid var(--light);padding-bottom:12px;margin-bottom:14px;}
+  .form-head h2{font-family:'Playfair Display',serif;font-size:22px;}
+  .form-head .who{color:var(--muted);font-size:13px;}
+  .legend{background:#faf8f4;border:1px solid var(--light);border-radius:8px;padding:8px 12px;font-size:12px;color:var(--muted);margin-bottom:14px;}
+  .legend b{color:var(--navy);}
+  .section{border:1px solid var(--light);border-radius:10px;margin-bottom:12px;overflow:hidden;}
+  .sec-head{background:#f9f7f4;padding:9px 13px;font-weight:600;font-size:13px;display:flex;justify-content:space-between;align-items:center;}
+  .sec-head .scaletag{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.03em;color:var(--muted);}
+  .sec-body{padding:8px 13px 12px;}
+  .grp-head{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--gold);margin:10px 0 4px;}
+  .frow{display:flex;align-items:center;gap:10px;padding:4px 0;}
+  .flabel{flex:1;font-size:13px;}
+  select.mark{padding:6px 9px;border:1px solid var(--light);border-radius:7px;font-size:13px;font-family:inherit;background:#fff;color:var(--navy);min-width:150px;}
+  input.mark{padding:6px 9px;border:1px solid var(--light);border-radius:7px;font-size:13px;font-family:inherit;}
+  table.grid{width:100%;border-collapse:collapse;font-size:13px;}
+  table.grid th,table.grid td{border:1px solid var(--light);padding:6px 8px;text-align:left;}
+  table.grid th{background:#f9f7f4;font-weight:600;font-size:12px;}
+  table.grid td.subj{font-weight:500;}
+  table.grid select.mark{min-width:90px;width:100%;}
+  .cmt{width:100%;min-height:90px;padding:10px 12px;border:1px solid var(--light);border-radius:8px;font-size:13px;font-family:inherit;resize:vertical;color:var(--navy);}
+  .save-bar{position:sticky;bottom:0;background:#fff;border-top:1px solid var(--light);padding:12px 0 2px;margin-top:16px;display:flex;gap:10px;align-items:center;}
+  .save-bar .note{color:var(--muted);font-size:12px;margin-left:auto;}
+  .ro-note{background:#faf8f4;border:1px solid var(--light);border-radius:8px;padding:10px 12px;font-size:13px;color:var(--muted);margin-top:14px;}
+  .toast{position:fixed;bottom:24px;right:24px;background:var(--navy);color:#fff;padding:12px 20px;border-radius:10px;font-size:13px;font-weight:500;transform:translateY(80px);opacity:0;transition:all .3s;pointer-events:none;z-index:200;}
+  .toast.show{transform:translateY(0);opacity:1;}
+  .toast.error{background:var(--danger);}
+</style>
+</head>
+<body>
+<nav class="topnav"><span class="title">Report Cards</span><a href="/">← Home</a></nav>
+<div class="page">
+  <h1>Report Cards</h1>
+  <div class="sub">Fill in each student's marks and comments for the trimester. The right card is matched to each student's grade automatically.</div>
+  <div class="controls">
+    <div class="term-tabs" id="termTabs"></div>
+    <span id="adminPick"></span>
+    <span class="ctx" id="ctxLabel"></span>
+  </div>
+  <div class="layout">
+    <div><div class="list" id="stuList"><div class="stu-item"><span class="stu-grade">Loading…</span></div></div></div>
+    <div class="panel" id="panel"><div class="empty">Select a student to fill in their report card.</div></div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+<script>
+  function toast(m,e){const t=document.getElementById('toast');t.textContent=m;t.className='toast show'+(e?' error':'');clearTimeout(toast._t);toast._t=setTimeout(()=>t.className='toast',2400);}
+  async function api(p,o){const r=await fetch(p,o);const d=await r.json().catch(()=>({}));if(!r.ok||d.error)throw new Error(d.error||('HTTP '+r.status));return d;}
+  function esc(s){const d=document.createElement('div');d.textContent=s==null?'':s;return d.innerHTML;}
+
+  const S={ctx:null,term:null,teacherId:null,selId:null,cur:null};
+
+  async function init(){
+    try{ S.ctx=await api('/api/report/entry/context'); }
+    catch(e){ document.getElementById('stuList').innerHTML='<div class="stu-item"><span class="stu-grade">Could not load.</span></div>'; return; }
+    S.term=S.ctx.current_term;
+    if(S.ctx.is_admin && S.ctx.homerooms.length){
+      S.teacherId=(S.ctx.teacher && S.ctx.homerooms.some(h=>h.staff_id===S.ctx.teacher.staff_id))?S.ctx.teacher.staff_id:S.ctx.homerooms[0].staff_id;
+    }else if(S.ctx.teacher){ S.teacherId=S.ctx.teacher.staff_id; }
+    renderControls();
+    loadRoster();
+  }
+
+  function renderControls(){
+    document.getElementById('termTabs').innerHTML=S.ctx.terms.map(t=>
+      `<button class="${t.key===S.term?'on':''}" onclick="setTerm('${t.key}')">${esc(t.label)}</button>`).join('');
+    const ap=document.getElementById('adminPick');
+    if(S.ctx.is_admin && S.ctx.homerooms.length){
+      ap.innerHTML=`<select class="pick" onchange="setTeacher(this.value)">`+
+        S.ctx.homerooms.map(h=>`<option value="${h.staff_id}" ${h.staff_id===S.teacherId?'selected':''}>${esc(h.name)} (${h.count})</option>`).join('')+`</select>`;
+    }else{ ap.innerHTML=''; }
+  }
+  function setTerm(k){ S.term=k; S.selId=null; renderControls(); document.getElementById('panel').innerHTML='<div class="empty">Select a student to fill in their report card.</div>'; loadRoster(); }
+  function setTeacher(id){ S.teacherId=+id; S.selId=null; document.getElementById('panel').innerHTML='<div class="empty">Select a student to fill in their report card.</div>'; loadRoster(); }
+
+  async function loadRoster(){
+    const el=document.getElementById('stuList');
+    let q='/api/report/entry/roster?term='+encodeURIComponent(S.term);
+    if(S.teacherId) q+='&teacher_id='+S.teacherId;
+    let data;
+    try{ data=await api(q); }
+    catch(e){ el.innerHTML=`<div class="stu-item"><span class="stu-grade">${esc(e.message)}</span></div>`; document.getElementById('ctxLabel').textContent=''; return; }
+    S.roster=data.students;
+    document.getElementById('ctxLabel').textContent=`${data.teacher.name} · ${data.term_label} · ${data.school_year}`;
+    if(!data.students.length){ el.innerHTML='<div class="stu-item"><span class="stu-grade">No active students in this homeroom.</span></div>'; return; }
+    el.innerHTML=data.students.map(s=>{
+      const cl=s.template_id?'':' notpl';
+      const chip=s.template_id?`<span class="chip ${s.status}">${({none:'Not started',draft:'In progress',complete:'Complete'})[s.status]}</span>`
+                              :`<span class="chip none">No card</span>`;
+      const click=s.template_id?`onclick="selectStudent(${s.student_id})"`:'';
+      return `<div class="stu-item${cl}${s.student_id===S.selId?' active':''}" ${click}>
+        <div><div class="stu-name">${esc(s.name)}</div><div class="stu-grade">Grade ${esc(s.grade||'—')}</div></div>
+        <div style="margin-left:auto;">${chip}</div></div>`;
+    }).join('');
+  }
+
+  async function selectStudent(id){
+    S.selId=id;
+    document.querySelectorAll('.stu-item').forEach(x=>x.classList.remove('active'));
+    const el=document.getElementById('panel'); el.innerHTML='<div class="empty">Loading…</div>';
+    try{ S.cur=await api('/api/report/entry/student?student_id='+id+'&term='+encodeURIComponent(S.term)); }
+    catch(e){ el.innerHTML=`<div class="empty">${esc(e.message)}</div>`; return; }
+    // re-highlight
+    const items=[...document.querySelectorAll('.stu-item')];
+    const idx=S.roster.findIndex(s=>s.student_id===id);
+    if(idx>=0 && items[idx]) items[idx].classList.add('active');
+    renderForm();
+  }
+
+  function levelsFor(key){ const s=S.cur.scales[key]; return s?s.levels:[]; }
+  function optText(l){ return l.code + (l.label?(' · '+l.label):(l.range?(' · '+l.range):'')); }
+  function sel(dataKey,scaleKey,val,dis){
+    let o='<option value="">—</option>';
+    levelsFor(scaleKey).forEach(l=>{ o+=`<option value="${esc(l.code)}" ${val===l.code?'selected':''}>${esc(optText(l))}</option>`; });
+    return `<select class="mark" data-k="${esc(dataKey)}" ${dis?'disabled':''}>${o}</select>`;
+  }
+
+  function renderForm(){
+    const P=S.cur, st=P.template.structure, marks=(P.entry.data&&P.entry.data.marks)||{}, dis=!P.can_edit;
+    const stat=P.entry.status||'none';
+    let h=`<div class="form-head">
+      <h2>${esc(P.student.name)}</h2>
+      <span class="who">Grade ${esc(P.student.grade||'—')} · ${esc(P.template.name)} · ${esc(P.term_label)}</span>
+      <span class="chip ${stat}" style="margin-left:auto;">${({none:'Not started',draft:'In progress',complete:'Complete'})[stat]}</span>
+    </div>`;
+    // scale legend(s)
+    const used=[...new Set((st.sections||[]).filter(s=>s.scale).map(s=>s.scale))];
+    used.forEach(k=>{ const sc=P.scales[k]; if(sc){ h+=`<div class="legend"><b>${esc(sc.name)}:</b> `+sc.levels.map(l=>`<b>${esc(l.code)}</b> ${esc(l.label||l.range||'')}`).join(' &nbsp; ')+`</div>`; } });
+
+    (st.sections||[]).forEach((sec,si)=>{
+      const kind=sec.kind||'skills';
+      h+=`<div class="section"><div class="sec-head"><span>${esc(sec.title||'Section')}</span>`+
+         (sec.scale?`<span class="scaletag">${esc(P.scales[sec.scale]?P.scales[sec.scale].name:sec.scale)}</span>`:'')+`</div><div class="sec-body">`;
+      if(kind==='subjects'){
+        h+='<table class="grid"><thead><tr><th>Subject</th>'+(sec.columns||[]).map(c=>`<th>${esc(c)}</th>`).join('')+'</tr></thead><tbody>';
+        (sec.rows||[]).forEach((subj,ri)=>{
+          h+=`<tr><td class="subj">${esc(subj)}</td>`+
+             (sec.columns||[]).map((c,ci)=>`<td>${sel(si+':'+ri+':'+ci, sec.scale, marks[si+':'+ri+':'+ci], dis)}</td>`).join('')+'</tr>';
+        });
+        h+='</tbody></table>';
+      }else if(kind==='behavior_matrix'){
+        const subs=sec.subjects||[];
+        h+='<table class="grid"><thead><tr><th></th>'+subs.map(su=>`<th>${esc(su)}</th>`).join('')+'</tr></thead><tbody>';
+        (sec.rows||[]).forEach((rw,ri)=>{
+          h+=`<tr><td class="subj">${esc(rw)}</td>`+
+             subs.map((su,ci)=>`<td>${sel(si+':b:'+ri+':'+ci, sec.scale, marks[si+':b:'+ri+':'+ci], dis)}</td>`).join('')+'</tr>';
+        });
+        h+='</tbody></table>';
+      }else if(kind==='attendance'){
+        (sec.fields||[]).forEach((f,fi)=>{
+          h+=`<div class="frow"><div class="flabel">${esc(f)}</div>`+
+             `<input type="text" class="mark" data-k="${si}:a:${fi}" value="${esc(marks[si+':a:'+fi]||'')}" ${dis?'disabled':''} style="width:90px;"></div>`;
+        });
+      }else{ // skills
+        if(sec.groups){
+          sec.groups.forEach((g,gi)=>{
+            h+=`<div class="grp-head">${esc(g.heading||'')}</div>`;
+            (g.rows||[]).forEach((r,ri)=>{ h+=`<div class="frow"><div class="flabel">${esc(r)}</div>${sel(si+':g:'+gi+':'+ri, sec.scale, marks[si+':g:'+gi+':'+ri], dis)}</div>`; });
+          });
+        }else{
+          (sec.rows||[]).forEach((r,ri)=>{ h+=`<div class="frow"><div class="flabel">${esc(r)}</div>${sel(si+':'+ri, sec.scale, marks[si+':'+ri], dis)}</div>`; });
+        }
+      }
+      h+=`</div></div>`;
+    });
+
+    // overall comments
+    const comment=(P.entry.data&&P.entry.data.comment)||'';
+    h+=`<div style="margin-top:16px;"><label style="font-size:11px;font-weight:500;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:5px;">Teacher comments</label>
+        <textarea class="cmt" id="rc-comment" ${dis?'disabled':''} placeholder="Overall comments for this trimester…">${esc(comment)}</textarea></div>`;
+
+    if(dis){
+      h+=`<div class="ro-note">You can view this card, but only ${esc(P.student.name.split(' ')[0])}'s homeroom teacher (or an admin) can edit it.</div>`;
+    }else{
+      h+=`<div class="save-bar">
+        <button class="btn btn-primary" onclick="save('draft')">Save draft</button>
+        <button class="btn btn-green" onclick="save('complete')">Mark complete</button>
+        <span class="note">Saved marks apply to ${esc(P.term_label)}, ${esc(P.school_year)}.</span></div>`;
+    }
+    document.getElementById('panel').innerHTML=h;
+  }
+
+  function gather(){
+    const marks={};
+    document.querySelectorAll('#panel .mark').forEach(el=>{ const v=(el.value||'').trim(); if(v!=='') marks[el.dataset.k]=v; });
+    const c=document.getElementById('rc-comment');
+    return {marks, comment:(c?c.value:'').trim()};
+  }
+  async function save(status){
+    const P=S.cur;
+    try{
+      const r=await api('/api/report/entry/save',{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({student_id:P.student.student_id,template_id:P.template.template_id,term:S.term,data:gather(),status})});
+      P.entry.status=r.status; P.entry.data=gather();
+      // update roster chip locally
+      const row=S.roster.find(s=>s.student_id===P.student.student_id); if(row) row.status=r.status;
+      loadRoster();
+      renderForm();
+      toast(status==='complete'?'Marked complete':'Draft saved');
+    }catch(e){ toast(e.message||'Could not save',true); }
+  }
+
+  init();
+</script>
+<script src="/nav.js" defer></script>
+</body>
+</html>
