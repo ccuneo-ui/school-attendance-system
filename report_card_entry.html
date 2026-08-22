@@ -60,6 +60,8 @@
   .flabel{flex:1;font-size:13px;}
   select.mark{padding:6px 9px;border:1px solid var(--light);border-radius:7px;font-size:13px;font-family:inherit;background:#fff;color:var(--navy);min-width:150px;}
   input.mark{padding:6px 9px;border:1px solid var(--light);border-radius:7px;font-size:13px;font-family:inherit;}
+  .autohint{font-size:11px;color:var(--muted);}
+  .att-note{font-size:12px;color:var(--muted);margin:2px 0 8px;}
   table.grid{width:100%;border-collapse:collapse;font-size:13px;}
   table.grid th,table.grid td{border:1px solid var(--light);padding:6px 8px;text-align:left;}
   table.grid th{background:#f9f7f4;font-weight:600;font-size:12px;}
@@ -194,9 +196,19 @@
         });
         h+='</tbody></table>';
       }else if(kind==='attendance'){
+        const autoMap=P.attendance_auto||{};
+        h+=`<div class="att-note">Filled in automatically from recorded attendance for this trimester. Type a number to override.</div>`;
         (sec.fields||[]).forEach((f,fi)=>{
+          const key=si+':a:'+fi;
+          const hasAuto=Object.prototype.hasOwnProperty.call(autoMap,f);
+          const auto=hasAuto?String(autoMap[f]):'';
+          const saved=marks[key];
+          const overridden=(saved!==undefined&&saved!=='');
+          const val=overridden?saved:auto;
+          const hint=hasAuto?(overridden?`<span class="autohint">edited · attendance shows ${esc(auto)}</span>`:`<span class="autohint">from attendance</span>`):'';
           h+=`<div class="frow"><div class="flabel">${esc(f)}</div>`+
-             `<input type="text" class="mark" data-k="${si}:a:${fi}" value="${esc(marks[si+':a:'+fi]||'')}" ${dis?'disabled':''} style="width:90px;"></div>`;
+             `<input type="text" class="mark att" data-k="${key}" data-auto="${esc(auto)}" value="${esc(String(val))}" ${dis?'disabled':''} style="width:80px;">`+
+             hint+`</div>`;
         });
       }else{ // skills
         if(sec.groups){
@@ -229,7 +241,14 @@
 
   function gather(){
     const marks={};
-    document.querySelectorAll('#panel .mark').forEach(el=>{ const v=(el.value||'').trim(); if(v!=='') marks[el.dataset.k]=v; });
+    document.querySelectorAll('#panel .mark').forEach(el=>{
+      const v=(el.value||'').trim();
+      if(el.classList.contains('att')){
+        // attendance auto-fills from recorded attendance; only store a real override
+        const auto=(el.dataset.auto||'').trim();
+        if(v!=='' && v!==auto) marks[el.dataset.k]=v;
+      }else if(v!==''){ marks[el.dataset.k]=v; }
+    });
     const c=document.getElementById('rc-comment');
     return {marks, comment:(c?c.value:'').trim()};
   }

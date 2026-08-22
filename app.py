@@ -7608,6 +7608,54 @@ def _report_can_edit_student(cur, email, student_id):
     return bool(row and row.get("homeroom_teacher_id") == staff["staff_id"])
 
 
+def _student_term_attendance(cur, student_id, start_iso, end_iso):
+    """Unexcused absent/tardy/ED counts for one student in a date window, from the
+    General Attendance program — same rule as the homeroom attendance report
+    (excused absences/tardies are deliberately NOT counted, per Karin)."""
+    cur.execute("SELECT program_id FROM programs WHERE program_name='General Attendance' AND status='active' LIMIT 1")
+    prog = fo(cur)
+    if not prog:
+        return {"absent": 0, "tardy": 0, "ed": 0}
+    cur.execute("""
+        SELECT a.status, COUNT(*) AS n
+        FROM attendance_records a
+        JOIN enrollments e ON a.enrollment_id = e.enrollment_id
+        WHERE e.program_id = %s AND e.student_id = %s
+          AND a.attendance_date BETWEEN %s AND %s
+          AND a.status IN ('absent', 'tardy', 'ed')
+        GROUP BY a.status
+    """, (prog["program_id"], student_id, start_iso, end_iso))
+    out = {"absent": 0, "tardy": 0, "ed": 0}
+    for r in fa(cur):
+        out[r["status"]] = r["n"]
+    return out
+
+
+def _attendance_auto_for_template(cur, student_id, structure, term, year):
+    """Live count for each attendance-section field in a template, for one term.
+    Maps field labels (Absences / Lates / Days Late / Early Dismissals) onto the
+    unexcused tally so the report card's attendance block fills itself in."""
+    wins = {k: (st, en) for k, _l, st, en in get_trimester_windows(year)}
+    if term not in wins:
+        return {}
+    st, en = wins[term]
+    counts = _student_term_attendance(cur, student_id, st, en)
+    def val_for(label):
+        t = (label or "").lower()
+        if "absen" in t: return counts["absent"]
+        if "late" in t or "tard" in t: return counts["tardy"]
+        if "early" in t or "dismiss" in t: return counts["ed"]
+        return None
+    auto = {}
+    for sec in (structure.get("sections") or []):
+        if sec.get("kind") == "attendance":
+            for f in (sec.get("fields") or []):
+                v = val_for(f)
+                if v is not None:
+                    auto[f] = v
+    return auto
+
+
 @app.route("/report-cards")
 @login_required
 def report_cards_entry_page():
@@ -7735,12 +7783,14 @@ def api_report_entry_student():
                            WHERE student_id=%s AND template_id=%s AND school_year_start=%s AND term=%s""",
                         (student_id, trow["template_id"], year, term))
             ent = fo(cur)
+            attendance_auto = _attendance_auto_for_template(cur, student_id, structure, term, year)
             return jsonify({
                 "student": {"student_id": stu["student_id"], "name": f'{stu["first_name"]} {stu["last_name"]}', "grade": stu.get("grade") or ""},
                 "term": term, "term_label": _report_term_label(term), "school_year": sy_long(year),
                 "template": {"template_id": trow["template_id"], "name": trow["name"], "layout": trow["layout"], "structure": structure},
                 "scales": scales,
                 "entry": {"data": (json.loads(ent["data"] or "{}") if ent else {}), "status": (ent["status"] if ent else "none")},
+                "attendance_auto": attendance_auto,
                 "can_edit": can_edit,
             })
     finally:
