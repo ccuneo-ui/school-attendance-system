@@ -58,6 +58,20 @@
   .toast{position:fixed;bottom:24px;right:24px;background:var(--navy);color:#fff;padding:12px 20px;border-radius:10px;font-size:13px;font-weight:500;transform:translateY(80px);opacity:0;transition:all .3s;pointer-events:none;z-index:200;}
   .toast.show{transform:translateY(0);opacity:1;}
   .toast.error{background:var(--danger);}
+  .modal-overlay{position:fixed;inset:0;background:rgba(26,39,68,.45);display:none;align-items:center;justify-content:center;z-index:300;padding:20px;}
+  .modal-overlay.show{display:flex;}
+  .modal{background:#fff;border-radius:14px;max-width:460px;width:100%;padding:24px;box-shadow:0 20px 60px rgba(0,0,0,.28);}
+  .modal h2{font-family:'Playfair Display',serif;font-size:21px;margin-bottom:14px;}
+  .opt-list{display:flex;flex-direction:column;gap:8px;margin:6px 0 4px;max-height:300px;overflow:auto;}
+  .opt-group-label{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--gold);margin:10px 0 2px;}
+  .opt{border:1px solid var(--light);border-radius:9px;padding:10px 12px;cursor:pointer;display:flex;gap:10px;align-items:flex-start;}
+  .opt:hover{background:#faf8f5;}
+  .opt.sel{border-color:var(--navy);background:#eef2f8;}
+  .opt .radio{width:16px;height:16px;border-radius:50%;border:2px solid var(--muted);flex-shrink:0;margin-top:2px;}
+  .opt.sel .radio{border-color:var(--navy);background:var(--navy);box-shadow:inset 0 0 0 3px #fff;}
+  .opt .opt-name{font-weight:500;font-size:13px;}
+  .opt .opt-desc{font-size:12px;color:var(--muted);margin-top:1px;line-height:1.4;}
+  .modal-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:18px;}
 </style>
 </head>
 <body>
@@ -71,6 +85,19 @@
       <button class="btn btn-ghost btn-sm" style="margin-top:10px;" onclick="newTemplate()">+ New template</button>
     </div>
     <div class="panel" id="panel"><div class="empty">Select a template to review or edit it.</div></div>
+  </div>
+</div>
+<div class="modal-overlay" id="newModal" onclick="if(event.target===this)closeNewModal()">
+  <div class="modal">
+    <h2>New report card template</h2>
+    <label class="fld">Template name</label>
+    <input type="text" id="nt-name" placeholder="e.g. First Grade Report Card" style="width:100%;margin-bottom:14px;">
+    <label class="fld">Start from</label>
+    <div class="opt-list" id="nt-opts"></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeNewModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="createTemplate()">Create template</button>
+    </div>
   </div>
 </div>
 <div class="toast" id="toast"></div>
@@ -185,15 +212,62 @@
     }catch(e){ toast(e.message||'Could not save',true); }
   }
 
-  async function newTemplate(){
-    const name=prompt('New template name (e.g. First Grade Report Card):'); if(!name)return;
-    const layout=confirm('Is this a MIDDLE-SCHOOL style card (letter grades by subject)?\\nOK = middle-school/departmental, Cancel = skills/standards checklist')?'departmental':'checklist';
-    const structure=layout==='departmental'
+  // Starting-point choice for a new template. ntChoice is a string like
+  // "copy:<id>" (clone an existing card) or "blank:checklist" / "blank:departmental".
+  let ntChoice=null;
+  function newTemplate(){
+    document.getElementById('nt-name').value='';
+    ntChoice=null;
+    let html='';
+    if(S.list.length){
+      html+='<div class="opt-group-label">Copy an existing card</div>';
+      html+=S.list.map(t=>`<div class="opt" data-k="copy:${t.template_id}" onclick="pickOpt(this)">
+        <div class="radio"></div><div>
+        <div class="opt-name">Copy &ldquo;${esc(t.name)}&rdquo;</div>
+        <div class="opt-desc">Starts with the same sections as this ${esc(t.layout)} card &mdash; then rename and adjust</div></div></div>`).join('');
+    }
+    html+='<div class="opt-group-label">Or start blank</div>';
+    html+=`<div class="opt" data-k="blank:checklist" onclick="pickOpt(this)">
+      <div class="radio"></div><div>
+      <div class="opt-name">Skills / standards checklist</div>
+      <div class="opt-desc">Lists of skill statements, each marked against a scale. Pre-K, Kindergarten and Lower School style.</div></div></div>`;
+    html+=`<div class="opt" data-k="blank:departmental" onclick="pickOpt(this)">
+      <div class="radio"></div><div>
+      <div class="opt-name">Departmental &mdash; letter grades by subject</div>
+      <div class="opt-desc">Subjects down the side with letter grades across the trimesters. Middle School style.</div></div></div>`;
+    document.getElementById('nt-opts').innerHTML=html;
+    document.getElementById('newModal').classList.add('show');
+    setTimeout(()=>document.getElementById('nt-name').focus(),50);
+  }
+  function pickOpt(el){
+    document.querySelectorAll('#nt-opts .opt').forEach(o=>o.classList.remove('sel'));
+    el.classList.add('sel'); ntChoice=el.dataset.k;
+  }
+  function closeNewModal(){ document.getElementById('newModal').classList.remove('show'); }
+  function blankStructure(layout){
+    return layout==='departmental'
       ? {sections:[{title:'Subjects',kind:'subjects',scale:'letter',columns:['Trimester 1','Trimester 2','Trimester 3','Final Exam','Final Average'],rows:['Subject']},{title:'Attendance',kind:'attendance',fields:['Absences','Lates','Early Dismissals']}]}
       : {sections:[{title:'New Section',kind:'skills',scale:(S.scales[0]?S.scales[0].key:'standards_4'),rows:['New item']},{title:'Attendance',kind:'attendance',fields:['Absences','Lates','Early Dismissals']}]};
-    try{ const r=await api('/api/report/templates',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,layout,structure,grades:[]})});
-      await loadList(); select(r.template_id); }
-    catch(e){ toast(e.message||'Could not create',true); }
+  }
+  async function createTemplate(){
+    const name=document.getElementById('nt-name').value.trim();
+    if(!name){ toast('Give the template a name first',true); document.getElementById('nt-name').focus(); return; }
+    if(!ntChoice){ toast('Pick what to start from',true); return; }
+    let layout, structure;
+    try{
+      if(ntChoice.indexOf('copy:')===0){
+        const src=await api('/api/report/templates/'+(+ntChoice.split(':')[1]));
+        layout=src.layout;
+        structure=JSON.parse(JSON.stringify(src.structure||{sections:[]}));
+      }else{
+        layout=ntChoice.split(':')[1];
+        structure=blankStructure(layout);
+      }
+      const r=await api('/api/report/templates',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,layout,structure,grades:[]})});
+      closeNewModal();
+      await loadList(); select(r.template_id);
+      toast('Template created');
+    }catch(e){ toast(e.message||'Could not create',true); }
   }
   init();
 </script>
