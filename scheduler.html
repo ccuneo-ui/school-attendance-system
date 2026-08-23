@@ -347,10 +347,23 @@ const SUBJECTS = ["MUSIC","ART","PE","SPANISH","TECH","LIBRARY","STEAM","HEALTH"
 const SUBJLBL = {MUSIC:"Music",ART:"Art",PE:"P.E.",SPANISH:"Spanish",TECH:"Tech",LIBRARY:"Library",STEAM:"STEAM",HEALTH:"Health",MATH:"Math",ELA:"ELA",SCIENCE:"Science",SOCIAL:"Soc. Studies"};
 const DAYS = ["Mon","Tue","Wed","Thu","Fri"];
 const PERIODS = [
-  {id:"P1",label:"8:30–9:14"},{id:"P2",label:"9:17–10:01"},{id:"P3",label:"10:04–10:48"},
-  {id:"P4",label:"10:51–11:35"},{id:"P5",label:"11:38–12:22"},{id:"P6",label:"12:25–1:09"},
+  {id:"P1",label:"8:25–9:09"},{id:"P2",label:"9:12–9:56"},{id:"P3",label:"9:59–10:43"},
+  {id:"P4",label:"10:46–11:35"},{id:"P5",label:"11:33–12:22"},{id:"P6",label:"12:25–1:09"},
   {id:"P7",label:"1:12–1:56"},{id:"P8",label:"1:59–2:43"}
 ];
+// 2026–27 bell times. Grades 5–8 moved to a 15-min homeroom (8:05–8:20), a 5-min-earlier
+// morning, and a recess+lunch block. That block sits at P5 for 5/6 and at P4 for 7/8, so
+// P4 and P5 differ by band. Lower school (JPK–4) keeps its existing times. plabel() returns
+// the correct clock time for a period given the grade band. (The all-groups master board
+// uses the P4/P5 envelope times above, since it stacks every band under one period header.)
+const PERIOD_TIMES = {
+  lower:{P1:"8:30–9:14",P2:"9:17–10:01",P3:"10:04–10:48",P4:"10:51–11:35",P5:"11:38–12:22",P6:"12:25–1:09",P7:"1:12–1:56",P8:"1:59–2:43",P9:"2:45–3:25"},
+  g56:{P1:"8:25–9:09",P2:"9:12–9:56",P3:"9:59–10:43",P4:"10:46–11:30",P5:"11:33–12:22",P6:"12:25–1:09",P7:"1:12–1:56",P8:"1:59–2:43",P9:"2:45–3:25"},
+  g78:{P1:"8:25–9:09",P2:"9:12–9:56",P3:"9:59–10:43",P4:"10:46–11:35",P5:"11:38–12:22",P6:"12:25–1:09",P7:"1:12–1:56",P8:"1:59–2:43",P9:"2:45–3:25"}
+};
+const G56=["5A","5B","5AB","6A","6B","6AB"], G78=["7A","7B","7C","7AB","8AB","8A","8B"];
+function bandOf(gid){ return G56.includes(gid)?"g56":(G78.includes(gid)?"g78":"lower"); }
+function plabel(pid,band){ return (PERIOD_TIMES[band]||PERIOD_TIMES.g78)[pid]||""; }
 const WED_FREE = {day:"Wed",period:"P3"};          // school-wide free period
 const SUBJ_DAILY_CAP = {ELA:2};                     // default 1; ELA may double
 const GROUP_DAILY_CAP = {"1":2,"2":2,"3":2,"4":2};  // grades 1-4: at most 2 specials per day
@@ -1301,8 +1314,9 @@ function renderSchedule(){
   }
 
   let h='<table class="sched"><thead><tr><th>Period</th>'+DAYS.map(d=>`<th>${d}</th>`).join("")+'</tr></thead><tbody>';
+  const _tband=(mode==="class")?bandOf(who):"g78";   // per-group time column follows the grade band
   PERIODS.forEach(p=>{
-    h+=`<tr><th style="text-align:right">${p.id}<br><span style="font-weight:400;color:var(--muted);font-size:10px">${p.label}</span></th>`;
+    h+=`<tr><th style="text-align:right">${p.id}<br><span style="font-weight:400;color:var(--muted);font-size:10px">${plabel(p.id,_tband)}</span></th>`;
     DAYS.forEach(d=>{
       const free=(d===WED_FREE.day&&p.id===WED_FREE.period);
       const cell=grid[d+"|"+p.id];
