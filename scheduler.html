@@ -1251,6 +1251,15 @@ function lunchDisp(lbl){
   if(lbl==="LUNCH")         return "Recess / Lunch";
   return lbl;
 }
+// Display text for a fixed block on the class/master views, enforced in code so it's correct
+// even when the saved schedule still holds an older label (e.g. "Free (Wed P3)" or plain
+// "Lunch"). Wednesday 3rd period is the Electives/Assembly block; grades 5–8 lunch shows the
+// recess+lunch split; everything else shows its stored label.
+function fixedDisplay(groupId, day, period, rawLabel){
+  if(day===WED_FREE.day && period===WED_FREE.period) return "Electives/Assembly";
+  if(/lunch/i.test(rawLabel||"") && (G56.includes(groupId)||G78.includes(groupId))) return "Recess / Lunch";
+  return rawLabel;
+}
 // per-teacher/day free-period labels: PREP, LUNCH DUTY / LUNCH NO DUTY
 function teacherDayInfo(tid){
   const plan=getLunchPlan(); const info={};
@@ -1309,7 +1318,7 @@ function renderSchedule(){
   const put=(d,p,html,meta)=>grid[d+"|"+p]={html,meta};
 
   if(mode==="class"){
-    fixedFor(who).forEach(dp=>{ const [d,p]=dp.split("|"); const lbl=(S.fixed.find(f=>f.groupId===who&&(f.day==="*"||f.day===d)&&f.period===p)||{}).label||""; put(d,p,`<span>${lbl}</span>`,{fixed:/free|elective|assembly/i.test(lbl)?'FREE':'LUNCH'}); });
+    fixedFor(who).forEach(dp=>{ const [d,p]=dp.split("|"); const lbl=(S.fixed.find(f=>f.groupId===who&&(f.day==="*"||f.day===d)&&f.period===p)||{}).label||""; const disp=fixedDisplay(who,d,p,lbl); put(d,p,`<span>${disp}</span>`,{fixed:/free|elective|assembly/i.test(disp)?'FREE':'LUNCH'}); });
     const map=placementByGroup(who);
     Object.entries(map).forEach(([dp,o])=>{ const [d,p]=dp.split("|");
       const tp=TEACHER_PALETTE[o.s.teacherId]||{bg:"#ECECEC",fg:"#333"};
@@ -1691,7 +1700,7 @@ function masterTD(d,p,rid,cell,fixedMap,interactive){
     return `<td ${inter} data-day="${d}" data-period="${p}" style="background:${gp.bg};color:${gp.fg}"><span class="mp-sub">${subjLabel(s.subject)}</span><span class="mp-tr">${s.teacherId}${s.aide?'·+B':''}</span><span class="mp-rm">${s.room}</span>${tag}</td>`;
   }
   const fx=fixedMap[key];
-  if(fx!=null){ const isFree=/free|elective|assembly/i.test(fx); return `<td class="mp-fx ${isFree?'mp-free':'mp-lunch'}" data-day="${d}" data-period="${p}"${DND}>${fx||'—'}</td>`; }
+  if(fx!=null){ const disp=fixedDisplay(rid,d,p,fx); const isFree=/free|elective|assembly/i.test(disp); return `<td class="mp-fx ${isFree?'mp-free':'mp-lunch'}" data-day="${d}" data-period="${p}"${DND}>${disp||'—'}</td>`; }
   if(d===WED_FREE.day && p===WED_FREE.period){ return `<td class="mp-fx mp-free" data-day="${d}" data-period="${p}">Electives/Assembly</td>`; }
   return `<td class="mp-empty" data-day="${d}" data-period="${p}"${DND}></td>`;
 }
