@@ -197,6 +197,7 @@
   </div>
 </header>
 <div id="viewBanner" style="display:none;background:#eef4ff;border-bottom:1px solid #c7d8f5;color:#1a3a6b;font-size:13px;font-weight:500;padding:8px 22px;">👁 View only — you can explore, generate, and rearrange freely, but nothing you change here is saved. Refresh to return to the live schedule.</div>
+<div id="conflictBanner" style="display:none;background:#fdeceb;border-bottom:1px solid #e0b3ac;color:#8a2f26;font-size:13px;font-weight:500;padding:8px 22px;">⚠ This schedule was changed in another session<span id="conflictWho"></span>. Your changes here were <b>not saved</b> — saving is blocked so you don't overwrite the newer version. <a href="#" onclick="location.reload();return false;" style="color:#8a2f26;text-decoration:underline;font-weight:600;">Reload to get the latest</a>, then re-apply your change.</div>
 
 <nav class="tabs" id="tabs">
   <button data-tab="rules" class="active">Rules</button>
@@ -2140,6 +2141,9 @@ function loadSchedule(e){ const f=e.target.files[0]; if(!f) return; const rd=new
 
 /* ==================== SERVER PERSISTENCE (Admin Portal) ==================== */
 let _booting=true, _saveT=null;
+let SCHED_VERSION=null;   // version of the server copy this tab loaded (for conflict detection)
+let SCHED_STALE=false;    // true once a save was rejected because the server moved ahead
+let _dirty=false;         // unsaved local changes (autosave is off — saving is manual)
 let CAN_EDIT=true;   // set from the server: staff without the scheduler permission get a read-only sandbox
 function setSaveStatus(t){ const el=document.getElementById('saveStatus'); if(el) el.textContent=t; }
 function applyEditMode(){
@@ -2173,23 +2177,46 @@ function applyPack(p){
   else { renderAll(); }
   return true;
 }
+function _clearDirtyCue(){ const b=document.getElementById('btnSave'); if(b){ b.style.background=''; b.style.borderColor=''; b.style.color=''; } }
 async function saveServer(manual){
   if(!CAN_EDIT){ if(manual) alert('This is a view-only copy — changes are not saved.'); return; }
+  if(SCHED_STALE){ if(manual) alert('This tab is out of date — the schedule was changed in another session. Reload the page to get the latest version before saving.'); return; }
   try{
     setSaveStatus('Saving…');
-    const r=await fetch('/api/scheduler',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({data:serverPack()})});
+    const r=await fetch('/api/scheduler',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({data:serverPack(), base_version:SCHED_VERSION})});
     const d=await r.json().catch(()=>({}));
+    if(r.status===409){
+      // Someone else saved after this tab loaded. Refuse to overwrite; make it obvious.
+      SCHED_STALE=true;
+      const who=(d && d.updated_by)?(' by '+d.updated_by):'';
+      const wl=document.getElementById('conflictWho'); if(wl) wl.textContent=who;
+      const cb=document.getElementById('conflictBanner'); if(cb) cb.style.display='block';
+      setSaveStatus('Not saved — changed elsewhere');
+      if(manual) alert('The schedule was changed in another session'+who+'.\n\nYour changes were NOT saved, so you don’t overwrite the newer version. Reload the page to get the latest, then re-apply your change.');
+      return;
+    }
     if(!r.ok||d.error) throw new Error(d.error||('HTTP '+r.status));
+    if(typeof d.version==='number') SCHED_VERSION=d.version;
+    _dirty=false; _clearDirtyCue();
     const now=new Date(); setSaveStatus('Saved '+now.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}));
   }catch(e){ setSaveStatus('Save failed'); if(manual) alert('Could not save to the server: '+e.message); }
 }
-function scheduleAutosave(){ if(!CAN_EDIT || _booting) return; if(_saveT) clearTimeout(_saveT); _saveT=setTimeout(()=>saveServer(false),1500); }
+// Autosave is intentionally OFF (a background resave from a stale tab could clobber a
+// newer save). Instead we just mark the schedule dirty and prompt for a manual Save.
+function markDirty(){
+  if(_booting || !CAN_EDIT || SCHED_STALE) return;
+  _dirty=true;
+  setSaveStatus('Unsaved changes — click 💾 Save');
+  const b=document.getElementById('btnSave'); if(b){ b.style.background='#fdeecb'; b.style.borderColor='#e0b35a'; b.style.color='#7a5a12'; }
+}
 async function loadServer(){
   _booting=true;
   try{
     const r=await fetch('/api/scheduler',{headers:{'Accept':'application/json'}});
     let d=null; if(r.ok){ d=await r.json().catch(()=>null); }
     if(d && typeof d.can_edit==='boolean') CAN_EDIT=d.can_edit;
+    SCHED_VERSION = (d && typeof d.version==='number') ? d.version : 0;   // baseline for conflict detection
+    SCHED_STALE=false; _dirty=false;
     // Preview override: /scheduler?readonly=1 lets an editor see exactly what view-only
     // staff see (only the Generate tab, no stats, no Save). It only ever removes edit
     // access for this page view — saving stays server-enforced — so it's safe.
@@ -2200,9 +2227,11 @@ async function loadServer(){
   }catch(e){ S=seed(); renderAll(); setSaveStatus('New — from workbook'); }
   finally{ _booting=false; }
 }
-// Persist automatically after a generate or any manual edit, without touching the engine.
-const _origAfterEdit=afterEdit;   afterEdit  =function(){ _origAfterEdit.apply(this,arguments);  scheduleAutosave(); };
-const _origShowResult=showResult; showResult =function(){ _origShowResult.apply(this,arguments); scheduleAutosave(); };
+// Mark the schedule as having unsaved changes after a generate or any edit (save is manual now).
+const _origAfterEdit=afterEdit;   afterEdit  =function(){ _origAfterEdit.apply(this,arguments);  markDirty(); };
+const _origShowResult=showResult; showResult =function(){ _origShowResult.apply(this,arguments); markDirty(); };
+// Warn before leaving with unsaved edits (since nothing autosaves).
+window.addEventListener('beforeunload', function(e){ if(_dirty && CAN_EDIT && !SCHED_STALE){ e.preventDefault(); e.returnValue=''; } });
 function boot(){ loadServer(); }
 
 /* ============================ INIT ============================ */

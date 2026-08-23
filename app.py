@@ -656,6 +656,9 @@ def init_db():
                     updated_by        TEXT
                 )
             """)
+            # Optimistic-concurrency version counter (bumps on every save) so a stale
+            # browser tab can't silently overwrite a newer save from another session.
+            cur.execute("ALTER TABLE scheduler_state ADD COLUMN IF NOT EXISTS version INTEGER NOT NULL DEFAULT 1")
             _seed_report_cards(cur)
             # ── Households, Parents, and linking tables ──
             cur.execute("""
@@ -7184,7 +7187,7 @@ def api_scheduler_get():
     conn = get_db_connection()
     try:
         with conn.cursor() as cur:
-            cur.execute("SELECT data, updated_at, updated_by FROM scheduler_state WHERE school_year_start=%s", (year,))
+            cur.execute("SELECT data, updated_at, updated_by, version FROM scheduler_state WHERE school_year_start=%s", (year,))
             row = cur.fetchone()
         data = None
         if row and row[0]:
@@ -7194,6 +7197,7 @@ def api_scheduler_get():
                 data = None
         return jsonify({"school_year_start": year, "data": data,
                         "can_edit": has_perm("scheduler"),
+                        "version": (row[3] if row and row[3] is not None else 0),
                         "updated_at": (row[1].isoformat() if row and row[1] else None) if row else None,
                         "updated_by": row[2] if row else None})
     finally:
@@ -7207,17 +7211,34 @@ def api_scheduler_save():
     data = body.get("data")
     if data is None:
         return jsonify({"error": "data required"}), 400
+    base_version = body.get("base_version")
     year = current_school_year_start()
     conn = get_db_connection()
     try:
         with conn.cursor() as cur:
-            cur.execute("""INSERT INTO scheduler_state (school_year_start, data, updated_at, updated_by)
-                           VALUES (%s,%s,NOW(),%s)
-                           ON CONFLICT (school_year_start)
-                           DO UPDATE SET data=EXCLUDED.data, updated_at=NOW(), updated_by=EXCLUDED.updated_by""",
-                        (year, json.dumps(data), session.get("user_email")))
+            # Lock the row for this year so concurrent saves serialise, then check the
+            # caller's base_version against what's stored. If the caller loaded an older
+            # version (someone else saved in between), reject instead of clobbering.
+            cur.execute("SELECT version, updated_by, updated_at FROM scheduler_state WHERE school_year_start=%s FOR UPDATE", (year,))
+            row = cur.fetchone()
+            cur_version = row[0] if row and row[0] is not None else 0
+            if row is not None and base_version is not None and int(base_version) != cur_version:
+                conn.rollback()
+                return jsonify({"error": "conflict", "current_version": cur_version,
+                                "updated_by": row[1],
+                                "updated_at": (row[2].isoformat() if row[2] else None)}), 409
+            new_version = cur_version + 1
+            email = session.get("user_email")
+            if row is not None:
+                cur.execute("""UPDATE scheduler_state SET data=%s, updated_at=NOW(), updated_by=%s, version=%s
+                               WHERE school_year_start=%s""",
+                            (json.dumps(data), email, new_version, year))
+            else:
+                cur.execute("""INSERT INTO scheduler_state (school_year_start, data, updated_at, updated_by, version)
+                               VALUES (%s,%s,NOW(),%s,%s)""",
+                            (year, json.dumps(data), email, new_version))
             conn.commit()
-        return jsonify({"success": True})
+        return jsonify({"success": True, "version": new_version})
     except Exception as e:
         conn.rollback()
         return jsonify({"error": str(e)}), 500
