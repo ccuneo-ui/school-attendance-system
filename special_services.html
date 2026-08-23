@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>In Session Special Services Schedule — Mizzentop Day School</title>
+<link rel="icon" type="image/svg+xml" href="/logo.svg">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=DM+Sans:wght@300;400;500;700&display=swap" rel="stylesheet"/>
+<style>
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+  :root{--navy:#1a2744;--green:#2d5016;--gold:#c8992a;--cream:#f7f3ec;--muted:#6b7280;--light:#e8e2d9;--danger:#9b1c1c;}
+  html,body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--navy);min-height:100%;}
+  .topnav{background:var(--navy);display:flex;align-items:center;gap:16px;padding:0 28px;height:56px;}
+  .topnav .title{color:#fff;font-size:14px;font-weight:500;}
+  .topnav a.home{margin-left:auto;color:rgba(255,255,255,0.85);text-decoration:none;font-size:13px;font-weight:500;border:1px solid rgba(255,255,255,0.25);padding:7px 14px;border-radius:8px;}
+  .topnav a.home:hover{background:rgba(255,255,255,0.1);}
+  .page{max-width:1500px;margin:0 auto;padding:32px 24px 90px;}
+  h1{font-family:'Playfair Display',serif;font-size:30px;margin-bottom:4px;}
+  .sub{color:var(--muted);font-size:14px;margin-bottom:22px;}
+  .tabs{display:flex;gap:6px;border-bottom:1px solid var(--light);margin-bottom:22px;}
+  .tab{padding:9px 18px;font-size:13px;font-weight:500;cursor:pointer;border:none;background:none;font-family:inherit;color:var(--muted);border-bottom:2px solid transparent;margin-bottom:-1px;}
+  .tab.on{color:var(--navy);border-bottom-color:var(--gold);}
+  .panel{display:none;} .panel.on{display:block;}
+
+  .toolbar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:16px;}
+  .toolbar label{font-size:12px;color:var(--muted);}
+  select,input[type=text]{padding:9px 12px;border:1px solid var(--light);border-radius:8px;font-size:13px;font-family:inherit;background:#fff;color:var(--navy);outline:none;}
+  select:focus,input[type=text]:focus{border-color:var(--navy);}
+  .btn{display:inline-flex;align-items:center;gap:6px;padding:9px 16px;border-radius:8px;font-size:13px;font-weight:500;font-family:inherit;cursor:pointer;border:none;}
+  .btn-primary{background:var(--navy);color:#fff;}
+  .btn-ghost{background:transparent;color:var(--muted);border:1px solid var(--light);}
+  .btn-danger{background:transparent;color:var(--danger);border:1px solid rgba(155,28,28,.35);}
+  .btn-sm{padding:5px 11px;font-size:12px;}
+  .spacer{flex:1;}
+
+  .gridwrap{background:#fff;border:1px solid var(--light);border-radius:12px;overflow:auto;}
+  table.grid{width:100%;border-collapse:collapse;table-layout:fixed;}
+  table.grid th{background:#f9f7f4;padding:10px 8px;font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--light);border-right:1px solid var(--light);}
+  table.grid th.perhead{width:92px;}
+  table.grid td{vertical-align:top;border-bottom:1px solid #f1ede6;border-right:1px solid #f1ede6;padding:6px;height:78px;}
+  table.grid td.percell{background:#faf8f5;text-align:center;padding-top:12px;}
+  .pnum{font-weight:700;font-size:14px;}
+  .ptime{font-size:10px;color:var(--muted);margin-top:2px;font-family:'DM Sans',sans-serif;}
+  .cell{min-height:60px;display:flex;flex-direction:column;gap:5px;}
+  .chip{border-left:4px solid var(--navy);background:#f6f6f8;border-radius:6px;padding:6px 8px;cursor:pointer;font-size:12px;line-height:1.32;text-align:left;width:100%;border-top:1px solid rgba(0,0,0,.05);border-right:1px solid rgba(0,0,0,.05);border-bottom:1px solid rgba(0,0,0,.05);font-family:inherit;color:var(--navy);}
+  .chip:hover{filter:brightness(.97);}
+  .chip .who{font-weight:700;}
+  .chip .svc{font-size:11px;font-weight:500;}
+  .chip .meta{font-size:11px;color:var(--muted);}
+  .chip.conflict{outline:2px solid var(--danger);outline-offset:1px;}
+  .chip.dim{opacity:.22;}
+  .addbtn{border:1px dashed var(--light);background:transparent;color:var(--muted);border-radius:6px;font-size:11px;padding:4px;cursor:pointer;font-family:inherit;}
+  .addbtn:hover{border-color:var(--navy);color:var(--navy);}
+  .legend{display:flex;flex-wrap:wrap;gap:14px;margin-top:14px;font-size:12px;color:var(--muted);align-items:center;}
+  .legend .sw{display:inline-block;width:11px;height:11px;border-radius:3px;margin-right:5px;vertical-align:-1px;}
+  .note{font-size:12px;color:var(--muted);margin-top:10px;}
+
+  .table-wrap{background:#fff;border:1px solid var(--light);border-radius:12px;overflow:hidden;max-width:720px;}
+  table.list{width:100%;border-collapse:collapse;}
+  table.list th{background:#f9f7f4;text-align:left;padding:11px 16px;font-size:11px;font-weight:500;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--light);}
+  table.list td{padding:12px 16px;font-size:14px;border-bottom:1px solid #f3f0eb;}
+  table.list tr:last-child td{border-bottom:none;}
+  table.list tr.inactive td{color:var(--muted);}
+  .pill{display:inline-block;font-size:11px;font-weight:600;padding:2px 9px;border-radius:12px;}
+  .pill-on{background:rgba(45,80,22,.12);color:var(--green);}
+  .pill-off{background:#eee;color:var(--muted);}
+  .row-actions{display:flex;gap:6px;justify-content:flex-end;}
+  .addbar{display:flex;gap:10px;margin-bottom:18px;max-width:720px;}
+  .addbar input{flex:1;}
+  .empty{text-align:center;color:var(--muted);padding:36px;}
+
+  .modal-bg{position:fixed;inset:0;background:rgba(26,39,68,.45);display:none;align-items:flex-start;justify-content:center;padding:60px 16px;z-index:1200;overflow:auto;}
+  .modal-bg.open{display:flex;}
+  .modal{background:#fff;border-radius:14px;width:100%;max-width:520px;padding:26px 28px 22px;}
+  .modal h2{font-family:'Playfair Display',serif;font-size:21px;margin-bottom:16px;}
+  .field{margin-bottom:14px;}
+  .field label{display:block;font-size:11px;font-weight:500;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);margin-bottom:5px;}
+  .field select,.field input[type=text]{width:100%;}
+  .two{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+  .modal-actions{display:flex;gap:10px;margin-top:20px;align-items:center;}
+  .warn{background:rgba(155,28,28,.07);border:1px solid rgba(155,28,28,.25);color:var(--danger);font-size:12px;padding:8px 10px;border-radius:8px;margin-bottom:12px;display:none;}
+  .warn.show{display:block;}
+  .toast{position:fixed;bottom:24px;right:24px;background:var(--navy);color:#fff;padding:12px 20px;border-radius:10px;font-size:13px;font-weight:500;transform:translateY(80px);opacity:0;transition:all .3s;pointer-events:none;z-index:1400;}
+  .toast.show{transform:translateY(0);opacity:1;}
+  .toast.error{background:var(--danger);}
+
+  @media print{
+    .topnav,.tabs,.toolbar,.addbtn,.note,#navbar,.modal-bg{display:none !important;}
+    body{background:#fff;}
+    .page{padding:0;max-width:none;}
+    .gridwrap{border:none;border-radius:0;}
+    table.grid td,table.grid th{border-color:#999;}
+    .chip{break-inside:avoid;}
+    @page{size:landscape;margin:.4in;}
+  }
+</style>
+</head>
+<body>
+<nav class="topnav"><span class="title">In Session Special Services</span><a class="home" href="/">← Home</a></nav>
+<div class="page">
+  <h1>In Session Special Services Schedule</h1>
+  <div class="sub" id="subline">During-the-school-day tutoring and support services.</div>
+
+  <div class="tabs">
+    <button class="tab on" id="tabSchedule" onclick="showTab('schedule')">Schedule</button>
+    <button class="tab" id="tabServices" onclick="showTab('services')">Services</button>
+  </div>
+
+  <div class="panel on" id="panelSchedule">
+    <div class="toolbar">
+      <label for="fStaff">Staff</label>
+      <select id="fStaff" onchange="render()"><option value="">All staff</option></select>
+      <label for="fService">Service</label>
+      <select id="fService" onchange="render()"><option value="">All services</option></select>
+      <label for="fStudent">Student</label>
+      <select id="fStudent" onchange="render()"><option value="">All students</option></select>
+      <button class="btn btn-ghost btn-sm" onclick="clearFilters()">Clear</button>
+      <div class="spacer"></div>
+      <button class="btn btn-ghost btn-sm" onclick="window.print()">Print</button>
+      <button class="btn btn-primary btn-sm" id="btnNew" onclick="openNew()">+ Add Session</button>
+    </div>
+
+    <div class="gridwrap">
+      <table class="grid" id="grid"><tbody><tr><td class="empty">Loading…</td></tr></tbody></table>
+    </div>
+    <div class="legend" id="legend"></div>
+    <div class="note">Click any session to edit it. A red outline means that staff member or student is booked twice in the same period.</div>
+  </div>
+
+  <div class="panel" id="panelServices">
+    <div class="addbar">
+      <input type="text" id="newService" placeholder="Add a service, e.g. Speech Therapy" onkeydown="if(event.key==='Enter')addService()">
+      <button class="btn btn-primary" onclick="addService()">Add Service</button>
+    </div>
+    <div class="table-wrap">
+      <table class="list">
+        <thead><tr><th>Service</th><th>Scheduled</th><th>Status</th><th style="text-align:right;">Actions</th></tr></thead>
+        <tbody id="svcRows"><tr><td colspan="4" class="empty">Loading…</td></tr></tbody>
+      </table>
+    </div>
+    <div class="note">Retiring a service hides it from the dropdown but leaves existing sessions intact.</div>
+  </div>
+</div>
+
+<div class="modal-bg" id="modal">
+  <div class="modal">
+    <h2 id="modalTitle">Add Session</h2>
+    <div class="warn" id="modalWarn"></div>
+    <div class="two">
+      <div class="field"><label for="mDay">Day</label><select id="mDay"></select></div>
+      <div class="field"><label for="mPeriod">Period</label><select id="mPeriod"></select></div>
+    </div>
+    <div class="field"><label for="mStudent">Student</label><select id="mStudent"></select></div>
+    <div class="field"><label for="mService">Service</label><select id="mService"></select></div>
+    <div class="two">
+      <div class="field"><label for="mStaff">Staff Member</label><select id="mStaff"></select></div>
+      <div class="field"><label for="mRoom">Room</label><select id="mRoom"></select></div>
+    </div>
+    <div class="field"><label for="mNotes">Notes (optional)</label><input type="text" id="mNotes" placeholder="e.g. every other week"></div>
+    <div class="modal-actions">
+      <button class="btn btn-primary" id="mSave" onclick="saveSession()">Save</button>
+      <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+      <div class="spacer"></div>
+      <button class="btn btn-danger" id="mDelete" onclick="deleteSession()" style="display:none;">Delete</button>
+    </div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+<script src="/nav.js" defer></script>
+<script>
+/* ── In Session Special Services Schedule ───────────────────────────────────
+   Periods down, days across (the master-poster layout). Every period/day cell
+   holds any number of sessions; a session is one staff member + one student +
+   one room + one service. Staff come from the "Special Services Role" tick box
+   on the staff record. Services are managed on the Services tab. */
+
+const SVC_COLORS = ['#1a2744','#2d5016','#8a5a13','#4a2a6b','#0f5b63','#8f1d3a','#3b5f8a','#6b6b1f'];
+
+let OPT = {days:[],periods:[],staff:[],students:[],rooms:[],services:[]};
+let SESSIONS = [];
+let TYPES = [];
+let CAN_EDIT = false;
+let YEAR = null;
+let editingId = null;
+
+function toast(m,e){const t=document.getElementById('toast');t.textContent=m;t.className='toast show'+(e?' error':'');clearTimeout(toast._t);toast._t=setTimeout(()=>t.className='toast',2400);}
+async function api(path,opts){const r=await fetch(path,opts);const d=await r.json().catch(()=>({}));if(!r.ok||d.error)throw new Error(d.error||('HTTP '+r.status));return d;}
+function esc(s){const d=document.createElement('div');d.textContent=s==null?'':s;return d.innerHTML;}
+function jpost(body){return {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)};}
+function jput(body){return {method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)};}
+
+function showTab(which){
+  document.getElementById('tabSchedule').classList.toggle('on',which==='schedule');
+  document.getElementById('tabServices').classList.toggle('on',which==='services');
+  document.getElementById('panelSchedule').classList.toggle('on',which==='schedule');
+  document.getElementById('panelServices').classList.toggle('on',which==='services');
+  if(which==='services') loadTypes();
+}
+
+function svcColor(serviceId){
+  const i = OPT.services.findIndex(s=>s.service_id===serviceId);
+  return SVC_COLORS[(i<0?0:i)%SVC_COLORS.length];
+}
+
+/* ── Load ───────────────────────────────────────────────────────────────── */
+async function load(){
+  try{
+    OPT = await api('/api/special-services/options');
+    CAN_EDIT = !!OPT.can_edit;
+    YEAR = OPT.school_year_start;
+    document.getElementById('subline').textContent =
+      'During-the-school-day tutoring and support services · ' + (OPT.school_year||'');
+    fillFilters(); fillModalSelects();
+    if(!CAN_EDIT){ document.getElementById('btnNew').style.display='none'; }
+  }catch(e){ toast('Could not load options',true); }
+  await loadSessions();
+}
+
+async function loadSessions(){
+  try{
+    const d = await api('/api/special-services/sessions?school_year='+YEAR);
+    SESSIONS = d.sessions||[];
+  }catch(e){ SESSIONS=[]; toast('Could not load sessions',true); }
+  render();
+}
+
+function fillFilters(){
+  const st=document.getElementById('fStaff'), sv=document.getElementById('fService'), sd=document.getElementById('fStudent');
+  st.innerHTML='<option value="">All staff</option>'+OPT.staff.map(s=>`<option value="${s.staff_id}">${esc(s.name)}</option>`).join('');
+  sv.innerHTML='<option value="">All services</option>'+OPT.services.map(s=>`<option value="${s.service_id}">${esc(s.name)}</option>`).join('');
+  sd.innerHTML='<option value="">All students</option>'+OPT.students.map(s=>`<option value="${s.student_id}">${esc(s.name)}${s.grade?' ('+esc(s.grade)+')':''}</option>`).join('');
+}
+
+function clearFilters(){
+  document.getElementById('fStaff').value='';
+  document.getElementById('fService').value='';
+  document.getElementById('fStudent').value='';
+  render();
+}
+
+/* ── Grid ───────────────────────────────────────────────────────────────── */
+function conflictKeys(){
+  // A staff member or a student booked twice in the same day+period.
+  const seenStaff={}, seenStudent={}, bad={};
+  SESSIONS.forEach(s=>{
+    const slot=s.day+'|'+s.period;
+    if(s.staff_id){const k=slot+'|st'+s.staff_id; (seenStaff[k]=seenStaff[k]||[]).push(s.ss_id);}
+    if(s.student_id){const k=slot+'|sd'+s.student_id; (seenStudent[k]=seenStudent[k]||[]).push(s.ss_id);}
+  });
+  [seenStaff,seenStudent].forEach(map=>{
+    Object.values(map).forEach(ids=>{ if(ids.length>1) ids.forEach(id=>bad[id]=true); });
+  });
+  return bad;
+}
+
+function matchesFilter(s){
+  const fs=document.getElementById('fStaff').value;
+  const fv=document.getElementById('fService').value;
+  const fd=document.getElementById('fStudent').value;
+  if(fs && String(s.staff_id)!==fs) return false;
+  if(fv && String(s.service_id)!==fv) return false;
+  if(fd && String(s.student_id)!==fd) return false;
+  return true;
+}
+
+function render(){
+  const bad = conflictKeys();
+  const anyFilter = ['fStaff','fService','fStudent'].some(id=>document.getElementById(id).value);
+  const byslot={};
+  SESSIONS.forEach(s=>{ (byslot[s.day+'|'+s.period]=byslot[s.day+'|'+s.period]||[]).push(s); });
+
+  let html='<thead><tr><th class="perhead">Period</th>'+
+    OPT.days.map(d=>`<th>${esc(d)}</th>`).join('')+'</tr></thead><tbody>';
+  OPT.periods.forEach(p=>{
+    html+=`<tr><td class="percell"><div class="pnum">${esc(p.id)}</div><div class="ptime">${esc(p.time||'')}</div></td>`;
+    OPT.days.forEach(d=>{
+      const list=(byslot[d+'|'+p.id]||[]);
+      html+='<td><div class="cell">';
+      list.forEach(s=>{
+        const dim = anyFilter && !matchesFilter(s);
+        const c = svcColor(s.service_id);
+        html+=`<button class="chip${bad[s.ss_id]?' conflict':''}${dim?' dim':''}" style="border-left-color:${c};"
+                 onclick="openEdit(${s.ss_id})" title="${esc((s.student_name||'')+' · '+(s.service_name||'')+' · '+(s.staff_name||'')+(s.notes?' · '+s.notes:''))}">
+                 <div class="who">${esc(s.student_name||'—')}${s.student_grade?' <span class="meta">'+esc(s.student_grade)+'</span>':''}</div>
+                 <div class="svc" style="color:${c};">${esc(s.service_name||'No service')}</div>
+                 <div class="meta">${esc(s.staff_name||'Unassigned')}${s.room_name?' · '+esc(s.room_name):''}</div>
+               </button>`;
+      });
+      if(CAN_EDIT) html+=`<button class="addbtn" onclick="openNew('${d}','${p.id}')">+</button>`;
+      html+='</div></td>';
+    });
+    html+='</tr>';
+  });
+  html+='</tbody>';
+  document.getElementById('grid').innerHTML=html;
+
+  document.getElementById('legend').innerHTML = OPT.services.map(s=>
+    `<span><span class="sw" style="background:${svcColor(s.service_id)}"></span>${esc(s.name)}</span>`).join('')
+    + `<span style="margin-left:auto;">${SESSIONS.length} session${SESSIONS.length===1?'':'s'} scheduled</span>`;
+}
+
+/* ── Session modal ──────────────────────────────────────────────────────── */
+function fillModalSelects(){
+  document.getElementById('mDay').innerHTML = OPT.days.map(d=>`<option value="${d}">${esc(d)}</option>`).join('');
+  document.getElementById('mPeriod').innerHTML = OPT.periods.map(p=>`<option value="${p.id}">${esc(p.id)} · ${esc(p.time||'')}</option>`).join('');
+  document.getElementById('mStudent').innerHTML = '<option value="">— pick a student —</option>'+
+    OPT.students.map(s=>`<option value="${s.student_id}">${esc(s.name)}${s.grade?' ('+esc(s.grade)+')':''}</option>`).join('');
+  document.getElementById('mService').innerHTML = '<option value="">— none —</option>'+
+    OPT.services.map(s=>`<option value="${s.service_id}">${esc(s.name)}</option>`).join('');
+  document.getElementById('mStaff').innerHTML = '<option value="">— unassigned —</option>'+
+    OPT.staff.map(s=>`<option value="${s.staff_id}">${esc(s.name)}</option>`).join('');
+  document.getElementById('mRoom').innerHTML = '<option value="">— none —</option>'+
+    OPT.rooms.map(r=>`<option value="${r.room_id}">${esc(r.name)}</option>`).join('');
+}
+
+function openNew(day,period){
+  if(!CAN_EDIT) return;
+  editingId=null;
+  document.getElementById('modalTitle').textContent='Add Session';
+  document.getElementById('mDay').value = day || OPT.days[0];
+  document.getElementById('mPeriod').value = period || OPT.periods[0].id;
+  document.getElementById('mStudent').value='';
+  document.getElementById('mService').value = OPT.services.length?OPT.services[0].service_id:'';
+  document.getElementById('mStaff').value='';
+  document.getElementById('mRoom').value='';
+  document.getElementById('mNotes').value='';
+  document.getElementById('mDelete').style.display='none';
+  showWarn('');
+  document.getElementById('modal').classList.add('open');
+}
+
+function openEdit(id){
+  const s=SESSIONS.find(x=>x.ss_id===id); if(!s) return;
+  editingId=id;
+  document.getElementById('modalTitle').textContent = CAN_EDIT?'Edit Session':'Session';
+  document.getElementById('mDay').value=s.day;
+  document.getElementById('mPeriod').value=s.period;
+  document.getElementById('mStudent').value=s.student_id||'';
+  document.getElementById('mService').value=s.service_id||'';
+  document.getElementById('mStaff').value=s.staff_id||'';
+  document.getElementById('mRoom').value=s.room_id||'';
+  document.getElementById('mNotes').value=s.notes||'';
+  document.getElementById('mDelete').style.display=CAN_EDIT?'inline-flex':'none';
+  document.getElementById('mSave').style.display=CAN_EDIT?'inline-flex':'none';
+  showWarn('');
+  document.getElementById('modal').classList.add('open');
+}
+
+function closeModal(){ document.getElementById('modal').classList.remove('open'); }
+function showWarn(msg){ const w=document.getElementById('modalWarn'); w.textContent=msg; w.className='warn'+(msg?' show':''); }
+
+function payload(){
+  return {
+    school_year_start: YEAR,
+    day: document.getElementById('mDay').value,
+    period: document.getElementById('mPeriod').value,
+    student_id: document.getElementById('mStudent').value||null,
+    service_id: document.getElementById('mService').value||null,
+    staff_id: document.getElementById('mStaff').value||null,
+    room_id: document.getElementById('mRoom').value||null,
+    notes: document.getElementById('mNotes').value
+  };
+}
+
+function localConflict(p){
+  // Warn (but never block) if this slot already has the same staff member or student.
+  const clash = SESSIONS.filter(s=>s.ss_id!==editingId && s.day===p.day && s.period===p.period)
+    .filter(s=>(p.staff_id && String(s.staff_id)===String(p.staff_id)) ||
+               (p.student_id && String(s.student_id)===String(p.student_id)));
+  if(!clash.length) return '';
+  const c=clash[0];
+  return 'Heads up: ' + (String(c.staff_id)===String(p.staff_id) ? (c.staff_name||'That staff member') : (c.student_name||'That student'))
+       + ' is already booked ' + p.day + ' ' + p.period + '. Saved anyway — the grid will flag it.';
+}
+
+async function saveSession(){
+  const p=payload();
+  if(!p.student_id){ showWarn('Pick a student.'); return; }
+  const warn = localConflict(p);
+  try{
+    if(editingId) await api('/api/special-services/sessions/'+editingId, jput(p));
+    else await api('/api/special-services/sessions', jpost(p));
+    closeModal();
+    await loadSessions();
+    toast(warn || (editingId?'Session updated':'Session added'), !!warn);
+  }catch(e){ showWarn(e.message); }
+}
+
+async function deleteSession(){
+  if(!editingId) return;
+  const s=SESSIONS.find(x=>x.ss_id===editingId);
+  if(!confirm('Remove '+((s&&s.student_name)||'this session')+' from '+((s&&s.day)||'')+' '+((s&&s.period)||'')+'?')) return;
+  try{
+    await api('/api/special-services/sessions/'+editingId,{method:'DELETE'});
+    closeModal(); await loadSessions(); toast('Session removed');
+  }catch(e){ showWarn(e.message); }
+}
+
+/* ── Services tab ───────────────────────────────────────────────────────── */
+async function loadTypes(){
+  try{ TYPES=(await api('/api/special-services/types')).services||[]; }
+  catch(e){ TYPES=[]; toast('Could not load services',true); }
+  renderTypes();
+}
+
+function renderTypes(){
+  const tb=document.getElementById('svcRows');
+  if(!TYPES.length){ tb.innerHTML='<tr><td colspan="4" class="empty">No services yet. Add your first one above.</td></tr>'; return; }
+  tb.innerHTML=TYPES.map(t=>`
+    <tr class="${t.active?'':'inactive'}">
+      <td style="font-weight:500;">${esc(t.name)}</td>
+      <td>${t.use_count||0}</td>
+      <td><span class="pill ${t.active?'pill-on':'pill-off'}">${t.active?'Active':'Retired'}</span></td>
+      <td><div class="row-actions">
+        ${CAN_EDIT?`<button class="btn btn-ghost btn-sm" onclick="renameService(${t.service_id})">Rename</button>
+        <button class="btn btn-ghost btn-sm" onclick="toggleService(${t.service_id},${t.active?'false':'true'})">${t.active?'Retire':'Restore'}</button>`:''}
+      </div></td>
+    </tr>`).join('');
+}
+
+async function addService(){
+  const el=document.getElementById('newService');
+  const name=el.value.trim(); if(!name) return;
+  try{ await api('/api/special-services/types', jpost({name})); el.value=''; await refreshServices(); toast('Service added'); }
+  catch(e){ toast(e.message,true); }
+}
+
+async function renameService(id){
+  const t=TYPES.find(x=>x.service_id===id); if(!t) return;
+  const name=prompt('Rename service', t.name); if(name===null) return;
+  if(!name.trim()) return;
+  try{ await api('/api/special-services/types/'+id, jput({name:name.trim()})); await refreshServices(); toast('Renamed'); }
+  catch(e){ toast(e.message,true); }
+}
+
+async function toggleService(id,makeActive){
+  try{ await api('/api/special-services/types/'+id, jput({active:makeActive})); await refreshServices(); }
+  catch(e){ toast(e.message,true); }
+}
+
+async function refreshServices(){
+  await loadTypes();
+  // The dropdown + legend follow the active list, so refresh options too.
+  try{
+    const o = await api('/api/special-services/options');
+    OPT.services = o.services||[];
+    fillFilters(); fillModalSelects(); render();
+  }catch(e){}
+}
+
+document.getElementById('modal').addEventListener('click',e=>{ if(e.target.id==='modal') closeModal(); });
+document.addEventListener('keydown',e=>{ if(e.key==='Escape') closeModal(); });
+load();
+</script>
+</body>
+</html>

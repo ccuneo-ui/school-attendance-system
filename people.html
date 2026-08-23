@@ -209,6 +209,13 @@
           </select>
         </div>
         <div class="form-group full">
+          <label style="text-transform:none;letter-spacing:0;">
+            <input type="checkbox" id="isSpecialServices" style="width:auto;margin-right:8px;vertical-align:-2px;">
+            Special Services Role
+            <span style="color:var(--muted);font-weight:400;text-transform:none;">— appears in the Special Services staff dropdown</span>
+          </label>
+        </div>
+        <div class="form-group full">
           <label>Title / Position</label>
           <input type="text" id="staffRole" placeholder="e.g. Fourth Grade Homeroom Teacher">
         </div>
@@ -432,6 +439,7 @@
     document.getElementById('role').value = s.role || 'staff';
     document.getElementById('status').value = s.status || 'active';
     document.getElementById('staffRole').value = s.title || '';
+    document.getElementById('isSpecialServices').checked = !!s.is_special_services;
     // Decide whether the permission controls are editable for this row.
     const targetEmail = (s.email || '').toLowerCase();
     let lockReason = null;
@@ -469,6 +477,7 @@
       role: document.getElementById('role').value,
       status: document.getElementById('status').value,
       title: document.getElementById('staffRole').value.trim(),
+      is_special_services: document.getElementById('isSpecialServices').checked ? 1 : 0,
     };
     // Only send permission fields when they're unlocked (editor may manage
     // permissions, and it isn't their own row or the superadmin). The server

@@ -79,6 +79,7 @@ PERMISSION_SILOS = [
         {"key": "staff_directory", "label": "Staff Directory",   "href": "/staff"},
         {"key": "classes",         "label": "Classes",           "href": "/classes"},
         {"key": "scheduler",       "label": "Scheduler",         "href": "/scheduler"},
+        {"key": "special_services", "label": "Special Services", "href": "/special-services"},
         {"key": "rooms",           "label": "Rooms",             "href": "/rooms"},
         {"key": "report_card_templates", "label": "Report Card Templates", "href": "/report-card-templates"},
         {"key": "report_cards",          "label": "Report Cards",          "href": "/report-cards"},
@@ -644,6 +645,41 @@ def init_db():
             """)
             cur.execute("CREATE INDEX IF NOT EXISTS idx_section_enroll_student ON section_enrollments(student_id)")
             cur.execute("CREATE INDEX IF NOT EXISTS idx_section_enroll_section ON section_enrollments(section_id)")
+            # ── In-session special services ──
+            # A second, much simpler schedule for during-the-school-day support
+            # (OG tutoring, push-in, pull-out). One row per staff+student+period+day
+            # session. The service list itself is staff-managed on the same page.
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS special_service_types (
+                    service_id  SERIAL PRIMARY KEY,
+                    name        TEXT NOT NULL UNIQUE,
+                    active      BOOLEAN NOT NULL DEFAULT TRUE,
+                    sort_order  INTEGER NOT NULL DEFAULT 0,
+                    created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+            for _i, _nm in enumerate(("OG Tutoring", "Push-In Support", "Pull-Out Support")):
+                cur.execute("""INSERT INTO special_service_types (name, sort_order)
+                               VALUES (%s, %s) ON CONFLICT (name) DO NOTHING""", (_nm, _i))
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS special_service_sessions (
+                    ss_id             SERIAL PRIMARY KEY,
+                    school_year_start INTEGER NOT NULL,
+                    day               TEXT NOT NULL,
+                    period            TEXT NOT NULL,
+                    staff_id          INTEGER REFERENCES staff(staff_id) ON DELETE SET NULL,
+                    student_id        INTEGER REFERENCES students(student_id) ON DELETE CASCADE,
+                    room_id           INTEGER REFERENCES rooms(room_id) ON DELETE SET NULL,
+                    service_id        INTEGER REFERENCES special_service_types(service_id) ON DELETE SET NULL,
+                    notes             TEXT,
+                    created_at        TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at        TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_by        TEXT
+                )
+            """)
+            cur.execute("CREATE INDEX IF NOT EXISTS idx_ss_sessions_slot ON special_service_sessions(school_year_start, day, period)")
+            # Marks a staff member as available in the special-services staff dropdown.
+            cur.execute("ALTER TABLE staff ADD COLUMN IF NOT EXISTS is_special_services INTEGER NOT NULL DEFAULT 0")
             # ── Scheduler state ──
             # The master-schedule generator (Scheduler page) persists its full working
             # state — inputs, the generated grid, and manual edits — as one JSON blob per
@@ -1083,6 +1119,11 @@ def scheduler_page():
 @require_perm("rooms")
 def rooms_page():
     return send_from_directory(".", "rooms.html")
+
+@app.route("/special-services")
+@require_perm("special_services")
+def special_services_page():
+    return send_from_directory(".", "special_services.html")
 
 @app.route("/staff")
 @app.route("/people")
@@ -2743,13 +2784,14 @@ def get_people_staff():
     conn = get_db_connection()
     try:
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
-            cur.execute("SELECT staff_id,first_name,last_name,email,role,status,can_record_attendance,can_manage_billing,can_manage_people,can_manage_permissions,permissions,title FROM staff ORDER BY last_name,first_name")
+            cur.execute("SELECT staff_id,first_name,last_name,email,role,status,can_record_attendance,can_manage_billing,can_manage_people,can_manage_permissions,permissions,title,is_special_services FROM staff ORDER BY last_name,first_name")
             rows = fa(cur)
         # Normalize permissions to a resolved key list for the frontend, so the
         # editor shows the right boxes even for legacy rows.
         for r in rows:
             r["permissions"] = permissions_for_staff(r)
             r["can_manage_permissions"] = bool(r.get("can_manage_permissions"))
+            r["is_special_services"] = bool(r.get("is_special_services"))
         return jsonify(rows)
     finally:
         conn.close()
@@ -2783,12 +2825,13 @@ def add_people_staff():
             cur.execute("""
                 INSERT INTO staff (first_name,last_name,email,role,title,status,
                                    can_record_attendance,can_manage_billing,can_manage_people,
-                                   can_manage_permissions,permissions,hire_date)
-                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                                   can_manage_permissions,permissions,hire_date,is_special_services)
+                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
             """, (data.get("first_name"),data.get("last_name"),data.get("email"),
                   data.get("role","staff"),data.get("title",""),data.get("status","active"),
                   flags["can_record_attendance"],flags["can_manage_billing"],flags["can_manage_people"],
-                  cmp_flag,json.dumps(keys),"2025-09-01"))
+                  cmp_flag,json.dumps(keys),"2025-09-01",
+                  1 if data.get("is_special_services") else 0))
         conn.commit()
         return jsonify({"success":True}),201
     except Exception as e:
@@ -2815,6 +2858,11 @@ def update_people_staff(staff_id):
         profile_fields = ["first_name","last_name","email","role","title","status"]
         fields = [f + " = %s" for f in profile_fields if f in data]
         values = [data[f] for f in profile_fields if f in data]
+        # The Special Services Role tick box is an ordinary profile attribute: it only
+        # decides whether the person appears in the special-services staff dropdown.
+        if "is_special_services" in data:
+            fields.append("is_special_services = %s")
+            values.append(1 if data["is_special_services"] else 0)
 
         # Permission changes are privileged and never allowed on your own account
         # or on the superadmin. This is the server-side guard that stops someone
@@ -7053,6 +7101,289 @@ def api_sections_students():
             q += " ORDER BY last_name, first_name"
             cur.execute(q, params)
             return jsonify({"students": fa(cur)})
+    finally:
+        conn.close()
+
+
+# ============================================
+# In-Session Special Services Schedule
+# --------------------------------------------
+# A second, deliberately simple schedule for during-the-school-day support
+# (OG tutoring, push-in, pull-out). Periods down, days across, exactly like the
+# scheduler's master poster; each period/day cell holds any number of sessions,
+# and each session is one staff member + one student + one room + one service.
+# Staff only appear in the dropdown if their staff record has the "Special
+# Services Role" box ticked (staff.is_special_services). The service list itself
+# is managed from the Services tab on the same page.
+# ============================================
+SS_DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri"]
+SS_PERIODS = [
+    {"id": "P1", "time": "8:25–9:09"},
+    {"id": "P2", "time": "9:12–9:56"},
+    {"id": "P3", "time": "9:59–10:43"},
+    {"id": "P4", "time": "10:46–11:35"},
+    {"id": "P5", "time": "11:33–12:22"},
+    {"id": "P6", "time": "12:25–1:09"},
+    {"id": "P7", "time": "1:12–1:56"},
+    {"id": "P8", "time": "1:59–2:43"},
+]
+SS_PERIOD_IDS = [pd["id"] for pd in SS_PERIODS]
+
+
+def _ss_year(default=None):
+    """School year for a special-services request (?school_year=2026), defaulting
+    to the portal-wide current year."""
+    raw = request.args.get("school_year")
+    if (raw or "").isdigit():
+        return int(raw)
+    return default if default is not None else current_school_year_start()
+
+
+def _ss_int(v):
+    """Coerce a dropdown value to an int id, treating blank/none as NULL."""
+    if v in (None, "", "null"):
+        return None
+    try:
+        return int(v)
+    except (TypeError, ValueError):
+        return None
+
+
+@app.route("/api/special-services/options")
+@login_required
+def api_ss_options():
+    """Everything the page's dropdowns need, in one call."""
+    conn = get_db_connection()
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute("""SELECT staff_id, first_name, last_name, title
+                           FROM staff
+                           WHERE status='active' AND COALESCE(is_special_services,0)=1
+                           ORDER BY last_name, first_name""")
+            staff = [{"staff_id": r["staff_id"],
+                      "name": (r["first_name"] + " " + r["last_name"]).strip(),
+                      "title": r.get("title") or ""} for r in fa(cur)]
+            cur.execute("""SELECT student_id, first_name, last_name, grade
+                           FROM students WHERE status='active'
+                           ORDER BY last_name, first_name""")
+            students = [{"student_id": r["student_id"],
+                         "name": (r["first_name"] + " " + r["last_name"]).strip(),
+                         "grade": r.get("grade") or ""} for r in fa(cur)]
+            cur.execute("SELECT room_id, name FROM rooms WHERE active ORDER BY sort_order, name")
+            rooms = fa(cur)
+            cur.execute("""SELECT service_id, name FROM special_service_types
+                           WHERE active ORDER BY sort_order, name""")
+            services = fa(cur)
+        return jsonify({
+            "days": SS_DAYS,
+            "periods": SS_PERIODS,
+            "staff": staff,
+            "students": students,
+            "rooms": rooms,
+            "services": services,
+            "school_year_start": current_school_year_start(),
+            "school_year": sy_long(current_school_year_start()),
+            "can_edit": has_perm("special_services"),
+        })
+    finally:
+        conn.close()
+
+
+@app.route("/api/special-services/sessions")
+@login_required
+def api_ss_sessions():
+    year = _ss_year()
+    conn = get_db_connection()
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute("""
+                SELECT ss.ss_id, ss.school_year_start, ss.day, ss.period, ss.notes,
+                       ss.staff_id, ss.student_id, ss.room_id, ss.service_id,
+                       (st.first_name || ' ' || st.last_name) AS staff_name,
+                       (sd.first_name || ' ' || sd.last_name) AS student_name,
+                       sd.grade AS student_grade,
+                       r.name AS room_name,
+                       t.name AS service_name
+                FROM special_service_sessions ss
+                LEFT JOIN staff    st ON st.staff_id   = ss.staff_id
+                LEFT JOIN students sd ON sd.student_id = ss.student_id
+                LEFT JOIN rooms    r  ON r.room_id     = ss.room_id
+                LEFT JOIN special_service_types t ON t.service_id = ss.service_id
+                WHERE ss.school_year_start = %s
+                ORDER BY ss.period, ss.day, t.name, sd.last_name
+            """, (year,))
+            return jsonify({"school_year_start": year, "sessions": fa(cur)})
+    finally:
+        conn.close()
+
+
+def _ss_validate(d):
+    """Return an error string, or None if the payload's slot is valid."""
+    if d.get("day") not in SS_DAYS:
+        return "Pick a day."
+    if d.get("period") not in SS_PERIOD_IDS:
+        return "Pick a period."
+    if not _ss_int(d.get("student_id")):
+        return "Pick a student."
+    return None
+
+
+@app.route("/api/special-services/sessions", methods=["POST"])
+@require_perm("special_services")
+def api_ss_session_create():
+    d = request.get_json() or {}
+    err = _ss_validate(d)
+    if err:
+        return jsonify({"error": err}), 400
+    year = _ss_int(d.get("school_year_start")) or current_school_year_start()
+    conn = get_db_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                INSERT INTO special_service_sessions
+                    (school_year_start, day, period, staff_id, student_id, room_id,
+                     service_id, notes, updated_by)
+                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING ss_id
+            """, (year, d["day"], d["period"], _ss_int(d.get("staff_id")),
+                  _ss_int(d.get("student_id")), _ss_int(d.get("room_id")),
+                  _ss_int(d.get("service_id")), (d.get("notes") or "").strip() or None,
+                  session.get("user_email")))
+            ss_id = cur.fetchone()[0]
+        conn.commit()
+        return jsonify({"success": True, "ss_id": ss_id})
+    except Exception as e:
+        conn.rollback()
+        return jsonify({"error": str(e)}), 500
+    finally:
+        conn.close()
+
+
+@app.route("/api/special-services/sessions/<int:ss_id>", methods=["PUT"])
+@require_perm("special_services")
+def api_ss_session_update(ss_id):
+    d = request.get_json() or {}
+    # A drag-and-drop move sends only day/period; the full form sends everything.
+    if "day" in d and d["day"] not in SS_DAYS:
+        return jsonify({"error": "Pick a day."}), 400
+    if "period" in d and d["period"] not in SS_PERIOD_IDS:
+        return jsonify({"error": "Pick a period."}), 400
+    fields, vals = [], []
+    for col in ("day", "period"):
+        if col in d:
+            fields.append(col + "=%s")
+            vals.append(d[col])
+    for col in ("staff_id", "student_id", "room_id", "service_id"):
+        if col in d:
+            fields.append(col + "=%s")
+            vals.append(_ss_int(d[col]))
+    if "notes" in d:
+        fields.append("notes=%s")
+        vals.append((d.get("notes") or "").strip() or None)
+    if not fields:
+        return jsonify({"error": "No changes"}), 400
+    fields += ["updated_at=CURRENT_TIMESTAMP", "updated_by=%s"]
+    vals.append(session.get("user_email"))
+    vals.append(ss_id)
+    conn = get_db_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("UPDATE special_service_sessions SET " + ", ".join(fields) +
+                        " WHERE ss_id=%s", vals)
+        conn.commit()
+        return jsonify({"success": True})
+    except Exception as e:
+        conn.rollback()
+        return jsonify({"error": str(e)}), 500
+    finally:
+        conn.close()
+
+
+@app.route("/api/special-services/sessions/<int:ss_id>", methods=["DELETE"])
+@require_perm("special_services")
+def api_ss_session_delete(ss_id):
+    conn = get_db_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM special_service_sessions WHERE ss_id=%s", (ss_id,))
+        conn.commit()
+        return jsonify({"success": True})
+    except Exception as e:
+        conn.rollback()
+        return jsonify({"error": str(e)}), 500
+    finally:
+        conn.close()
+
+
+# ---- The service list behind the Service dropdown (Services tab) ----
+@app.route("/api/special-services/types")
+@login_required
+def api_ss_types():
+    conn = get_db_connection()
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute("""SELECT t.service_id, t.name, t.active, t.sort_order,
+                                  (SELECT COUNT(*) FROM special_service_sessions ss
+                                   WHERE ss.service_id = t.service_id) AS use_count
+                           FROM special_service_types t
+                           ORDER BY t.sort_order, t.name""")
+            return jsonify({"services": fa(cur)})
+    finally:
+        conn.close()
+
+
+@app.route("/api/special-services/types", methods=["POST"])
+@require_perm("special_services")
+def api_ss_type_create():
+    name = ((request.get_json() or {}).get("name") or "").strip()
+    if not name:
+        return jsonify({"error": "Name required"}), 400
+    conn = get_db_connection()
+    try:
+        with conn.cursor() as cur:
+            # Re-adding a name that was retired simply brings it back.
+            cur.execute("""INSERT INTO special_service_types (name, sort_order)
+                           VALUES (%s, COALESCE((SELECT MAX(sort_order)+1
+                                                 FROM special_service_types), 0))
+                           ON CONFLICT (name) DO UPDATE SET active=TRUE
+                           RETURNING service_id""", (name,))
+            sid = cur.fetchone()[0]
+        conn.commit()
+        return jsonify({"success": True, "service_id": sid})
+    except Exception as e:
+        conn.rollback()
+        return jsonify({"error": str(e)}), 500
+    finally:
+        conn.close()
+
+
+@app.route("/api/special-services/types/<int:service_id>", methods=["PUT"])
+@require_perm("special_services")
+def api_ss_type_update(service_id):
+    d = request.get_json() or {}
+    fields, vals = [], []
+    if "name" in d:
+        nm = (d.get("name") or "").strip()
+        if not nm:
+            return jsonify({"error": "Name required"}), 400
+        fields.append("name=%s")
+        vals.append(nm)
+    for col in ("active", "sort_order"):
+        if col in d:
+            fields.append(col + "=%s")
+            vals.append(d[col])
+    if not fields:
+        return jsonify({"error": "No changes"}), 400
+    vals.append(service_id)
+    conn = get_db_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("UPDATE special_service_types SET " + ", ".join(fields) +
+                        " WHERE service_id=%s", vals)
+        conn.commit()
+        return jsonify({"success": True})
+    except Exception as e:
+        conn.rollback()
+        return jsonify({"error": str(e)}), 500
     finally:
         conn.close()
 
