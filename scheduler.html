@@ -349,7 +349,7 @@ const DAYS = ["Mon","Tue","Wed","Thu","Fri"];
 const PERIODS = [
   {id:"P1",label:"8:25–9:09"},{id:"P2",label:"9:12–9:56"},{id:"P3",label:"9:59–10:43"},
   {id:"P4",label:"10:46–11:35"},{id:"P5",label:"11:33–12:22"},{id:"P6",label:"12:25–1:09"},
-  {id:"P7",label:"1:12–1:56"},{id:"P8",label:"1:59–2:43"}
+  {id:"P7",label:"1:12–1:56"},{id:"P8",label:"1:59–2:43"},{id:"P9",label:"2:45–3:25"}
 ];
 // 2026–27 bell times. Grades 5–8 moved to a 15-min homeroom (8:05–8:20), a 5-min-earlier
 // morning, and a recess+lunch block. That block sits at P5 for 5/6 and at P4 for 7/8, so
@@ -490,7 +490,7 @@ function seed(){
   return S;
 }
 
-function allP(){ return PERIODS.map(p=>p.id); }
+function allP(){ return PERIODS.map(p=>p.id).filter(id=>id!=="P9"); }  // academic periods only — P9 (2:45–3:25) is a non-class block, never solver-scheduled
 function fullWeek(periods){ const o={}; DAYS.forEach(d=>o[d]=periods.slice()); return o; }
 function without(arr,x){ return arr.filter(p=>p!==x); }
 
@@ -1260,6 +1260,12 @@ function fixedDisplay(groupId, day, period, rawLabel){
   if(/lunch/i.test(rawLabel||"") && (G56.includes(groupId)||G78.includes(groupId))) return "Recess / Lunch";
   return rawLabel;
 }
+// Period 9 (2:45–3:25) is a non-academic block. Grades 5–8 get a day-specific Extra Help /
+// Advisory / Student Council block; the rest of the school just has a Homeroom period.
+const P9_LABELS = {Mon:"Extra Help / Student Council", Tue:"Advisory", Wed:"Extra Help", Thu:"Extra Help", Fri:"Extra Help"};
+function p9Label(groupId, day){
+  return (G56.includes(groupId)||G78.includes(groupId)) ? (P9_LABELS[day]||"Extra Help") : "Homeroom";
+}
 // per-teacher/day free-period labels: PREP, LUNCH DUTY / LUNCH NO DUTY
 function teacherDayInfo(tid){
   const plan=getLunchPlan(); const info={};
@@ -1336,6 +1342,12 @@ function renderSchedule(){
   PERIODS.forEach(p=>{
     h+=`<tr><th style="text-align:right">${p.id}<br><span style="font-weight:400;color:var(--muted);font-size:10px">${plabel(p.id,_tband)}</span></th>`;
     DAYS.forEach(d=>{
+      if(p.id==="P9"){
+        // Non-academic 9th-period block. 5–8 students and every teacher see the day's Extra
+        // Help/Advisory block; lower-school groups fall through to a normal Homeroom cell.
+        if(mode!=="class"){ h+=`<td class="lbl-prep">${P9_LABELS[d]||"Extra Help"}</td>`; return; }
+        if(G56.includes(who)||G78.includes(who)){ h+=`<td class="subj-FREE">${P9_LABELS[d]||"Extra Help"}</td>`; return; }
+      }
       const free=(d===WED_FREE.day&&p.id===WED_FREE.period);
       const cell=grid[d+"|"+p.id];
       if(cell){
@@ -1699,6 +1711,7 @@ function masterTD(d,p,rid,cell,fixedMap,interactive){
     const inter=interactive?`class="mp-cell clickable" data-occ="${c.i}" draggable="true" ondragstart="posterDragStart(event,${c.i})" ondragend="posterDragEnd()"${DND} onclick="openMove(${c.i})" title="${grpName(s.groupId)} · ${subjLabel(s.subject)} · ${s.teacherId} — click for swap options, or drag"`:`class="mp-cell"`;
     return `<td ${inter} data-day="${d}" data-period="${p}" style="background:${gp.bg};color:${gp.fg}"><span class="mp-sub">${subjLabel(s.subject)}</span><span class="mp-tr">${s.teacherId}${s.aide?'·+B':''}</span><span class="mp-rm">${s.room}</span>${tag}</td>`;
   }
+  if(p==="P9"){ return `<td class="mp-fx mp-free" data-day="${d}" data-period="${p}">${p9Label(rid,d)}</td>`; }   // 9th-period block
   const fx=fixedMap[key];
   if(fx!=null){ const disp=fixedDisplay(rid,d,p,fx); const isFree=/free|elective|assembly/i.test(disp); return `<td class="mp-fx ${isFree?'mp-free':'mp-lunch'}" data-day="${d}" data-period="${p}"${DND}>${disp||'—'}</td>`; }
   if(d===WED_FREE.day && p===WED_FREE.period){ return `<td class="mp-fx mp-free" data-day="${d}" data-period="${p}">Electives/Assembly</td>`; }
