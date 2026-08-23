@@ -1347,7 +1347,8 @@ function renderSchedule(){
   const old=document.getElementById("unplacedbox"); if(old) old.remove();
   if(un.length){
     const byg={}; un.forEach(s=>{ (byg[s.groupId]=byg[s.groupId]||[]).push(subjLabel(s.subject)+(s.aide?'*':'')); });
-    let u='<div class="status err" style="margin-top:14px"><b>Unplaced ('+un.length+'):</b> '+Object.entries(byg).map(([g,ss])=>`${g}: ${ss.join(", ")}`).join(" · ")+' <small>(* needs Belmonte)</small></div>';
+    const anyAide = un.some(s=>s.aide);   // only show the Belmonte legend if something is actually starred
+    let u='<div class="status err" style="margin-top:14px"><b>Unplaced ('+un.length+'):</b> '+Object.entries(byg).map(([g,ss])=>`${g}: ${ss.join(", ")}`).join(" · ")+(anyAide?' <small>(* needs Belmonte)</small>':'')+'</div>';
     $("#schedwrap").insertAdjacentHTML("afterend",'<div id="unplacedbox">'+u+'</div>');
   }
 }

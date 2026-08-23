@@ -1,5 +1,7 @@
 # Changelog
 
+2026-08-23: Scheduler unplaced list — the "(* needs Belmonte)" legend now only appears when an unplaced class is actually aide-flagged. Before, it printed at the bottom of the Unplaced box every time, which made it look like classes such as 8B Math (Duthie's Blue math, which never needs the aide) required Belmonte. An unplaced class only needs Belmonte if it shows a * right after its name.
+
 2026-08-23: Scheduler save is now conflict-safe. Previously, if two editors had the scheduler open at once, a stale tab could silently overwrite a newer save (this is how deleted requirements like the bad JPK/Math rows kept reappearing). The server now versions each saved schedule and rejects a save from a tab that loaded an older version, and autosave has been removed — the schedule saves only when you click 💾 Save. An out-of-date tab shows a red "changed in another session — reload to get the latest" banner and is blocked from saving until it reloads, so no one can clobber someone else's work. Unsaved edits now tint the Save button and warn before you navigate away.
 
 2026-08-19: Scheduler preview switch — editors can append ?readonly=1 to the scheduler URL (/scheduler?readonly=1) to see the exact view-only staff experience (only the Generate tab, no stats, no Save button) without needing a separate test account. The override only removes edit access for that page view; saving stays server-enforced.
