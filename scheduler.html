@@ -520,10 +520,10 @@ function buildFixed(){
   add("JPK","P5","Lunch"); add("SPK","P5","Lunch");
   add("K","P6","Lunch");
   ["1","2","3","4"].forEach(g=>add(g,"P6","Lunch"));       // lower school P6
-  ["5A","5B","5AB","6A","6B","6AB"].forEach(g=>add(g,"P5","Lunch")); // 5/6 lunch P5
-  ["7A","7B","7C","7AB","8AB","8A","8B"].forEach(g=>add(g,"P4","Lunch")); // 7/8 lunch P4
-  // School-wide free Wednesday P3 (all groups EXCEPT Kindergarten, whose non-Art specials may use it)
-  ALLGROUPIDS().filter(g=>g!=="K").forEach(g=>F.push({groupId:g,day:"Wed",period:"P3",label:"Free (Wed P3)"}));
+  ["5A","5B","5AB","6A","6B","6AB"].forEach(g=>add(g,"P5","Recess / Lunch")); // 5/6 lunch P5 (recess first half, lunch second)
+  ["7A","7B","7C","7AB","8AB","8A","8B"].forEach(g=>add(g,"P4","Recess / Lunch")); // 7/8 lunch P4 (recess first half, lunch second)
+  // Wednesday 3rd period is a school-wide Electives/Assembly block (all groups EXCEPT Kindergarten, whose non-Art specials may use it)
+  ALLGROUPIDS().filter(g=>g!=="K").forEach(g=>F.push({groupId:g,day:"Wed",period:"P3",label:"Electives/Assembly"}));
   return F;
 }
 function ALLGROUPIDS(){ return ["JPK","SPK","K","1","2","3","4","5A","5B","5AB","6A","6B","6AB","7A","7B","7C","7AB","8AB","8A","8B"]; }
@@ -1242,6 +1242,15 @@ function computeLunchPlan(){
 function getLunchPlan(){ if(!LUNCH_PLAN) LUNCH_PLAN=computeLunchPlan(); return LUNCH_PLAN; }
 function invalidateLunchPlan(){ LUNCH_PLAN=null; }
 
+// Display text for a teacher lunch label. Internally the plan keeps "LUNCH DUTY"/"LUNCH NO
+// DUTY"/"LUNCH" (used for detection and the edit dialog); on the grid we show the recess+lunch
+// wording Eileen asked for. Keep the raw label for logic, map only for display.
+function lunchDisp(lbl){
+  if(lbl==="LUNCH DUTY")    return "Recess / Lunch Duty";
+  if(lbl==="LUNCH NO DUTY") return "Recess / Lunch No Duty";
+  if(lbl==="LUNCH")         return "Recess / Lunch";
+  return lbl;
+}
 // per-teacher/day free-period labels: PREP, LUNCH DUTY / LUNCH NO DUTY
 function teacherDayInfo(tid){
   const plan=getLunchPlan(); const info={};
@@ -1300,7 +1309,7 @@ function renderSchedule(){
   const put=(d,p,html,meta)=>grid[d+"|"+p]={html,meta};
 
   if(mode==="class"){
-    fixedFor(who).forEach(dp=>{ const [d,p]=dp.split("|"); const lbl=(S.fixed.find(f=>f.groupId===who&&(f.day==="*"||f.day===d)&&f.period===p)||{}).label||""; put(d,p,`<span>${lbl}</span>`,{fixed:lbl.toLowerCase().includes('free')?'FREE':'LUNCH'}); });
+    fixedFor(who).forEach(dp=>{ const [d,p]=dp.split("|"); const lbl=(S.fixed.find(f=>f.groupId===who&&(f.day==="*"||f.day===d)&&f.period===p)||{}).label||""; put(d,p,`<span>${lbl}</span>`,{fixed:/free|elective|assembly/i.test(lbl)?'FREE':'LUNCH'}); });
     const map=placementByGroup(who);
     Object.entries(map).forEach(([dp,o])=>{ const [d,p]=dp.split("|");
       const tp=TEACHER_PALETTE[o.s.teacherId]||{bg:"#ECECEC",fg:"#333"};
@@ -1326,7 +1335,7 @@ function renderSchedule(){
           const cls=`keycell${clickable?' clickable':''}`;
           const onc=clickable?` onclick="openMove(${cell.meta.i})"`:'';
           h+=`<td class="${cls}" style="background:${cell.meta.bg};color:${cell.meta.fg}"${onc}>${cell.html}</td>`; }
-      } else if(free && mode!=="teacher"){ h+=`<td class="subj-FREE">Free</td>`; }
+      } else if(free && mode!=="teacher"){ h+=`<td class="subj-FREE">Electives/Assembly</td>`; }
       else {
         if(mode==="class"){ // open time — editable so editors can write what happens then
           const div=(grp(who)||{}).div; const key=who+"|"+d+"|"+p.id;
@@ -1336,11 +1345,12 @@ function renderSchedule(){
           h+=`<td class="subj-CORE editcell${edited?' edited':''}" contenteditable="true" spellcheck="false" title="Click to type what happens here" onblur="saveHomeroom('${who}','${d}','${p.id}',this.innerText); if(!this.innerText.trim())this.innerText='${def}'" onfocus="if(this.innerText==='${def}')this.innerText=''">${txt}</td>`;
         }
         else { const av=(avail(who)[d]||[]).includes(p.id); const isFreeWed=(d===WED_FREE.day&&p.id===WED_FREE.period);
-          const lbl = isFreeWed ? "PREP" : (av ? ((tinfo&&tinfo[d]&&tinfo[d][p.id])||"—") : "off");
+          const lbl = isFreeWed ? "PREP" : (av ? ((tinfo&&tinfo[d]&&tinfo[d][p.id])||"—") : "off");   // raw label (kept for detection)
           const isLunch=/LUNCH/.test(lbl);
-          const lc = isLunch?"lbl-lunch":(lbl==="PREP"?"lbl-prep":(lbl==="free"?"lbl-prep":""));
+          const lc = isFreeWed ? "lbl-prep" : (isLunch?"lbl-lunch":(lbl==="PREP"?"lbl-prep":(lbl==="free"?"lbl-prep":"")));
           const clk = isLunch?` clickable" title="Click to move this lunch or toggle duty" onclick="openLunchEdit('${who}','${d}')`:"";
-          h+=`<td class="${lc}${clk}" style="${av||isFreeWed?'':'background:#f4f2ec;color:#c0bbac'}">${lbl}</td>`; }
+          const disp = isFreeWed ? "Electives/Assembly" : lunchDisp(lbl);   // recess+lunch wording / Wednesday block
+          h+=`<td class="${lc}${clk}" style="${av||isFreeWed?'':'background:#f4f2ec;color:#c0bbac'}">${disp}</td>`; }
       }
     });
     h+="</tr>";
@@ -1681,8 +1691,8 @@ function masterTD(d,p,rid,cell,fixedMap,interactive){
     return `<td ${inter} data-day="${d}" data-period="${p}" style="background:${gp.bg};color:${gp.fg}"><span class="mp-sub">${subjLabel(s.subject)}</span><span class="mp-tr">${s.teacherId}${s.aide?'·+B':''}</span><span class="mp-rm">${s.room}</span>${tag}</td>`;
   }
   const fx=fixedMap[key];
-  if(fx!=null){ const isFree=/free/i.test(fx); return `<td class="mp-fx ${isFree?'mp-free':'mp-lunch'}" data-day="${d}" data-period="${p}"${DND}>${fx||'—'}</td>`; }
-  if(d===WED_FREE.day && p===WED_FREE.period){ return `<td class="mp-fx mp-free" data-day="${d}" data-period="${p}">free</td>`; }
+  if(fx!=null){ const isFree=/free|elective|assembly/i.test(fx); return `<td class="mp-fx ${isFree?'mp-free':'mp-lunch'}" data-day="${d}" data-period="${p}"${DND}>${fx||'—'}</td>`; }
+  if(d===WED_FREE.day && p===WED_FREE.period){ return `<td class="mp-fx mp-free" data-day="${d}" data-period="${p}">Electives/Assembly</td>`; }
   return `<td class="mp-empty" data-day="${d}" data-period="${p}"${DND}></td>`;
 }
 // Grid for a single period: header row of days + one row per group. Used by the per-period PDF pages.
