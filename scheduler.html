@@ -390,11 +390,11 @@ function seed(){
     {id:"6AB",name:"6th (whole grade)",div:"Middle",cohort:"6",part:"AB",hr:""},
     {id:"7A",name:"7th Gold",div:"Middle",cohort:"7",part:"A",hr:"Jakobsen"},
     {id:"7B",name:"7th Blue",div:"Middle",cohort:"7",part:"B",hr:"Jakobsen"},
-    {id:"7C",name:"7th White (math)",div:"Middle",cohort:"7",part:"C",hr:""},
+    {id:"7C",name:"7th Alvarez",div:"Middle",cohort:"7",part:"C",hr:""},
     {id:"7AB",name:"7th (whole grade)",div:"Middle",cohort:"7",part:"AB",hr:""},  // used only for the 1×/week merged SS & ELA
     {id:"8AB",name:"8th (whole grade)",div:"Middle",cohort:"8",part:"AB",hr:"Ballard"},
-    {id:"8A",name:"8th Gold (math split)",div:"Middle",cohort:"8",part:"A",hr:"Ballard"},
-    {id:"8B",name:"8th Blue (math split)",div:"Middle",cohort:"8",part:"B",hr:"Ballard"}
+    {id:"8A",name:"8th McLeod",div:"Middle",cohort:"8",part:"A",hr:"Ballard"},
+    {id:"8B",name:"8th Duthie",div:"Middle",cohort:"8",part:"B",hr:"Ballard"}
   ];
 
   // ----- teachers ----- (room = where they teach; availability windows below)
@@ -571,7 +571,14 @@ let S = seed();
 const $=(s,el=document)=>el.querySelector(s);
 const $$=(s,el=document)=>[...el.querySelectorAll(s)];
 const grp = id => S.classes.find(c=>c.id===id);
-const grpName = id => (grp(id)?grp(id).name:id);
+// Math sections are named after the teacher, not the color (Eileen). 7C is a math-only section,
+// so its whole name changes; the Gold/Blue sections keep their color name for every OTHER subject
+// and only their MATH class shows the teacher name (see mathSectionName / masterTD / per-group).
+const MATH_SECTION_NAME={"6A":"6th McLeod","6B":"6th Duthie","7A":"7th McLeod","7B":"7th Duthie","7C":"7th Alvarez","8A":"8th McLeod","8B":"8th Duthie"};
+const GROUP_NAME_OVERRIDE={"7C":"7th Alvarez","8A":"8th McLeod","8B":"8th Duthie"};   // math-only sections — rename everywhere
+const grpName = id => GROUP_NAME_OVERRIDE[id] || (grp(id)?grp(id).name:id);
+// Name to show for a specific class = teacher name for 6/7/8 math, otherwise the section (color) name.
+const classSectionName = (groupId, subject) => (subject==="MATH" && MATH_SECTION_NAME[groupId]) ? MATH_SECTION_NAME[groupId] : grpName(groupId);
 const tchr = id => S.teachers.find(t=>t.id===id);
 const subjLabel = s => SUBJLBL[s]||s;
 // does the person `who` staff this session? (Belmonte is the aide, present in aide-flagged classes)
@@ -1098,12 +1105,30 @@ function softOptimize(sessions, assign, deadline, seedn){
   return assign;
 }
 
+// Hard math alignment: after a first solve, pin each grade's Gold/White math sessions to the
+// same day+period as that grade's Blue (Duthie) section, then the caller re-solves with those
+// pins so every section of a grade does math at the same time. Returns true if pins were set.
+const MATH_ALIGN_MAP={"6B":["6A"],"7B":["7A","7C"],"8B":["8A"]};
+function applyMathAlignPins(freshSessions, srcSessions, srcAssign){
+  const bluePer={};
+  srcSessions.forEach((s,i)=>{ const v=srcAssign[i]; if(v&&s.subject==="MATH"&&MATH_ALIGN_MAP[s.groupId]){ (bluePer[s.groupId]=bluePer[s.groupId]||{})[v.day]=v.period; } });
+  const byGroup={}; freshSessions.forEach((s,i)=>{ if(s.subject==="MATH"){ (byGroup[s.groupId]=byGroup[s.groupId]||[]).push(i); } });
+  let any=false;
+  Object.keys(MATH_ALIGN_MAP).forEach(blue=>{
+    const bp=bluePer[blue]; if(!bp) return;
+    const days=DAYS.filter(d=>bp[d]);
+    const bidx=byGroup[blue]||[];
+    days.forEach((d,k)=>{ if(bidx[k]!=null){ freshSessions[bidx[k]].pin={day:d,period:bp[d]}; any=true; } });
+    MATH_ALIGN_MAP[blue].forEach(o=>{ const oidx=byGroup[o]||[]; days.forEach((d,k)=>{ if(oidx[k]!=null) freshSessions[oidx[k]].pin={day:d,period:bp[d]}; }); });
+  });
+  return any;
+}
 function runSolve(){
   const budget=+$("#effort").value;
   $("#solvestatus").innerHTML='<div class="status warn">Solving… placing the tightest resources first, then arranging for Eileen\'s preferences (clustering, preps, double blocks).</div>';
   setTimeout(()=>{
-    const sessions=buildSessions();
-    const t0=Date.now(); const hardBudget=Math.max(2000, Math.round(budget*0.45)); const deadline=t0+hardBudget;
+    let sessions=buildSessions();
+    const t0=Date.now(); const hardBudget=Math.max(2000, Math.round(budget*0.35)); const deadline=t0+hardBudget;
     let best=null, restarts=0;
     while(Date.now()<deadline){
       const per=Math.min(deadline, Date.now()+Math.max(1500, hardBudget/3));
@@ -1112,13 +1137,30 @@ function runSolve(){
       if(!best || r.placed>best.placed) best=r;
       if(r.complete) { best=r; break; }
     }
+    // Pass 2 — hard-align 6th/7th/8th math (Gold & White pinned to Blue's period), then re-solve.
+    let mathAligned=false;
+    if(best && best.complete){
+      const pinned=buildSessions();
+      if(applyMathAlignPins(pinned, sessions, best.assign)){
+        const dl2=Date.now()+hardBudget; let best2=null, r2=0;
+        while(Date.now()<dl2){
+          const per=Math.min(dl2, Date.now()+Math.max(1500, hardBudget/3));
+          const r=solveMinConflicts(pinned, 202+r2*2654435761, per);
+          r2++;
+          if(!best2 || r.placed>best2.placed) best2=r;
+          if(r.complete){ best2=r; break; }
+        }
+        if(best2 && best2.complete){ best=best2; sessions=pinned; restarts+=r2; mathAligned=true; }
+        // if pass 2 can't fully place, keep the pass-1 (soft-aligned) result and flag it below
+      }
+    }
     let assign=best.assign, soft0=null, soft1=null;
     if(best.complete){
       soft0=softCost(sessions,assign);
       assign=softOptimize(sessions, assign.map(v=>v&&{...v}), t0+budget, 7);
       soft1=softCost(sessions,assign);
     }
-    RESULT={sessions, assign, placed:best.placed, total:best.total, complete:best.complete, ms:Date.now()-t0, restarts, soft0, soft1};
+    RESULT={sessions, assign, placed:best.placed, total:best.total, complete:best.complete, ms:Date.now()-t0, restarts, soft0, soft1, mathAligned};
     showResult();
   },40);
 }
@@ -1145,7 +1187,7 @@ function onViewModeChange(){
   if(mode==="complete"||mode==="debug"||mode==="prefs"||mode==="prep"||mode==="master"){ lab.style.display="none"; }
   else{
     lab.style.display="";
-    if(mode==="class") sel.innerHTML=S.classes.map(c=>`<option value="${c.id}">${c.id} · ${c.name}</option>`).join("");
+    if(mode==="class") sel.innerHTML=S.classes.map(c=>`<option value="${c.id}">${c.id} · ${grpName(c.id)}</option>`).join("");
     else sel.innerHTML=S.teachers.map(t=>`<option value="${t.id}">${t.name}</option>`).join("")+`<option value="${AIDE_ID}">Belmonte (aide)</option>`;
   }
   renderSchedule();
@@ -1707,7 +1749,8 @@ function masterTD(d,p,rid,cell,fixedMap,interactive){
   const DND=interactive?` ondragover="event.preventDefault();this.classList.add('dragover')" ondragleave="this.classList.remove('dragover')" ondrop="posterDrop(event,this)"`:"";
   const key=d+"|"+p+"|"+rid, c=cell[key];
   if(c){ const s=c.s, gp=TEACHER_PALETTE[s.teacherId]||{bg:"#ececec",fg:"#333"};
-    const whole=s.groupId!==rid; const tag=whole?`<span class="mp-whole">${grpName(s.groupId)}</span>`:"";
+    const whole=s.groupId!==rid; let tag=whole?`<span class="mp-whole">${grpName(s.groupId)}</span>`:"";
+    if(!whole && s.subject==="MATH" && MATH_SECTION_NAME[s.groupId]) tag=`<span class="mp-whole">${MATH_SECTION_NAME[s.groupId]}</span>`;   // math named by teacher
     const inter=interactive?`class="mp-cell clickable" data-occ="${c.i}" draggable="true" ondragstart="posterDragStart(event,${c.i})" ondragend="posterDragEnd()"${DND} onclick="openMove(${c.i})" title="${grpName(s.groupId)} · ${subjLabel(s.subject)} · ${s.teacherId} — click for swap options, or drag"`:`class="mp-cell"`;
     return `<td ${inter} data-day="${d}" data-period="${p}" style="background:${gp.bg};color:${gp.fg}"><span class="mp-sub">${subjLabel(s.subject)}</span><span class="mp-tr">${s.teacherId}${s.aide?'·+B':''}</span><span class="mp-rm">${s.room}</span>${tag}</td>`;
   }
