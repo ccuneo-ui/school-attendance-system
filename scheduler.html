@@ -1188,7 +1188,7 @@ function onViewModeChange(){
   else{
     lab.style.display="";
     if(mode==="class") sel.innerHTML=S.classes.map(c=>`<option value="${c.id}">${c.id} · ${grpName(c.id)}</option>`).join("");
-    else sel.innerHTML=S.teachers.map(t=>`<option value="${t.id}">${t.name}</option>`).join("")+`<option value="${AIDE_ID}">Belmonte (aide)</option>`;
+    else sel.innerHTML=S.teachers.slice().sort((a,b)=>a.name.localeCompare(b.name)).map(t=>`<option value="${t.id}">${t.name}</option>`).join("")+`<option value="${AIDE_ID}">Belmonte (aide)</option>`;
   }
   renderSchedule();
 }
