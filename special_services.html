@@ -112,6 +112,8 @@
       <select id="fStaff" onchange="render()"><option value="">All staff</option></select>
       <label for="fService">Service</label>
       <select id="fService" onchange="render()"><option value="">All services</option></select>
+      <label for="fGrade">Grade</label>
+      <select id="fGrade" onchange="onGradeFilter()"><option value="">All grades</option></select>
       <label for="fStudent">Student</label>
       <select id="fStudent" onchange="render()"><option value="">All students</option></select>
       <button class="btn btn-ghost btn-sm" onclick="clearFilters()">Clear</button>
@@ -150,7 +152,10 @@
       <div class="field"><label for="mDay">Day</label><select id="mDay"></select></div>
       <div class="field"><label for="mPeriod">Period</label><select id="mPeriod"></select></div>
     </div>
-    <div class="field"><label for="mStudent">Student</label><select id="mStudent"></select></div>
+    <div class="two" style="grid-template-columns:140px 1fr;">
+      <div class="field"><label for="mGrade">Grade</label><select id="mGrade" onchange="fillModalStudents()"></select></div>
+      <div class="field"><label for="mStudent">Student</label><select id="mStudent"></select></div>
+    </div>
     <div class="field"><label for="mService">Service</label><select id="mService"></select></div>
     <div class="two">
       <div class="field"><label for="mStaff">Staff Member</label><select id="mStaff"></select></div>
@@ -197,6 +202,26 @@ function showTab(which){
   if(which==='services') loadTypes();
 }
 
+/* Grades sort in school order (JPK, SPK, K, 1…8), not alphabetically. */
+const GRADE_RANK = {'JPK':-3,'SPK':-2,'PK':-3,'K':-1,'KG':-1};
+function gradeRank(g){
+  const k=(g||'').toString().trim().toUpperCase();
+  if(k in GRADE_RANK) return GRADE_RANK[k];
+  const n=parseInt(k,10);
+  return isNaN(n)?99:n;
+}
+function allGrades(){
+  const seen=[];
+  OPT.students.forEach(s=>{ const g=(s.grade||'').trim(); if(g && seen.indexOf(g)<0) seen.push(g); });
+  return seen.sort((a,b)=>gradeRank(a)-gradeRank(b) || a.localeCompare(b));
+}
+function studentsInGrade(grade){
+  return grade ? OPT.students.filter(s=>(s.grade||'')===grade) : OPT.students;
+}
+function studentOptions(grade){
+  return studentsInGrade(grade).map(s=>`<option value="${s.student_id}">${esc(s.name)}${s.grade?' ('+esc(s.grade)+')':''}</option>`).join('');
+}
+
 function svcColor(serviceId){
   const i = OPT.services.findIndex(s=>s.service_id===serviceId);
   return SVC_COLORS[(i<0?0:i)%SVC_COLORS.length];
@@ -225,16 +250,36 @@ async function loadSessions(){
 }
 
 function fillFilters(){
-  const st=document.getElementById('fStaff'), sv=document.getElementById('fService'), sd=document.getElementById('fStudent');
+  const st=document.getElementById('fStaff'), sv=document.getElementById('fService'), gr=document.getElementById('fGrade');
   st.innerHTML='<option value="">All staff</option>'+OPT.staff.map(s=>`<option value="${s.staff_id}">${esc(s.name)}</option>`).join('');
   sv.innerHTML='<option value="">All services</option>'+OPT.services.map(s=>`<option value="${s.service_id}">${esc(s.name)}</option>`).join('');
-  sd.innerHTML='<option value="">All students</option>'+OPT.students.map(s=>`<option value="${s.student_id}">${esc(s.name)}${s.grade?' ('+esc(s.grade)+')':''}</option>`).join('');
+  const keepGrade=gr.value;
+  gr.innerHTML='<option value="">All grades</option>'+allGrades().map(g=>`<option value="${esc(g)}">Grade ${esc(g)}</option>`).join('');
+  gr.value=keepGrade||'';
+  fillStudentFilter();
+}
+
+/* The Student dropdown lists only the chosen grade, so you can narrow a 200-name
+   list to one grade first. Picking a grade on its own already filters the grid. */
+function fillStudentFilter(){
+  const gr=document.getElementById('fGrade').value;
+  const sd=document.getElementById('fStudent');
+  const keep=sd.value;
+  sd.innerHTML='<option value="">'+(gr?('All of grade '+esc(gr)):'All students')+'</option>'+studentOptions(gr);
+  sd.value = Array.prototype.some.call(sd.options,o=>o.value===keep) ? keep : '';
+}
+
+function onGradeFilter(){
+  fillStudentFilter();
+  render();
 }
 
 function clearFilters(){
   document.getElementById('fStaff').value='';
   document.getElementById('fService').value='';
+  document.getElementById('fGrade').value='';
   document.getElementById('fStudent').value='';
+  fillStudentFilter();
   render();
 }
 
@@ -257,15 +302,17 @@ function matchesFilter(s){
   const fs=document.getElementById('fStaff').value;
   const fv=document.getElementById('fService').value;
   const fd=document.getElementById('fStudent').value;
+  const fg=document.getElementById('fGrade').value;
   if(fs && String(s.staff_id)!==fs) return false;
   if(fv && String(s.service_id)!==fv) return false;
   if(fd && String(s.student_id)!==fd) return false;
+  if(fg && (s.student_grade||'')!==fg) return false;
   return true;
 }
 
 function render(){
   const bad = conflictKeys();
-  const anyFilter = ['fStaff','fService','fStudent'].some(id=>document.getElementById(id).value);
+  const anyFilter = ['fStaff','fService','fStudent','fGrade'].some(id=>document.getElementById(id).value);
   const byslot={};
   SESSIONS.forEach(s=>{ (byslot[s.day+'|'+s.period]=byslot[s.day+'|'+s.period]||[]).push(s); });
 
@@ -303,8 +350,11 @@ function render(){
 function fillModalSelects(){
   document.getElementById('mDay').innerHTML = OPT.days.map(d=>`<option value="${d}">${esc(d)}</option>`).join('');
   document.getElementById('mPeriod').innerHTML = OPT.periods.map(p=>`<option value="${p.id}">${esc(p.id)} · ${esc(p.time||'')}</option>`).join('');
-  document.getElementById('mStudent').innerHTML = '<option value="">— pick a student —</option>'+
-    OPT.students.map(s=>`<option value="${s.student_id}">${esc(s.name)}${s.grade?' ('+esc(s.grade)+')':''}</option>`).join('');
+  const mg=document.getElementById('mGrade');
+  const keepG=mg.value;
+  mg.innerHTML='<option value="">All grades</option>'+allGrades().map(x=>`<option value="${esc(x)}">Grade ${esc(x)}</option>`).join('');
+  mg.value=keepG||'';
+  fillModalStudents();
   document.getElementById('mService').innerHTML = '<option value="">— none —</option>'+
     OPT.services.map(s=>`<option value="${s.service_id}">${esc(s.name)}</option>`).join('');
   document.getElementById('mStaff').innerHTML = '<option value="">— unassigned —</option>'+
@@ -313,13 +363,24 @@ function fillModalSelects(){
     OPT.rooms.map(r=>`<option value="${r.room_id}">${esc(r.name)}</option>`).join('');
 }
 
+/* Narrow the modal's student list to one grade (keeps the current pick if it
+   still belongs to that grade). */
+function fillModalStudents(keepId){
+  const grade=document.getElementById('mGrade').value;
+  const sel=document.getElementById('mStudent');
+  const keep = keepId!==undefined ? String(keepId||'') : sel.value;
+  sel.innerHTML='<option value="">— pick a student —</option>'+studentOptions(grade);
+  sel.value = Array.prototype.some.call(sel.options,o=>o.value===keep) ? keep : '';
+}
+
 function openNew(day,period){
   if(!CAN_EDIT) return;
   editingId=null;
   document.getElementById('modalTitle').textContent='Add Session';
   document.getElementById('mDay').value = day || OPT.days[0];
   document.getElementById('mPeriod').value = period || OPT.periods[0].id;
-  document.getElementById('mStudent').value='';
+  document.getElementById('mGrade').value='';
+  fillModalStudents('');
   document.getElementById('mService').value = OPT.services.length?OPT.services[0].service_id:'';
   document.getElementById('mStaff').value='';
   document.getElementById('mRoom').value='';
@@ -335,7 +396,8 @@ function openEdit(id){
   document.getElementById('modalTitle').textContent = CAN_EDIT?'Edit Session':'Session';
   document.getElementById('mDay').value=s.day;
   document.getElementById('mPeriod').value=s.period;
-  document.getElementById('mStudent').value=s.student_id||'';
+  document.getElementById('mGrade').value = s.student_grade || '';
+  fillModalStudents(s.student_id||'');
   document.getElementById('mService').value=s.service_id||'';
   document.getElementById('mStaff').value=s.staff_id||'';
   document.getElementById('mRoom').value=s.room_id||'';
