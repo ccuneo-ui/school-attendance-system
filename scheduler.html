@@ -1128,10 +1128,15 @@ function runSolve(){
   $("#solvestatus").innerHTML='<div class="status warn">Solving… placing the tightest resources first, then arranging for Eileen\'s preferences (clustering, preps, double blocks).</div>';
   setTimeout(()=>{
     let sessions=buildSessions();
-    const t0=Date.now(); const hardBudget=Math.max(2000, Math.round(budget*0.35)); const deadline=t0+hardBudget;
+    const t0=Date.now();
+    // Pass 1 gets the lion's share of the budget so it reliably finds a complete draft. The loop
+    // breaks the instant it does, so a generous cap costs nothing on easy runs — it only matters
+    // on a slower machine or unlucky seed (which is what left a couple of classes unplaced before).
+    const p1Budget=Math.max(3000, Math.round(budget*0.6));
+    const dl1=t0+p1Budget;
     let best=null, restarts=0;
-    while(Date.now()<deadline){
-      const per=Math.min(deadline, Date.now()+Math.max(1500, hardBudget/3));
+    while(Date.now()<dl1){
+      const per=Math.min(dl1, Date.now()+Math.max(1500, p1Budget/3));
       const r=solveMinConflicts(sessions, 101+restarts*2654435761, per);
       restarts++;
       if(!best || r.placed>best.placed) best=r;
@@ -1142,22 +1147,25 @@ function runSolve(){
     if(best && best.complete){
       const pinned=buildSessions();
       if(applyMathAlignPins(pinned, sessions, best.assign)){
-        const dl2=Date.now()+hardBudget; let best2=null, r2=0;
+        const p2Budget=Math.max(2500, Math.round(budget*0.4));
+        const dl2=Date.now()+p2Budget; let best2=null, r2=0;
         while(Date.now()<dl2){
-          const per=Math.min(dl2, Date.now()+Math.max(1500, hardBudget/3));
+          const per=Math.min(dl2, Date.now()+Math.max(1500, p2Budget/3));
           const r=solveMinConflicts(pinned, 202+r2*2654435761, per);
           r2++;
           if(!best2 || r.placed>best2.placed) best2=r;
           if(r.complete){ best2=r; break; }
         }
         if(best2 && best2.complete){ best=best2; sessions=pinned; restarts+=r2; mathAligned=true; }
-        // if pass 2 can't fully place, keep the pass-1 (soft-aligned) result and flag it below
+        // if pass 2 can't fully place in time, keep the pass-1 (complete, soft-aligned) result
       }
     }
     let assign=best.assign, soft0=null, soft1=null;
     if(best.complete){
       soft0=softCost(sessions,assign);
-      assign=softOptimize(sessions, assign.map(v=>v&&{...v}), t0+budget, 7);
+      // Always give the soft pass a real window, even if the hard passes ran long.
+      const softDl=Math.max(t0+budget, Date.now()+Math.max(2000, Math.round(budget*0.25)));
+      assign=softOptimize(sessions, assign.map(v=>v&&{...v}), softDl, 7);
       soft1=softCost(sessions,assign);
     }
     RESULT={sessions, assign, placed:best.placed, total:best.total, complete:best.complete, ms:Date.now()-t0, restarts, soft0, soft1, mathAligned};
