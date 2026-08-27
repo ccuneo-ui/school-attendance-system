@@ -1011,9 +1011,8 @@ function softCost(sessions, assign, detail){
     (mathP[s.groupId]=mathP[s.groupId]||{})[v.day]=v.period; });
   MATH_ALIGN.forEach(g=>{ DAYS.forEach(day=>{ const bp=(mathP[g.blue]||{})[day]; if(!bp)return;
     g.others.forEach(o=>{
-      // Friday exception: 7th Gold (7A) may run at a different time than 7th Blue/White on
-      // Fridays, so McLeod isn't pulled across the whole lunch window. Blue & White stay aligned.
-      if(o==="7A" && day==="Fri") return;
+      // Every grade's Gold/White math aligns to Blue every day, Fridays included (hard-locked in
+      // the second solve pass; this soft cost keeps the fallback path aiming for the same thing).
       const op=(mathP[o]||{})[day]; if(op && op!==bp){ cost+=25; d.mathAlign++; } }); }); });
 
   // avoid Alvarez teaching Tech at the same time Petralia teaches STEAM
@@ -1148,7 +1147,9 @@ function runSolve(){
     if(best && best.complete){
       const pinned=buildSessions();
       if(applyMathAlignPins(pinned, sessions, best.assign)){
-        const p2Budget=Math.max(2500, Math.round(budget*0.4));
+        // Pass 2 also gets the full budget so the hard alignment actually lands on a slower
+        // browser instead of timing out and falling back to the soft (Friday-misaligned) draft.
+        const p2Budget=Math.max(4000, budget);
         const dl2=Date.now()+p2Budget; let best2=null, r2=0;
         while(Date.now()<dl2){
           const per=Math.min(dl2, Date.now()+Math.max(1500, p2Budget/3));
