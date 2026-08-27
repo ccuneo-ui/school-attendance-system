@@ -1129,10 +1129,11 @@ function runSolve(){
   setTimeout(()=>{
     let sessions=buildSessions();
     const t0=Date.now();
-    // Pass 1 gets the lion's share of the budget so it reliably finds a complete draft. The loop
-    // breaks the instant it does, so a generous cap costs nothing on easy runs — it only matters
-    // on a slower machine or unlucky seed (which is what left a couple of classes unplaced before).
-    const p1Budget=Math.max(3000, Math.round(budget*0.6));
+    // Pass 1 may use the FULL time budget to find a complete draft. It breaks the instant it does,
+    // so a fast browser (Chrome) still finishes in a fraction of a second; a slower one (Safari)
+    // simply gets the extra time it needs instead of giving up with a couple of classes unplaced.
+    // Completeness must not depend on how fast the browser is.
+    const p1Budget=Math.max(4000, budget);
     const dl1=t0+p1Budget;
     let best=null, restarts=0;
     while(Date.now()<dl1){
