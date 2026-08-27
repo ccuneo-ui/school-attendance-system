@@ -33,6 +33,18 @@ app = Flask(__name__)
 CORS(app)
 app.secret_key = os.environ.get("SECRET_KEY", "dev-secret-change-in-production")
 
+# Always make HTML and JS revalidate, so a deploy takes effect on the next page load without a
+# hard-refresh. (Admin pages were being served from browser cache, so staff kept running old code
+# after a deploy — e.g. the scheduler generating with pre-update rules.) Files still cache but the
+# browser must check with the server first, which returns a cheap 304 when nothing changed.
+@app.after_request
+def _revalidate_html_js(resp):
+    ct = (resp.headers.get("Content-Type") or "").lower()
+    if ct.startswith("text/html") or "javascript" in ct:
+        resp.headers["Cache-Control"] = "no-cache, must-revalidate"
+        resp.headers.pop("Expires", None)
+    return resp
+
 # ── Google OAuth ──
 oauth = OAuth(app)
 google = oauth.register(

@@ -219,7 +219,17 @@ function studentsInGrade(grade){
   return grade ? OPT.students.filter(s=>(s.grade||'')===grade) : OPT.students;
 }
 function studentOptions(grade){
-  return studentsInGrade(grade).map(s=>`<option value="${s.student_id}">${esc(s.name)}${s.grade?' ('+esc(s.grade)+')':''}</option>`).join('');
+  const opt = s=>`<option value="${s.student_id}">${esc(s.name)}${s.grade?' ('+esc(s.grade)+')':''}</option>`;
+  // One grade chosen: a plain short list. "All grades": group the whole school
+  // under grade headings so you can still jump straight to a grade in the list.
+  if(grade) return studentsInGrade(grade).map(opt).join('');
+  let html='';
+  allGrades().forEach(g=>{
+    html+=`<optgroup label="Grade ${esc(g)}">`+studentsInGrade(g).map(opt).join('')+'</optgroup>';
+  });
+  const ungraded = OPT.students.filter(s=>!(s.grade||'').trim());
+  if(ungraded.length) html+='<optgroup label="No grade">'+ungraded.map(opt).join('')+'</optgroup>';
+  return html;
 }
 
 function svcColor(serviceId){
