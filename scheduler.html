@@ -791,12 +791,13 @@ function fixedFor(groupId){
 function avail(tid){ return S.availability[tid]||fullWeek(allP()); }
 
 // Fixed math grid (by grade cohort). All of a grade's sections meet at this period each day.
-// Non-Wed: 6th=P3, 7th=P6, 8th=P4 (distinct, in Duthie's window, off each grade's lunch, off the
-// 7th-science P7/P8 block; McLeod free at P5). Wed: 6th moves to P7 (P3 is closed school-wide).
+// 6th=P3, 7th=P6, 8th=P5 — distinct (so Duthie/McLeod aren't double-booked), inside Duthie's window,
+// off each grade's lunch (5/6 lunch = P5, 7/8 lunch = P4), and off the 7th-science P7/P8 block; this
+// leaves McLeod a free P4 for lunch. Wed: 6th moves to P7 since 3rd period is closed school-wide.
 const MATH_GRID={
   "6":{Mon:"P3",Tue:"P3",Wed:"P7",Thu:"P3",Fri:"P3"},
   "7":{Mon:"P6",Tue:"P6",Wed:"P6",Thu:"P6",Fri:"P6"},
-  "8":{Mon:"P4",Tue:"P4",Wed:"P4",Thu:"P4",Fri:"P4"}
+  "8":{Mon:"P5",Tue:"P5",Wed:"P5",Thu:"P5",Fri:"P5"}
 };
 function buildSessions(){
   const out=[];
