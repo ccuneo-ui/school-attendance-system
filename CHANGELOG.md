@@ -1,5 +1,7 @@
 # Changelog
 
+2026-08-28: Classes page — added a Grade filter next to the Type filter, so you can narrow the class list to a single grade (and combine it with Type, e.g. 7th-grade Subject classes). "All grades" shows everything as before.
+
 2026-08-28: Classes → Gold & Blue — the student list no longer sits in a short internal scroll-box. It was capped at ~62% of the screen height with its own scrollbar, so a grade with more students than fit (e.g. 23 in 7th) looked like it was only showing the first ~10 unless you scrolled inside that box. The list now grows with the page, so every student in the grade is visible by scrolling normally.
 
 2026-08-27: Scheduler — 6th/7th/8th math alignment is now guaranteed identical on every browser. The earlier approach re-solved under a time limit to align the split math, which meant a slower browser (Safari) could run out of time and fall back to a misaligned draft — so Chrome and Safari gave different results. Math is now placed on a fixed grade-wide period grid pinned in code (the same mechanism as the 7th-grade Science lock): 6th at 3rd period (moved to 7th period on Wednesday, since 3rd is closed school-wide), 7th at 6th period, 8th at 5th period, every day including Friday (8th sits at 5th so it clears the 7th/8th lunch at 4th period). No re-solve, no timing, no browser dependence — every Generate lines Gold/Blue/White up the same way, and it still comes out complete with McLeod keeping a daily lunch (verified across Quick/Standard runs).

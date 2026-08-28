@@ -104,6 +104,12 @@
         <option value="elective">Elective</option>
       </select>
     </div>
+    <div>
+      <label class="fld">Grade</label>
+      <select id="gradeFilter" onchange="renderList()">
+        <option value="">All grades</option>
+      </select>
+    </div>
     <div class="spacer"></div>
     <button class="btn btn-primary" onclick="openNew()">+ New Class</button>
   </div>
@@ -262,6 +268,7 @@
     document.getElementById('n-teacher').innerHTML=teacherOptions();
     document.getElementById('n-room').innerHTML=roomOptions();
     document.getElementById('n-grade').innerHTML=gradeOptions('','— none —');
+    document.getElementById('gradeFilter').innerHTML='<option value="">All grades</option>'+(S.opts.grades||[]).map(g=>`<option value="${esc(g)}">${esc(g)}</option>`).join('');
     await loadSections();
   }
 
@@ -274,8 +281,10 @@
 
   function renderList(){
     const el=document.getElementById('secList');
-    if(!S.sections.length){el.innerHTML='<div class="sec-item"><span class="muted">No classes yet. Click “+ New Class”.</span></div>';return;}
-    el.innerHTML=S.sections.map(s=>`
+    const gf=document.getElementById('gradeFilter'); const gsel=gf?gf.value:'';
+    const items=gsel ? S.sections.filter(s=>String(s.grade)===String(gsel)) : S.sections;
+    if(!items.length){el.innerHTML='<div class="sec-item"><span class="muted">No classes'+(gsel?(' for grade '+esc(gsel)):' yet')+'. Click “+ New Class”.</span></div>';return;}
+    el.innerHTML=items.map(s=>`
       <div class="sec-item ${s.section_id==S.selId?'active':''} ${s.active?'':'inactive'}" onclick="select(${s.section_id})">
         <div class="sec-name"><span class="type-tag t-${s.type}">${TYPES[s.type]||s.type}</span>${esc(s.name)}</div>
         <div class="sec-meta">${esc(s.teacher_name||'No teacher')}${s.room_name?' · '+esc(s.room_name):''} · ${s.roster_count} student${s.roster_count==1?'':'s'}</div>
