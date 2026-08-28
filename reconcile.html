@@ -113,6 +113,7 @@ function buildSched(S){
   const byId={}; (S.classes||[]).forEach(c=>byId[c.id]=c);
   const seen={}, out=[];
   (S.requirements||[]).forEach(q=>{
+    if(!(q.perWeek>0))return; // a class scheduled 0×/week isn't a real class (zeroed-out requirement)
     const g=byId[q.groupId]||{}; const cohort=gradeCanon(g.cohort!=null?g.cohort:q.groupId);
     const slot=schedSlot(cohort,g.part||'',q.subject,q.teacherId);
     const key=cohort+'|'+q.subject+'|'+slot;
