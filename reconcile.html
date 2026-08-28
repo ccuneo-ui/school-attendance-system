@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Class Reconciliation — Mizzentop Day School</title>
+<link rel="icon" type="image/svg+xml" href="/logo.svg">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+<style>
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+  :root{--navy:#1a2744;--green:#2d5016;--gold:#c8992a;--cream:#f7f3ec;--muted:#6b7280;--light:#e8e2d9;--danger:#9b1c1c;
+        --ok:#2d7a3e;--warn:#b45309;--warnbg:#fff8e6;--warnbd:#f0d98a;--okbg:#eef6ee;--errbg:#fbecec;}
+  html,body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--navy);min-height:100%;}
+  .topnav{background:var(--navy);display:flex;align-items:center;gap:16px;padding:0 28px;height:56px;}
+  .topnav .title{color:#fff;font-size:14px;font-weight:500;}
+  .topnav .right{margin-left:auto;display:flex;gap:10px;}
+  .topnav a{color:rgba(255,255,255,0.85);text-decoration:none;font-size:13px;font-weight:500;border:1px solid rgba(255,255,255,0.25);padding:7px 14px;border-radius:8px;}
+  .topnav a:hover{background:rgba(255,255,255,0.1);}
+  .page{max-width:1080px;margin:0 auto;padding:28px 24px 90px;}
+  h1{font-family:'Playfair Display',serif;font-size:30px;margin-bottom:2px;}
+  .sub{color:var(--muted);font-size:14px;margin-bottom:22px;line-height:1.5;max-width:760px;}
+  .btn{display:inline-flex;align-items:center;gap:6px;padding:9px 16px;border-radius:8px;font-size:13px;font-weight:500;font-family:inherit;cursor:pointer;border:none;text-decoration:none;}
+  .btn-primary{background:var(--navy);color:#fff;}
+  .btn-ghost{background:transparent;color:var(--muted);border:1px solid var(--light);}
+  .toprow{display:flex;gap:10px;align-items:center;margin-bottom:22px;flex-wrap:wrap;}
+  .scorecards{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px;margin-bottom:26px;}
+  .card{background:#fff;border:1px solid var(--light);border-radius:12px;padding:16px 18px;}
+  .card .num{font-family:'Playfair Display',serif;font-size:32px;line-height:1;}
+  .card .lbl{font-size:12px;color:var(--muted);margin-top:6px;font-weight:500;}
+  .card.ok .num{color:var(--ok);} .card.warn .num{color:var(--warn);} .card.err .num{color:var(--danger);}
+  section.block{background:#fff;border:1px solid var(--light);border-radius:12px;margin-bottom:20px;overflow:hidden;}
+  .block-head{display:flex;align-items:center;gap:10px;padding:15px 18px;cursor:pointer;user-select:none;}
+  .block-head:hover{background:#faf8f5;}
+  .block-head h2{font-family:'Playfair Display',serif;font-size:18px;flex:1;}
+  .pill{font-size:12px;font-weight:600;padding:3px 10px;border-radius:12px;}
+  .pill.ok{background:var(--okbg);color:var(--ok);} .pill.warn{background:var(--warnbg);color:var(--warn);} .pill.err{background:var(--errbg);color:var(--danger);}
+  .caret{color:var(--muted);font-size:13px;transition:transform .15s;}
+  .block.collapsed .caret{transform:rotate(-90deg);}
+  .block.collapsed .block-body{display:none;}
+  .block-body{padding:4px 18px 18px;}
+  .lead{font-size:13px;color:var(--muted);line-height:1.55;margin:6px 0 14px;}
+  table{width:100%;border-collapse:collapse;font-size:13px;}
+  th{text-align:left;font-size:11px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);font-weight:600;padding:8px 10px;border-bottom:1px solid var(--light);}
+  td{padding:9px 10px;border-bottom:1px solid #f3f0eb;vertical-align:top;}
+  tr:last-child td{border-bottom:none;}
+  .sched-name{font-weight:600;}
+  .arrow{color:var(--muted);padding:0 6px;}
+  .tag{display:inline-block;font-size:10px;font-weight:600;padding:1px 7px;border-radius:10px;text-transform:uppercase;letter-spacing:.03em;}
+  .tag.gold{background:rgba(200,153,42,.16);color:#7a5a10;} .tag.blue{background:#e6effb;color:#1b5faa;}
+  .tag.whole{background:rgba(26,39,68,.1);color:var(--navy);} .tag.solo{background:#eee;color:#555;} .tag.tchr{background:#efe6f7;color:#5b2a86;}
+  .grade-h{font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;padding:14px 10px 4px;}
+  .note{font-size:12.5px;color:var(--muted);}
+  .hint{background:var(--warnbg);border:1px solid var(--warnbd);color:#7a5a10;border-radius:8px;padding:10px 13px;font-size:12.5px;line-height:1.5;margin-bottom:14px;}
+  .foot{font-size:12px;color:var(--muted);margin-top:8px;}
+  .spinwrap{padding:60px 20px;text-align:center;color:var(--muted);}
+  @media print{.topnav,.toprow{display:none;}.block.collapsed .block-body{display:block;}.block-head{cursor:default;}}
+</style>
+</head>
+<body>
+<nav class="topnav">
+  <span class="title">Class Reconciliation</span>
+  <div class="right"><a href="/classes">Classes</a><a href="/scheduler">Scheduler</a><a href="/">← Home</a></div>
+</nav>
+<div class="page">
+  <h1>Class Reconciliation</h1>
+  <div class="sub">Compares every class the <b>Scheduler</b> timetables against the sections built on the <b>Classes</b> page,
+    and shows where the two agree and where they differ. This is a read-only check &mdash; it changes nothing.
+    Use it to line the two up before generating student and teacher schedules.</div>
+
+  <div class="toprow">
+    <button class="btn btn-primary" onclick="run()">↻ Re-run check</button>
+    <button class="btn btn-ghost" onclick="window.print()">Print / Save PDF</button>
+    <span class="foot" id="stamp"></span>
+  </div>
+
+  <div id="out"><div class="spinwrap">Loading the scheduler and the Classes page…</div></div>
+</div>
+
+<script>
+/* ---------------- canonical model ---------------- */
+const SUBJ_LABEL={MATH:'Math',ELA:'ELA',SCIENCE:'Science',SOCIAL:'Social Studies',SPANISH:'Spanish',
+  ART:'Art',MUSIC:'Music',PE:'PE',STEAM:'STEAM',TECH:'Tech',LIBRARY:'Library',HEALTH:'Health'};
+const SUBJ_CANON={math:'MATH',ela:'ELA',science:'SCIENCE','social studies':'SOCIAL',social:'SOCIAL',
+  spanish:'SPANISH',art:'ART',music:'MUSIC',pe:'PE','p.e.':'PE',steam:'STEAM',tech:'TECH',
+  library:'LIBRARY',health:'HEALTH'};
+const SUBJ_PHRASES=Object.keys(SUBJ_CANON).sort((a,b)=>b.length-a.length);
+const MATH_TEACHER_GRADES=new Set(['6','7','8']);
+const GRADE_ORDER=['JPK','SPK','K','1','2','3','4','5','6','7','8'];
+
+function gradeCanon(g){ if(g==null)return ''; g=String(g).trim().toLowerCase();
+  if(g==='kindergarten'||g==='k')return 'K'; if(g==='jpk')return 'JPK'; if(g==='spk')return 'SPK';
+  const m=g.match(/^(\d+)/); return m?m[1]:g.toUpperCase(); }
+function gradeLabel(g){ return g==='K'?'Kindergarten':(['JPK','SPK'].includes(g)?g:(g+ordinal(g)+' Grade')); }
+function ordinal(g){ const n=+g; if(!n)return ''; if(n===1)return 'st'; if(n===2)return 'nd'; if(n===3)return 'rd'; return 'th'; }
+function slotLabel(slot){ if(slot==='WHOLE')return 'Whole Grade'; if(slot==='GOLD')return 'Gold';
+  if(slot==='BLUE')return 'Blue'; if(slot==='WHITE')return 'White'; if(slot==='SOLO')return '';
+  if(slot&&slot.startsWith('T:'))return slot.slice(2); return slot||''; }
+function slotTag(slot){ if(slot==='WHOLE')return '<span class="tag whole">whole grade</span>';
+  if(slot==='GOLD')return '<span class="tag gold">Gold</span>'; if(slot==='BLUE')return '<span class="tag blue">Blue</span>';
+  if(slot==='WHITE')return '<span class="tag solo">White</span>'; if(slot==='SOLO')return '';
+  if(slot&&slot.startsWith('T:'))return '<span class="tag tchr">'+esc(slot.slice(2))+'</span>'; return ''; }
+function esc(s){const d=document.createElement('div');d.textContent=s==null?'':s;return d.innerHTML;}
+function friendly(grade,subject,slot){ const sl=slotLabel(slot); return gradeLabel(grade)+' '+(SUBJ_LABEL[subject]||subject)+(sl?(' '+sl):''); }
+
+/* ---------------- scheduler side ---------------- */
+function schedSlot(cohort,part,subject,teacher){
+  if(part==='AB')return 'WHOLE';
+  if(subject==='MATH'&&MATH_TEACHER_GRADES.has(cohort))return 'T:'+teacher;
+  if(part==='A')return 'GOLD'; if(part==='B')return 'BLUE'; if(part==='C')return 'WHITE';
+  return 'SOLO';
+}
+function buildSched(S){
+  const byId={}; (S.classes||[]).forEach(c=>byId[c.id]=c);
+  const seen={}, out=[];
+  (S.requirements||[]).forEach(q=>{
+    const g=byId[q.groupId]||{}; const cohort=gradeCanon(g.cohort!=null?g.cohort:q.groupId);
+    const slot=schedSlot(cohort,g.part||'',q.subject,q.teacherId);
+    const key=cohort+'|'+q.subject+'|'+slot;
+    const dedup=q.groupId+'|'+q.subject+'|'+q.teacherId;
+    if(seen[dedup])return; seen[dedup]=1;
+    out.push({grade:cohort,subject:q.subject,slot,teacher:q.teacherId,key,groupId:q.groupId});
+  });
+  return out;
+}
+
+/* ---------------- classes side ---------------- */
+function parseSection(name){
+  let n=(name||'').trim();
+  n=n.replace(/^(JPK|SPK|Kindergarten|\d+(?:st|nd|rd|th)? Grade|\d+(?:st|nd|rd|th))\s+/i,'');
+  const low=n.toLowerCase(); let subj=null, rest=n;
+  for(const ph of SUBJ_PHRASES){ if(low.startsWith(ph)){ subj=SUBJ_CANON[ph]; rest=n.slice(ph.length).trim(); break; } }
+  return {subject:subj, suffix:rest};
+}
+function classSlot(suffix){
+  const s=(suffix||'').trim().toLowerCase();
+  if(s==='whole grade'||s==='whole')return 'WHOLE';
+  if(s==='gold')return 'GOLD'; if(s==='blue')return 'BLUE'; if(s==='white')return 'WHITE';
+  if(s==='')return 'SOLO';
+  return 'T:'+suffix.trim();
+}
+function buildClasses(sections){
+  return sections.filter(s=>s.type==='subject'||s.type==='elective').map(s=>{
+    const grade=gradeCanon(s.grade); const p=parseSection(s.name);
+    const slot=p.subject?classSlot(p.suffix):null;
+    return {id:s.section_id, name:s.name, grade, subject:p.subject, slot,
+      teacher:s.teacher_name||'', n:s.roster_count, active:s.active,
+      key:(p.subject&&grade)?(grade+'|'+p.subject+'|'+slot):null};
+  });
+}
+
+/* ---------------- reconcile ---------------- */
+function reconcile(sched, cls){
+  const clsByKey={}; cls.forEach(c=>{ if(c.key)(clsByKey[c.key]=clsByKey[c.key]||[]).push(c); });
+  const schByKey={}; sched.forEach(c=>{ (schByKey[c.key]=schByKey[c.key]||[]).push(c); });
+  const matched=[], schedOnly=[], classesOnly=[], unparsed=[];
+  sched.forEach(c=>{ const m=clsByKey[c.key]; if(m) matched.push({sched:c,cls:m[0]}); else schedOnly.push(c); });
+  cls.forEach(c=>{ if(!c.key){ unparsed.push(c); return; } if(!schByKey[c.key]) classesOnly.push(c); });
+  // split mismatches: same grade+subject unmatched on BOTH sides
+  const gsKey=x=>x.grade+'|'+x.subject;
+  const soByGs={}, coByGs={};
+  schedOnly.forEach(c=>(soByGs[gsKey(c)]=soByGs[gsKey(c)]||[]).push(c));
+  classesOnly.forEach(c=>(coByGs[gsKey(c)]=coByGs[gsKey(c)]||[]).push(c));
+  const mismatches=[], pureSchedOnly=[], pureClassesOnly=[];
+  Object.keys(soByGs).forEach(gs=>{ if(coByGs[gs]) mismatches.push({gs,sched:soByGs[gs],cls:coByGs[gs]}); else soByGs[gs].forEach(c=>pureSchedOnly.push(c)); });
+  Object.keys(coByGs).forEach(gs=>{ if(!soByGs[gs]) coByGs[gs].forEach(c=>pureClassesOnly.push(c)); });
+  return {matched, mismatches, pureSchedOnly, pureClassesOnly, unparsed};
+}
+
+/* ---------------- render ---------------- */
+function gsort(a,b){ const ia=GRADE_ORDER.indexOf(a), ib=GRADE_ORDER.indexOf(b); return (ia<0?99:ia)-(ib<0?99:ib); }
+function block(id,cls,title,pillClass,pillText,lead,bodyHtml,collapsed){
+  return `<section class="block ${collapsed?'collapsed':''}" id="blk-${id}">
+    <div class="block-head" onclick="document.getElementById('blk-${id}').classList.toggle('collapsed')">
+      <span class="caret">▼</span><h2>${title}</h2><span class="pill ${pillClass}">${pillText}</span>
+    </div>
+    <div class="block-body">${lead?`<div class="lead">${lead}</div>`:''}${bodyHtml}</div>
+  </section>`;
+}
+
+function render(res, meta){
+  const {matched,mismatches,pureSchedOnly,pureClassesOnly,unparsed}=res;
+  const nDisc = mismatches.length + pureSchedOnly.length + pureClassesOnly.length;
+  let html='';
+  // scorecards
+  html+=`<div class="scorecards">
+    <div class="card"><div class="num">${meta.schedTotal}</div><div class="lbl">Scheduler classes</div></div>
+    <div class="card"><div class="num">${meta.clsTotal}</div><div class="lbl">Class-page sections</div></div>
+    <div class="card ok"><div class="num">${matched.length}</div><div class="lbl">Matched</div></div>
+    <div class="card ${nDisc?'warn':'ok'}"><div class="num">${nDisc}</div><div class="lbl">Need attention</div></div>
+  </div>`;
+
+  // 1. split mismatches
+  if(mismatches.length){
+    let rows='';
+    mismatches.sort((a,b)=>gsort(a.sched[0].grade,b.sched[0].grade)).forEach(m=>{
+      const sName=m.sched.map(c=>friendly(c.grade,c.subject,c.slot)+' '+slotTag(c.slot)).join('<br>');
+      const cName=m.cls.map(c=>esc(c.name)+' '+slotTag(c.slot)+` <span class="note">· ${c.n} student${c.n==1?'':'s'}</span>`).join('<br>');
+      rows+=`<tr><td class="sched-name">${sName}</td><td>${cName}</td></tr>`;
+    });
+    html+=block('mismatch','', 'Split mismatches', 'err', mismatches.length+' subject'+(mismatches.length==1?'':'s'),
+      'The two sides schedule the same grade &amp; subject but disagree on how it is split (whole-grade vs Gold/Blue, or a missing half). Pick one structure and make both sides match.',
+      `<table><thead><tr><th>Scheduler has</th><th>Classes page has</th></tr></thead><tbody>${rows}</tbody></table>`, false);
+  }
+  // 2. scheduler-only
+  if(pureSchedOnly.length){
+    let rows=''; pureSchedOnly.sort((a,b)=>gsort(a.grade,b.grade)).forEach(c=>{
+      rows+=`<tr><td class="sched-name">${friendly(c.grade,c.subject,c.slot)} ${slotTag(c.slot)}</td><td>${esc(c.teacher)}</td></tr>`; });
+    html+=block('schedonly','', 'On the scheduler, not on the Classes page', 'warn', pureSchedOnly.length+'',
+      'The scheduler timetables these, but there is no matching section on the Classes page &mdash; so they have no roster. Either create the section on the Classes page, or remove the class from the scheduler if it should not run.',
+      `<table><thead><tr><th>Scheduler class</th><th>Teacher</th></tr></thead><tbody>${rows}</tbody></table>`, false);
+  }
+  // 3. classes-only
+  const co=pureClassesOnly.concat(unparsed.map(u=>Object.assign({},u,{_unparsed:true})));
+  if(co.length){
+    let rows=''; co.sort((a,b)=>gsort(a.grade,b.grade)).forEach(c=>{
+      const why=c._unparsed?'<span class="note">support / non-timetable block</span>':'<span class="note">no scheduler class</span>';
+      rows+=`<tr><td class="sched-name">${esc(c.name)}</td><td>${esc(c.teacher||'')}</td><td>${c.n} student${c.n==1?'':'s'}</td><td>${why}</td></tr>`; });
+    html+=block('classonly','', 'On the Classes page, not on the scheduler', 'warn', co.length+'',
+      'These sections exist on the Classes page but the scheduler does not timetable them. That is expected for support blocks (Study Skills, OT, etc.) and anything the timetable does not place. Nothing to fix unless one of these should be on the master schedule.',
+      `<table><thead><tr><th>Section</th><th>Teacher</th><th>Roster</th><th></th></tr></thead><tbody>${rows}</tbody></table>`, false);
+  }
+  // 4. matched (collapsed)
+  {
+    const byGrade={}; matched.forEach(m=>{ (byGrade[m.sched.grade]=byGrade[m.sched.grade]||[]).push(m); });
+    let body='';
+    Object.keys(byGrade).sort(gsort).forEach(g=>{
+      body+=`<div class="grade-h">${gradeLabel(g)}</div><table><tbody>`;
+      byGrade[g].sort((a,b)=>a.sched.subject.localeCompare(b.sched.subject)).forEach(m=>{
+        body+=`<tr><td class="sched-name">${friendly(m.sched.grade,m.sched.subject,m.sched.slot)} ${slotTag(m.sched.slot)}</td>
+          <td class="arrow">↔</td><td>${esc(m.cls.name)} <span class="note">· ${m.cls.n} student${m.cls.n==1?'':'s'}</span></td></tr>`;
+      });
+      body+='</tbody></table>';
+    });
+    html+=block('matched','', 'Matched classes', 'ok', matched.length+'',
+      'These scheduler classes line up cleanly with a section on the Classes page. Once the items above are resolved, every one of these can carry a roster into student and teacher schedules.',
+      body, true);
+  }
+
+  document.getElementById('out').innerHTML=html;
+  document.getElementById('stamp').textContent =
+    'Checked '+new Date().toLocaleString()+' · school year '+meta.year+'-'+String((+meta.year+1)).slice(-2)+
+    ' · '+meta.homeroomAdvisory+' homeroom/advisory sections excluded';
+}
+
+/* ---------------- run ---------------- */
+async function run(){
+  document.getElementById('out').innerHTML='<div class="spinwrap">Loading the scheduler and the Classes page…</div>';
+  let schedR, secR;
+  try{
+    [schedR, secR]=await Promise.all([
+      fetch('/api/scheduler').then(r=>r.json()),
+      fetch('/api/sections').then(r=>r.json())
+    ]);
+  }catch(e){ document.getElementById('out').innerHTML='<div class="spinwrap">Could not load data. Make sure you are signed in, then re-run.</div>'; return; }
+  const S=(schedR.data||{}).S||{};
+  if(!S.requirements||!S.requirements.length){
+    document.getElementById('out').innerHTML='<div class="spinwrap">The scheduler has no saved state yet. Open the Scheduler, generate a schedule and save, then re-run this check.</div>'; return;
+  }
+  const sections=secR.sections||[];
+  const sched=buildSched(S);
+  const cls=buildClasses(sections);
+  const res=reconcile(sched, cls);
+  render(res, {
+    schedTotal:sched.length, clsTotal:cls.length,
+    year:secR.school_year_start||'',
+    homeroomAdvisory:sections.filter(s=>s.type==='homeroom'||s.type==='advisory').length
+  });
+}
+run();
+</script>
+<script src="/nav.js" defer></script>
+</body>
+</html>
