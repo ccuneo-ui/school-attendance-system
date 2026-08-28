@@ -1120,6 +1120,13 @@ def students():
 def classes_page():
     return send_from_directory(".", "classes.html")
 
+@app.route("/reconcile")
+@require_perm("classes")
+def reconcile_page():
+    # Read-only diagnostic: compares the Scheduler's timetabled classes against the
+    # sections on the Classes page. Pulls only /api/scheduler and /api/sections; writes nothing.
+    return send_from_directory(".", "reconcile.html")
+
 @app.route("/scheduler")
 @login_required
 def scheduler_page():
