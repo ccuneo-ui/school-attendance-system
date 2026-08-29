@@ -1032,6 +1032,14 @@ def serve_logo():
     return send_from_directory(".", "logo.svg")
 
 
+@app.route("/favicon.ico")
+def serve_favicon():
+    """Fallback favicon. Browsers request /favicon.ico automatically, so this
+    guarantees every page gets the school mark even if its <head> is missing the
+    <link rel="icon"> tag."""
+    return send_from_directory(".", "logo.svg", mimetype="image/svg+xml")
+
+
 # ============================================
 # GLOBAL NAV BAR
 # ============================================

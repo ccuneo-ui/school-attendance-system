@@ -51,6 +51,7 @@ Each page is self-contained with inline `<style>` and `<script>` tags.
 
 ### Assets
 - `logo.svg` — School logo (served at `/logo.svg`, used as favicon)
+- `/favicon.ico` route in `app.py` serves `logo.svg` as a fallback, so browsers still get the school mark on any page whose `<head>` is missing the icon tag
 - `icon-facebook.svg`, `icon-instagram.svg`, `icon-linkedin.svg`
 
 ### Utility Scripts (not part of running app)
@@ -83,6 +84,15 @@ Each page is self-contained with inline `<style>` and `<script>` tags.
 - `@people_required` — Superadmin OR `can_manage_people` permission
 - Permissions refresh from DB on every request via `@app.before_request`
 - Three permission flags on staff: `can_record_attendance`, `can_manage_people`, `can_manage_billing`
+
+### New Page Checklist (every new .html page)
+1. `<head>` includes the favicon tag, immediately after `<title>`:
+   `<link rel="icon" type="image/svg+xml" href="/logo.svg">`
+   (Pages that `{% extends "base.html" %}` inherit it — no tag needed.)
+2. `<script src="/nav.js" defer></script>` for the global nav bar.
+3. Add a route in `app.py` via `send_from_directory(".", "your_page.html")`.
+4. Add the page key/label/href to `PERMISSION_SILOS` in `app.py` to put it in the menu.
+5. Add the filename to the `FILES` list in `deploy_to_live.command` — a page not in FILES silently 404s in production.
 
 ### Frontend Conventions
 - CSS variables for theming: `--navy`, `--green`, `--gold`, `--cream`, `--border`, `--muted`
