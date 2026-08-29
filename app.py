@@ -121,6 +121,7 @@ NAV_REFERENCE = {"key": "reference", "label": "Reference", "pages": [
     {"key": "bus_dashboard",      "label": "Bus Dashboard",       "href": "/bus-dashboard"},
     {"key": "attendance_report",  "label": "Attendance Report",   "href": "/homeroom-attendance-report"},
     {"key": "schedule",           "label": "Schedule",            "href": "/scheduler"},
+    {"key": "person_schedules",   "label": "Student & Teacher Schedules", "href": "/schedule"},
 ]}
 
 # Order the menus appear in the bar.
