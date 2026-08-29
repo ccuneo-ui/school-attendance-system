@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Schedules — Mizzentop Day School</title>
+<link rel="icon" type="image/svg+xml" href="/logo.svg">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+<style>
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+  :root{--navy:#1a2744;--green:#2d5016;--gold:#c8992a;--cream:#f7f3ec;--muted:#6b7280;--light:#e8e2d9;--danger:#9b1c1c;
+        --blue:#2563eb;--bluebg:#e6effb;--goldbg:#f6edd6;--wholebg:#eceff5;--freebg:#faf8f4;--fixedbg:#f3efe7;}
+  html,body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--navy);min-height:100%;}
+  .topnav{background:var(--navy);display:flex;align-items:center;gap:16px;padding:0 28px;height:56px;}
+  .topnav .title{color:#fff;font-size:14px;font-weight:500;}
+  .topnav .right{margin-left:auto;display:flex;gap:10px;}
+  .topnav a{color:rgba(255,255,255,0.85);text-decoration:none;font-size:13px;font-weight:500;border:1px solid rgba(255,255,255,0.25);padding:7px 14px;border-radius:8px;}
+  .topnav a:hover{background:rgba(255,255,255,0.1);}
+  .page{max-width:1120px;margin:0 auto;padding:26px 22px 90px;}
+  h1{font-family:'Playfair Display',serif;font-size:28px;margin-bottom:2px;}
+  .sub{color:var(--muted);font-size:13.5px;margin-bottom:18px;}
+  .pickbar{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;margin-bottom:22px;background:#fff;border:1px solid var(--light);border-radius:12px;padding:14px 16px;}
+  .fld{display:flex;flex-direction:column;gap:5px;}
+  .fld label{font-size:11px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);}
+  select,input[type=text]{padding:8px 11px;border:1px solid var(--light);border-radius:8px;font-size:13px;font-family:inherit;background:#fff;color:var(--navy);outline:none;min-width:200px;}
+  select:focus,input:focus{border-color:var(--navy);}
+  .seg{display:inline-flex;border:1px solid var(--light);border-radius:8px;overflow:hidden;}
+  .seg button{border:none;background:#fff;font-family:inherit;font-size:13px;font-weight:600;color:var(--muted);padding:8px 16px;cursor:pointer;}
+  .seg button.on{background:var(--navy);color:#fff;}
+  .btn{display:inline-flex;align-items:center;gap:6px;padding:8px 15px;border-radius:8px;font-size:13px;font-weight:600;font-family:inherit;cursor:pointer;border:none;text-decoration:none;}
+  .btn-ghost{background:transparent;color:var(--muted);border:1px solid var(--light);}
+  .btn-primary{background:var(--navy);color:#fff;}
+  .head{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:4px;}
+  .head h2{font-family:'Playfair Display',serif;font-size:23px;}
+  .head .who-meta{color:var(--muted);font-size:13.5px;}
+  .stamp{color:var(--muted);font-size:12px;margin:2px 0 16px;}
+  .gridwrap{overflow-x:auto;background:#fff;border:1px solid var(--light);border-radius:12px;padding:6px;margin-bottom:22px;}
+  table.week{width:100%;border-collapse:collapse;font-size:12.5px;min-width:720px;}
+  table.week th,table.week td{border:1px solid #eee6d9;padding:6px 8px;vertical-align:top;}
+  table.week thead th{background:#faf7f1;font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);text-align:center;}
+  table.week td.per{background:#faf7f1;white-space:nowrap;width:118px;}
+  table.week td.per .pn{font-weight:700;font-size:12px;}
+  table.week td.per .pt{color:var(--muted);font-size:11px;}
+  .cell{min-height:34px;}
+  .cell .cname{font-weight:600;line-height:1.2;}
+  .cell .cmeta{color:var(--muted);font-size:11px;margin-top:2px;}
+  .cell.gold{background:var(--goldbg);} .cell.blue{background:var(--bluebg);} .cell.whole{background:var(--wholebg);}
+  .cell.fixed{background:var(--fixedbg);color:#6a5a3a;font-style:italic;}
+  .cell.free{background:var(--freebg);color:#9a927f;}
+  .tag{display:inline-block;font-size:9.5px;font-weight:700;padding:1px 6px;border-radius:9px;text-transform:uppercase;letter-spacing:.03em;margin-left:5px;vertical-align:middle;}
+  .tag.gold{background:rgba(200,153,42,.2);color:#7a5a10;} .tag.blue{background:#d5e6f9;color:#1b5faa;} .tag.whole{background:rgba(26,39,68,.12);color:var(--navy);}
+  .classlist{background:#fff;border:1px solid var(--light);border-radius:12px;padding:16px 18px;margin-bottom:20px;}
+  .classlist h3{font-family:'Playfair Display',serif;font-size:17px;margin-bottom:10px;}
+  .clrow{padding:10px 0;border-top:1px solid #f3efe7;}
+  .clrow:first-of-type{border-top:none;}
+  .clrow .cl-top{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;}
+  .clrow .cl-name{font-weight:600;font-size:14px;}
+  .clrow .cl-meta{color:var(--muted);font-size:12.5px;}
+  .roster{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;}
+  .stud{font-size:12px;background:#f5f1e8;border:1px solid var(--light);border-radius:20px;padding:3px 10px;cursor:pointer;text-decoration:none;color:var(--navy);}
+  .stud:hover{background:#eef2f8;border-color:#c9d4e6;}
+  .note{font-size:12.5px;color:var(--muted);}
+  .empty{color:var(--muted);text-align:center;padding:50px 20px;}
+  .backlink{font-size:12.5px;color:var(--blue);text-decoration:none;}
+  @media print{.topnav,.pickbar,.noprint{display:none;}.page{padding:0;}.gridwrap{overflow:visible;}table.week{min-width:0;}}
+</style>
+</head>
+<body>
+<nav class="topnav">
+  <span class="title">Schedules</span>
+  <div class="right"><a href="/my-classroom">My Classroom</a><a href="/reconcile">Class Check</a><a href="/">← Home</a></div>
+</nav>
+<div class="page">
+  <h1>Schedules</h1>
+  <div class="sub">Look up any student's or teacher's weekly schedule from the current master timetable. Read-only.</div>
+
+  <div class="pickbar noprint">
+    <div class="fld">
+      <label>View</label>
+      <div class="seg" id="seg">
+        <button data-mode="teacher" onclick="setMode('teacher')">Teacher</button>
+        <button data-mode="student" onclick="setMode('student')">Student</button>
+      </div>
+    </div>
+    <div class="fld" id="pickWrap">
+      <label id="pickLabel">Teacher</label>
+      <select id="pick" onchange="onPick()"><option value="">Loading…</option></select>
+    </div>
+    <div style="flex:1"></div>
+    <button class="btn btn-ghost" onclick="window.print()">Print / Save PDF</button>
+  </div>
+
+  <div id="out"><div class="empty">Loading the timetable…</div></div>
+</div>
+
+<script>
+/* ============ constants (mirror the scheduler) ============ */
+const DAYS=["Mon","Tue","Wed","Thu","Fri"];
+const PERIODS=["P1","P2","P3","P4","P5","P6","P7","P8","P9"];
+const PERIOD_TIMES={
+  lower:{P1:"8:30–9:14",P2:"9:17–10:01",P3:"10:04–10:48",P4:"10:51–11:35",P5:"11:38–12:22",P6:"12:25–1:09",P7:"1:12–1:56",P8:"1:59–2:43",P9:"2:45–3:25"},
+  g56:{P1:"8:25–9:09",P2:"9:12–9:56",P3:"9:59–10:43",P4:"10:46–11:30",P5:"11:33–12:22",P6:"12:25–1:09",P7:"1:12–1:56",P8:"1:59–2:43",P9:"2:45–3:25"},
+  g78:{P1:"8:25–9:09",P2:"9:12–9:56",P3:"9:59–10:43",P4:"10:46–11:35",P5:"11:38–12:22",P6:"12:25–1:09",P7:"1:12–1:56",P8:"1:59–2:43",P9:"2:45–3:25"}
+};
+const G56=["5A","5B","5AB","6A","6B","6AB"], G78=["7A","7B","7C","7AB","8AB","8A","8B"];
+const WED_FREE={day:"Wed",period:"P3"};
+const P9_LABELS={Mon:"Extra Help / Student Council",Tue:"Advisory",Wed:"Extra Help",Thu:"Extra Help",Fri:"Extra Help"};
+function bandOfGroup(g){ return G56.includes(g)?"g56":(G78.includes(g)?"g78":"lower"); }
+function bandOfGrade(gr){ gr=String(gr); return (gr==="5"||gr==="6")?"g56":(gr==="7"||gr==="8")?"g78":"lower"; }
+function p9Label(anyGroup,day){ return (G56.includes(anyGroup)||G78.includes(anyGroup))?(P9_LABELS[day]||"Extra Help"):"Homeroom"; }
+function fixedDisplay(groupId,day,period,raw){
+  if(day===WED_FREE.period&&false){}
+  if(day===WED_FREE.day&&period===WED_FREE.period) return "Electives / Assembly";
+  if(/lunch/i.test(raw||"")&&(G56.includes(groupId)||G78.includes(groupId))) return "Recess / Lunch";
+  return raw;
+}
+const SUBJ_LABEL={MATH:"Math",ELA:"ELA",SCIENCE:"Science",SOCIAL:"Social Studies",SPANISH:"Spanish",ART:"Art",MUSIC:"Music",PE:"PE",STEAM:"STEAM",TECH:"Tech",LIBRARY:"Library",HEALTH:"Health"};
+const SUBJ_CANON={math:"MATH",ela:"ELA",science:"SCIENCE","social studies":"SOCIAL",social:"SOCIAL",spanish:"SPANISH",art:"ART",music:"MUSIC",pe:"PE","p.e.":"PE",steam:"STEAM",tech:"TECH",library:"LIBRARY",health:"HEALTH"};
+const SUBJ_PHRASES=Object.keys(SUBJ_CANON).sort((a,b)=>b.length-a.length);
+const MATH_TEACHER_GRADES=new Set(["6","7","8"]);
+const MATH_SECTION_NAME={"6A":"6th McLeod","6B":"6th Duthie","7A":"7th McLeod","7B":"7th Duthie","7C":"7th Alvarez","8A":"8th McLeod","8B":"8th Duthie"};
+const GROUP_NAME_OVERRIDE={"7C":"7th Alvarez","8A":"8th McLeod","8B":"8th Duthie"};
+
+function esc(s){const d=document.createElement('div');d.textContent=s==null?'':s;return d.innerHTML;}
+function gradeCanon(g){ if(g==null)return ''; g=String(g).trim().toLowerCase();
+  if(g==='kindergarten'||g==='k')return 'K'; if(g==='jpk')return 'JPK'; if(g==='spk')return 'SPK';
+  const m=g.match(/^(\d+)/); return m?m[1]:g.toUpperCase(); }
+function schedSlot(cohort,part,subject,teacher){
+  if(part==='AB')return 'WHOLE';
+  if(subject==='MATH'&&MATH_TEACHER_GRADES.has(cohort))return 'T:'+teacher;
+  if(part==='A')return 'GOLD'; if(part==='B')return 'BLUE'; if(part==='C')return 'WHITE'; return 'SOLO';
+}
+function parseSection(name){
+  let n=(name||'').trim().replace(/^(JPK|SPK|Kindergarten|\d+(?:st|nd|rd|th)? Grade|\d+(?:st|nd|rd|th))\s+/i,'');
+  const low=n.toLowerCase(); let subj=null,rest=n;
+  for(const ph of SUBJ_PHRASES){ if(low.startsWith(ph)){ subj=SUBJ_CANON[ph]; rest=n.slice(ph.length).trim(); break; } }
+  return {subject:subj,suffix:rest};
+}
+function classSlot(suffix){ const s=(suffix||'').trim().toLowerCase();
+  if(s==='whole grade'||s==='whole')return 'WHOLE'; if(s==='gold')return 'GOLD'; if(s==='blue')return 'BLUE';
+  if(s==='white')return 'WHITE'; if(s==='')return 'SOLO'; return 'T:'+suffix.trim(); }
+function slotCss(slot){ if(slot==='GOLD')return 'gold'; if(slot==='BLUE')return 'blue'; if(slot==='WHOLE')return 'whole'; return ''; }
+function slotTag(slot){ if(slot==='GOLD')return '<span class="tag gold">Gold</span>'; if(slot==='BLUE')return '<span class="tag blue">Blue</span>';
+  if(slot==='WHOLE')return '<span class="tag whole">whole</span>'; return ''; }
+
+/* ============ state ============ */
+let SCHED=null, ROST=null;
+let grpById={}, classKeyToSessions={}, teacherSessions={}, fixedByGroup={};
+let studentsById={}, sectionsById={}, sectionsByStudent={}, teachersById={}, sectionsByTeacher={};
+let MODE='teacher';
+
+async function boot(){
+  let sr,rr;
+  try{ [sr,rr]=await Promise.all([fetch('/api/scheduler').then(r=>r.json()), fetch('/api/schedule/rosters').then(r=>r.json())]); }
+  catch(e){ document.getElementById('out').innerHTML='<div class="empty">Could not load data. Make sure you are signed in.</div>'; return; }
+  SCHED=(sr.data||{}); ROST=rr;
+  const S=SCHED.S||{}, res=SCHED.result||{};
+  (S.classes||[]).forEach(c=>grpById[c.id]=c);
+  // fixed blocks by group
+  (S.fixed||[]).forEach(f=>{ (fixedByGroup[f.groupId]=fixedByGroup[f.groupId]||[]).push(f); });
+  // sessions -> class keys + teacher buckets
+  const sess=res.sessions||[], asg=res.assign||[];
+  sess.forEach((s,i)=>{
+    const a=asg[i]||{}; if(!a.day||!a.period) return;
+    const g=grpById[s.groupId]||{}; const cohort=gradeCanon(g.cohort!=null?g.cohort:s.groupId);
+    const slot=schedSlot(cohort,g.part||'',s.subject,s.teacherId);
+    const key=cohort+'|'+s.subject+'|'+slot;
+    const pl={day:a.day,period:a.period,groupId:s.groupId,subject:s.subject,teacherId:s.teacherId,room:s.room,aide:s.aide,slot};
+    (classKeyToSessions[key]=classKeyToSessions[key]||[]).push(pl);
+    (teacherSessions[s.teacherId]=teacherSessions[s.teacherId]||[]).push(pl);
+    if(s.aide) (teacherSessions['Belmonte']=teacherSessions['Belmonte']||[]).push(pl);
+  });
+  // rosters
+  (ROST.students||[]).forEach(s=>{ studentsById[s.student_id]=s; });
+  (ROST.sections||[]).forEach(sec=>{
+    sectionsById[sec.section_id]=sec;
+    if(sec.teacher_id) (sectionsByTeacher[sec.teacher_id]=sectionsByTeacher[sec.teacher_id]||[]).push(sec);
+    if(sec.teacher_id && !teachersById[sec.teacher_id]) teachersById[sec.teacher_id]={id:sec.teacher_id,name:sec.teacher_name||('#'+sec.teacher_id),last:sec.teacher_last||''};
+    (sec.student_ids||[]).forEach(sid=>{ (sectionsByStudent[sid]=sectionsByStudent[sid]||[]).push(sec); });
+  });
+  fillPicker();
+  // route from URL
+  const q=new URLSearchParams(location.search);
+  if(q.get('student')){ MODE='student'; syncSeg(); document.getElementById('pick').value=q.get('student'); renderStudent(+q.get('student')); }
+  else if(q.get('teacher')){ MODE='teacher'; syncSeg(); const tv=resolveTeacherParam(q.get('teacher')); document.getElementById('pick').value=tv||''; if(tv) renderTeacher(+tv); else document.getElementById('out').innerHTML='<div class="empty">That teacher was not found.</div>'; }
+  else { syncSeg(); document.getElementById('out').innerHTML='<div class="empty">Pick a teacher or student above to see their week.</div>'; }
+}
+
+function resolveTeacherParam(v){ // accept staff_id or last name
+  if(teachersById[v]) return v;
+  const byLast=Object.values(teachersById).find(t=>String(t.last).toLowerCase()===String(v).toLowerCase());
+  return byLast?String(byLast.id):'';
+}
+function syncSeg(){ document.querySelectorAll('#seg button').forEach(b=>b.classList.toggle('on',b.dataset.mode===MODE)); document.getElementById('pickLabel').textContent = MODE==='teacher'?'Teacher':'Student'; }
+function fillPicker(){
+  const sel=document.getElementById('pick');
+  if(MODE==='teacher'){
+    const ts=Object.values(teachersById).sort((a,b)=>(a.last||a.name).localeCompare(b.last||b.name));
+    sel.innerHTML='<option value="">Choose a teacher…</option>'+ts.map(t=>`<option value="${t.id}">${esc(t.name)}</option>`).join('');
+  } else {
+    const ss=(ROST.students||[]).slice().sort((a,b)=>String(a.grade).localeCompare(String(b.grade),undefined,{numeric:true})||a.last_name.localeCompare(b.last_name));
+    sel.innerHTML='<option value="">Choose a student…</option>'+ss.map(s=>`<option value="${s.student_id}">${esc(s.last_name+', '+s.first_name)} · Gr ${esc(s.grade||'—')}</option>`).join('');
+  }
+}
+function setMode(m){ MODE=m; syncSeg(); fillPicker(); document.getElementById('out').innerHTML='<div class="empty">Pick a '+m+' above.</div>'; history.replaceState(null,'','/schedule'); }
+function onPick(){ const v=document.getElementById('pick').value; if(!v){return;}
+  if(MODE==='teacher'){ history.replaceState(null,'','/schedule?teacher='+v); renderTeacher(+v); }
+  else { history.replaceState(null,'','/schedule?student='+v); renderStudent(+v); } }
+
+/* ============ grid rendering ============ */
+function blankGrid(){ const g={}; DAYS.forEach(d=>PERIODS.forEach(p=>g[d+'|'+p]=null)); return g; }
+function renderGrid(cells, band){
+  band=band||'g78';
+  let h='<div class="gridwrap"><table class="week"><thead><tr><th>Period</th>'+DAYS.map(d=>`<th>${d}</th>`).join('')+'</tr></thead><tbody>';
+  PERIODS.forEach(p=>{
+    const t=(PERIOD_TIMES[band]||PERIOD_TIMES.g78)[p]||'';
+    h+=`<tr><td class="per"><div class="pn">${p}</div><div class="pt">${t}</div></td>`;
+    DAYS.forEach(d=>{
+      const c=cells[d+'|'+p];
+      if(!c){ h+='<td><div class="cell free"></div></td>'; }
+      else if(c.kind==='fixed'){ h+=`<td><div class="cell fixed">${esc(c.label)}</div></td>`; }
+      else{ h+=`<td><div class="cell ${slotCss(c.slot)}"><div class="cname">${esc(c.name)}${slotTag(c.slot)}</div><div class="cmeta">${c.meta.map(esc).filter(Boolean).join(' · ')}</div></div></td>`; }
+    });
+    h+='</tr>';
+  });
+  h+='</tbody></table></div>';
+  return h;
+}
+
+/* ============ teacher view ============ */
+function classDisplay(groupId,subject){
+  if(subject==='MATH'&&MATH_SECTION_NAME[groupId]) return MATH_SECTION_NAME[groupId];
+  if(GROUP_NAME_OVERRIDE[groupId]) return GROUP_NAME_OVERRIDE[groupId];
+  const g=grpById[groupId]; return g?g.name:groupId;
+}
+function renderTeacher(staffId){
+  const t=teachersById[staffId]; if(!t){ document.getElementById('out').innerHTML='<div class="empty">Teacher not found.</div>'; return; }
+  const last=t.last||''; const sess=(teacherSessions[last]||[]);
+  const cells=blankGrid();
+  sess.forEach(pl=>{
+    cells[pl.day+'|'+pl.period]={kind:'class',slot:pl.slot,name:classDisplay(pl.groupId,pl.subject)+(pl.aide?' *':''),
+      meta:[SUBJ_LABEL[pl.subject]||pl.subject, pl.room||'']};
+  });
+  // representative band: middle-school if they teach any 5-8, else lower
+  const band=sess.some(pl=>bandOfGroup(pl.groupId)!=='lower')?(sess.some(pl=>bandOfGroup(pl.groupId)==='g78')?'g78':'g56'):'lower';
+  let h=`<div class="head"><h2>${esc(t.name)}</h2><span class="who-meta">Teacher schedule</span></div>`;
+  h+=`<div class="stamp">${sess.length} class periods/week · ${ROST.school_year_start}-${String(ROST.school_year_start+1).slice(-2)}</div>`;
+  h+= sess.length?renderGrid(cells,band):'<div class="gridwrap"><div class="empty">No classes on the generated timetable for this teacher.</div></div>';
+  // classes + rosters
+  const secs=(sectionsByTeacher[staffId]||[]).slice().sort((a,b)=>(a.type>b.type?1:-1)||a.name.localeCompare(b.name));
+  h+='<div class="classlist"><h3>Classes &amp; rosters</h3>';
+  if(!secs.length) h+='<div class="note">No sections assigned on the Classes page.</div>';
+  secs.forEach(sec=>{
+    const studs=(sec.student_ids||[]).map(id=>studentsById[id]).filter(Boolean)
+      .sort((a,b)=>a.last_name.localeCompare(b.last_name));
+    h+=`<div class="clrow"><div class="cl-top"><span class="cl-name">${esc(sec.name)}</span>
+      <span class="cl-meta">${esc((sec.type||'')+(sec.room_name?' · '+sec.room_name:''))} · ${studs.length} student${studs.length==1?'':'s'}</span></div>`;
+    if(studs.length) h+='<div class="roster">'+studs.map(s=>`<a class="stud" href="/schedule?student=${s.student_id}">${esc(s.last_name+', '+s.first_name)}</a>`).join('')+'</div>';
+    h+='</div>';
+  });
+  h+='</div>';
+  document.getElementById('out').innerHTML=h;
+}
+
+/* ============ student view ============ */
+function renderStudent(studentId){
+  const st=studentsById[studentId]; if(!st){ document.getElementById('out').innerHTML='<div class="empty">Student not found.</div>'; return; }
+  const grade=gradeCanon(st.grade);
+  const secs=(sectionsByStudent[studentId]||[]);
+  const cells=blankGrid();
+  const myGroups=new Set();
+  const placedSectionIds=new Set();
+  const otherSections=[]; // enrolled but not on the timetable (support / homeroom / advisory)
+  secs.forEach(sec=>{
+    if(sec.type==='homeroom'||sec.type==='advisory'){ otherSections.push(sec); return; }
+    const p=parseSection(sec.name); const g=gradeCanon(sec.grade);
+    const key=(p.subject&&g)?(g+'|'+p.subject+'|'+classSlot(p.suffix)):null;
+    const sessions=key?classKeyToSessions[key]:null;
+    if(!sessions||!sessions.length){ otherSections.push(sec); return; }
+    placedSectionIds.add(sec.section_id);
+    sessions.forEach(pl=>{
+      myGroups.add(pl.groupId);
+      cells[pl.day+'|'+pl.period]={kind:'class',slot:pl.slot,name:sec.name,
+        meta:[sec.teacher_last||sec.teacher_name||'', sec.room_name||'']};
+    });
+  });
+  // overlay fixed blocks (lunch / electives) for the student's groups
+  const groupsArr=[...myGroups];
+  groupsArr.forEach(gid=>{
+    (fixedByGroup[gid]||[]).forEach(f=>{
+      const days = f.day==='*'?DAYS:[f.day];
+      days.forEach(d=>{
+        const cellKey=d+'|'+f.period;
+        if(cells[cellKey]&&cells[cellKey].kind==='class') return; // don't overwrite a class
+        cells[cellKey]={kind:'fixed',label:fixedDisplay(gid,d,f.period,f.label)};
+      });
+    });
+  });
+  // P9 block
+  const anyG=groupsArr[0]||('grade'+grade);
+  DAYS.forEach(d=>{ const k=d+'|P9'; if(!cells[k]) cells[k]={kind:'fixed',label:p9Label(groupsArr[0]||'',d)}; });
+  // Wednesday electives if not already set
+  const wkey=WED_FREE.day+'|'+WED_FREE.period;
+  if(!cells[wkey]&&(grade==='5'||grade==='6'||grade==='7'||grade==='8')) cells[wkey]={kind:'fixed',label:'Electives / Assembly'};
+
+  const band=bandOfGrade(grade);
+  const color=st.cohort_color?(' · '+st.cohort_color.charAt(0).toUpperCase()+st.cohort_color.slice(1)):'';
+  let h=`<div class="head"><h2>${esc(st.first_name+' '+st.last_name)}</h2><span class="who-meta">Grade ${esc(st.grade||'—')}${esc(color)} · student schedule</span></div>`;
+  h+=`<div class="stamp">${placedSectionIds.size} scheduled classes · ${ROST.school_year_start}-${String(ROST.school_year_start+1).slice(-2)}</div>`;
+  h+=renderGrid(cells,band);
+  // class list
+  h+='<div class="classlist"><h3>Classes</h3>';
+  const placed=secs.filter(s=>placedSectionIds.has(s.section_id)).sort((a,b)=>a.name.localeCompare(b.name));
+  if(!placed.length) h+='<div class="note">No timetabled classes found for this student.</div>';
+  placed.forEach(sec=>{ h+=`<div class="clrow"><div class="cl-top"><span class="cl-name">${esc(sec.name)}</span>
+    <span class="cl-meta">${esc((sec.teacher_name||'No teacher')+(sec.room_name?' · '+sec.room_name:''))}</span></div></div>`; });
+  const support=otherSections.filter(s=>!(s.type==='homeroom')); // show advisory + support separately
+  if(otherSections.length){
+    h+='<div class="clrow"><div class="cl-meta" style="margin-top:2px">Also enrolled (not on the class timetable): '+
+      otherSections.map(s=>esc(s.name)).join(', ')+'</div></div>';
+  }
+  h+='</div>';
+  document.getElementById('out').innerHTML=h;
+}
+
+boot();
+</script>
+<script src="/nav.js" defer></script>
+</body>
+</html>

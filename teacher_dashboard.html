@@ -96,6 +96,14 @@
     textarea { width: 100%; border: 1px solid var(--border); border-radius: 8px; padding: 10px; font-family: 'DM Sans', sans-serif; font-size: 13px; resize: vertical; min-height: 60px; }
     .modal-actions { display: flex; justify-content: space-between; gap: 8px; margin-top: 12px; align-items: center; }
     .loading { text-align: center; color: var(--muted); padding: 60px 0; font-size: 14px; }
+    .wkwrap { overflow-x: auto; }
+    table.wk { border-collapse: collapse; width: 100%; font-size: 11.5px; min-width: 540px; }
+    table.wk th, table.wk td { border: 1px solid #eee6d9; padding: 4px 6px; vertical-align: top; }
+    table.wk thead th { background: #faf7f1; font-size: 10px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); text-align: center; }
+    table.wk td.wp { background: #faf7f1; font-weight: 700; text-align: center; width: 34px; }
+    table.wk td.wc b { display: block; font-weight: 600; line-height: 1.15; }
+    table.wk td.wc span { color: var(--muted); font-size: 10px; }
+    .sched-link { font-size: 13px; color: var(--blue); text-decoration: none; }
   </style>
 </head>
 <body>
@@ -115,7 +123,47 @@
 <script>
 const API = '';
 let DATA = null;
+let SCHED = null;      // scheduler state (data.S + data.result), for the weekly grid
 let attendance = {};   // student_id -> {status, note}
+
+const SCHED_DAYS = ["Mon","Tue","Wed","Thu","Fri"];
+const SCHED_PERIODS = ["P1","P2","P3","P4","P5","P6","P7","P8","P9"];
+const SUBJ_SHORT = {MATH:"Math",ELA:"ELA",SCIENCE:"Science",SOCIAL:"Soc. St.",SPANISH:"Spanish",ART:"Art",MUSIC:"Music",PE:"PE",STEAM:"STEAM",TECH:"Tech",LIBRARY:"Library",HEALTH:"Health"};
+const MATH_SECTION_NAME = {"6A":"6th McLeod","6B":"6th Duthie","7A":"7th McLeod","7B":"7th Duthie","7C":"7th Alvarez","8A":"8th McLeod","8B":"8th Duthie"};
+const GROUP_NAME_OVERRIDE = {"7C":"7th Alvarez","8A":"8th McLeod","8B":"8th Duthie"};
+
+function mySchedCells(){
+  if(!SCHED || !SCHED.result || !SCHED.S) return null;
+  const S = SCHED.S, res = SCHED.result;
+  const grpById = {}; (S.classes||[]).forEach(c => grpById[c.id] = c);
+  const last = (DATA.teacher.name||'').trim().split(/\s+/).slice(-1)[0];
+  const sess = res.sessions||[], asg = res.assign||[];
+  const cells = {};
+  sess.forEach((s,i) => {
+    if (s.teacherId !== last && !(s.aide && last === 'Belmonte')) return;
+    const a = asg[i]||{}; if(!a.day) return;
+    const nm = (s.subject==='MATH' && MATH_SECTION_NAME[s.groupId]) ? MATH_SECTION_NAME[s.groupId]
+             : (GROUP_NAME_OVERRIDE[s.groupId] || (grpById[s.groupId] ? grpById[s.groupId].name : s.groupId));
+    cells[a.day+'|'+a.period] = { name: nm + (s.aide?' *':''), room: s.room, subj: s.subject };
+  });
+  return cells;
+}
+function renderMySchedule(){
+  const cells = mySchedCells();
+  if(!cells || !Object.keys(cells).length) return '';
+  let h = `<div class="card"><div class="card-head">
+    <div><span class="card-title">My weekly schedule</span><span class="card-sub">from the master timetable</span></div>
+    <a class="sched-link" href="/schedule?teacher=${DATA.teacher.staff_id}">Full view / print →</a></div>
+    <div class="wkwrap"><table class="wk"><thead><tr><th></th>${SCHED_DAYS.map(d=>`<th>${d}</th>`).join('')}</tr></thead><tbody>`;
+  SCHED_PERIODS.forEach(p => {
+    h += `<tr><td class="wp">${p}</td>` + SCHED_DAYS.map(d => {
+      const c = cells[d+'|'+p];
+      return c ? `<td class="wc"><b>${esc(c.name)}</b><span>${esc(SUBJ_SHORT[c.subj]||c.subj)}${c.room?' · '+esc(c.room):''}</span></td>` : '<td></td>';
+    }).join('') + '</tr>';
+  });
+  h += '</tbody></table></div></div>';
+  return h;
+}
 
 function esc(s){ return (s==null?'':String(s)).replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
 function initials(name){ return name.split(/\s+/).map(w=>w[0]||'').slice(0,2).join('').toUpperCase(); }
@@ -128,6 +176,7 @@ async function load(){
   DATA = await res.json();
   if (DATA.error){ document.getElementById('root').innerHTML = `<div class="empty">${esc(DATA.error)}</div>`; return; }
   DATA.homeroom.students.forEach(s => { if (s.att_status) attendance[s.student_id] = { status: s.att_status, note: '' }; });
+  try { const sr = await (await fetch(`${API}/api/scheduler`)).json(); SCHED = sr.data || null; } catch(e) { SCHED = null; }
   render();
 }
 
@@ -159,6 +208,8 @@ function render(){
     html += `<div class="stat ${done?'ok':'warn'}"><div class="label">Attendance</div><div class="value small">${done?'Taken':'Not taken'}</div></div>`;
   }
   html += `<div class="stat"><div class="label">Health flags</div><div class="value">${flagged}</div></div></div>`;
+
+  html += renderMySchedule();
 
   if (DATA.has_homeroom){
     const hr = DATA.homeroom;
@@ -273,7 +324,7 @@ async function openStudent(id){
     <div id="notes-list">${notesHtml}</div>
     <textarea id="note-input" placeholder="Add a note about ${esc(s.name.split(' ')[0])}…"></textarea>
     <div class="modal-actions">
-      <a href="/students" style="font-size:13px;color:var(--blue);text-decoration:none;">Open full profile →</a>
+      <a href="/schedule?student=${id}" style="font-size:13px;color:var(--blue);text-decoration:none;">View weekly schedule →</a>
       <div style="display:flex;gap:8px;">
         <button class="btn btn-secondary" onclick="closeModal()">Close</button>
         <button class="btn btn-primary" onclick="addNote(${id})">Add note</button>

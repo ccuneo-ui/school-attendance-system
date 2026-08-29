@@ -1127,6 +1127,13 @@ def reconcile_page():
     # sections on the Classes page. Pulls only /api/scheduler and /api/sections; writes nothing.
     return send_from_directory(".", "reconcile.html")
 
+@app.route("/schedule")
+@login_required
+def schedule_page():
+    # Read-only weekly schedule viewer for any student or teacher. Any signed-in staff
+    # may view; nothing is editable. Reads the generated timetable + section rosters.
+    return send_from_directory(".", "schedule.html")
+
 @app.route("/scheduler")
 @login_required
 def scheduler_page():
@@ -6957,6 +6964,54 @@ def api_sections_list():
             q += " ORDER BY s.type, s.name"
             cur.execute(q, params)
             return jsonify({"school_year_start": year, "sections": fa(cur)})
+    finally:
+        conn.close()
+
+
+@app.route("/api/schedule/rosters")
+@login_required
+def api_schedule_rosters():
+    # Read-only bundle powering the /schedule viewer: every active section for the
+    # current year (with teacher/room) plus its enrolled active-student ids, and the
+    # roster of active students. Lets the page resolve student<->section<->class and
+    # render any student's or teacher's week in one round trip. Writes nothing.
+    year = current_school_year_start()
+    conn = get_db_connection()
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute("""
+                SELECT s.section_id, s.type, s.name, s.subject, s.grade,
+                       s.teacher_id, (st.first_name || ' ' || st.last_name) AS teacher_name,
+                       st.last_name AS teacher_last, r.name AS room_name
+                FROM sections s
+                LEFT JOIN staff st ON st.staff_id = s.teacher_id
+                LEFT JOIN rooms r ON r.room_id = s.room_id
+                WHERE s.school_year_start = %s AND s.active = TRUE
+                ORDER BY s.type, s.name
+            """, (year,))
+            sections = {row["section_id"]: dict(row, student_ids=[]) for row in fa(cur)}
+            cur.execute("""
+                SELECT se.section_id, se.student_id
+                FROM section_enrollments se
+                JOIN sections s ON s.section_id = se.section_id
+                JOIN students st ON st.student_id = se.student_id
+                WHERE s.school_year_start = %s AND s.active = TRUE AND st.status = 'active'
+            """, (year,))
+            for e in fa(cur):
+                sec = sections.get(e["section_id"])
+                if sec is not None:
+                    sec["student_ids"].append(e["student_id"])
+            cur.execute("""
+                SELECT student_id, first_name, last_name, grade, cohort_color
+                FROM students WHERE status = 'active'
+                ORDER BY grade, last_name, first_name
+            """)
+            students = fa(cur)
+        return jsonify({
+            "school_year_start": year,
+            "sections": list(sections.values()),
+            "students": students,
+        })
     finally:
         conn.close()
 
