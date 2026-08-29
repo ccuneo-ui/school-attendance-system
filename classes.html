@@ -42,6 +42,7 @@
   .t-advisory{background:rgba(45,80,22,.12);color:var(--green);}
   .t-subject{background:rgba(200,153,42,.16);color:#7a5a10;}
   .t-elective{background:#efe6f7;color:#5b2a86;}
+  .grade-badge{display:inline-block;font-size:10px;font-weight:600;padding:1px 7px;border-radius:10px;margin-right:6px;background:#e7ecf5;color:var(--navy);letter-spacing:.02em;}
   .panel{background:#fff;border:1px solid var(--light);border-radius:12px;padding:22px;}
   .panel .empty{color:var(--muted);text-align:center;padding:60px 20px;}
   .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:18px;}
@@ -190,6 +191,7 @@
   async function api(path,opts){const r=await fetch(path,opts);const d=await r.json().catch(()=>({}));if(!r.ok||d.error)throw new Error(d.error||('HTTP '+r.status));return d;}
   function esc(s){const d=document.createElement('div');d.textContent=s==null?'':s;return d.innerHTML;}
   const TYPES={homeroom:'Homeroom',advisory:'Advisory',subject:'Subject',elective:'Elective'};
+  function fmtGrade(g){ g=String(g==null?'':g).trim(); if(!g) return ''; if(/^\d+$/.test(g)) return 'Gr '+g; return g; }
   const TERMS={year:'Full year',t1:'Trimester 1',t2:'Trimester 2',t3:'Trimester 3'};
 
   const S={opts:null,sections:[],selId:null,roster:[]};
@@ -286,7 +288,7 @@
     if(!items.length){el.innerHTML='<div class="sec-item"><span class="muted">No classes'+(gsel?(' for grade '+esc(gsel)):' yet')+'. Click “+ New Class”.</span></div>';return;}
     el.innerHTML=items.map(s=>`
       <div class="sec-item ${s.section_id==S.selId?'active':''} ${s.active?'':'inactive'}" onclick="select(${s.section_id})">
-        <div class="sec-name"><span class="type-tag t-${s.type}">${TYPES[s.type]||s.type}</span>${esc(s.name)}</div>
+        <div class="sec-name"><span class="type-tag t-${s.type}">${TYPES[s.type]||s.type}</span>${s.grade?`<span class="grade-badge">${esc(fmtGrade(s.grade))}</span>`:''}${esc(s.name)}</div>
         <div class="sec-meta">${esc(s.teacher_name||'No teacher')}${s.room_name?' · '+esc(s.room_name):''} · ${s.roster_count} student${s.roster_count==1?'':'s'}</div>
       </div>`).join('');
   }
