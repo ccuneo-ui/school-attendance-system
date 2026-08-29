@@ -120,7 +120,6 @@ NAV_REFERENCE = {"key": "reference", "label": "Reference", "pages": [
     {"key": "dismissal_staff",    "label": "Dismissal Staff View", "href": "/dismissal-staff"},
     {"key": "bus_dashboard",      "label": "Bus Dashboard",       "href": "/bus-dashboard"},
     {"key": "attendance_report",  "label": "Attendance Report",   "href": "/homeroom-attendance-report"},
-    {"key": "schedule",           "label": "Schedule",            "href": "/scheduler"},
     {"key": "person_schedules",   "label": "Student & Teacher Schedules", "href": "/schedule"},
 ]}
 
@@ -1030,14 +1029,6 @@ def get_session():
 @app.route("/logo.svg")
 def serve_logo():
     return send_from_directory(".", "logo.svg")
-
-
-@app.route("/favicon.ico")
-def serve_favicon():
-    """Fallback favicon. Browsers request /favicon.ico automatically, so this
-    guarantees every page gets the school mark even if its <head> is missing the
-    <link rel="icon"> tag."""
-    return send_from_directory(".", "logo.svg", mimetype="image/svg+xml")
 
 
 # ============================================
