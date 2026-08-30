@@ -21,6 +21,7 @@
   .sub{color:var(--muted);font-size:13.5px;margin-bottom:18px;}
   .pickbar{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;margin-bottom:22px;background:#fff;border:1px solid var(--light);border-radius:12px;padding:14px 16px;}
   .fld{display:flex;flex-direction:column;gap:5px;}
+  .fld[hidden]{display:none;}
   .fld label{font-size:11px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);}
   select,input[type=text]{padding:8px 11px;border:1px solid var(--light);border-radius:8px;font-size:13px;font-family:inherit;background:#fff;color:var(--navy);outline:none;min-width:200px;}
   select:focus,input:focus{border-color:var(--navy);}
@@ -91,9 +92,18 @@
         <button data-mode="homeroom" onclick="setMode('homeroom')">Homeroom</button>
       </div>
     </div>
+    <div class="fld" id="gradeWrap" hidden>
+      <label>Grade</label>
+      <select id="gradeSel" onchange="onGradeChange()"></select>
+    </div>
     <div class="fld" id="pickWrap">
       <label id="pickLabel">Teacher</label>
       <select id="pick" onchange="onPick()"><option value="">Loading…</option></select>
+    </div>
+    <div class="fld" id="searchWrap" hidden>
+      <label>Search name</label>
+      <input type="text" id="stuSearch" list="stuList" placeholder="Type a student's name…" autocomplete="off" onchange="onSearchPick()">
+      <datalist id="stuList"></datalist>
     </div>
     <div style="flex:1"></div>
     <button class="btn btn-ghost" onclick="window.print()">Print / Save PDF</button>
@@ -205,7 +215,7 @@ async function boot(){
   fillPicker();
   // route from URL
   const q=new URLSearchParams(location.search);
-  if(q.get('student')){ MODE='student'; syncSeg(); document.getElementById('pick').value=q.get('student'); renderStudent(+q.get('student')); }
+  if(q.get('student')){ const sid=+q.get('student'); MODE='student'; syncSeg(); fillPicker(); syncStudentSelectors(sid); renderStudent(sid); }
   else if(q.get('teacher')){ MODE='teacher'; syncSeg(); const tv=resolveTeacherParam(q.get('teacher')); document.getElementById('pick').value=tv||''; if(tv) renderTeacher(+tv); else document.getElementById('out').innerHTML='<div class="empty">That teacher was not found.</div>'; }
   else if(q.get('homeroom')){ MODE='homeroom'; syncSeg(); fillPicker(); const hv=q.get('homeroom'); document.getElementById('pick').value=hv; renderHomeroom(hv); }
   else { syncSeg(); document.getElementById('out').innerHTML='<div class="empty">Pick a teacher or student above to see their week.</div>'; }
@@ -216,7 +226,65 @@ function resolveTeacherParam(v){ // accept staff_id or last name
   const byLast=Object.values(teachersById).find(t=>String(t.last).toLowerCase()===String(v).toLowerCase());
   return byLast?String(byLast.id):'';
 }
-function syncSeg(){ document.querySelectorAll('#seg button').forEach(b=>b.classList.toggle('on',b.dataset.mode===MODE)); document.getElementById('pickLabel').textContent = MODE==='teacher'?'Teacher':MODE==='homeroom'?'Homeroom':'Student'; }
+function syncSeg(){ document.querySelectorAll('#seg button').forEach(b=>b.classList.toggle('on',b.dataset.mode===MODE)); document.getElementById('pickLabel').textContent = MODE==='teacher'?'Teacher':MODE==='homeroom'?'Homeroom':'Student';
+  const isStu=MODE==='student';
+  document.getElementById('gradeWrap').hidden=!isStu;
+  document.getElementById('searchWrap').hidden=!isStu; }
+
+/* ---- student picker: pick a grade, then a student; or type a name ---- */
+const GRADE_ORDER=['JPK','SPK','K','1','2','3','4','5','6','7','8'];
+function gradeRank(g){ const i=GRADE_ORDER.indexOf(String(g).toUpperCase().trim()); return i<0?99:i; }
+let curGrade='';                 // grade currently chosen in the Grade dropdown ('' = none, '__all' = all)
+let studentLabelToId={};         // datalist label -> student_id (for the search box)
+function fillGradeSelect(){
+  const grades=[...new Set((ROST.students||[]).map(s=>String(s.grade||'').trim()).filter(Boolean))]
+    .sort((a,b)=>gradeRank(a)-gradeRank(b)||a.localeCompare(b,undefined,{numeric:true}));
+  document.getElementById('gradeSel').innerHTML='<option value="">Choose a grade…</option>'
+    +grades.map(g=>`<option value="${esc(g)}">Grade ${esc(g)}</option>`).join('')
+    +'<option value="__all">All grades</option>';
+}
+function studentsInGrade(grade){
+  let ss=(ROST.students||[]).slice();
+  if(grade && grade!=='__all') ss=ss.filter(s=>String(s.grade).trim()===String(grade));
+  return ss.sort((a,b)=>a.last_name.localeCompare(b.last_name)||a.first_name.localeCompare(b.first_name));
+}
+function fillStudentSelect(grade){
+  const sel=document.getElementById('pick');
+  if(!grade){ sel.innerHTML='<option value="">Choose a grade first…</option>'; sel.disabled=true; return; }
+  sel.disabled=false;
+  const ss=studentsInGrade(grade), all=grade==='__all';
+  sel.innerHTML='<option value="">Choose a student…</option>'
+    +ss.map(s=>`<option value="${s.student_id}">${esc(s.last_name+', '+s.first_name)}${all?' · Gr '+esc(s.grade||'—'):''}</option>`).join('');
+}
+function fillSearchList(){
+  studentLabelToId={};
+  const seen={};
+  const ss=(ROST.students||[]).slice().sort((a,b)=>a.last_name.localeCompare(b.last_name)||a.first_name.localeCompare(b.first_name));
+  document.getElementById('stuList').innerHTML=ss.map(s=>{
+    let lbl=s.last_name+', '+s.first_name+' · Gr '+(s.grade||'—');
+    if(seen[lbl]) lbl+=' (#'+s.student_id+')'; seen[lbl]=1; studentLabelToId[lbl]=s.student_id;
+    return `<option value="${esc(lbl)}"></option>`; }).join('');
+}
+// Point the Grade + Student dropdowns (and the search box) at a specific student, without rendering.
+function syncStudentSelectors(id){
+  const st=studentsById[id]; if(!st) return;
+  const gsel=document.getElementById('gradeSel'), g=String(st.grade||'').trim();
+  if([...gsel.options].some(o=>o.value===g)){ gsel.value=g; curGrade=g; } else { gsel.value='__all'; curGrade='__all'; }
+  fillStudentSelect(curGrade);
+  document.getElementById('pick').value=String(id);
+  const inp=document.getElementById('stuSearch'); if(inp) inp.value=st.last_name+', '+st.first_name+' · Gr '+(st.grade||'—');
+}
+function onGradeChange(){ curGrade=document.getElementById('gradeSel').value; fillStudentSelect(curGrade);
+  document.getElementById('out').innerHTML='<div class="empty">'+(curGrade?'Pick a student above.':'Pick a grade, then a student — or search by name.')+'</div>'; }
+function onSearchPick(){ const inp=document.getElementById('stuSearch'); const v=(inp.value||'').trim(); if(!v) return;
+  let id=studentLabelToId[v];
+  if(!id){ // tolerate a partial/typed name: unique case-insensitive prefix match
+    const keys=Object.keys(studentLabelToId).filter(k=>k.toLowerCase().startsWith(v.toLowerCase()));
+    if(keys.length===1) id=studentLabelToId[keys[0]];
+  }
+  if(!id) return;
+  syncStudentSelectors(id);
+  history.replaceState(null,'','/schedule?student='+id); renderStudent(+id); }
 // Homeroom sections (with a roster) — the whole-grade groups a student sits in for homeroom.
 function homeroomSections(){
   return (ROST.sections||[]).filter(s=>s.type==='homeroom' && (s.student_ids||[]).length)
@@ -231,13 +299,17 @@ function fillPicker(){
     const hs=homeroomSections();
     sel.innerHTML='<option value="">Choose a homeroom…</option>'+hs.map(s=>`<option value="${s.section_id}">${esc(s.name)}${s.teacher_last?' · '+esc(s.teacher_last):''} · ${(s.student_ids||[]).length} students</option>`).join('');
   } else {
-    const ss=(ROST.students||[]).slice().sort((a,b)=>String(a.grade).localeCompare(String(b.grade),undefined,{numeric:true})||a.last_name.localeCompare(b.last_name));
-    sel.innerHTML='<option value="">Choose a student…</option>'+ss.map(s=>`<option value="${s.student_id}">${esc(s.last_name+', '+s.first_name)} · Gr ${esc(s.grade||'—')}</option>`).join('');
+    // Student: a Grade dropdown drives which students appear, plus a type-to-search box.
+    fillGradeSelect(); fillSearchList();
+    document.getElementById('gradeSel').value=''; curGrade='';
+    fillStudentSelect('');
+    const inp=document.getElementById('stuSearch'); if(inp) inp.value='';
   }
 }
 function setMode(m){ MODE=m; syncSeg(); fillPicker();
-  const noun = m==='homeroom'?'homeroom':m;
-  document.getElementById('out').innerHTML='<div class="empty">Pick a '+noun+' above.</div>'; history.replaceState(null,'','/schedule'); }
+  const msg = m==='student' ? 'Pick a grade, then a student — or search by name.'
+            : m==='homeroom' ? 'Pick a homeroom above.' : 'Pick a teacher above.';
+  document.getElementById('out').innerHTML='<div class="empty">'+msg+'</div>'; history.replaceState(null,'','/schedule'); }
 function onPick(){ const v=document.getElementById('pick').value; if(!v){return;}
   if(MODE==='teacher'){ history.replaceState(null,'','/schedule?teacher='+v); renderTeacher(+v); }
   else if(MODE==='homeroom'){ history.replaceState(null,'','/schedule?homeroom='+encodeURIComponent(v)); renderHomeroom(v); }
