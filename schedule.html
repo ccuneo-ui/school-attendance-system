@@ -337,6 +337,7 @@ function renderTeacher(staffId){
   } else {
     const g=homeroomGroupFor(last);
     if(g){ cells=buildGroupCells(g.id); band=bandOfGroup(g.id);
+      DAYS.forEach(d=>{ const he=(SCHED.homeroomEdits||{})[last+'|'+d+'|HR']; cells[d+'|HR']={kind:'fixed',label:he||'Homeroom'}; });
       subtitle=`Homeroom teacher · ${esc(g.name||g.id)}`;
       stamp=`Homeroom-based day (this staff member doesn't teach a timetabled subject) · ${ROST.school_year_start}-${String(ROST.school_year_start+1).slice(-2)}`;
     } else { cells=buildTeacherCells(last); band='g78'; subtitle='Teacher schedule';

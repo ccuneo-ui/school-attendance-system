@@ -1248,7 +1248,11 @@ function onViewModeChange(){
   else{
     lab.style.display="";
     if(mode==="class") sel.innerHTML=S.classes.map(c=>`<option value="${c.id}">${c.id} · ${grpName(c.id)}</option>`).join("");
-    else sel.innerHTML=S.teachers.slice().sort((a,b)=>a.name.localeCompare(b.name)).map(t=>`<option value="${t.id}">${t.name}</option>`).join("")+`<option value="${AIDE_ID}">Belmonte (aide)</option>`;
+    else { const hs=homeroomStaffMap();
+      const hsOpts=Object.keys(hs).sort().map(nm=>`<option value="${nm}">${nm} — homeroom (${grpName(hs[nm])})</option>`).join("");
+      sel.innerHTML=S.teachers.slice().sort((a,b)=>a.name.localeCompare(b.name)).map(t=>`<option value="${t.id}">${t.name}</option>`).join("")
+        +`<option value="${AIDE_ID}">Belmonte (aide)</option>`
+        +(hsOpts?`<optgroup label="Homeroom teachers">${hsOpts}</optgroup>`:""); }
   }
   renderSchedule();
 }
@@ -1407,6 +1411,50 @@ function setLunch(p){ pushUndo(); const {tid,day}=lunchEditKey; const cur=_ovFor
 function setDuty(b){ pushUndo(); const {tid,day}=lunchEditKey; const cur=_ovFor(); lunchOverrides[tid+"|"+day]={...cur,duty:b}; invalidateLunchPlan(); afterEdit(); openLunchEdit(tid,day); }
 function clearLunchOverride(){ pushUndo(); const {tid,day}=lunchEditKey; delete lunchOverrides[tid+"|"+day]; invalidateLunchPlan(); afterEdit(); openLunchEdit(tid,day); }
 
+// Homeroom-only staff (PreK / lower-grade homeroom teachers) — they don't teach a timetabled
+// subject, so they're not in S.teachers, but each class group names its homeroom teacher in `hr`.
+// Map { hrName -> groupId } for those not already a subject teacher, so they can be picked in the
+// By-teacher view to edit their HR homeroom label.
+function homeroomStaffMap(){
+  const teacherIds=new Set(S.teachers.map(t=>t.id));
+  const map={};
+  S.classes.forEach(c=>{ const hr=(c.hr||"").trim();
+    if(!hr || hr.includes("/") || teacherIds.has(hr)) return;
+    if(!(hr in map)) map[hr]=c.id; });
+  return map;
+}
+// Render a homeroom-only teacher's week: their group's day (specials + lunch + homeroom), with the
+// HR row editable and stored against that person (homeroomEdits key "name|day|HR").
+function renderHomeroomStaff(tid, gid){
+  $("#legend").innerHTML=`<span class="hint" style="margin:0">Homeroom teacher — the <b>HR</b> row is editable (type this person's role); the rest shows their homeroom group's day. <span class="swatch subj-CORE"></span> Homeroom</span>`;
+  const band=bandOf(gid), map=placementByGroup(gid);
+  const fixedSet={}; fixedFor(gid).forEach(dp=>{ const [d,p]=dp.split("|");
+    const lbl=(S.fixed.find(f=>f.groupId===gid&&(f.day==="*"||f.day===d)&&f.period===p)||{}).label||"";
+    fixedSet[dp]=fixedDisplay(gid,d,p,lbl); });
+  let h='<table class="sched"><thead><tr><th>Period</th>'+DAYS.map(d=>`<th>${d}</th>`).join("")+'</tr></thead><tbody>';
+  h+=`<tr><th style="text-align:right">HR<br><span style="font-weight:400;color:var(--muted);font-size:10px">8:05–8:20</span></th>`;
+  DAYS.forEach(d=>{ const key=tid+"|"+d+"|HR", def="Homeroom", txt=homeroomEdits[key]||def, edited=!!homeroomEdits[key];
+    h+=`<td class="subj-CORE editcell${edited?' edited':''}" contenteditable="true" spellcheck="false" title="Homeroom by default — type this person's role at this time" onblur="saveHomeroom('${tid}','${d}','HR',this.innerText); markDirty(); if(!this.innerText.trim())this.innerText='${def}'" onfocus="if(this.innerText==='${def}')this.innerText=''">${txt}</td>`; });
+  h+=`</tr>`;
+  PERIODS.forEach(p=>{
+    h+=`<tr><th style="text-align:right">${p.id}<br><span style="font-weight:400;color:var(--muted);font-size:10px">${plabel(p.id,band)}</span></th>`;
+    DAYS.forEach(d=>{
+      if(p.id==="P9"){ h+=`<td class="subj-FREE">${p9Label(gid,d)}</td>`; return; }
+      const cell=map[d+"|"+p.id];
+      if(cell){ const s=cell.s, gp=GROUP_PALETTE[s.groupId]||{bg:"#ECECEC",fg:"#333"};
+        h+=`<td class="keycell" style="background:${gp.bg};color:${gp.fg}"><span class="l2">${subjLabel(s.subject)}</span><span class="l3">${s.teacherId} · ${s.room}</span></td>`; return; }
+      const fx=fixedSet[d+"|"+p.id];
+      if(fx){ const isFree=/free|elective|assembly/i.test(fx); h+=`<td class="subj-${isFree?'FREE':'LUNCH'}">${fx}</td>`; return; }
+      if(d===WED_FREE.day&&p.id===WED_FREE.period){ h+=`<td class="subj-FREE">Electives/Assembly</td>`; return; }
+      h+=`<td class="subj-CORE">Homeroom</td>`;
+    });
+    h+=`</tr>`;
+  });
+  h+="</tbody></table>";
+  $("#schedwrap").innerHTML=h;
+  const old=document.getElementById("unplacedbox"); if(old) old.remove();
+}
+
 function renderSchedule(){
   if(!RESULT) return;
   const mode=$("#viewmode").value;
@@ -1420,6 +1468,7 @@ function renderSchedule(){
   if(mode==="prep"){ renderPrepSchedule(); return; }
   if(mode==="master"){ renderMaster(); return; }
   const who=$("#viewwho").value;
+  if(mode==="teacher"){ const hs=homeroomStaffMap(); if(hs[who]){ renderHomeroomStaff(who, hs[who]); return; } }
   const tinfo = (mode==="teacher") ? teacherDayInfo(who) : null;
 
   const grid={};
