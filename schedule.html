@@ -46,7 +46,8 @@
   .cell .cmeta{color:var(--muted);font-size:11px;margin-top:2px;}
   .cell.gold{background:var(--goldbg);} .cell.blue{background:var(--bluebg);} .cell.whole{background:var(--wholebg);}
   .cell.fixed{background:var(--fixedbg);color:#6a5a3a;font-style:italic;}
-  .cell.free{background:var(--freebg);color:#9a927f;}
+  .cell.free{background:var(--freebg);color:#7a7360;font-weight:600;font-size:11px;}
+  .cell.off{background:#f1eee7;color:#b8b2a3;font-style:italic;font-size:11px;}
   .tag{display:inline-block;font-size:9.5px;font-weight:700;padding:1px 6px;border-radius:9px;text-transform:uppercase;letter-spacing:.03em;margin-left:5px;vertical-align:middle;}
   .tag.gold{background:rgba(200,153,42,.2);color:#7a5a10;} .tag.blue{background:#d5e6f9;color:#1b5faa;} .tag.whole{background:rgba(26,39,68,.12);color:var(--navy);}
   .classlist{background:#fff;border:1px solid var(--light);border-radius:12px;padding:16px 18px;margin-bottom:20px;}
@@ -207,21 +208,111 @@ function onPick(){ const v=document.getElementById('pick').value; if(!v){return;
   if(MODE==='teacher'){ history.replaceState(null,'','/schedule?teacher='+v); renderTeacher(+v); }
   else { history.replaceState(null,'','/schedule?student='+v); renderStudent(+v); } }
 
+/* ============ scheduler-parity helpers (read-only; mirror the scheduler) ============ */
+const LUNCH_WIN=['P4','P5','P6'], MIN_DUTY=3, AIDE_ID='Belmonte';
+const NO_DUTY_TEACHERS=new Set(['Keenan','Jordan']);
+const ACAD=['P1','P2','P3','P4','P5','P6','P7','P8'];   // academic periods (P9 & HR are non-academic)
+function staffs(s,tid){ return s.teacherId===tid || (tid===AIDE_ID && s.aide); }
+function avail(tid){ const a=((SCHED.S||{}).availability||{})[tid]; if(a) return a; const w={}; DAYS.forEach(d=>w[d]=ACAD.slice()); return w; }
+function lunchDisp(lbl){ if(lbl==='LUNCH DUTY')return'Recess / Lunch Duty'; if(lbl==='LUNCH NO DUTY')return'Recess / Lunch No Duty'; if(lbl==='LUNCH')return'Recess / Lunch'; return lbl; }
+let LUNCH_PLAN=null;
+function computeLunchPlan(){
+  const S=SCHED.S||{}, res=SCHED.result||{}, sess=res.sessions||[], asg=res.assign||[];
+  const lunchOverrides=SCHED.lunchOverrides||{}, teachers=S.teachers||[];
+  const plan={}; teachers.forEach(t=>plan[t.id]={});
+  const booked={}; teachers.forEach(t=>{ booked[t.id]={}; DAYS.forEach(d=>booked[t.id][d]=new Set()); });
+  sess.forEach((s,i)=>{ const v=asg[i]; if(!v||!v.day)return; teachers.forEach(t=>{ if(staffs(s,t.id)) booked[t.id][v.day].add(v.period); }); });
+  DAYS.forEach(day=>{
+    const info={};
+    teachers.forEach(t=>{
+      const av=avail(t.id)[day]||[];
+      const free=av.filter(p=>!booked[t.id][day].has(p) && !(day===WED_FREE.day&&p===WED_FREE.period));
+      const winFree=LUNCH_WIN.filter(p=>free.includes(p));
+      let base=winFree[0]; if(!base && free.length) base=free[0];
+      const prepCount=free.length-(base?1:0);
+      const eligible=t.id!==AIDE_ID && !NO_DUTY_TEACHERS.has(t.id) && prepCount>=2 && winFree.length>0;
+      info[t.id]={free,winFree,base,prepCount,eligible};
+    });
+    const chosen={}; teachers.forEach(t=>chosen[t.id]=info[t.id].base);
+    const dutyAt=p=>teachers.filter(t=>info[t.id].eligible && chosen[t.id]===p).length;
+    ['P4','P5'].forEach(target=>{ let guard=0;
+      while(dutyAt(target)<MIN_DUTY && guard++<60){
+        const cand=teachers.find(t=>{ const it=info[t.id]; if(!it.eligible||chosen[t.id]===target||!it.winFree.includes(target))return false;
+          const cur=chosen[t.id]; if((cur==='P4'||cur==='P5')&&dutyAt(cur)<=MIN_DUTY)return false; return true; });
+        if(!cand)break; chosen[cand.id]=target;
+      }});
+    teachers.forEach(t=>{ const it=info[t.id]; let lunchP=chosen[t.id]; let dutyBool=it.eligible;
+      const ov=lunchOverrides[t.id+'|'+day];
+      if(ov){ if(ov.lunchP && it.free.includes(ov.lunchP)) lunchP=ov.lunchP; if(typeof ov.duty==='boolean') dutyBool=ov.duty; }
+      let dutyLabel; if(t.id===AIDE_ID)dutyLabel='LUNCH'; else if(NO_DUTY_TEACHERS.has(t.id))dutyLabel='LUNCH NO DUTY'; else dutyLabel=dutyBool?'LUNCH DUTY':'LUNCH NO DUTY';
+      plan[t.id][day]={free:it.free,winFree:it.winFree,lunchP,dutyLabel,prepLabel:(t.id===AIDE_ID)?'free':'PREP'};
+    });
+  });
+  return plan;
+}
+function getLunchPlan(){ if(!LUNCH_PLAN)LUNCH_PLAN=computeLunchPlan(); return LUNCH_PLAN; }
+function teacherDayInfo(tid){ const plan=getLunchPlan(); const info={};
+  DAYS.forEach(d=>{ const pd=(plan[tid]||{})[d]; const m={}; if(pd){ pd.free.forEach(p=>{ m[p]=(p===pd.lunchP)?pd.dutyLabel:pd.prepLabel; }); } info[d]=m; }); return info; }
+function lastToken(nm){ return String(nm||'').trim().split(/\s+/).slice(-1)[0]; }
+function isSchedTeacher(tid){ return ((SCHED.S||{}).teachers||[]).some(t=>t.id===tid) || tid===AIDE_ID; }
+// group this staff member is the homeroom teacher of (by last name), for non-subject teachers
+function homeroomGroupFor(last){ return ((SCHED.S||{}).classes||[]).find(c=>c.hr && c.hr.split(/[^A-Za-z]+/).includes(last)); }
+
+// A scheduler teacher's full week: classes + PREP + Recess/Lunch(±duty) + P9 + HR + Electives + off.
+function buildTeacherCells(tid){
+  const cells={}; const tinfo=teacherDayInfo(tid); const av=avail(tid);
+  DAYS.forEach(d=>{
+    const hk=tid+'|'+d+'|HR', he=(SCHED.homeroomEdits||{})[hk];
+    cells[d+'|HR']={kind:'fixed',label:he||'Homeroom'};
+    PERIODS.forEach(p=>{
+      const pl=(teacherSessions[tid]||[]).find(x=>x.day===d&&x.period===p);
+      if(pl){ cells[d+'|'+p]={kind:'class',slot:pl.slot,name:classDisplay(pl.groupId,pl.subject)+(pl.aide?' *':''),meta:[SUBJ_LABEL[pl.subject]||pl.subject,pl.room||'']}; return; }
+      if(p==='P9'){ cells[d+'|'+p]={kind:'fixed',label:(P9_LABELS[d]||'Extra Help')}; return; }
+      if(d===WED_FREE.day&&p===WED_FREE.period){ cells[d+'|'+p]={kind:'fixed',label:'Electives / Assembly'}; return; }
+      const lbl=tinfo[d]&&tinfo[d][p];
+      if(lbl){ cells[d+'|'+p]=/LUNCH/.test(lbl)?{kind:'fixed',label:lunchDisp(lbl)}:{kind:'free',label:'PREP'}; return; }
+      cells[d+'|'+p]=(av[d]||[]).includes(p)?{kind:'free',label:'PREP'}:{kind:'off',label:'off'};
+    });
+  });
+  return cells;
+}
+// A class group's full week (for a homeroom/PreK teacher, or a student): specials + lunch + homeroom.
+function buildGroupCells(gid){
+  const cells={}; const res=SCHED.result||{}, sess=res.sessions||[], asg=res.assign||[];
+  DAYS.forEach(d=>{
+    cells[d+'|HR']={kind:'fixed',label:'Homeroom'};
+    PERIODS.forEach(p=>{
+      let found=null;
+      for(let i=0;i<sess.length;i++){ const v=asg[i]; if(!v||v.day!==d||v.period!==p)continue; const s=sess[i];
+        if(s.groupId===gid || (s.conflicts&&s.conflicts.includes(gid))){ found=s; break; } }
+      if(found){ const gg=grpById[found.groupId]||{}; const slot=schedSlot(gradeCanon(gg.cohort!=null?gg.cohort:found.groupId),gg.part||'',found.subject,found.teacherId);
+        cells[d+'|'+p]={kind:'class',slot,name:classDisplay(found.groupId,found.subject),meta:[SUBJ_LABEL[found.subject]||found.subject,found.teacherId||'',found.room||'']}; return; }
+      if(p==='P9'){ cells[d+'|'+p]={kind:'fixed',label:(G56.includes(gid)||G78.includes(gid))?(P9_LABELS[d]||'Extra Help'):'Homeroom'}; return; }
+      if(d===WED_FREE.day&&p===WED_FREE.period){ cells[d+'|'+p]={kind:'fixed',label:'Electives / Assembly'}; return; }
+      const fx=(fixedByGroup[gid]||[]).find(f=>(f.day==='*'||f.day===d)&&f.period===p);
+      if(fx){ cells[d+'|'+p]={kind:'fixed',label:fixedDisplay(gid,d,p,fx.label)}; return; }
+      cells[d+'|'+p]={kind:'fixed',label:'Homeroom'};
+    });
+  });
+  return cells;
+}
+
 /* ============ grid rendering ============ */
 function blankGrid(){ const g={}; DAYS.forEach(d=>PERIODS.forEach(p=>g[d+'|'+p]=null)); return g; }
+function cellHTML(c){
+  if(!c) return '<td><div class="cell free"></div></td>';
+  if(c.kind==='fixed') return `<td><div class="cell fixed">${esc(c.label||'')}</div></td>`;
+  if(c.kind==='free')  return `<td><div class="cell free">${esc(c.label||'')}</div></td>`;
+  if(c.kind==='off')   return `<td><div class="cell off">off</div></td>`;
+  return `<td><div class="cell ${slotCss(c.slot)}"><div class="cname">${esc(c.name)}${slotTag(c.slot)}</div><div class="cmeta">${(c.meta||[]).map(esc).filter(Boolean).join(' · ')}</div></div></td>`;
+}
 function renderGrid(cells, band){
   band=band||'g78';
   let h='<div class="gridwrap"><table class="week"><thead><tr><th>Period</th>'+DAYS.map(d=>`<th>${d}</th>`).join('')+'</tr></thead><tbody>';
+  h+=`<tr><td class="per"><div class="pn">HR</div><div class="pt">8:05–8:20</div></td>`+DAYS.map(d=>cellHTML(cells[d+'|HR'])).join('')+'</tr>';
   PERIODS.forEach(p=>{
     const t=(PERIOD_TIMES[band]||PERIOD_TIMES.g78)[p]||'';
-    h+=`<tr><td class="per"><div class="pn">${p}</div><div class="pt">${t}</div></td>`;
-    DAYS.forEach(d=>{
-      const c=cells[d+'|'+p];
-      if(!c){ h+='<td><div class="cell free"></div></td>'; }
-      else if(c.kind==='fixed'){ h+=`<td><div class="cell fixed">${esc(c.label)}</div></td>`; }
-      else{ h+=`<td><div class="cell ${slotCss(c.slot)}"><div class="cname">${esc(c.name)}${slotTag(c.slot)}</div><div class="cmeta">${c.meta.map(esc).filter(Boolean).join(' · ')}</div></div></td>`; }
-    });
-    h+='</tr>';
+    h+=`<tr><td class="per"><div class="pn">${p}</div><div class="pt">${t}</div></td>`+DAYS.map(d=>cellHTML(cells[d+'|'+p])).join('')+'</tr>';
   });
   h+='</tbody></table></div>';
   return h;
@@ -235,17 +326,25 @@ function classDisplay(groupId,subject){
 }
 function renderTeacher(staffId){
   const t=teachersById[staffId]; if(!t){ document.getElementById('out').innerHTML='<div class="empty">Teacher not found.</div>'; return; }
-  const last=t.last||''; const sess=(teacherSessions[last]||[]);
-  const cells=blankGrid();
-  sess.forEach(pl=>{
-    cells[pl.day+'|'+pl.period]={kind:'class',slot:pl.slot,name:classDisplay(pl.groupId,pl.subject)+(pl.aide?' *':''),
-      meta:[SUBJ_LABEL[pl.subject]||pl.subject, pl.room||'']};
-  });
-  // representative band: middle-school if they teach any 5-8, else lower
-  const band=sess.some(pl=>bandOfGroup(pl.groupId)!=='lower')?(sess.some(pl=>bandOfGroup(pl.groupId)==='g78')?'g78':'g56'):'lower';
-  let h=`<div class="head"><h2>${esc(t.name)}</h2><span class="who-meta">Teacher schedule</span></div>`;
-  h+=`<div class="stamp">${sess.length} class periods/week · ${ROST.school_year_start}-${String(ROST.school_year_start+1).slice(-2)}</div>`;
-  h+= sess.length?renderGrid(cells,band):'<div class="gridwrap"><div class="empty">No classes on the generated timetable for this teacher.</div></div>';
+  const last=t.last||'';
+  let cells, band, subtitle, stamp;
+  if(isSchedTeacher(last)){
+    cells=buildTeacherCells(last);
+    const sess=teacherSessions[last]||[];
+    band=sess.some(pl=>bandOfGroup(pl.groupId)!=='lower')?(sess.some(pl=>bandOfGroup(pl.groupId)==='g78')?'g78':'g56'):'lower';
+    subtitle='Teacher schedule';
+    stamp=`${sess.length} class periods/week · ${ROST.school_year_start}-${String(ROST.school_year_start+1).slice(-2)}`;
+  } else {
+    const g=homeroomGroupFor(last);
+    if(g){ cells=buildGroupCells(g.id); band=bandOfGroup(g.id);
+      subtitle=`Homeroom teacher · ${esc(g.name||g.id)}`;
+      stamp=`Homeroom-based day (this staff member doesn't teach a timetabled subject) · ${ROST.school_year_start}-${String(ROST.school_year_start+1).slice(-2)}`;
+    } else { cells=buildTeacherCells(last); band='g78'; subtitle='Teacher schedule';
+      stamp=`No timetabled classes · ${ROST.school_year_start}-${String(ROST.school_year_start+1).slice(-2)}`; }
+  }
+  let h=`<div class="head"><h2>${esc(t.name)}</h2><span class="who-meta">${subtitle}</span></div>`;
+  h+=`<div class="stamp">${stamp}</div>`;
+  h+=renderGrid(cells,band);
   // classes + rosters
   const secs=(sectionsByTeacher[staffId]||[]).slice().sort((a,b)=>(a.type>b.type?1:-1)||a.name.localeCompare(b.name));
   h+='<div class="classlist"><h3>Classes &amp; rosters</h3>';
@@ -284,6 +383,8 @@ function renderStudent(studentId){
         meta:[sec.teacher_last||sec.teacher_name||'', sec.room_name||'']};
     });
   });
+  // HR homeroom period (8:05–8:20) for every student
+  DAYS.forEach(d=>{ cells[d+'|HR']={kind:'fixed',label:'Homeroom'}; });
   // overlay fixed blocks (lunch / electives) for the student's groups
   const groupsArr=[...myGroups];
   groupsArr.forEach(gid=>{
