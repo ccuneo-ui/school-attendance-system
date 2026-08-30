@@ -151,6 +151,7 @@ let SCHED=null, ROST=null;
 let grpById={}, classKeyToSessions={}, teacherSessions={}, fixedByGroup={};
 let studentsById={}, sectionsById={}, sectionsByStudent={}, teachersById={}, sectionsByTeacher={};
 let ssByStudent={};   // student_id -> [{day,period,service_name,staff_name,room_name}] (in-session special services)
+let ssByStaff={};     // staff_id -> [{day,period,service_name,student_name,student_grade,room_name}]
 let MODE='teacher';
 
 async function boot(){
@@ -162,7 +163,9 @@ async function boot(){
       ]); }
   catch(e){ document.getElementById('out').innerHTML='<div class="empty">Could not load data. Make sure you are signed in.</div>'; return; }
   SCHED=(sr.data||{}); ROST=rr;
-  ((ssr&&ssr.sessions)||[]).forEach(x=>{ if(!x.student_id||!x.day||!x.period) return; (ssByStudent[x.student_id]=ssByStudent[x.student_id]||[]).push(x); });
+  ((ssr&&ssr.sessions)||[]).forEach(x=>{ if(!x.day||!x.period) return;
+    if(x.student_id) (ssByStudent[x.student_id]=ssByStudent[x.student_id]||[]).push(x);
+    if(x.staff_id) (ssByStaff[x.staff_id]=ssByStaff[x.staff_id]||[]).push(x); });
   const S=SCHED.S||{}, res=SCHED.result||{};
   (S.classes||[]).forEach(c=>grpById[c.id]=c);
   // fixed blocks by group
@@ -184,9 +187,15 @@ async function boot(){
   (ROST.sections||[]).forEach(sec=>{
     sectionsById[sec.section_id]=sec;
     if(sec.teacher_id) (sectionsByTeacher[sec.teacher_id]=sectionsByTeacher[sec.teacher_id]||[]).push(sec);
-    if(sec.teacher_id && (!sec.teacher_status || sec.teacher_status==='active') && !teachersById[sec.teacher_id]) teachersById[sec.teacher_id]={id:sec.teacher_id,name:sec.teacher_name||('#'+sec.teacher_id),last:sec.teacher_last||''};
     (sec.student_ids||[]).forEach(sid=>{ (sectionsByStudent[sid]=sectionsByStudent[sid]||[]).push(sec); });
   });
+  // Teacher picker = every ACTIVE staff member (classroom, homeroom, or support-only). Anyone can
+  // have a schedule generated, even an empty one. Falls back to section teachers if the staff list is absent.
+  if((ROST.staff||[]).length){
+    (ROST.staff||[]).forEach(p=>{ teachersById[p.staff_id]={id:p.staff_id,name:(p.first_name+' '+p.last_name).trim(),last:p.last_name||''}; });
+  } else {
+    (ROST.sections||[]).forEach(sec=>{ if(sec.teacher_id && (!sec.teacher_status||sec.teacher_status==='active') && !teachersById[sec.teacher_id]) teachersById[sec.teacher_id]={id:sec.teacher_id,name:sec.teacher_name||('#'+sec.teacher_id),last:sec.teacher_last||''}; });
+  }
   fillPicker();
   // route from URL
   const q=new URLSearchParams(location.search);
@@ -354,16 +363,25 @@ function renderTeacher(staffId){
         const de=(SCHED.homeroomEdits||{})[last+'|'+d+'|DIS']; cells[d+'|DIS']={kind:'fixed',label:de||'Homeroom'}; });
       subtitle=`Homeroom teacher · ${esc(g.name||g.id)}`;
       stamp=`Homeroom-based day (this staff member doesn't teach a timetabled subject) · ${ROST.school_year_start}-${String(ROST.school_year_start+1).slice(-2)}`;
-    } else { cells=buildTeacherCells(last); band='g78'; subtitle='Teacher schedule';
+    } else { cells={}; band='g78'; subtitle='Staff schedule';
       stamp=`No timetabled classes · ${ROST.school_year_start}-${String(ROST.school_year_start+1).slice(-2)}`; }
   }
+  // In-session special services this person PROVIDES appear on their schedule (student + service).
+  const mySSp = ssByStaff[staffId]||[];
+  const ssGroup={};
+  mySSp.forEach(x=>{ (ssGroup[x.day+'|'+x.period]=ssGroup[x.day+'|'+x.period]||[]).push(x); });
+  Object.keys(ssGroup).forEach(k=>{ const arr=ssGroup[k];
+    const svcs=[...new Set(arr.map(x=>x.service_name||'Support'))].join(' / ');
+    const studs=arr.map(x=>x.student_name||('Grade '+(x.student_grade||'?'))).join(', ');
+    const rooms=[...new Set(arr.map(x=>x.room_name).filter(Boolean))].join(', ');
+    cells[k]={kind:'ss', name:studs, meta:[svcs, rooms]};
+  });
   let h=`<div class="head"><h2>${esc(t.name)}</h2><span class="who-meta">${subtitle}</span></div>`;
   h+=`<div class="stamp">${stamp}</div>`;
   h+=renderGrid(cells,band);
   // classes + rosters
   const secs=(sectionsByTeacher[staffId]||[]).slice().sort((a,b)=>(a.type>b.type?1:-1)||a.name.localeCompare(b.name));
   h+='<div class="classlist"><h3>Classes &amp; rosters</h3>';
-  if(!secs.length) h+='<div class="note">No sections assigned on the Classes page.</div>';
   secs.forEach(sec=>{
     const studs=(sec.student_ids||[]).map(id=>studentsById[id]).filter(Boolean)
       .sort((a,b)=>a.last_name.localeCompare(b.last_name));
@@ -372,6 +390,8 @@ function renderTeacher(staffId){
     if(studs.length) h+='<div class="roster">'+studs.map(s=>`<a class="stud" href="/schedule?student=${s.student_id}">${esc(s.last_name+', '+s.first_name)}</a>`).join('')+'</div>';
     h+='</div>';
   });
+  if(!secs.length && !mySSp.length) h+='<div class="note">No sections assigned on the Classes page.</div>';
+  if(mySSp.length) h+=`<div class="clrow"><div class="cl-meta" style="margin-top:2px"><b>Special services provided:</b> ${mySSp.length} session${mySSp.length==1?'':'s'} — shown on the grid.</div></div>`;
   h+='</div>';
   document.getElementById('out').innerHTML=h;
 }

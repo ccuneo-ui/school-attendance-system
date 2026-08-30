@@ -7007,10 +7007,19 @@ def api_schedule_rosters():
                 ORDER BY grade, last_name, first_name
             """)
             students = fa(cur)
+            # Every active staff member, so the Schedules page can show a schedule for anyone
+            # (classroom teacher, homeroom teacher, or support-only staff) — even an empty one.
+            cur.execute("""
+                SELECT staff_id, first_name, last_name
+                FROM staff WHERE status = 'active'
+                ORDER BY last_name, first_name
+            """)
+            staff = fa(cur)
         return jsonify({
             "school_year_start": year,
             "sections": list(sections.values()),
             "students": students,
+            "staff": staff,
         })
     finally:
         conn.close()
