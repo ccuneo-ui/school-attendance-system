@@ -1441,6 +1441,19 @@ function renderSchedule(){
 
   let h='<table class="sched"><thead><tr><th>Period</th>'+DAYS.map(d=>`<th>${d}</th>`).join("")+'</tr></thead><tbody>';
   const _tband=(mode==="class")?bandOf(who):"g78";   // per-group time column follows the grade band
+  // HR — a homeroom period before P1 (8:05–8:20). Non-academic (never solver-scheduled). In the
+  // By-teacher view each cell is editable and its label is stored per teacher (homeroomEdits), so a
+  // staff member's other role at that time stays with their personal schedule. Other views show "Homeroom".
+  h+=`<tr><th style="text-align:right">HR<br><span style="font-weight:400;color:var(--muted);font-size:10px">8:05–8:20</span></th>`;
+  DAYS.forEach(d=>{
+    if(mode==="teacher"){
+      const key=who+"|"+d+"|HR", def="Homeroom", txt=homeroomEdits[key]||def, edited=!!homeroomEdits[key];
+      h+=`<td class="subj-CORE editcell${edited?' edited':''}" contenteditable="true" spellcheck="false" title="Homeroom by default — click to type this person's role at this time" onblur="saveHomeroom('${who}','${d}','HR',this.innerText); markDirty(); if(!this.innerText.trim())this.innerText='${def}'" onfocus="if(this.innerText==='${def}')this.innerText=''">${txt}</td>`;
+    } else {
+      h+=`<td class="subj-CORE">Homeroom</td>`;
+    }
+  });
+  h+=`</tr>`;
   PERIODS.forEach(p=>{
     h+=`<tr><th style="text-align:right">${p.id}<br><span style="font-weight:400;color:var(--muted);font-size:10px">${plabel(p.id,_tband)}</span></th>`;
     DAYS.forEach(d=>{
@@ -1814,6 +1827,7 @@ function masterTD(d,p,rid,cell,fixedMap,interactive){
     const inter=interactive?`class="mp-cell clickable" data-occ="${c.i}" draggable="true" ondragstart="posterDragStart(event,${c.i})" ondragend="posterDragEnd()"${DND} onclick="openMove(${c.i})" title="${grpName(s.groupId)} · ${subjLabel(s.subject)} · ${s.teacherId} — click for swap options, or drag"`:`class="mp-cell"`;
     return `<td ${inter} data-day="${d}" data-period="${p}" style="background:${gp.bg};color:${gp.fg}"><span class="mp-sub">${subjLabel(s.subject)}</span><span class="mp-tr">${s.teacherId}${s.aide?'·+B':''}</span><span class="mp-rm">${s.room}</span>${tag}</td>`;
   }
+  if(p==="HR"){ return `<td class="mp-fx mp-free" data-day="${d}" data-period="${p}">Homeroom</td>`; }   // pre-P1 homeroom block (8:05–8:20)
   if(p==="P9"){ return `<td class="mp-fx mp-free" data-day="${d}" data-period="${p}">${p9Label(rid,d)}</td>`; }   // 9th-period block
   const fx=fixedMap[key];
   if(fx!=null){ const disp=fixedDisplay(rid,d,p,fx); const isFree=/free|elective|assembly/i.test(disp); return `<td class="mp-fx ${isFree?'mp-free':'mp-lunch'}" data-day="${d}" data-period="${p}"${DND}>${disp||'—'}</td>`; }
@@ -1832,12 +1846,10 @@ function periodTableHTML(pid,cell,fixedMap,ec,mids,interactive){
 function masterTableHTML(interactive){
   const {ec,mids,cell,fixedMap}=masterCellMap();
   let h=`<table class="mp"><thead><tr><th class="mp-corner">Period / Group</th>${DAYS.map(d=>`<th class="mp-day">${d}</th>`).join("")}</tr></thead><tbody>`;
-  PERIODS.forEach(p=>{
-    h+=`<tr class="mp-band"><td class="mp-per" colspan="${DAYS.length+1}">${p.id} · ${p.label}</td></tr>`;
-    const emit=(rid,section)=>{ h+=`<tr class="mp-row ${section}"><th class="mp-glabel" style="border-left:5px solid ${(GROUP_PALETTE[rid]||{bg:'#ccc'}).bg}">${grpName(rid)}</th>${DAYS.map(d=>masterTD(d,p.id,rid,cell,fixedMap,interactive)).join("")}</tr>`; };
-    ec.forEach(rid=>emit(rid,"ecrow"));
-    mids.forEach(rid=>emit(rid,"midrow"));
-  });
+  const emit=(rid,section,pid)=>{ h+=`<tr class="mp-row ${section}"><th class="mp-glabel" style="border-left:5px solid ${(GROUP_PALETTE[rid]||{bg:'#ccc'}).bg}">${grpName(rid)}</th>${DAYS.map(d=>masterTD(d,pid,rid,cell,fixedMap,interactive)).join("")}</tr>`; };
+  const band=(pid,label)=>{ h+=`<tr class="mp-band"><td class="mp-per" colspan="${DAYS.length+1}">${label}</td></tr>`; ec.forEach(rid=>emit(rid,"ecrow",pid)); mids.forEach(rid=>emit(rid,"midrow",pid)); };
+  band("HR","HR · 8:05–8:20");
+  PERIODS.forEach(p=>band(p.id, p.id+" · "+p.label));
   h+=`</tbody></table>`;
   return h;
 }
@@ -1872,6 +1884,7 @@ const DAY_FULL={Mon:"MONDAY",Tue:"TUESDAY",Wed:"WEDNESDAY",Thu:"THURSDAY",Fri:"F
 function boardMiniRow(day,pid,rid,cell,fixedMap){
   const key=day+"|"+pid+"|"+rid, c=cell[key];
   const stripe=(GROUP_PALETTE[rid]||{bg:'#ccc'}).bg;
+  if(pid==="HR"){ return `<div class="bm-row bm-empty" style="border-left:5px solid ${stripe}"><span class="bm-g">${grpName(rid)}</span><span class="bm-b"><span class="bm-t">Homeroom</span></span></div>`; }
   if(c){ const s=c.s, gp=TEACHER_PALETTE[s.teacherId]||{bg:"#ececec",fg:"#333"};
     const whole=s.groupId!==rid;
     return `<div class="bm-row" style="background:${gp.bg};color:${gp.fg};border-left:5px solid ${stripe}"><span class="bm-g">${grpName(rid)}</span><span class="bm-b"><b class="bm-s">${subjLabel(s.subject)}</b><span class="bm-t">${s.teacherId} · ${s.room}${whole?" · whole":""}</span></span></div>`;
@@ -1927,6 +1940,8 @@ function printMasterPDF(){
     <div class="bd-grid" style="grid-template-columns:0.75in repeat(${DAYS.length},1fr)">`;
   h+=`<div class="bg-corner">Period&nbsp;↓<br>Day&nbsp;→</div>`;
   DAYS.forEach(dd=>{ h+=`<div class="bg-dayhdr">${DAY_FULL[dd]||dd}</div>`; });
+  h+=`<div class="bg-perhdr">HR<span>8:05–8:20</span></div>`;
+  DAYS.forEach(dd=>{ h+=`<div class="bg-cell">${boardTracks(dd,"HR",ec,mids,cell,fixedMap)}</div>`; });
   PERIODS.forEach(p=>{
     h+=`<div class="bg-perhdr">${p.id}<span>${p.label}</span></div>`;
     DAYS.forEach(dd=>{ h+=`<div class="bg-cell">${boardTracks(dd,p.id,ec,mids,cell,fixedMap)}</div>`; });
