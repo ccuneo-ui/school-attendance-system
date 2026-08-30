@@ -45,6 +45,7 @@
   .chip{border-left:4px solid var(--navy);background:#f6f6f8;border-radius:6px;padding:6px 8px;cursor:pointer;font-size:12px;line-height:1.32;text-align:left;width:100%;border-top:1px solid rgba(0,0,0,.05);border-right:1px solid rgba(0,0,0,.05);border-bottom:1px solid rgba(0,0,0,.05);font-family:inherit;color:var(--navy);}
   .chip:hover{filter:brightness(.97);}
   .chip .who{font-weight:700;}
+  .chip .who.nostudent{font-weight:500;font-style:italic;color:var(--muted);}
   .chip .svc{font-size:11px;font-weight:500;}
   .chip .meta{font-size:11px;color:var(--muted);}
   .chip.conflict{outline:2px solid var(--danger);outline-offset:1px;}
@@ -337,8 +338,8 @@ function render(){
         const dim = anyFilter && !matchesFilter(s);
         const c = svcColor(s.service_id);
         html+=`<button class="chip${bad[s.ss_id]?' conflict':''}${dim?' dim':''}" style="border-left-color:${c};"
-                 onclick="openEdit(${s.ss_id})" title="${esc((s.student_name||'')+' · '+(s.service_name||'')+' · '+(s.staff_name||'')+(s.notes?' · '+s.notes:''))}">
-                 <div class="who">${esc(s.student_name||'—')}${s.student_grade?' <span class="meta">'+esc(s.student_grade)+'</span>':''}</div>
+                 onclick="openEdit(${s.ss_id})" title="${esc((s.student_name||'No specific student')+' · '+(s.service_name||'')+' · '+(s.staff_name||'')+(s.notes?' · '+s.notes:''))}">
+                 <div class="who${s.student_id?'':' nostudent'}">${s.student_id?esc(s.student_name||'—'):'No specific student'}${s.student_grade?' <span class="meta">'+esc(s.student_grade)+'</span>':''}</div>
                  <div class="svc" style="color:${c};">${esc(s.service_name||'No service')}</div>
                  <div class="meta">${esc(s.staff_name||'Unassigned')}${s.room_name?' · '+esc(s.room_name):''}</div>
                </button>`;
@@ -379,7 +380,7 @@ function fillModalStudents(keepId){
   const grade=document.getElementById('mGrade').value;
   const sel=document.getElementById('mStudent');
   const keep = keepId!==undefined ? String(keepId||'') : sel.value;
-  sel.innerHTML='<option value="">— pick a student —</option>'+studentOptions(grade);
+  sel.innerHTML='<option value="">N/A — no specific student</option>'+studentOptions(grade);
   sel.value = Array.prototype.some.call(sel.options,o=>o.value===keep) ? keep : '';
 }
 
@@ -447,7 +448,10 @@ function localConflict(p){
 
 async function saveSession(){
   const p=payload();
-  if(!p.student_id){ showWarn('Pick a student.'); return; }
+  if(!p.student_id && !p.staff_id){
+    showWarn("With no student picked (N/A), choose the staff member covering the session.");
+    return;
+  }
   const warn = localConflict(p);
   try{
     if(editingId) await api('/api/special-services/sessions/'+editingId, jput(p));

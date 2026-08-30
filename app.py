@@ -7306,8 +7306,11 @@ def _ss_validate(d):
         return "Pick a day."
     if d.get("period") not in SS_PERIOD_IDS:
         return "Pick a period."
-    if not _ss_int(d.get("student_id")):
-        return "Pick a student."
+    # The student is optional (N/A): a staff member can be pushed into a room to
+    # help several children at once, which is not one child's schedule. But an
+    # entry with neither a student nor a staff member says nothing, so require one.
+    if not _ss_int(d.get("student_id")) and not _ss_int(d.get("staff_id")):
+        return "Pick a student, or a staff member if this session isn't for one student."
     return None
 
 
