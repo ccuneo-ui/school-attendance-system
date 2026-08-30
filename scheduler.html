@@ -1450,6 +1450,10 @@ function renderHomeroomStaff(tid, gid){
     });
     h+=`</tr>`;
   });
+  h+=`<tr><th style="text-align:right">DIS<br><span style="font-weight:400;color:var(--muted);font-size:10px">3:25–3:30</span></th>`;
+  DAYS.forEach(d=>{ const key=tid+"|"+d+"|DIS", def="Homeroom", txt=homeroomEdits[key]||def, edited=!!homeroomEdits[key];
+    h+=`<td class="subj-CORE editcell${edited?' edited':''}" contenteditable="true" spellcheck="false" title="Dismissal — Homeroom by default; type this person's role at this time" onblur="saveHomeroom('${tid}','${d}','DIS',this.innerText); markDirty(); if(!this.innerText.trim())this.innerText='${def}'" onfocus="if(this.innerText==='${def}')this.innerText=''">${txt}</td>`; });
+  h+=`</tr>`;
   h+="</tbody></table>";
   $("#schedwrap").innerHTML=h;
   const old=document.getElementById("unplacedbox"); if(old) old.remove();
@@ -1540,6 +1544,18 @@ function renderSchedule(){
     });
     h+="</tr>";
   });
+  // Dismissal — a homeroom period after P9 (3:25–3:30). Same behaviour as HR: editable per teacher in
+  // the By-teacher view (stored in homeroomEdits key "name|day|DIS"), "Homeroom" elsewhere. Non-academic.
+  h+=`<tr><th style="text-align:right">DIS<br><span style="font-weight:400;color:var(--muted);font-size:10px">3:25–3:30</span></th>`;
+  DAYS.forEach(d=>{
+    if(mode==="teacher"){
+      const key=who+"|"+d+"|DIS", def="Homeroom", txt=homeroomEdits[key]||def, edited=!!homeroomEdits[key];
+      h+=`<td class="subj-CORE editcell${edited?' edited':''}" contenteditable="true" spellcheck="false" title="Dismissal — Homeroom by default; click to type this person's role at this time" onblur="saveHomeroom('${who}','${d}','DIS',this.innerText); markDirty(); if(!this.innerText.trim())this.innerText='${def}'" onfocus="if(this.innerText==='${def}')this.innerText=''">${txt}</td>`;
+    } else {
+      h+=`<td class="subj-CORE">Homeroom</td>`;
+    }
+  });
+  h+=`</tr>`;
   if(mode==="teacher"){ // end-of-day tally: classes / preps / lunch
     const perDay=DAYS.map(d=>{ let cls=0; RESULT.sessions.forEach((s,i)=>{ if(RESULT.assign[i]&&staffs(s,who)&&RESULT.assign[i].day===d) cls++; });
       const m=tinfo[d]||{}; let preps=0,lunch=0; Object.values(m).forEach(l=>{ if(l==="PREP"||l==="free")preps++; else if(/LUNCH/.test(l))lunch++; });
@@ -1877,6 +1893,7 @@ function masterTD(d,p,rid,cell,fixedMap,interactive){
     return `<td ${inter} data-day="${d}" data-period="${p}" style="background:${gp.bg};color:${gp.fg}"><span class="mp-sub">${subjLabel(s.subject)}</span><span class="mp-tr">${s.teacherId}${s.aide?'·+B':''}</span><span class="mp-rm">${s.room}</span>${tag}</td>`;
   }
   if(p==="HR"){ return `<td class="mp-fx mp-free" data-day="${d}" data-period="${p}">Homeroom</td>`; }   // pre-P1 homeroom block (8:05–8:20)
+  if(p==="DIS"){ return `<td class="mp-fx mp-free" data-day="${d}" data-period="${p}">Homeroom</td>`; }   // post-P9 dismissal block (3:25–3:30)
   if(p==="P9"){ return `<td class="mp-fx mp-free" data-day="${d}" data-period="${p}">${p9Label(rid,d)}</td>`; }   // 9th-period block
   const fx=fixedMap[key];
   if(fx!=null){ const disp=fixedDisplay(rid,d,p,fx); const isFree=/free|elective|assembly/i.test(disp); return `<td class="mp-fx ${isFree?'mp-free':'mp-lunch'}" data-day="${d}" data-period="${p}"${DND}>${disp||'—'}</td>`; }
@@ -1899,6 +1916,7 @@ function masterTableHTML(interactive){
   const band=(pid,label)=>{ h+=`<tr class="mp-band"><td class="mp-per" colspan="${DAYS.length+1}">${label}</td></tr>`; ec.forEach(rid=>emit(rid,"ecrow",pid)); mids.forEach(rid=>emit(rid,"midrow",pid)); };
   band("HR","HR · 8:05–8:20");
   PERIODS.forEach(p=>band(p.id, p.id+" · "+p.label));
+  band("DIS","Dismissal · 3:25–3:30");
   h+=`</tbody></table>`;
   return h;
 }
@@ -1933,7 +1951,7 @@ const DAY_FULL={Mon:"MONDAY",Tue:"TUESDAY",Wed:"WEDNESDAY",Thu:"THURSDAY",Fri:"F
 function boardMiniRow(day,pid,rid,cell,fixedMap){
   const key=day+"|"+pid+"|"+rid, c=cell[key];
   const stripe=(GROUP_PALETTE[rid]||{bg:'#ccc'}).bg;
-  if(pid==="HR"){ return `<div class="bm-row bm-empty" style="border-left:5px solid ${stripe}"><span class="bm-g">${grpName(rid)}</span><span class="bm-b"><span class="bm-t">Homeroom</span></span></div>`; }
+  if(pid==="HR"||pid==="DIS"){ return `<div class="bm-row bm-empty" style="border-left:5px solid ${stripe}"><span class="bm-g">${grpName(rid)}</span><span class="bm-b"><span class="bm-t">Homeroom</span></span></div>`; }
   if(c){ const s=c.s, gp=TEACHER_PALETTE[s.teacherId]||{bg:"#ececec",fg:"#333"};
     const whole=s.groupId!==rid;
     return `<div class="bm-row" style="background:${gp.bg};color:${gp.fg};border-left:5px solid ${stripe}"><span class="bm-g">${grpName(rid)}</span><span class="bm-b"><b class="bm-s">${subjLabel(s.subject)}</b><span class="bm-t">${s.teacherId} · ${s.room}${whole?" · whole":""}</span></span></div>`;
@@ -1995,6 +2013,8 @@ function printMasterPDF(){
     h+=`<div class="bg-perhdr">${p.id}<span>${p.label}</span></div>`;
     DAYS.forEach(dd=>{ h+=`<div class="bg-cell">${boardTracks(dd,p.id,ec,mids,cell,fixedMap)}</div>`; });
   });
+  h+=`<div class="bg-perhdr">Dismissal<span>3:25–3:30</span></div>`;
+  DAYS.forEach(dd=>{ h+=`<div class="bg-cell">${boardTracks(dd,"DIS",ec,mids,cell,fixedMap)}</div>`; });
   h+=`</div>`;
   root.innerHTML=h;
   document.body.classList.add("mp-printing");

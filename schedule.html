@@ -264,6 +264,8 @@ function buildTeacherCells(tid){
   DAYS.forEach(d=>{
     const hk=tid+'|'+d+'|HR', he=(SCHED.homeroomEdits||{})[hk];
     cells[d+'|HR']={kind:'fixed',label:he||'Homeroom'};
+    const dk=tid+'|'+d+'|DIS', de=(SCHED.homeroomEdits||{})[dk];
+    cells[d+'|DIS']={kind:'fixed',label:de||'Homeroom'};
     PERIODS.forEach(p=>{
       const pl=(teacherSessions[tid]||[]).find(x=>x.day===d&&x.period===p);
       if(pl){ cells[d+'|'+p]={kind:'class',slot:pl.slot,name:classDisplay(pl.groupId,pl.subject)+(pl.aide?' *':''),meta:[SUBJ_LABEL[pl.subject]||pl.subject,pl.room||'']}; return; }
@@ -281,6 +283,7 @@ function buildGroupCells(gid){
   const cells={}; const res=SCHED.result||{}, sess=res.sessions||[], asg=res.assign||[];
   DAYS.forEach(d=>{
     cells[d+'|HR']={kind:'fixed',label:'Homeroom'};
+    cells[d+'|DIS']={kind:'fixed',label:'Homeroom'};
     PERIODS.forEach(p=>{
       let found=null;
       for(let i=0;i<sess.length;i++){ const v=asg[i]; if(!v||v.day!==d||v.period!==p)continue; const s=sess[i];
@@ -314,6 +317,7 @@ function renderGrid(cells, band){
     const t=(PERIOD_TIMES[band]||PERIOD_TIMES.g78)[p]||'';
     h+=`<tr><td class="per"><div class="pn">${p}</div><div class="pt">${t}</div></td>`+DAYS.map(d=>cellHTML(cells[d+'|'+p])).join('')+'</tr>';
   });
+  h+=`<tr><td class="per"><div class="pn">DIS</div><div class="pt">3:25–3:30</div></td>`+DAYS.map(d=>cellHTML(cells[d+'|DIS'])).join('')+'</tr>';
   h+='</tbody></table></div>';
   return h;
 }
@@ -337,7 +341,8 @@ function renderTeacher(staffId){
   } else {
     const g=homeroomGroupFor(last);
     if(g){ cells=buildGroupCells(g.id); band=bandOfGroup(g.id);
-      DAYS.forEach(d=>{ const he=(SCHED.homeroomEdits||{})[last+'|'+d+'|HR']; cells[d+'|HR']={kind:'fixed',label:he||'Homeroom'}; });
+      DAYS.forEach(d=>{ const he=(SCHED.homeroomEdits||{})[last+'|'+d+'|HR']; cells[d+'|HR']={kind:'fixed',label:he||'Homeroom'};
+        const de=(SCHED.homeroomEdits||{})[last+'|'+d+'|DIS']; cells[d+'|DIS']={kind:'fixed',label:de||'Homeroom'}; });
       subtitle=`Homeroom teacher · ${esc(g.name||g.id)}`;
       stamp=`Homeroom-based day (this staff member doesn't teach a timetabled subject) · ${ROST.school_year_start}-${String(ROST.school_year_start+1).slice(-2)}`;
     } else { cells=buildTeacherCells(last); band='g78'; subtitle='Teacher schedule';
@@ -384,8 +389,8 @@ function renderStudent(studentId){
         meta:[sec.teacher_last||sec.teacher_name||'', sec.room_name||'']};
     });
   });
-  // HR homeroom period (8:05–8:20) for every student
-  DAYS.forEach(d=>{ cells[d+'|HR']={kind:'fixed',label:'Homeroom'}; });
+  // HR homeroom (8:05–8:20) and Dismissal (3:25–3:30) for every student
+  DAYS.forEach(d=>{ cells[d+'|HR']={kind:'fixed',label:'Homeroom'}; cells[d+'|DIS']={kind:'fixed',label:'Homeroom'}; });
   // overlay fixed blocks (lunch / electives) for the student's groups
   const groupsArr=[...myGroups];
   groupsArr.forEach(gid=>{
