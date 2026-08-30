@@ -66,6 +66,14 @@
   .note{font-size:12.5px;color:var(--muted);}
   .empty{color:var(--muted);text-align:center;padding:50px 20px;}
   .backlink{font-size:12.5px;color:var(--blue);text-decoration:none;}
+  .cell.has-pop{cursor:help;}
+  .cell.has-pop .cname{text-decoration:underline dotted rgba(26,39,68,.35);text-underline-offset:2px;}
+  .roster-tip{position:fixed;z-index:1000;min-width:170px;max-width:280px;background:#fff;border:1px solid var(--light);border-radius:10px;box-shadow:0 8px 26px rgba(26,39,68,.18);padding:9px 11px;font-size:12px;color:var(--navy);}
+  .roster-tip .rt-h{font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);margin-bottom:5px;}
+  .roster-tip .rt-list{max-height:280px;overflow:auto;line-height:1.55;}
+  .roster-tip .rt-list div{white-space:nowrap;}
+  .roster-tip .rt-empty{color:var(--muted);font-style:italic;}
+  @media print{.roster-tip{display:none!important;}}
   .hrhead{background:#fff;border:1px solid var(--light);border-radius:12px;padding:12px 16px;margin-bottom:16px;font-size:13.5px;}
   .hrhead .muted{color:var(--muted);}
   .student-page + .student-page{margin-top:28px;border-top:2px solid var(--light);padding-top:26px;}
@@ -166,6 +174,8 @@ function slotTag(slot){ if(slot==='GOLD')return '<span class="tag gold">Gold</sp
 let SCHED=null, ROST=null;
 let grpById={}, classKeyToSessions={}, teacherSessions={}, fixedByGroup={};
 let studentsById={}, sectionsById={}, sectionsByStudent={}, teachersById={}, sectionsByTeacher={};
+let rosterByKey={};   // class key (grade|subject|slot) -> {ids:Set} of enrolled student_ids (for hover rosters)
+let POP_ROSTERS=[];   // per-render list of {title, names[]} the teacher-view hover tips read by index
 let ssByStudent={};   // student_id -> [{day,period,service_name,staff_name,room_name}] (in-session special services)
 let ssByStaff={};     // staff_id -> [{day,period,service_name,student_name,student_grade,room_name}]
 let MODE='teacher';
@@ -193,7 +203,7 @@ async function boot(){
     const g=grpById[s.groupId]||{}; const cohort=gradeCanon(g.cohort!=null?g.cohort:s.groupId);
     const slot=schedSlot(cohort,g.part||'',s.subject,s.teacherId);
     const key=cohort+'|'+s.subject+'|'+slot;
-    const pl={day:a.day,period:a.period,groupId:s.groupId,subject:s.subject,teacherId:s.teacherId,room:s.room,aide:s.aide,slot};
+    const pl={day:a.day,period:a.period,groupId:s.groupId,subject:s.subject,teacherId:s.teacherId,room:s.room,aide:s.aide,slot,key};
     (classKeyToSessions[key]=classKeyToSessions[key]||[]).push(pl);
     (teacherSessions[s.teacherId]=teacherSessions[s.teacherId]||[]).push(pl);
     if(s.aide) (teacherSessions['Belmonte']=teacherSessions['Belmonte']||[]).push(pl);
@@ -204,6 +214,13 @@ async function boot(){
     sectionsById[sec.section_id]=sec;
     if(sec.teacher_id) (sectionsByTeacher[sec.teacher_id]=sectionsByTeacher[sec.teacher_id]||[]).push(sec);
     (sec.student_ids||[]).forEach(sid=>{ (sectionsByStudent[sid]=sectionsByStudent[sid]||[]).push(sec); });
+    // roster by class key (same key the student view matches on) -> for hover rosters in Teacher view
+    if(sec.type!=='homeroom' && sec.type!=='advisory'){
+      const ps=parseSection(sec.name), gg=gradeCanon(sec.grade);
+      if(ps.subject && gg){ const k=gg+'|'+ps.subject+'|'+classSlot(ps.suffix);
+        const b=rosterByKey[k]||(rosterByKey[k]={ids:new Set()});
+        (sec.student_ids||[]).forEach(id=>b.ids.add(id)); }
+    }
   });
   // Teacher picker = every ACTIVE staff member (classroom, homeroom, or support-only). Anyone can
   // have a schedule generated, even an empty one. Falls back to section teachers if the staff list is absent.
@@ -212,6 +229,7 @@ async function boot(){
   } else {
     (ROST.sections||[]).forEach(sec=>{ if(sec.teacher_id && (!sec.teacher_status||sec.teacher_status==='active') && !teachersById[sec.teacher_id]) teachersById[sec.teacher_id]={id:sec.teacher_id,name:sec.teacher_name||('#'+sec.teacher_id),last:sec.teacher_last||''}; });
   }
+  initRosterTip();
   fillPicker();
   // route from URL
   const q=new URLSearchParams(location.search);
@@ -365,6 +383,42 @@ function isSchedTeacher(tid){ return ((SCHED.S||{}).teachers||[]).some(t=>t.id==
 // group this staff member is the homeroom teacher of (by last name), for non-subject teachers
 function homeroomGroupFor(last){ return ((SCHED.S||{}).classes||[]).find(c=>c.hr && c.hr.split(/[^A-Za-z]+/).includes(last)); }
 
+// Attach a hover roster to a class cell: resolve the class key to enrolled students and stash the
+// name list in POP_ROSTERS, tagging the cell with its index (read on hover). No-op if no roster.
+function attachRoster(cell, key, title){
+  const b=rosterByKey[key]; if(!b||!b.ids||!b.ids.size) return;
+  const names=[...b.ids].map(id=>studentsById[id]).filter(Boolean)
+    .sort((a,b)=>a.last_name.localeCompare(b.last_name)||a.first_name.localeCompare(b.first_name))
+    .map(s=>s.last_name+', '+s.first_name);
+  if(!names.length) return;
+  cell.popId=POP_ROSTERS.length;
+  POP_ROSTERS.push({title:String(title||'Class').replace(/\s\*$/,''), names});
+}
+// Floating roster tooltip (position:fixed so the grid's horizontal scroll can't clip it).
+let _rosterTipEl=null;
+function initRosterTip(){
+  if(_rosterTipEl) return;
+  _rosterTipEl=document.createElement('div'); _rosterTipEl.className='roster-tip'; _rosterTipEl.style.display='none';
+  document.body.appendChild(_rosterTipEl);
+  const out=document.getElementById('out');
+  out.addEventListener('mouseover',e=>{ const cell=e.target.closest('.has-pop'); if(cell) showRosterTip(cell); });
+  out.addEventListener('mouseout',e=>{ const cell=e.target.closest('.has-pop'); if(!cell) return;
+    if(e.relatedTarget && cell.contains(e.relatedTarget)) return; hideRosterTip(); });
+  window.addEventListener('scroll',hideRosterTip,true);
+}
+function showRosterTip(cell){
+  const data=POP_ROSTERS[+cell.getAttribute('data-pop')]; const el=_rosterTipEl; if(!data||!el){hideRosterTip();return;}
+  el.innerHTML=`<div class="rt-h">${esc(data.title)} · ${data.names.length} student${data.names.length==1?'':'s'}</div>`
+    +(data.names.length?`<div class="rt-list">${data.names.map(n=>`<div>${esc(n)}</div>`).join('')}</div>`:`<div class="rt-empty">No students enrolled</div>`);
+  el.style.display='block'; el.style.left='0px'; el.style.top='0px';
+  const r=cell.getBoundingClientRect(), tw=el.offsetWidth, th=el.offsetHeight, M=8;
+  let left=r.left, top=r.bottom+6;
+  if(left+tw>window.innerWidth-M) left=window.innerWidth-M-tw; if(left<M) left=M;
+  if(top+th>window.innerHeight-M) top=r.top-6-th; if(top<M) top=M;
+  el.style.left=left+'px'; el.style.top=top+'px';
+}
+function hideRosterTip(){ if(_rosterTipEl) _rosterTipEl.style.display='none'; }
+
 // A scheduler teacher's full week: classes + PREP + Recess/Lunch(±duty) + P9 + HR + Electives + off.
 function buildTeacherCells(tid){
   const cells={}; const tinfo=teacherDayInfo(tid); const av=avail(tid);
@@ -375,7 +429,8 @@ function buildTeacherCells(tid){
     cells[d+'|DIS']={kind:'fixed',label:de||'Homeroom'};
     PERIODS.forEach(p=>{
       const pl=(teacherSessions[tid]||[]).find(x=>x.day===d&&x.period===p);
-      if(pl){ cells[d+'|'+p]={kind:'class',slot:pl.slot,name:classDisplay(pl.groupId,pl.subject)+(pl.aide?' *':''),meta:[SUBJ_LABEL[pl.subject]||pl.subject,pl.room||'']}; return; }
+      if(pl){ const cell={kind:'class',slot:pl.slot,name:classDisplay(pl.groupId,pl.subject)+(pl.aide?' *':''),meta:[SUBJ_LABEL[pl.subject]||pl.subject,pl.room||'']};
+        attachRoster(cell,pl.key,cell.name); cells[d+'|'+p]=cell; return; }
       if(p==='P9'){ cells[d+'|'+p]={kind:'fixed',label:(P9_LABELS[d]||'Extra Help')}; return; }
       if(d===WED_FREE.day&&p===WED_FREE.period){ cells[d+'|'+p]={kind:'fixed',label:'Electives / Assembly'}; return; }
       const lbl=tinfo[d]&&tinfo[d][p];
@@ -415,7 +470,9 @@ function cellHTML(c){
   if(c.kind==='free')  return `<td><div class="cell free">${esc(c.label||'')}</div></td>`;
   if(c.kind==='off')   return `<td><div class="cell off">off</div></td>`;
   if(c.kind==='ss')    return `<td><div class="cell ss"><div class="cname">${esc(c.name)}<span class="tag ss">support</span></div><div class="cmeta">${(c.meta||[]).map(esc).filter(Boolean).join(' · ')}</div></div></td>`;
-  return `<td><div class="cell ${slotCss(c.slot)}"><div class="cname">${esc(c.name)}${slotTag(c.slot)}</div><div class="cmeta">${(c.meta||[]).map(esc).filter(Boolean).join(' · ')}</div></div></td>`;
+  const cls='cell '+slotCss(c.slot)+(c.popId!=null?' has-pop':'');
+  const dp=(c.popId!=null)?` data-pop="${c.popId}"`:'';
+  return `<td><div class="${cls}"${dp}><div class="cname">${esc(c.name)}${slotTag(c.slot)}</div><div class="cmeta">${(c.meta||[]).map(esc).filter(Boolean).join(' · ')}</div></div></td>`;
 }
 function renderGrid(cells, band){
   band=band||'g78';
@@ -437,6 +494,7 @@ function classDisplay(groupId,subject){
   const g=grpById[groupId]; return g?g.name:groupId;
 }
 function renderTeacher(staffId){
+  POP_ROSTERS=[]; hideRosterTip();   // reset hover rosters for this render
   const t=teachersById[staffId]; if(!t){ document.getElementById('out').innerHTML='<div class="empty">Teacher not found.</div>'; return; }
   const last=t.last||'';
   let cells, band, subtitle, stamp;
