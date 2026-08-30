@@ -65,7 +65,12 @@
   .note{font-size:12.5px;color:var(--muted);}
   .empty{color:var(--muted);text-align:center;padding:50px 20px;}
   .backlink{font-size:12.5px;color:var(--blue);text-decoration:none;}
-  @media print{.topnav,.pickbar,.noprint,.classlist{display:none;}.page{padding:0;}.gridwrap{overflow:visible;}table.week{min-width:0;}}
+  .hrhead{background:#fff;border:1px solid var(--light);border-radius:12px;padding:12px 16px;margin-bottom:16px;font-size:13.5px;}
+  .hrhead .muted{color:var(--muted);}
+  .student-page + .student-page{margin-top:28px;border-top:2px solid var(--light);padding-top:26px;}
+  @media print{.topnav,.pickbar,.noprint,.classlist{display:none;}.page{padding:0;}.gridwrap{overflow:visible;}table.week{min-width:0;}
+    .student-page{break-inside:avoid;margin-top:0;border-top:none;padding-top:0;}
+    .student-page + .student-page{page-break-before:always;}}
 </style>
 </head>
 <body>
@@ -83,6 +88,7 @@
       <div class="seg" id="seg">
         <button data-mode="teacher" onclick="setMode('teacher')">Teacher</button>
         <button data-mode="student" onclick="setMode('student')">Student</button>
+        <button data-mode="homeroom" onclick="setMode('homeroom')">Homeroom</button>
       </div>
     </div>
     <div class="fld" id="pickWrap">
@@ -201,6 +207,7 @@ async function boot(){
   const q=new URLSearchParams(location.search);
   if(q.get('student')){ MODE='student'; syncSeg(); document.getElementById('pick').value=q.get('student'); renderStudent(+q.get('student')); }
   else if(q.get('teacher')){ MODE='teacher'; syncSeg(); const tv=resolveTeacherParam(q.get('teacher')); document.getElementById('pick').value=tv||''; if(tv) renderTeacher(+tv); else document.getElementById('out').innerHTML='<div class="empty">That teacher was not found.</div>'; }
+  else if(q.get('homeroom')){ MODE='homeroom'; syncSeg(); fillPicker(); const hv=q.get('homeroom'); document.getElementById('pick').value=hv; renderHomeroom(hv); }
   else { syncSeg(); document.getElementById('out').innerHTML='<div class="empty">Pick a teacher or student above to see their week.</div>'; }
 }
 
@@ -209,20 +216,31 @@ function resolveTeacherParam(v){ // accept staff_id or last name
   const byLast=Object.values(teachersById).find(t=>String(t.last).toLowerCase()===String(v).toLowerCase());
   return byLast?String(byLast.id):'';
 }
-function syncSeg(){ document.querySelectorAll('#seg button').forEach(b=>b.classList.toggle('on',b.dataset.mode===MODE)); document.getElementById('pickLabel').textContent = MODE==='teacher'?'Teacher':'Student'; }
+function syncSeg(){ document.querySelectorAll('#seg button').forEach(b=>b.classList.toggle('on',b.dataset.mode===MODE)); document.getElementById('pickLabel').textContent = MODE==='teacher'?'Teacher':MODE==='homeroom'?'Homeroom':'Student'; }
+// Homeroom sections (with a roster) — the whole-grade groups a student sits in for homeroom.
+function homeroomSections(){
+  return (ROST.sections||[]).filter(s=>s.type==='homeroom' && (s.student_ids||[]).length)
+    .sort((a,b)=>String(a.grade).localeCompare(String(b.grade),undefined,{numeric:true})||a.name.localeCompare(b.name));
+}
 function fillPicker(){
   const sel=document.getElementById('pick');
   if(MODE==='teacher'){
     const ts=Object.values(teachersById).sort((a,b)=>(a.last||a.name).localeCompare(b.last||b.name));
     sel.innerHTML='<option value="">Choose a teacher…</option>'+ts.map(t=>`<option value="${t.id}">${esc(t.name)}</option>`).join('');
+  } else if(MODE==='homeroom'){
+    const hs=homeroomSections();
+    sel.innerHTML='<option value="">Choose a homeroom…</option>'+hs.map(s=>`<option value="${s.section_id}">${esc(s.name)}${s.teacher_last?' · '+esc(s.teacher_last):''} · ${(s.student_ids||[]).length} students</option>`).join('');
   } else {
     const ss=(ROST.students||[]).slice().sort((a,b)=>String(a.grade).localeCompare(String(b.grade),undefined,{numeric:true})||a.last_name.localeCompare(b.last_name));
     sel.innerHTML='<option value="">Choose a student…</option>'+ss.map(s=>`<option value="${s.student_id}">${esc(s.last_name+', '+s.first_name)} · Gr ${esc(s.grade||'—')}</option>`).join('');
   }
 }
-function setMode(m){ MODE=m; syncSeg(); fillPicker(); document.getElementById('out').innerHTML='<div class="empty">Pick a '+m+' above.</div>'; history.replaceState(null,'','/schedule'); }
+function setMode(m){ MODE=m; syncSeg(); fillPicker();
+  const noun = m==='homeroom'?'homeroom':m;
+  document.getElementById('out').innerHTML='<div class="empty">Pick a '+noun+' above.</div>'; history.replaceState(null,'','/schedule'); }
 function onPick(){ const v=document.getElementById('pick').value; if(!v){return;}
   if(MODE==='teacher'){ history.replaceState(null,'','/schedule?teacher='+v); renderTeacher(+v); }
+  else if(MODE==='homeroom'){ history.replaceState(null,'','/schedule?homeroom='+encodeURIComponent(v)); renderHomeroom(v); }
   else { history.replaceState(null,'','/schedule?student='+v); renderStudent(+v); } }
 
 /* ============ scheduler-parity helpers (read-only; mirror the scheduler) ============ */
@@ -419,6 +437,12 @@ function renderTeacher(staffId){
 /* ============ student view ============ */
 function renderStudent(studentId){
   const st=studentsById[studentId]; if(!st){ document.getElementById('out').innerHTML='<div class="empty">Student not found.</div>'; return; }
+  document.getElementById('out').innerHTML=studentBlockHTML(studentId);
+}
+// Build ONE student's schedule block (header + grid + class list) as an HTML string, so it can be
+// shown on its own (Student view) or stacked for a whole homeroom (one student per printed page).
+function studentBlockHTML(studentId){
+  const st=studentsById[studentId]; if(!st) return '<div class="empty">Student not found.</div>';
   const grade=gradeCanon(st.grade);
   const secs=(sectionsByStudent[studentId]||[]);
   const cells=blankGrid();
@@ -482,6 +506,21 @@ function renderStudent(studentId){
       otherSections.map(s=>esc(s.name)).join(', ')+'</div></div>';
   }
   h+='</div>';
+  return h;
+}
+
+/* ============ whole-homeroom view (batch print) ============ */
+// Stack every student in a homeroom, each in its own page-break wrapper, so Print / Save PDF
+// produces one student schedule per page.
+function renderHomeroom(sectionId){
+  const sec=sectionsById[sectionId]||sectionsById[+sectionId];
+  if(!sec){ document.getElementById('out').innerHTML='<div class="empty">Homeroom not found.</div>'; return; }
+  const kids=(sec.student_ids||[]).map(id=>studentsById[id]).filter(Boolean)
+    .sort((a,b)=>a.last_name.localeCompare(b.last_name));
+  if(!kids.length){ document.getElementById('out').innerHTML='<div class="empty">No students are enrolled in '+esc(sec.name)+'.</div>'; return; }
+  const teach=sec.teacher_name?(' · '+esc(sec.teacher_name)):'';
+  let h=`<div class="hrhead noprint"><b>${esc(sec.name)}</b>${teach} — ${kids.length} student${kids.length==1?'':'s'}. <span class="muted">Print / Save PDF prints one student per page.</span></div>`;
+  h+=kids.map(k=>`<div class="student-page">${studentBlockHTML(k.student_id)}</div>`).join('');
   document.getElementById('out').innerHTML=h;
 }
 
