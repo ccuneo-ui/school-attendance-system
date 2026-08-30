@@ -363,8 +363,28 @@ function renderTeacher(staffId){
         const de=(SCHED.homeroomEdits||{})[last+'|'+d+'|DIS']; cells[d+'|DIS']={kind:'fixed',label:de||'Homeroom'}; });
       subtitle=`Homeroom teacher · ${esc(g.name||g.id)}`;
       stamp=`Homeroom-based day (this staff member doesn't teach a timetabled subject) · ${ROST.school_year_start}-${String(ROST.school_year_start+1).slice(-2)}`;
-    } else { cells={}; band='g78'; subtitle='Staff schedule';
-      stamp=`No timetabled classes · ${ROST.school_year_start}-${String(ROST.school_year_start+1).slice(-2)}`; }
+    } else {
+      cells={}; band='g78';
+      const mySecs=sectionsByTeacher[staffId]||[];
+      const isHR=mySecs.some(s=>s.type==='homeroom'||s.type==='advisory');
+      const he=SCHED.homeroomEdits||{};
+      const hasEdit=DAYS.some(d=>he[last+'|'+d+'|HR']||he[last+'|'+d+'|DIS']);
+      if(isHR){
+        // Homeroom/advisory teacher with no timetabled class (e.g. an advisory teacher): show the
+        // editable HR/DIS homeroom rows (Homeroom by default) that were set in the scheduler.
+        DAYS.forEach(d=>{ cells[d+'|HR']={kind:'fixed',label:he[last+'|'+d+'|HR']||'Homeroom'};
+          cells[d+'|DIS']={kind:'fixed',label:he[last+'|'+d+'|DIS']||'Homeroom'}; });
+        const hrSec=mySecs.find(s=>s.type==='homeroom'||s.type==='advisory');
+        subtitle='Homeroom teacher'+(hrSec&&hrSec.name?` · ${esc(hrSec.name)}`:'');
+        stamp=`Homeroom periods (set in the scheduler) · ${ROST.school_year_start}-${String(ROST.school_year_start+1).slice(-2)}`;
+      } else {
+        // Any other active staff: an empty week, but honour HR/DIS labels if the scheduler set them.
+        if(hasEdit) DAYS.forEach(d=>{ const h1=he[last+'|'+d+'|HR']; if(h1) cells[d+'|HR']={kind:'fixed',label:h1};
+          const d1=he[last+'|'+d+'|DIS']; if(d1) cells[d+'|DIS']={kind:'fixed',label:d1}; });
+        subtitle='Staff schedule';
+        stamp=`No timetabled classes · ${ROST.school_year_start}-${String(ROST.school_year_start+1).slice(-2)}`;
+      }
+    }
   }
   // In-session special services this person PROVIDES appear on their schedule (student + service).
   const mySSp = ssByStaff[staffId]||[];

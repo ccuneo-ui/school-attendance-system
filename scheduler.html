@@ -1248,8 +1248,10 @@ function onViewModeChange(){
   else{
     lab.style.display="";
     if(mode==="class") sel.innerHTML=S.classes.map(c=>`<option value="${c.id}">${c.id} · ${grpName(c.id)}</option>`).join("");
-    else { const hs=homeroomStaffMap();
-      const hsOpts=Object.keys(hs).sort().map(nm=>`<option value="${nm}">${nm} — homeroom (${grpName(hs[nm])})</option>`).join("");
+    else { const hs=allHomeroomStaff();
+      const hsOpts=Object.keys(hs).sort().map(nm=>{ const e=hs[nm];
+        const lbl=e.gid?`homeroom (${grpName(e.gid)})`:"homeroom";
+        return `<option value="${nm}">${e.name} — ${lbl}</option>`; }).join("");
       sel.innerHTML=S.teachers.slice().sort((a,b)=>a.name.localeCompare(b.name)).map(t=>`<option value="${t.id}">${t.name}</option>`).join("")
         +`<option value="${AIDE_ID}">Belmonte (aide)</option>`
         +(hsOpts?`<optgroup label="Homeroom teachers">${hsOpts}</optgroup>`:""); }
@@ -1284,6 +1286,11 @@ function placementByGroup(gid){
   RESULT.sessions.forEach((s,i)=>{ if(gids.includes(s.groupId) && RESULT.assign[i]){ const v=RESULT.assign[i]; map[v.day+"|"+v.period]={s,i}; } });
   return map;
 }
+
+// Homeroom/advisory teachers who live only on the Classes page (no scheduler cohort of their own,
+// e.g. an advisory teacher who doesn't teach a timetabled subject). Loaded from /api/schedule/rosters
+// so they can be picked in the By-teacher view and their HR/DIS rows edited. [{last,name,gid}] gid may be null.
+let DB_HR_STAFF = [];
 
 // editors' custom text for open/homeroom cells, keyed "group|day|period" (persists in memory, saved with inputs)
 let homeroomEdits = {};
@@ -1423,12 +1430,59 @@ function homeroomStaffMap(){
     if(!(hr in map)) map[hr]=c.id; });
   return map;
 }
+// Best-effort map a Classes-page grade (e.g. "1", "5", "K", "JPK") to a whole-cohort scheduler group id,
+// so a DB homeroom teacher with a real grade can show that grade's day. Returns null when there's no match
+// (e.g. advisory sections with no grade) — the teacher then gets an editable HR/DIS grid with an open middle.
+function gidForGrade(grade){
+  if(grade==null) return null;
+  let g=String(grade).trim().toUpperCase();
+  if(!g) return null;
+  g=g.replace(/(ST|ND|RD|TH)$/,"").replace(/\s*GRADE$/,"").trim();     // "1st Grade"->"1"
+  if(g==="PK"||g==="PRE-K"||g==="PREK") g="JPK";
+  const c=S.classes.find(c=>String(c.cohort||"").toUpperCase()===g && (c.part===""||c.part==="AB"));
+  return c?c.id:null;
+}
+// Seed homerooms (from S.classes[].hr) merged with DB homeroom/advisory teachers (DB_HR_STAFF).
+// Returns { lastName: {name, gid} }. gid may be null (no timetabled cohort). Seed wins on a name clash.
+function allHomeroomStaff(){
+  const seed=homeroomStaffMap(), out={};
+  Object.keys(seed).forEach(last=>{ out[last]={name:last, gid:seed[last]}; });
+  const teacherIds=new Set(S.teachers.map(t=>t.id));
+  DB_HR_STAFF.forEach(e=>{ if(!e.last || out[e.last] || teacherIds.has(e.last) || e.last===AIDE_ID) return; out[e.last]={name:e.name||e.last, gid:e.gid||null}; });
+  return out;
+}
+// Pull homeroom/advisory teachers from the Classes page so they can be edited here even when they have
+// no scheduler cohort. Read-only; failures are non-fatal (the page still works without it).
+async function loadDbHomerooms(){
+  try{
+    const r=await fetch('/api/schedule/rosters',{headers:{'Accept':'application/json'}});
+    if(!r.ok) return;
+    const d=await r.json().catch(()=>null); if(!d||!Array.isArray(d.sections)) return;
+    const teacherIds=new Set(S.teachers.map(t=>t.id));
+    const seedLasts=new Set(Object.keys(homeroomStaffMap()));
+    const byLast={};
+    d.sections.forEach(sec=>{
+      if(sec.type!=="homeroom" && sec.type!=="advisory") return;
+      if((sec.teacher_status||"active")!=="active") return;
+      const last=(sec.teacher_last||"").trim(); if(!last) return;
+      if(teacherIds.has(last) || seedLasts.has(last) || last===AIDE_ID) return;   // already covered (subject teacher, seed homeroom, or the aide)
+      const gid=gidForGrade(sec.grade);
+      if(!byLast[last]) byLast[last]={last, name:(sec.teacher_name||last).trim(), gid};
+      else if(!byLast[last].gid && gid) byLast[last].gid=gid;   // prefer a mappable grade if two sections
+    });
+    DB_HR_STAFF=Object.values(byLast).sort((a,b)=>a.last.localeCompare(b.last));
+    if(DB_HR_STAFF.length && $("#viewmode").value==="teacher") onViewModeChange();  // refresh dropdown
+  }catch(e){ /* non-fatal */ }
+}
 // Render a homeroom-only teacher's week: their group's day (specials + lunch + homeroom), with the
 // HR row editable and stored against that person (homeroomEdits key "name|day|HR").
 function renderHomeroomStaff(tid, gid){
-  $("#legend").innerHTML=`<span class="hint" style="margin:0">Homeroom teacher — the <b>HR</b> row is editable (type this person's role); the rest shows their homeroom group's day. <span class="swatch subj-CORE"></span> Homeroom</span>`;
-  const band=bandOf(gid), map=placementByGroup(gid);
-  const fixedSet={}; fixedFor(gid).forEach(dp=>{ const [d,p]=dp.split("|");
+  const hasGroup=!!gid;
+  $("#legend").innerHTML = hasGroup
+    ? `<span class="hint" style="margin:0">Homeroom teacher — the <b>HR</b> and <b>DIS</b> rows are editable (type this person's role); the rest shows their homeroom group's day. <span class="swatch subj-CORE"></span> Homeroom</span>`
+    : `<span class="hint" style="margin:0">Homeroom teacher (no timetabled class) — the <b>HR</b> and <b>DIS</b> rows are editable (type this person's role). The rest of the day is open. <span class="swatch subj-CORE"></span> Homeroom</span>`;
+  const band=hasGroup?bandOf(gid):"g78", map=hasGroup?placementByGroup(gid):{};
+  const fixedSet={}; if(hasGroup) fixedFor(gid).forEach(dp=>{ const [d,p]=dp.split("|");
     const lbl=(S.fixed.find(f=>f.groupId===gid&&(f.day==="*"||f.day===d)&&f.period===p)||{}).label||"";
     fixedSet[dp]=fixedDisplay(gid,d,p,lbl); });
   let h='<table class="sched"><thead><tr><th>Period</th>'+DAYS.map(d=>`<th>${d}</th>`).join("")+'</tr></thead><tbody>';
@@ -1439,14 +1493,14 @@ function renderHomeroomStaff(tid, gid){
   PERIODS.forEach(p=>{
     h+=`<tr><th style="text-align:right">${p.id}<br><span style="font-weight:400;color:var(--muted);font-size:10px">${plabel(p.id,band)}</span></th>`;
     DAYS.forEach(d=>{
-      if(p.id==="P9"){ h+=`<td class="subj-FREE">${p9Label(gid,d)}</td>`; return; }
+      if(p.id==="P9"){ h+=`<td class="subj-FREE">${hasGroup?p9Label(gid,d):"—"}</td>`; return; }
       const cell=map[d+"|"+p.id];
       if(cell){ const s=cell.s, gp=GROUP_PALETTE[s.groupId]||{bg:"#ECECEC",fg:"#333"};
         h+=`<td class="keycell" style="background:${gp.bg};color:${gp.fg}"><span class="l2">${subjLabel(s.subject)}</span><span class="l3">${s.teacherId} · ${s.room}</span></td>`; return; }
       const fx=fixedSet[d+"|"+p.id];
       if(fx){ const isFree=/free|elective|assembly/i.test(fx); h+=`<td class="subj-${isFree?'FREE':'LUNCH'}">${fx}</td>`; return; }
       if(d===WED_FREE.day&&p.id===WED_FREE.period){ h+=`<td class="subj-FREE">Electives/Assembly</td>`; return; }
-      h+=`<td class="subj-CORE">Homeroom</td>`;
+      h+=`<td class="${hasGroup?'subj-CORE':'subj-FREE'}">${hasGroup?"Homeroom":"—"}</td>`;
     });
     h+=`</tr>`;
   });
@@ -1472,7 +1526,7 @@ function renderSchedule(){
   if(mode==="prep"){ renderPrepSchedule(); return; }
   if(mode==="master"){ renderMaster(); return; }
   const who=$("#viewwho").value;
-  if(mode==="teacher"){ const hs=homeroomStaffMap(); if(hs[who]){ renderHomeroomStaff(who, hs[who]); return; } }
+  if(mode==="teacher"){ const hs=allHomeroomStaff(); if(hs[who]){ renderHomeroomStaff(who, hs[who].gid); return; } }
   const tinfo = (mode==="teacher") ? teacherDayInfo(who) : null;
 
   const grid={};
@@ -2466,7 +2520,7 @@ const _origAfterEdit=afterEdit;   afterEdit  =function(){ _origAfterEdit.apply(t
 const _origShowResult=showResult; showResult =function(){ _origShowResult.apply(this,arguments); markDirty(); };
 // Warn before leaving with unsaved edits (since nothing autosaves).
 window.addEventListener('beforeunload', function(e){ if(_dirty && CAN_EDIT && !SCHED_STALE){ e.preventDefault(); e.returnValue=''; } });
-function boot(){ loadServer(); }
+function boot(){ loadServer().then(loadDbHomerooms); }
 
 /* ============================ INIT ============================ */
 boot();
