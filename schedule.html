@@ -48,6 +48,8 @@
   .cell.fixed{background:var(--fixedbg);color:#6a5a3a;font-style:italic;}
   .cell.free{background:var(--freebg);color:#7a7360;font-weight:600;font-size:11px;}
   .cell.off{background:#f1eee7;color:#b8b2a3;font-style:italic;font-size:11px;}
+  .cell.ss{background:#e7f2ea;box-shadow:inset 3px 0 0 #2d7a3e;}
+  .tag.ss{background:#cfe6d6;color:#215c30;}
   .tag{display:inline-block;font-size:9.5px;font-weight:700;padding:1px 6px;border-radius:9px;text-transform:uppercase;letter-spacing:.03em;margin-left:5px;vertical-align:middle;}
   .tag.gold{background:rgba(200,153,42,.2);color:#7a5a10;} .tag.blue{background:#d5e6f9;color:#1b5faa;} .tag.whole{background:rgba(26,39,68,.12);color:var(--navy);}
   .classlist{background:#fff;border:1px solid var(--light);border-radius:12px;padding:16px 18px;margin-bottom:20px;}
@@ -148,13 +150,19 @@ function slotTag(slot){ if(slot==='GOLD')return '<span class="tag gold">Gold</sp
 let SCHED=null, ROST=null;
 let grpById={}, classKeyToSessions={}, teacherSessions={}, fixedByGroup={};
 let studentsById={}, sectionsById={}, sectionsByStudent={}, teachersById={}, sectionsByTeacher={};
+let ssByStudent={};   // student_id -> [{day,period,service_name,staff_name,room_name}] (in-session special services)
 let MODE='teacher';
 
 async function boot(){
-  let sr,rr;
-  try{ [sr,rr]=await Promise.all([fetch('/api/scheduler').then(r=>r.json()), fetch('/api/schedule/rosters').then(r=>r.json())]); }
+  let sr,rr,ssr;
+  try{ [sr,rr,ssr]=await Promise.all([
+        fetch('/api/scheduler').then(r=>r.json()),
+        fetch('/api/schedule/rosters').then(r=>r.json()),
+        fetch('/api/special-services/sessions').then(r=>r.json()).catch(()=>({sessions:[]}))
+      ]); }
   catch(e){ document.getElementById('out').innerHTML='<div class="empty">Could not load data. Make sure you are signed in.</div>'; return; }
   SCHED=(sr.data||{}); ROST=rr;
+  ((ssr&&ssr.sessions)||[]).forEach(x=>{ if(!x.student_id||!x.day||!x.period) return; (ssByStudent[x.student_id]=ssByStudent[x.student_id]||[]).push(x); });
   const S=SCHED.S||{}, res=SCHED.result||{};
   (S.classes||[]).forEach(c=>grpById[c.id]=c);
   // fixed blocks by group
@@ -176,7 +184,7 @@ async function boot(){
   (ROST.sections||[]).forEach(sec=>{
     sectionsById[sec.section_id]=sec;
     if(sec.teacher_id) (sectionsByTeacher[sec.teacher_id]=sectionsByTeacher[sec.teacher_id]||[]).push(sec);
-    if(sec.teacher_id && !teachersById[sec.teacher_id]) teachersById[sec.teacher_id]={id:sec.teacher_id,name:sec.teacher_name||('#'+sec.teacher_id),last:sec.teacher_last||''};
+    if(sec.teacher_id && (!sec.teacher_status || sec.teacher_status==='active') && !teachersById[sec.teacher_id]) teachersById[sec.teacher_id]={id:sec.teacher_id,name:sec.teacher_name||('#'+sec.teacher_id),last:sec.teacher_last||''};
     (sec.student_ids||[]).forEach(sid=>{ (sectionsByStudent[sid]=sectionsByStudent[sid]||[]).push(sec); });
   });
   fillPicker();
@@ -307,6 +315,7 @@ function cellHTML(c){
   if(c.kind==='fixed') return `<td><div class="cell fixed">${esc(c.label||'')}</div></td>`;
   if(c.kind==='free')  return `<td><div class="cell free">${esc(c.label||'')}</div></td>`;
   if(c.kind==='off')   return `<td><div class="cell off">off</div></td>`;
+  if(c.kind==='ss')    return `<td><div class="cell ss"><div class="cname">${esc(c.name)}<span class="tag ss">support</span></div><div class="cmeta">${(c.meta||[]).map(esc).filter(Boolean).join(' · ')}</div></div></td>`;
   return `<td><div class="cell ${slotCss(c.slot)}"><div class="cname">${esc(c.name)}${slotTag(c.slot)}</div><div class="cmeta">${(c.meta||[]).map(esc).filter(Boolean).join(' · ')}</div></div></td>`;
 }
 function renderGrid(cells, band){
@@ -409,6 +418,10 @@ function renderStudent(studentId){
   // Wednesday electives if not already set
   const wkey=WED_FREE.day+'|'+WED_FREE.period;
   if(!cells[wkey]&&(grade==='5'||grade==='6'||grade==='7'||grade==='8')) cells[wkey]={kind:'fixed',label:'Electives / Assembly'};
+  // In-session special services OVERRIDE whatever is on the regular schedule for that period/day.
+  const mySS=ssByStudent[studentId]||[];
+  mySS.forEach(x=>{ const staffLast=(x.staff_name||'').split(' ').slice(-1)[0];
+    cells[x.day+'|'+x.period]={kind:'ss',name:x.service_name||'Special service',meta:[staffLast, x.room_name||'']}; });
 
   const band=bandOfGrade(grade);
   const color=st.cohort_color?(' · '+st.cohort_color.charAt(0).toUpperCase()+st.cohort_color.slice(1)):'';
@@ -421,6 +434,8 @@ function renderStudent(studentId){
   if(!placed.length) h+='<div class="note">No timetabled classes found for this student.</div>';
   placed.forEach(sec=>{ h+=`<div class="clrow"><div class="cl-top"><span class="cl-name">${esc(sec.name)}</span>
     <span class="cl-meta">${esc((sec.teacher_name||'No teacher')+(sec.room_name?' · '+sec.room_name:''))}</span></div></div>`; });
+  if(mySS.length){ const svcs=[...new Set(mySS.map(x=>x.service_name||'Special service'))];
+    h+=`<div class="clrow"><div class="cl-meta" style="margin-top:2px"><b>Special services:</b> ${svcs.map(esc).join(', ')} — shown on the grid, overriding the regular class that period.</div></div>`; }
   const support=otherSections.filter(s=>!(s.type==='homeroom')); // show advisory + support separately
   if(otherSections.length){
     h+='<div class="clrow"><div class="cl-meta" style="margin-top:2px">Also enrolled (not on the class timetable): '+

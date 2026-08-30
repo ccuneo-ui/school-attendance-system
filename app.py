@@ -6982,7 +6982,7 @@ def api_schedule_rosters():
             cur.execute("""
                 SELECT s.section_id, s.type, s.name, s.subject, s.grade,
                        s.teacher_id, (st.first_name || ' ' || st.last_name) AS teacher_name,
-                       st.last_name AS teacher_last, r.name AS room_name
+                       st.last_name AS teacher_last, st.status AS teacher_status, r.name AS room_name
                 FROM sections s
                 LEFT JOIN staff st ON st.staff_id = s.teacher_id
                 LEFT JOIN rooms r ON r.room_id = s.room_id
