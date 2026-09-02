@@ -104,6 +104,8 @@
     table.wk td.wc b { display: block; font-weight: 600; line-height: 1.15; }
     table.wk td.wc span { color: var(--muted); font-size: 10px; }
     .sched-link { font-size: 13px; color: var(--blue); text-decoration: none; }
+    .ph-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+    a.btn-mysched { text-decoration: none; white-space: nowrap; margin-top: 6px; }
     a.sname { color: inherit; text-decoration: none; cursor: pointer; display: inline-block; }
     a.sname:hover { color: var(--blue); text-decoration: underline; }
   </style>
@@ -198,8 +200,13 @@ function render(){
   const flagged = Object.values(idx).filter(s => s.allergies || s.medical_alert).length;
 
   let html = `<div class="page-header">
-    <h1>${esc(greet)}, ${esc(t.split(' ')[0])}</h1>
-    <p>${esc(DATA.day_name)} · ${esc(fmtDate(DATA.date))} · ${esc(DATA.school_year)}</p>
+    <div class="ph-row">
+      <div>
+        <h1>${esc(greet)}, ${esc(t.split(' ')[0])}</h1>
+        <p>${esc(DATA.day_name)} · ${esc(fmtDate(DATA.date))} · ${esc(DATA.school_year)}</p>
+      </div>
+      <a class="btn btn-secondary btn-mysched" href="/schedule?teacher=${encodeURIComponent(DATA.teacher.staff_id)}">See my schedule →</a>
+    </div>
   </div>`;
 
   html += `<div class="stats">
@@ -237,6 +244,7 @@ function render(){
 
   html += `<div class="section-label">Quick actions</div><div class="quick">`;
   if (DATA.has_homeroom) html += `<div class="qtile" onclick="document.getElementById('save-att').scrollIntoView({behavior:'smooth'})">Take attendance</div>`;
+  html += `<div class="qtile" onclick="location.href='/schedule?teacher=${encodeURIComponent(DATA.teacher.staff_id)}'">See my schedule<small>full week / print</small></div>`;
   html += `<div class="qtile disabled">Grades<small>with report cards</small></div></div>`;
 
   document.getElementById('root').innerHTML = html;
