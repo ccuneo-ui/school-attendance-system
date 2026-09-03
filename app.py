@@ -10,6 +10,7 @@ import psycopg2
 import psycopg2.extras
 from datetime import datetime
 import os
+import re
 import json
 
 def parse_time_to_minutes(time_str):
@@ -8034,16 +8035,97 @@ def _match_template(templates, grade):
             return t
     return None
 
-def _report_can_edit_student(cur, email, student_id):
-    """Homeroom teacher of the student, or an admin, may edit."""
+# ── Report card edit scope ────────────────────────────────────────────────
+# Who may enter what on a student's card:
+#   mode "all"     = admin, or the student's homeroom/advisory teacher -> whole card
+#   mode "subject" = a teacher of one of the student's SUBJECT classes -> only that
+#                    subject's row(s) in the "Subjects" grid; everything else read-only
+#   mode "none"    = read-only
+# Sections carry no reliable `subject` value in the DB (it is NULL for every row as of
+# Sept 2026), so the subject is derived from the section NAME's leading word(s)
+# ("Math Duthie" -> MATH, "Social Studies Whole Grade" -> SOCIAL, "Spanish Blue" ->
+# WORLDLANG) and matched against the template row label ("World Language" -> WORLDLANG).
+_REPORT_SUBJECT_ALIASES = {
+    "ELA": "ELA", "ENGLISH": "ELA", "ENGLISHLANGUAGEARTS": "ELA", "LANGUAGEARTS": "ELA",
+    "MATH": "MATH", "MATHEMATICS": "MATH",
+    "SOCIALSTUDIES": "SOCIAL", "SOCIAL": "SOCIAL", "HISTORY": "SOCIAL",
+    "SCIENCE": "SCIENCE",
+    "SPANISH": "WORLDLANG", "WORLDLANGUAGE": "WORLDLANG", "WORLDLANGUAGES": "WORLDLANG",
+    "FRENCH": "WORLDLANG", "LATIN": "WORLDLANG",
+    "ART": "ART", "MUSIC": "MUSIC", "PE": "PE", "PHYSICALEDUCATION": "PE",
+    "STEAM": "STEAM", "TECH": "TECH", "TECHNOLOGY": "TECH",
+    "LIBRARY": "LIBRARY", "HEALTH": "HEALTH",
+}
+
+
+def _report_subject_key(text):
+    """Normalize a section name or a template row label to a canonical subject key."""
+    if not text:
+        return None
+    words = re.sub(r"[^A-Za-z ]", " ", str(text)).split()
+    if not words:
+        return None
+    for n in range(min(3, len(words)), 0, -1):
+        cand = "".join(words[:n]).upper()
+        if cand in _REPORT_SUBJECT_ALIASES:
+            return _REPORT_SUBJECT_ALIASES[cand]
+    return None
+
+
+def _report_edit_scope(cur, email, student_id):
+    """Return {"mode": all|subject|none, "subjects": [KEY,...]} for this user+student."""
     if session.get("is_superadmin") or session.get("can_manage_people"):
-        return True
+        return {"mode": "all", "subjects": []}
     staff = _staff_row_for_email(cur, email)
     if not staff:
-        return False
+        return {"mode": "none", "subjects": []}
+    sid = staff["staff_id"]
     cur.execute("SELECT homeroom_teacher_id FROM students WHERE student_id=%s", (student_id,))
     row = fo(cur)
-    return bool(row and row.get("homeroom_teacher_id") == staff["staff_id"])
+    if row and row.get("homeroom_teacher_id") == sid:
+        return {"mode": "all", "subjects": []}
+    year = current_school_year_start()
+    # also treat "teacher of a homeroom/advisory section this student is in" as homeroom
+    cur.execute("""
+        SELECT s.type, s.name, s.subject
+        FROM sections s
+        JOIN section_enrollments se ON se.section_id = s.section_id
+        WHERE se.student_id=%s AND s.teacher_id=%s AND s.active AND s.school_year_start=%s
+    """, (student_id, sid, year))
+    subs = set()
+    for r in fa(cur):
+        if (r.get("type") or "") in ("homeroom", "advisory"):
+            return {"mode": "all", "subjects": []}
+        k = _report_subject_key(r.get("subject")) or _report_subject_key(r.get("name"))
+        if k:
+            subs.add(k)
+    if subs:
+        return {"mode": "subject", "subjects": sorted(subs)}
+    return {"mode": "none", "subjects": []}
+
+
+def _report_allowed_keys(structure, scope):
+    """Mark keys a 'subject'-scope teacher may write. None = everything (mode 'all')."""
+    if scope.get("mode") == "all":
+        return None
+    keys = set()
+    if scope.get("mode") != "subject":
+        return keys
+    allowed = set(scope.get("subjects") or [])
+    for si, sec in enumerate(structure.get("sections") or []):
+        if (sec.get("kind") or "skills") != "subjects":
+            continue
+        cols = len(sec.get("columns") or [])
+        for ri, label in enumerate(sec.get("rows") or []):
+            if _report_subject_key(label) in allowed:
+                for ci in range(cols):
+                    keys.add("%d:%d:%d" % (si, ri, ci))
+    return keys
+
+
+def _report_can_edit_student(cur, email, student_id):
+    """Back-compat: True when this user may edit anything on the card."""
+    return _report_edit_scope(cur, email, student_id).get("mode") != "none"
 
 
 def _student_term_attendance(cur, student_id, start_iso, end_iso):
@@ -8122,6 +8204,27 @@ def api_report_entry_context():
                     ORDER BY st.last_name, st.first_name
                 """)
                 homerooms = [{"staff_id": r["staff_id"], "name": f'{r["first_name"]} {r["last_name"]}', "count": r["n"]} for r in fa(cur)]
+            # subject/elective classes this staff member teaches (for subject-teacher entry)
+            my_sections = []
+            if staff:
+                cur.execute("""
+                    SELECT s.section_id, s.name, s.grade, s.type,
+                           (SELECT COUNT(*) FROM section_enrollments se WHERE se.section_id = s.section_id) AS n
+                    FROM sections s
+                    WHERE s.teacher_id=%s AND s.active AND s.school_year_start=%s
+                      AND s.type IN ('subject','elective')
+                    ORDER BY s.grade, s.name
+                """, (staff["staff_id"], year))
+                for r in fa(cur):
+                    my_sections.append({
+                        "section_id": r["section_id"], "name": r["name"],
+                        "grade": r.get("grade") or "", "type": r["type"], "count": r["n"],
+                        "subject": _report_subject_key(r["name"]),
+                    })
+            has_homeroom = False
+            if staff:
+                cur.execute("SELECT 1 FROM students WHERE homeroom_teacher_id=%s AND status='active' LIMIT 1", (staff["staff_id"],))
+                has_homeroom = bool(fo(cur))
             cur_term = _report_current_term(year)
             terms = [{"key": k, "label": l, "current": (k == cur_term)} for k, l, st, en in get_trimester_windows(year)]
             return jsonify({
@@ -8129,6 +8232,8 @@ def api_report_entry_context():
                 "is_admin": is_admin,
                 "teacher": teacher,
                 "homerooms": homerooms,
+                "my_sections": my_sections,
+                "has_homeroom": has_homeroom,
                 "terms": terms,
                 "current_term": cur_term,
             })
@@ -8147,6 +8252,48 @@ def api_report_entry_roster():
     try:
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
             staff = _staff_row_for_email(cur, email)
+            section_id = request.args.get("section_id", type=int)
+            if section_id:
+                cur.execute("""SELECT section_id, name, grade, type, teacher_id
+                               FROM sections WHERE section_id=%s AND school_year_start=%s""", (section_id, year))
+                sec = fo(cur)
+                if not sec:
+                    return jsonify({"error": "That class was not found for this school year."}), 404
+                if not is_admin and not (staff and sec.get("teacher_id") == staff["staff_id"]):
+                    return jsonify({"error": "You can only open rosters for your own classes."}), 403
+                templates = _active_templates(cur)
+                cur.execute("""
+                    SELECT st.student_id, st.first_name, st.last_name, st.grade
+                    FROM section_enrollments se JOIN students st ON st.student_id = se.student_id
+                    WHERE se.section_id=%s AND st.status='active'
+                    ORDER BY st.last_name, st.first_name
+                """, (section_id,))
+                students = fa(cur)
+                ids = [r["student_id"] for r in students]
+                emap = {}
+                if ids:
+                    cur.execute("""SELECT student_id, template_id, status FROM report_entries
+                                   WHERE school_year_start=%s AND term=%s AND student_id = ANY(%s)""", (year, term, ids))
+                    emap = {r["student_id"]: r for r in fa(cur)}
+                out = []
+                for stu in students:
+                    tpl = _match_template(templates, stu.get("grade"))
+                    ent = emap.get(stu["student_id"])
+                    out.append({
+                        "student_id": stu["student_id"],
+                        "name": f'{stu["first_name"]} {stu["last_name"]}',
+                        "grade": stu.get("grade") or "",
+                        "template_id": tpl["template_id"] if tpl else None,
+                        "template_name": tpl["name"] if tpl else None,
+                        "status": (ent["status"] if ent else "none"),
+                    })
+                return jsonify({
+                    "term": term, "term_label": _report_term_label(term),
+                    "school_year": sy_long(year), "scope": "section",
+                    "teacher": {"staff_id": sec.get("teacher_id"),
+                                "name": (sec["name"] + (" · Grade " + sec["grade"] if sec.get("grade") else ""))},
+                    "students": out,
+                })
             teacher_id = request.args.get("teacher_id", type=int)
             if teacher_id and not is_admin:
                 teacher_id = staff["staff_id"] if staff else None
@@ -8207,7 +8354,8 @@ def api_report_entry_student():
             stu = fo(cur)
             if not stu:
                 return jsonify({"error": "student not found"}), 404
-            can_edit = _report_can_edit_student(cur, email, student_id)
+            scope = _report_edit_scope(cur, email, student_id)
+            can_edit = scope["mode"] != "none"
             templates = _active_templates(cur)
             tpl = _match_template(templates, stu.get("grade"))
             if not tpl:
@@ -8222,6 +8370,13 @@ def api_report_entry_student():
                         (student_id, trow["template_id"], year, term))
             ent = fo(cur)
             attendance_auto = _attendance_auto_for_template(cur, student_id, structure, term, year)
+            # A specials teacher (Art/PE/…) is a subject teacher, but this template may have
+            # no row of theirs — then there is nothing for them to edit, so: read-only.
+            allowed_keys = sorted(_report_allowed_keys(structure, scope) or [])
+            if scope["mode"] == "subject" and not allowed_keys:
+                scope = {"mode": "none", "subjects": []}
+                can_edit = False
+            scope_out = {"mode": scope["mode"], "subjects": scope.get("subjects") or [], "keys": allowed_keys}
             return jsonify({
                 "student": {"student_id": stu["student_id"], "name": f'{stu["first_name"]} {stu["last_name"]}', "grade": stu.get("grade") or ""},
                 "term": term, "term_label": _report_term_label(term), "school_year": sy_long(year),
@@ -8230,6 +8385,7 @@ def api_report_entry_student():
                 "entry": {"data": (json.loads(ent["data"] or "{}") if ent else {}), "status": (ent["status"] if ent else "none")},
                 "attendance_auto": attendance_auto,
                 "can_edit": can_edit,
+                "edit_scope": scope_out,
             })
     finally:
         conn.close()
@@ -8253,8 +8409,37 @@ def api_report_entry_save():
     conn = get_db_connection()
     try:
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
-            if not _report_can_edit_student(cur, email, student_id):
-                return jsonify({"error": "You can only enter report cards for your own homeroom students."}), 403
+            scope = _report_edit_scope(cur, email, student_id)
+            if scope["mode"] == "none":
+                return jsonify({"error": "You can only enter report cards for your own homeroom or class students."}), 403
+            if scope["mode"] == "subject":
+                # A subject teacher may only touch their own subject's marks. Merge their
+                # changes into whatever the homeroom teacher has already saved, and never
+                # let them change the comment or the completion status.
+                cur.execute("SELECT structure FROM report_templates WHERE template_id=%s", (template_id,))
+                trow = fo(cur)
+                structure = json.loads((trow or {}).get("structure") or '{"sections":[]}')
+                allowed = _report_allowed_keys(structure, scope)
+                if not allowed:
+                    return jsonify({"error": "None of this card's subjects are yours to enter."}), 403
+                cur.execute("""SELECT data, status FROM report_entries
+                               WHERE student_id=%s AND template_id=%s AND school_year_start=%s AND term=%s""",
+                            (student_id, template_id, year, term))
+                prev = fo(cur)
+                base = json.loads((prev or {}).get("data") or "{}") or {}
+                marks = dict(base.get("marks") or {})
+                incoming = (data or {}).get("marks") or {}
+                for k in allowed:
+                    v = incoming.get(k)
+                    if v in (None, ""):
+                        marks.pop(k, None)
+                    else:
+                        marks[k] = v
+                base["marks"] = marks
+                data = base
+                status = (prev or {}).get("status") or "draft"
+                if status == "none":
+                    status = "draft"
             cur.execute("""
                 INSERT INTO report_entries (student_id, template_id, school_year_start, term, data, status, updated_by, updated_at)
                 VALUES (%s,%s,%s,%s,%s,%s,%s,NOW())

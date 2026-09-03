@@ -97,7 +97,7 @@
   async function api(p,o){const r=await fetch(p,o);const d=await r.json().catch(()=>({}));if(!r.ok||d.error)throw new Error(d.error||('HTTP '+r.status));return d;}
   function esc(s){const d=document.createElement('div');d.textContent=s==null?'':s;return d.innerHTML;}
 
-  const S={ctx:null,term:null,teacherId:null,selId:null,cur:null};
+  const S={ctx:null,term:null,teacherId:null,sectionId:null,selId:null,cur:null};
 
   async function init(){
     try{ S.ctx=await api('/api/report/entry/context'); }
@@ -106,6 +106,10 @@
     if(S.ctx.is_admin && S.ctx.homerooms.length){
       S.teacherId=(S.ctx.teacher && S.ctx.homerooms.some(h=>h.staff_id===S.ctx.teacher.staff_id))?S.ctx.teacher.staff_id:S.ctx.homerooms[0].staff_id;
     }else if(S.ctx.teacher){ S.teacherId=S.ctx.teacher.staff_id; }
+    // A teacher with no homeroom of their own starts on their first subject class.
+    if(!S.ctx.is_admin && !S.ctx.has_homeroom && (S.ctx.my_sections||[]).length){
+      S.sectionId=S.ctx.my_sections[0].section_id;
+    }
     renderControls();
     loadRoster();
   }
@@ -114,24 +118,37 @@
     document.getElementById('termTabs').innerHTML=S.ctx.terms.map(t=>
       `<button class="${t.key===S.term?'on':''}" onclick="setTerm('${t.key}')">${esc(t.label)}</button>`).join('');
     const ap=document.getElementById('adminPick');
+    let html='';
     if(S.ctx.is_admin && S.ctx.homerooms.length){
-      ap.innerHTML=`<select class="pick" onchange="setTeacher(this.value)">`+
+      html+=`<select class="pick" onchange="setTeacher(this.value)" ${S.sectionId?'disabled':''}>`+
         S.ctx.homerooms.map(h=>`<option value="${h.staff_id}" ${h.staff_id===S.teacherId?'selected':''}>${esc(h.name)} (${h.count})</option>`).join('')+`</select>`;
-    }else{ ap.innerHTML=''; }
+    }
+    const secs=S.ctx.my_sections||[];
+    if(secs.length){
+      const canHR = S.ctx.is_admin || S.ctx.has_homeroom;
+      html+=`<select class="pick" onchange="setScope(this.value)">`+
+        (canHR?`<option value="" ${S.sectionId?'':'selected'}>My homeroom</option>`:'')+
+        secs.map(x=>`<option value="${x.section_id}" ${x.section_id===S.sectionId?'selected':''}>${esc(x.name)}${x.grade?' · Gr '+esc(x.grade):''} (${x.count})</option>`).join('')+
+        `</select>`;
+    }
+    ap.innerHTML=html;
   }
+  function setScope(v){ S.sectionId=v?+v:null; S.selId=null; renderControls();
+    document.getElementById('panel').innerHTML='<div class="empty">Select a student to fill in their report card.</div>'; loadRoster(); }
   function setTerm(k){ S.term=k; S.selId=null; renderControls(); document.getElementById('panel').innerHTML='<div class="empty">Select a student to fill in their report card.</div>'; loadRoster(); }
   function setTeacher(id){ S.teacherId=+id; S.selId=null; document.getElementById('panel').innerHTML='<div class="empty">Select a student to fill in their report card.</div>'; loadRoster(); }
 
   async function loadRoster(){
     const el=document.getElementById('stuList');
     let q='/api/report/entry/roster?term='+encodeURIComponent(S.term);
-    if(S.teacherId) q+='&teacher_id='+S.teacherId;
+    if(S.sectionId) q+='&section_id='+S.sectionId;
+    else if(S.teacherId) q+='&teacher_id='+S.teacherId;
     let data;
     try{ data=await api(q); }
     catch(e){ el.innerHTML=`<div class="stu-item"><span class="stu-grade">${esc(e.message)}</span></div>`; document.getElementById('ctxLabel').textContent=''; return; }
     S.roster=data.students;
     document.getElementById('ctxLabel').textContent=`${data.teacher.name} · ${data.term_label} · ${data.school_year}`;
-    if(!data.students.length){ el.innerHTML='<div class="stu-item"><span class="stu-grade">No active students in this homeroom.</span></div>'; return; }
+    if(!data.students.length){ el.innerHTML='<div class="stu-item"><span class="stu-grade">No active students in this '+(S.sectionId?'class':'homeroom')+'.</span></div>'; return; }
     el.innerHTML=data.students.map(s=>{
       const cl=s.template_id?'':' notpl';
       const chip=s.template_id?`<span class="chip ${s.status}">${({none:'Not started',draft:'In progress',complete:'Complete'})[s.status]}</span>`
@@ -164,8 +181,18 @@
     return `<select class="mark" data-k="${esc(dataKey)}" ${dis?'disabled':''}>${o}</select>`;
   }
 
+  // Which individual marks may this user write?
+  //   mode 'all'     -> everything;  'subject' -> only the keys the server listed
+  //   mode 'none'    -> nothing
+  function scopeOf(P){ return P.edit_scope || {mode:(P.can_edit?'all':'none'), subjects:[], keys:[]}; }
+  function lockedKeys(P){ const sc=scopeOf(P); return sc.mode==='subject' ? new Set(sc.keys||[]) : null; }
+
   function renderForm(){
-    const P=S.cur, st=P.template.structure, marks=(P.entry.data&&P.entry.data.marks)||{}, dis=!P.can_edit;
+    const P=S.cur, st=P.template.structure, marks=(P.entry.data&&P.entry.data.marks)||{};
+    const sc=scopeOf(P), allowSet=lockedKeys(P);
+    const dis=!P.can_edit;                       // whole-card read-only
+    const only=(sc.mode==='subject');            // subject teacher: their columns only
+    const lock=k => dis || (only && !allowSet.has(k));
     const stat=P.entry.status||'none';
     let h=`<div class="form-head">
       <h2>${esc(P.student.name)}</h2>
@@ -184,17 +211,24 @@
         h+='<table class="grid"><thead><tr><th>Subject</th>'+(sec.columns||[]).map(c=>`<th>${esc(c)}</th>`).join('')+'</tr></thead><tbody>';
         (sec.rows||[]).forEach((subj,ri)=>{
           h+=`<tr><td class="subj">${esc(subj)}</td>`+
-             (sec.columns||[]).map((c,ci)=>`<td>${sel(si+':'+ri+':'+ci, sec.scale, marks[si+':'+ri+':'+ci], dis)}</td>`).join('')+'</tr>';
+             (sec.columns||[]).map((c,ci)=>`<td>${sel(si+':'+ri+':'+ci, sec.scale, marks[si+':'+ri+':'+ci], lock(si+':'+ri+':'+ci))}</td>`).join('')+'</tr>';
         });
         h+='</tbody></table>';
       }else if(kind==='behavior_matrix'){
         const subs=sec.subjects||[];
-        h+='<table class="grid"><thead><tr><th></th>'+subs.map(su=>`<th>${esc(su)}</th>`).join('')+'</tr></thead><tbody>';
-        (sec.rows||[]).forEach((rw,ri)=>{
-          h+=`<tr><td class="subj">${esc(rw)}</td>`+
-             subs.map((su,ci)=>`<td>${sel(si+':b:'+ri+':'+ci, sec.scale, marks[si+':b:'+ri+':'+ci], dis)}</td>`).join('')+'</tr>';
-        });
-        h+='</tbody></table>';
+        if(!subs.length){
+          // No per-subject columns configured: one mark per behavior for this trimester.
+          (sec.rows||[]).forEach((rw,ri)=>{
+            h+=`<div class="frow"><div class="flabel">${esc(rw)}</div>${sel(si+':b:'+ri, sec.scale, marks[si+':b:'+ri], lock(si+':b:'+ri))}</div>`;
+          });
+        }else{
+          h+='<table class="grid"><thead><tr><th></th>'+subs.map(su=>`<th>${esc(su)}</th>`).join('')+'</tr></thead><tbody>';
+          (sec.rows||[]).forEach((rw,ri)=>{
+            h+=`<tr><td class="subj">${esc(rw)}</td>`+
+               subs.map((su,ci)=>`<td>${sel(si+':b:'+ri+':'+ci, sec.scale, marks[si+':b:'+ri+':'+ci], lock(si+':b:'+ri+':'+ci))}</td>`).join('')+'</tr>';
+          });
+          h+='</tbody></table>';
+        }
       }else if(kind==='attendance'){
         const autoMap=P.attendance_auto||{};
         h+=`<div class="att-note">Filled in automatically from recorded attendance for this trimester. Type a number to override.</div>`;
@@ -207,17 +241,17 @@
           const val=overridden?saved:auto;
           const hint=hasAuto?(overridden?`<span class="autohint">edited · attendance shows ${esc(auto)}</span>`:`<span class="autohint">from attendance</span>`):'';
           h+=`<div class="frow"><div class="flabel">${esc(f)}</div>`+
-             `<input type="text" class="mark att" data-k="${key}" data-auto="${esc(auto)}" value="${esc(String(val))}" ${dis?'disabled':''} style="width:80px;">`+
+             `<input type="text" class="mark att" data-k="${key}" data-auto="${esc(auto)}" value="${esc(String(val))}" ${lock(key)?'disabled':''} style="width:80px;">`+
              hint+`</div>`;
         });
       }else{ // skills
         if(sec.groups){
           sec.groups.forEach((g,gi)=>{
             h+=`<div class="grp-head">${esc(g.heading||'')}</div>`;
-            (g.rows||[]).forEach((r,ri)=>{ h+=`<div class="frow"><div class="flabel">${esc(r)}</div>${sel(si+':g:'+gi+':'+ri, sec.scale, marks[si+':g:'+gi+':'+ri], dis)}</div>`; });
+            (g.rows||[]).forEach((r,ri)=>{ const k=si+':g:'+gi+':'+ri; h+=`<div class="frow"><div class="flabel">${esc(r)}</div>${sel(k, sec.scale, marks[k], lock(k))}</div>`; });
           });
         }else{
-          (sec.rows||[]).forEach((r,ri)=>{ h+=`<div class="frow"><div class="flabel">${esc(r)}</div>${sel(si+':'+ri, sec.scale, marks[si+':'+ri], dis)}</div>`; });
+          (sec.rows||[]).forEach((r,ri)=>{ const k=si+':'+ri; h+=`<div class="frow"><div class="flabel">${esc(r)}</div>${sel(k, sec.scale, marks[k], lock(k))}</div>`; });
         }
       }
       h+=`</div></div>`;
@@ -226,10 +260,17 @@
     // overall comments
     const comment=(P.entry.data&&P.entry.data.comment)||'';
     h+=`<div style="margin-top:16px;"><label style="font-size:11px;font-weight:500;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:5px;">Teacher comments</label>
-        <textarea class="cmt" id="rc-comment" ${dis?'disabled':''} placeholder="Overall comments for this trimester…">${esc(comment)}</textarea></div>`;
+        <textarea class="cmt" id="rc-comment" ${(dis||only)?'disabled':''} placeholder="Overall comments for this trimester…">${esc(comment)}</textarea></div>`;
 
     if(dis){
       h+=`<div class="ro-note">You can view this card, but only ${esc(P.student.name.split(' ')[0])}'s homeroom teacher (or an admin) can edit it.</div>`;
+    }else if(only){
+      const names=(st.sections||[]).filter(x=>(x.kind||'skills')==='subjects')
+        .flatMap(x=>(x.rows||[]).filter((r,ri)=>(x.columns||[]).some((c,ci)=>allowSet.has((st.sections.indexOf(x))+':'+ri+':'+ci))));
+      h+=`<div class="ro-note">You teach ${esc(names.join(', ')||'a class')} for ${esc(P.student.name.split(' ')[0])}, so you can enter those marks. The rest of the card belongs to their homeroom teacher.</div>
+        <div class="save-bar">
+        <button class="btn btn-primary" onclick="save('draft')">Save my marks</button>
+        <span class="note">Applies to ${esc(P.term_label)}, ${esc(P.school_year)}.</span></div>`;
     }else{
       h+=`<div class="save-bar">
         <button class="btn btn-primary" onclick="save('draft')">Save draft</button>
