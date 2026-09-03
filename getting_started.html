@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Getting Started — Mizzentop Day School</title>
+<link rel="icon" type="image/svg+xml" href="/logo.svg">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+<style>
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+  :root{--navy:#1a2744;--green:#2d5016;--gold:#c8992a;--cream:#f7f3ec;--muted:#6b7280;--light:#e8e2d9;
+        --ok:#2d7a3e;--warn:#b45309;--warnbg:#fff8e6;--warnbd:#f0d98a;--okbg:#eef6ee;}
+  html,body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--navy);min-height:100%;}
+  .page{max-width:1000px;margin:0 auto;padding:28px 24px 90px;}
+  h1{font-family:'Playfair Display',serif;font-size:31px;margin-bottom:4px;}
+  .sub{color:var(--muted);font-size:14px;margin-bottom:22px;line-height:1.55;max-width:720px;}
+  .btn{display:inline-flex;align-items:center;gap:6px;padding:9px 16px;border-radius:8px;font-size:13px;font-weight:500;font-family:inherit;cursor:pointer;border:none;text-decoration:none;}
+  .btn-ghost{background:transparent;color:var(--muted);border:1px solid var(--light);}
+  .toprow{display:flex;gap:10px;align-items:center;margin-bottom:20px;flex-wrap:wrap;}
+
+  .pills{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:26px;}
+  .pill{font-size:13px;font-weight:500;padding:8px 15px;border-radius:20px;border:1px solid var(--light);
+        background:#fff;color:var(--muted);cursor:pointer;font-family:inherit;}
+  .pill:hover{border-color:var(--gold);}
+  .pill.on{background:var(--navy);color:#fff;border-color:var(--navy);}
+
+  section.block{background:#fff;border:1px solid var(--light);border-radius:12px;margin-bottom:20px;overflow:hidden;}
+  .block-head{padding:16px 20px 12px;border-bottom:1px solid #f3f0eb;}
+  .block-head h2{font-family:'Playfair Display',serif;font-size:20px;}
+  .block-head .who{font-size:12.5px;color:var(--muted);margin-top:4px;line-height:1.5;}
+  .block-body{padding:6px 20px 18px;}
+
+  .tool{display:flex;gap:14px;padding:13px 0;border-bottom:1px solid #f3f0eb;align-items:flex-start;}
+  .tool:last-child{border-bottom:none;}
+  .tool .ic{flex:0 0 30px;height:30px;border-radius:8px;background:rgba(26,39,68,.07);display:flex;
+            align-items:center;justify-content:center;font-size:15px;margin-top:1px;}
+  .tool .body{flex:1;min-width:0;}
+  .tool .nm{font-size:14.5px;font-weight:600;}
+  .tool .nm a{color:var(--navy);text-decoration:none;border-bottom:1px solid rgba(26,39,68,.25);}
+  .tool .nm a:hover{border-bottom-color:var(--gold);}
+  .tool .ds{font-size:13px;color:#4b5563;line-height:1.55;margin-top:3px;}
+  .tool .wh{font-size:11.5px;color:var(--muted);margin-top:5px;}
+  .tool .wh b{color:var(--navy);font-weight:600;}
+  .star{display:inline-block;font-size:10px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;
+        background:rgba(200,153,42,.18);color:#7a5a10;padding:2px 8px;border-radius:10px;margin-left:7px;vertical-align:2px;}
+
+  .hint{background:var(--warnbg);border:1px solid var(--warnbd);color:#7a5a10;border-radius:10px;
+        padding:12px 15px;font-size:13px;line-height:1.6;margin-bottom:22px;}
+  .hint b{color:#5c430c;}
+  section.later{background:#fbfaf7;border-style:dashed;}
+  section.later .tool .ic{background:#eceae5;color:var(--muted);}
+  section.later .tool .nm{color:#4b5563;}
+  .foot{font-size:12.5px;color:var(--muted);margin-top:26px;line-height:1.6;}
+  @media print{
+    .topnav,.toprow,.pills,#globalnav,nav{display:none !important;}
+    body{background:#fff;} .page{padding:0;max-width:none;}
+    section.block{break-inside:avoid;page-break-inside:avoid;border-color:#ccc;}
+    .hint{border-color:#ccc;}
+  }
+</style>
+</head>
+<body>
+<div class="page">
+  <h1>Getting Started</h1>
+  <p class="sub">What's ready to use in the operations portal for the start of the year. Pick your role below to see
+     just your tools — everything here is live today at <b>admin.mizzentopdayschool.org</b>.</p>
+
+  <div class="toprow">
+    <button class="btn btn-ghost" onclick="window.print()">🖨 Print / Save PDF</button>
+  </div>
+
+  <div class="hint">
+    <b>Two things before you start.</b> Sign in with your Mizzentop Google account — no separate password.
+    Every page has the navy <b>menu bar across the top</b>; that's how you move between tools without going back home.
+    If a menu item you expect isn't there, you don't have that permission yet — just ask and it takes a minute to add.
+  </div>
+
+  <div class="pills">
+    <button class="pill on" data-r="all">Show everything</button>
+    <button class="pill" data-r="hr">Homeroom teacher</button>
+    <button class="pill" data-r="subj">Subject teacher</button>
+    <button class="pill" data-r="other">Other staff</button>
+  </div>
+
+  <!-- EVERYONE -->
+  <section class="block" data-role="hr subj other">
+    <div class="block-head">
+      <h2>Everyone</h2>
+      <div class="who">Open to every signed-in staff member. These live in the <b>Reference</b> menu.</div>
+    </div>
+    <div class="block-body">
+      <div class="tool"><div class="ic">🗓</div><div class="body">
+        <div class="nm"><a href="/schedule">Student &amp; Teacher Schedules</a><span class="star">Start here</span></div>
+        <div class="ds">Look up any teacher's or any student's full week, exactly as the master timetable has it —
+          classes, prep, recess/lunch, homeroom and dismissal. Search a student by name, or pick a whole homeroom
+          and print every child's schedule, one per page.</div>
+        <div class="wh"><b>Menu:</b> Reference → Student &amp; Teacher Schedules</div>
+      </div></div>
+      <div class="tool"><div class="ic">👪</div><div class="body">
+        <div class="nm"><a href="/family-directory">Family Directory</a></div>
+        <div class="ds">Search any family or student and see the household — address, parents/guardians, phones,
+          emails, who's authorized for pickup, and each student's emergency contact. Prints a per-family emergency
+          sheet or a whole-school emergency contact list.</div>
+        <div class="wh"><b>Menu:</b> Reference → Family Directory · Read-only</div>
+      </div></div>
+      <div class="tool"><div class="ic">🚸</div><div class="body">
+        <div class="nm"><a href="/dismissal-staff">Dismissal Staff View</a></div>
+        <div class="ds">Where every child is going today — buses, car line, activities, and any change a parent
+          called in. This is the screen to check at the end of the day.</div>
+        <div class="wh"><b>Menu:</b> Reference → Dismissal Staff View</div>
+      </div></div>
+      <div class="tool"><div class="ic">🚌</div><div class="body">
+        <div class="nm"><a href="/bus-dashboard">Bus Dashboard</a></div>
+        <div class="ds">Today's riders by bus route.</div>
+        <div class="wh"><b>Menu:</b> Reference → Bus Dashboard</div>
+      </div></div>
+      <div class="tool"><div class="ic">📊</div><div class="body">
+        <div class="nm"><a href="/homeroom-attendance-report">Attendance Report</a></div>
+        <div class="ds">Absence, tardy and early-dismissal tallies by trimester, per student or per homeroom.
+          Exports to a spreadsheet; prior years are available from the year picker.</div>
+        <div class="wh"><b>Menu:</b> Reference → Attendance Report</div>
+      </div></div>
+      <div class="tool"><div class="ic">🧩</div><div class="body">
+        <div class="nm"><a href="/scheduler">Scheduler</a></div>
+        <div class="ds">The master timetable board for the whole school. Everyone can open it and look; for most
+          staff it's view-only — nothing you click can change the live schedule.</div>
+        <div class="wh"><b>Menu:</b> People → Scheduler · View-only unless you're a schedule editor</div>
+      </div></div>
+    </div>
+  </section>
+
+  <!-- HOMEROOM TEACHERS -->
+  <section class="block" data-role="hr">
+    <div class="block-head">
+      <h2>Homeroom teachers</h2>
+      <div class="who">You may also teach subjects — if so, the Subject teacher section below is yours too.</div>
+    </div>
+    <div class="block-body">
+      <div class="tool"><div class="ic">🏫</div><div class="body">
+        <div class="nm"><a href="/my-classroom">My Classroom</a><span class="star">Your home base</span></div>
+        <div class="ds">Signing in drops you here. Your own weekly schedule at the top; then your homeroom roster
+          with allergy and medical flags, today's dismissal for each child, and attendance you can take right on the
+          page. Click any student's name to open their weekly schedule.</div>
+        <div class="wh"><b>Menu:</b> My Classroom · This is also what "/" opens for you</div>
+      </div></div>
+      <div class="tool"><div class="ic">✅</div><div class="body">
+        <div class="nm"><a href="/homeroom-attendance">Homeroom Attendance</a></div>
+        <div class="ds">The full attendance screen for your homeroom — present, absent, tardy, early dismissal,
+          excused or not. Same records that feed the attendance report and report cards. (You can also take it
+          straight from My Classroom.)</div>
+        <div class="wh"><b>Menu:</b> Daily Input → Homeroom Attendance · <b>Every morning</b></div>
+      </div></div>
+      <div class="tool"><div class="ic">🖨</div><div class="body">
+        <div class="nm"><a href="/schedule">Your homeroom's schedules, printed</a></div>
+        <div class="ds">On the Schedules page choose <b>Homeroom</b>, pick yours, and print — you get one page per
+          student, ready to send home or tape inside a folder in the first week.</div>
+        <div class="wh"><b>Menu:</b> Reference → Student &amp; Teacher Schedules → Homeroom</div>
+      </div></div>
+      <div class="tool"><div class="ic">🍎</div><div class="body">
+        <div class="nm"><a href="/dismissal">Daily Ops</a></div>
+        <div class="ds">The day's dismissal planning and changes. If you handle end-of-day logistics for your group,
+          this is where a change gets recorded so it shows on the Dismissal Staff View.</div>
+        <div class="wh"><b>Menu:</b> Daily Input → Daily Ops · Only if it's part of your role</div>
+      </div></div>
+    </div>
+  </section>
+
+  <!-- SUBJECT TEACHERS -->
+  <section class="block" data-role="subj">
+    <div class="block-head">
+      <h2>Subject teachers</h2>
+      <div class="who">Anyone teaching a timetabled class — whether or not you also have a homeroom.</div>
+    </div>
+    <div class="block-body">
+      <div class="tool"><div class="ic">🏫</div><div class="body">
+        <div class="nm"><a href="/my-classroom">My Classroom</a><span class="star">Your home base</span></div>
+        <div class="ds">Your weekly schedule plus every section you teach, with its roster, room and student count.
+          Click a student to see their week — useful when you need to find them, or to know why they're pulled out.</div>
+        <div class="wh"><b>Menu:</b> My Classroom · This is also what "/" opens for you</div>
+      </div></div>
+      <div class="tool"><div class="ic">🗓</div><div class="body">
+        <div class="nm"><a href="/schedule">Your week, printed</a></div>
+        <div class="ds">Schedules → Teacher → your name gives you the full grid: classes, prep, recess/lunch (with
+          or without duty), Wednesday electives, homeroom and dismissal. <b>Hover any class</b> and its roster pops
+          up. Print it for your desk.</div>
+        <div class="wh"><b>Menu:</b> Reference → Student &amp; Teacher Schedules → Teacher</div>
+      </div></div>
+      <div class="tool"><div class="ic">🔎</div><div class="body">
+        <div class="nm"><a href="/schedule">Finding a student mid-day</a></div>
+        <div class="ds">Schedules → Student, search the name, and you see where they are every period — including
+          any in-session support that pulls them from your class, shown in green with the provider's name.</div>
+        <div class="wh"><b>Menu:</b> Reference → Student &amp; Teacher Schedules → Student</div>
+      </div></div>
+      <div class="tool"><div class="ic">✅</div><div class="body">
+        <div class="nm"><a href="/homeroom-attendance">Attendance</a></div>
+        <div class="ds">Daily attendance is taken by the <b>homeroom</b> teacher, not per class. If you don't have a
+          homeroom you have nothing to take — check the Attendance Report if you need a student's history.</div>
+        <div class="wh">Nothing to do daily</div>
+      </div></div>
+    </div>
+  </section>
+
+  <!-- OTHER STAFF -->
+  <section class="block" data-role="other">
+    <div class="block-head">
+      <h2>Other staff</h2>
+      <div class="who">Tutors, support providers, aides, program staff and helpers. You'll land on the portal home
+        screen rather than a classroom dashboard.</div>
+    </div>
+    <div class="block-body">
+      <div class="tool"><div class="ic">🗓</div><div class="body">
+        <div class="nm"><a href="/schedule">Your own schedule</a><span class="star">New this year</span></div>
+        <div class="ds">Every active staff member can now be looked up on the Schedules page — not just classroom
+          teachers. If you run in-session support sessions, they appear on your week with the student, service and
+          room. Choose Teacher, then your name.</div>
+        <div class="wh"><b>Menu:</b> Reference → Student &amp; Teacher Schedules → Teacher</div>
+      </div></div>
+      <div class="tool"><div class="ic">🤝</div><div class="body">
+        <div class="nm"><a href="/special-services">Special Services Schedule</a></div>
+        <div class="ds">The during-the-day support grid — periods 1–8 across Monday–Friday. Each session is a staff
+          member, a room, a service (OG tutoring, push-in, pull-out) and either a specific student or "no specific
+          student" when you're pushing into a room. Double-bookings get flagged in red. Filter by staff, service or
+          grade, and print.</div>
+        <div class="wh"><b>Menu:</b> People → Special Services · Needs the Special Services permission</div>
+      </div></div>
+      <div class="tool"><div class="ic">📋</div><div class="body">
+        <div class="nm"><a href="/program-attendance">Program Attendance</a></div>
+        <div class="ds">Attendance for tutoring, clubs and enrichment programs — this is what feeds family billing,
+          so it matters that it's taken. Before &amp; Aftercare has its own screen.</div>
+        <div class="wh"><b>Menu:</b> Daily Input → Program Attendance / Before &amp; Aftercare · If you run a program</div>
+      </div></div>
+      <div class="tool"><div class="ic">🍪</div><div class="body">
+        <div class="nm"><a href="/mcard">M Card Snack Tracker &amp; School Store</a></div>
+        <div class="ds">Snack and store purchases, which also flow through to the monthly family bill.</div>
+        <div class="wh"><b>Menu:</b> Daily Input → M Card Snack Tracker / School Store · If you cover these</div>
+      </div></div>
+      <div class="tool"><div class="ic">🚸</div><div class="body">
+        <div class="nm"><a href="/dismissal-staff">Dismissal Staff View</a></div>
+        <div class="ds">If you help at dismissal, this is the one screen you need — every child and where they're
+          going today, including same-day changes.</div>
+        <div class="wh"><b>Menu:</b> Reference → Dismissal Staff View</div>
+      </div></div>
+    </div>
+  </section>
+
+  <!-- COMING LATER -->
+  <section class="block later" data-role="hr subj other">
+    <div class="block-head">
+      <h2>Coming later this year</h2>
+      <div class="who">Built or being built, but not something to use in week one. You may see these in the menu —
+        no need to open them yet; there'll be a proper walkthrough before each one goes live.</div>
+    </div>
+    <div class="block-body">
+      <div class="tool"><div class="ic">📝</div><div class="body">
+        <div class="nm">Report Cards</div>
+        <div class="ds">Entering marks and comments online, with each teacher seeing only their own subjects and
+          attendance filling itself in from the daily records. Training will come before the first trimester closes.</div>
+        <div class="wh">Do not use yet</div>
+      </div></div>
+      <div class="tool"><div class="ic">🖨</div><div class="body">
+        <div class="nm">Printed report cards</div>
+        <div class="ds">Generating the finished report card to print or send to families.</div>
+        <div class="wh">In development</div>
+      </div></div>
+      <div class="tool"><div class="ic">👤</div><div class="body">
+        <div class="nm">Staff roles on your record</div>
+        <div class="ds">Marking each staff member explicitly as homeroom / subject / specials / support, so the
+          system stops having to guess and pages tailor themselves to you automatically.</div>
+        <div class="wh">Planned this fall</div>
+      </div></div>
+    </div>
+  </section>
+
+  <p class="foot">
+    Something wrong, missing, or awkward? That's worth telling me — most of what's on this page came from someone
+    saying "it would be easier if…". <b>Colin Cuneo</b>
+  </p>
+</div>
+
+<script>
+  document.querySelectorAll('.pill').forEach(function(b){
+    b.addEventListener('click', function(){
+      document.querySelectorAll('.pill').forEach(function(x){ x.classList.remove('on'); });
+      b.classList.add('on');
+      var r = b.dataset.r;
+      document.querySelectorAll('section.block').forEach(function(s){
+        s.style.display = (r === 'all' || (s.dataset.role || '').split(' ').indexOf(r) !== -1) ? '' : 'none';
+      });
+    });
+  });
+  window.addEventListener('beforeprint', function(){
+    document.querySelectorAll('section.block').forEach(function(s){ s.style.display = ''; });
+  });
+</script>
+<script src="/nav.js" defer></script>
+</body>
+</html>

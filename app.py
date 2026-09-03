@@ -117,6 +117,7 @@ SILO_KEYS = {silo["key"]: [p["key"] for p in silo["pages"]] for silo in PERMISSI
 # The Reference group lives here instead of in PERMISSION_SILOS because those
 # pages are read-only and deliberately open to any signed-in staff member.
 NAV_REFERENCE = {"key": "reference", "label": "Reference", "pages": [
+    {"key": "getting_started",    "label": "Getting Started",     "href": "/getting-started"},
     {"key": "family_directory",   "label": "Family Directory",    "href": "/family-directory"},
     {"key": "dismissal_staff",    "label": "Dismissal Staff View", "href": "/dismissal-staff"},
     {"key": "bus_dashboard",      "label": "Bus Dashboard",       "href": "/bus-dashboard"},
@@ -1127,6 +1128,14 @@ def reconcile_page():
     # Read-only diagnostic: compares the Scheduler's timetabled classes against the
     # sections on the Classes page. Pulls only /api/scheduler and /api/sections; writes nothing.
     return send_from_directory(".", "reconcile.html")
+
+@app.route("/getting-started")
+@login_required
+def getting_started_page():
+    # Static "what's ready to use" guide for staff, grouped by role. Open to any
+    # signed-in staff member (lives in the ungated Reference nav group).
+    return send_from_directory(".", "getting_started.html")
+
 
 @app.route("/schedule")
 @login_required
