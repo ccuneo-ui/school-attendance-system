@@ -123,6 +123,7 @@ NAV_REFERENCE = {"key": "reference", "label": "Reference", "pages": [
     {"key": "bus_dashboard",      "label": "Bus Dashboard",       "href": "/bus-dashboard"},
     {"key": "attendance_report",  "label": "Attendance Report",   "href": "/homeroom-attendance-report"},
     {"key": "person_schedules",   "label": "Student & Teacher Schedules", "href": "/schedule"},
+    {"key": "signature",          "label": "Email Signature Generator", "href": "/signature"},
 ]}
 
 # Order the menus appear in the bar.
@@ -2018,7 +2019,8 @@ def save_homeroom_attendance():
 # ============================================
 
 def _staff_row_for_email(cur, email):
-    cur.execute("SELECT staff_id, first_name, last_name FROM staff WHERE email=%s AND status='active'", (email,))
+    cur.execute("SELECT staff_id, first_name, last_name, COALESCE(is_special_services,0) AS is_special_services "
+                "FROM staff WHERE email=%s AND status='active'", (email,))
     return fo(cur)
 
 
@@ -2171,12 +2173,73 @@ def api_my_classroom():
                     "students": roster,
                 })
 
+            # ── In-session Special Services this staff member provides ──
+            # Only meaningful for staff with the "Special Services Role" tick box, but the
+            # query is driven by the sessions themselves, so it is right either way.
+            cur.execute("""
+                SELECT ss.ss_id, ss.day, ss.period, ss.notes,
+                       t.name AS service, r.name AS room,
+                       s.student_id, s.first_name, s.last_name, s.grade,
+                       s.allergies, s.medical_alert, s.medications, s.dietary,
+                       s.emergency_contact_name, s.emergency_contact_phone
+                FROM special_service_sessions ss
+                LEFT JOIN special_service_types t ON t.service_id = ss.service_id
+                LEFT JOIN rooms r ON r.room_id = ss.room_id
+                LEFT JOIN students s ON s.student_id = ss.student_id
+                WHERE ss.staff_id = %s AND ss.school_year_start = %s
+                  AND (s.student_id IS NULL OR s.status = 'active')
+            """, (sid, year))
+            ss_rows = fa(cur)
+            day_abbr = {"Monday": "Mon", "Tuesday": "Tue", "Wednesday": "Wed",
+                        "Thursday": "Thu", "Friday": "Fri"}.get(day_name)
+            per_rank = {pid: i for i, pid in enumerate(SS_PERIOD_IDS)}
+            day_rank = {d: i for i, d in enumerate(SS_DAYS)}
+            ss_students, ss_general = {}, []
+            for r in ss_rows:
+                item = {
+                    "ss_id": r["ss_id"], "day": r.get("day") or "", "period": r.get("period") or "",
+                    "service": r.get("service") or "Support", "room": r.get("room") or "",
+                    "notes": r.get("notes") or "",
+                    "today": bool(day_abbr and r.get("day") == day_abbr),
+                }
+                if not r.get("student_id"):
+                    ss_general.append(item)
+                    continue
+                key = r["student_id"]
+                if key not in ss_students:
+                    ss_students[key] = {
+                        "student_id": key,
+                        "name": f'{r["first_name"]} {r["last_name"]}',
+                        "grade": r.get("grade") or "",
+                        "allergies": r.get("allergies") or "",
+                        "medical_alert": r.get("medical_alert") or "",
+                        "medications": r.get("medications") or "",
+                        "dietary": r.get("dietary") or "",
+                        "emergency_contact_name": r.get("emergency_contact_name") or "",
+                        "emergency_contact_phone": r.get("emergency_contact_phone") or "",
+                        "sessions": [],
+                    }
+                ss_students[key]["sessions"].append(item)
+            def _slot(x):
+                return (day_rank.get(x["day"], 9), per_rank.get(x["period"], 99))
+            for v in ss_students.values():
+                v["sessions"].sort(key=_slot)
+            ss_general.sort(key=_slot)
+            ss_list = sorted(ss_students.values(), key=lambda x: x["name"].split()[-1])
+
             return jsonify({
-                "teacher": {"staff_id": sid, "name": f'{staff["first_name"]} {staff["last_name"]}'},
+                "teacher": {"staff_id": sid, "name": f'{staff["first_name"]} {staff["last_name"]}',
+                            "is_special_services": bool(staff.get("is_special_services"))},
                 "date": today,
                 "day_name": day_name,
                 "school_year": sy_long(year),
                 "has_homeroom": len(homeroom_students) > 0,
+                "special_services": {
+                    "students": ss_list,
+                    "general": ss_general,
+                    "session_count": len(ss_rows),
+                    "today_count": sum(1 for r in ss_rows if day_abbr and r.get("day") == day_abbr),
+                },
                 "homeroom": {
                     "name": hm.get("name") or "Homeroom",
                     "room": hm.get("room") or "",
