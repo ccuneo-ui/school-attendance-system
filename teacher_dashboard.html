@@ -245,7 +245,7 @@ function render(){
   html += `<div class="section-label">Quick actions</div><div class="quick">`;
   if (DATA.has_homeroom) html += `<div class="qtile" onclick="document.getElementById('save-att').scrollIntoView({behavior:'smooth'})">Take attendance</div>`;
   html += `<div class="qtile" onclick="location.href='/schedule?teacher=${encodeURIComponent(DATA.teacher.staff_id)}'">See my schedule<small>full week / print</small></div>`;
-  html += `<div class="qtile disabled">Grades<small>with report cards</small></div></div>`;
+  html += `<div class="qtile" onclick="location.href='/report-cards'">Report cards<small>enter grades &amp; comments</small></div></div>`;
 
   document.getElementById('root').innerHTML = html;
 }
