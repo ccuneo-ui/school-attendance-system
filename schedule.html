@@ -66,6 +66,12 @@
   .note{font-size:12.5px;color:var(--muted);}
   .empty{color:var(--muted);text-align:center;padding:50px 20px;}
   .backlink{font-size:12.5px;color:var(--blue);text-decoration:none;}
+  td.prepcell{vertical-align:top;min-width:150px;font-size:11.5px;line-height:1.4;}
+  td.prepcell>div{margin:1px 0;}
+  .pl-prep{color:var(--green);} .pl-prep b{color:var(--green);}
+  .pl-duty{color:#6b5a12;} .pl-duty b{color:#6b5a12;}
+  .pl-lunch{color:#8f8a79;}
+  .pl-none{color:#c9c3b3;}
   .cell.has-pop{cursor:help;}
   .cell.has-pop .cname{text-decoration:underline dotted rgba(26,39,68,.35);text-underline-offset:2px;}
   .roster-tip{position:fixed;z-index:1000;min-width:170px;max-width:280px;background:#fff;border:1px solid var(--light);border-radius:10px;box-shadow:0 8px 26px rgba(26,39,68,.18);padding:9px 11px;font-size:12px;color:var(--navy);}
@@ -98,6 +104,7 @@
         <button data-mode="teacher" onclick="setMode('teacher')">Teacher</button>
         <button data-mode="student" onclick="setMode('student')">Student</button>
         <button data-mode="homeroom" onclick="setMode('homeroom')">Homeroom</button>
+        <button data-mode="prep" onclick="setMode('prep')">Prep &amp; Duty</button>
       </div>
     </div>
     <div class="fld" id="gradeWrap" hidden>
@@ -236,6 +243,7 @@ async function boot(){
   if(q.get('student')){ const sid=+q.get('student'); MODE='student'; syncSeg(); fillPicker(); syncStudentSelectors(sid); renderStudent(sid); }
   else if(q.get('teacher')){ MODE='teacher'; syncSeg(); const tv=resolveTeacherParam(q.get('teacher')); document.getElementById('pick').value=tv||''; if(tv) renderTeacher(+tv); else document.getElementById('out').innerHTML='<div class="empty">That teacher was not found.</div>'; }
   else if(q.get('homeroom')){ MODE='homeroom'; syncSeg(); fillPicker(); const hv=q.get('homeroom'); document.getElementById('pick').value=hv; renderHomeroom(hv); }
+  else if(q.get('prep')){ MODE='prep'; syncSeg(); renderPrep(); }
   else { syncSeg(); document.getElementById('out').innerHTML='<div class="empty">Pick a teacher or student above to see their week.</div>'; }
 }
 
@@ -247,7 +255,8 @@ function resolveTeacherParam(v){ // accept staff_id or last name
 function syncSeg(){ document.querySelectorAll('#seg button').forEach(b=>b.classList.toggle('on',b.dataset.mode===MODE)); document.getElementById('pickLabel').textContent = MODE==='teacher'?'Teacher':MODE==='homeroom'?'Homeroom':'Student';
   const isStu=MODE==='student';
   document.getElementById('gradeWrap').hidden=!isStu;
-  document.getElementById('searchWrap').hidden=!isStu; }
+  document.getElementById('searchWrap').hidden=!isStu;
+  document.getElementById('pickWrap').hidden=(MODE==='prep'); }   // Prep & Duty is a whole-school grid — no picker
 
 /* ---- student picker: pick a grade, then a student; or type a name ---- */
 const GRADE_ORDER=['JPK','SPK','K','1','2','3','4','5','6','7','8'];
@@ -309,6 +318,7 @@ function homeroomSections(){
     .sort((a,b)=>String(a.grade).localeCompare(String(b.grade),undefined,{numeric:true})||a.name.localeCompare(b.name));
 }
 function fillPicker(){
+  if(MODE==='prep') return;   // no per-person picker in the Prep & Duty view
   const sel=document.getElementById('pick');
   if(MODE==='teacher'){
     const ts=Object.values(teachersById).sort((a,b)=>(a.last||a.name).localeCompare(b.last||b.name));
@@ -325,6 +335,7 @@ function fillPicker(){
   }
 }
 function setMode(m){ MODE=m; syncSeg(); fillPicker();
+  if(m==='prep'){ history.replaceState(null,'','/schedule?prep=1'); renderPrep(); return; }
   const msg = m==='student' ? 'Pick a grade, then a student — or search by name.'
             : m==='homeroom' ? 'Pick a homeroom above.' : 'Pick a teacher above.';
   document.getElementById('out').innerHTML='<div class="empty">'+msg+'</div>'; history.replaceState(null,'','/schedule'); }
@@ -651,6 +662,37 @@ function renderHomeroom(sectionId){
   const teach=sec.teacher_name?(' · '+esc(sec.teacher_name)):'';
   let h=`<div class="hrhead noprint"><b>${esc(sec.name)}</b>${teach} — ${kids.length} student${kids.length==1?'':'s'}. <span class="muted">Print / Save PDF prints one student per page.</span></div>`;
   h+=kids.map(k=>`<div class="student-page">${studentBlockHTML(k.student_id)}</div>`).join('');
+  document.getElementById('out').innerHTML=h;
+}
+
+/* ============ prep & lunch-duty view (whole school) ============ */
+// Same read-only computation as the scheduler's PREP schedule: for each period/day, who is on PREP,
+// who is on lunch DUTY, and who is on lunch with NO duty. Derived from the ported lunch plan.
+function renderPrep(){
+  const teachers=((SCHED||{}).S||{}).teachers||[];
+  if(!teachers.length){ document.getElementById('out').innerHTML='<div class="empty">No timetable loaded yet.</div>'; return; }
+  const info={}; teachers.forEach(t=>info[t.id]=teacherDayInfo(t.id));
+  const cell={}; DAYS.forEach(d=>PERIODS.forEach(p=>cell[d+'|'+p]={prep:[],duty:[],noduty:[]}));
+  teachers.forEach(t=>DAYS.forEach(d=>{ const m=info[t.id][d]||{};
+    Object.entries(m).forEach(([p,lbl])=>{ const c=cell[d+'|'+p]; if(!c)return;
+      if(lbl==='PREP')c.prep.push(t.id); else if(lbl==='LUNCH DUTY')c.duty.push(t.id); else if(lbl==='LUNCH NO DUTY')c.noduty.push(t.id); }); }));
+  const srt=a=>a.slice().sort((x,y)=>String(x).localeCompare(String(y)));
+  const yr=`${ROST.school_year_start}-${String(ROST.school_year_start+1).slice(-2)}`;
+  let h=`<div class="head"><h2>Prep &amp; Lunch Duty</h2><span class="who-meta">Whole-school view</span></div>`;
+  h+=`<div class="stamp">Who has PREP each period, plus who's on lunch (duty vs. no-duty). Teachers not shown are teaching or off that period. · ${yr}</div>`;
+  h+=`<div class="gridwrap"><table class="week"><thead><tr><th>Period</th>${DAYS.map(d=>`<th>${d}</th>`).join('')}</tr></thead><tbody>`;
+  PERIODS.forEach(p=>{
+    const tm=(PERIOD_TIMES.g78||{})[p]||'';
+    h+=`<tr><td class="per"><div class="pn">${p}</div><div class="pt">${tm}</div></td>`;
+    DAYS.forEach(d=>{ const c=cell[d+'|'+p]; let inner='';
+      if(c.prep.length) inner+=`<div class="pl-prep"><b>PREP:</b> ${srt(c.prep).map(esc).join(', ')}</div>`;
+      if(c.duty.length) inner+=`<div class="pl-duty"><b>Lunch duty:</b> ${srt(c.duty).map(esc).join(', ')}</div>`;
+      if(c.noduty.length) inner+=`<div class="pl-lunch">Lunch: ${srt(c.noduty).map(esc).join(', ')}</div>`;
+      if(!inner) inner='<span class="pl-none">—</span>';
+      h+=`<td class="prepcell">${inner}</td>`; });
+    h+='</tr>';
+  });
+  h+='</tbody></table></div>';
   document.getElementById('out').innerHTML=h;
 }
 
