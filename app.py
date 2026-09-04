@@ -1146,10 +1146,13 @@ def schedule_page():
     return send_from_directory(".", "schedule.html")
 
 @app.route("/scheduler")
-@login_required
+@require_perm("scheduler")
 def scheduler_page():
-    # Viewable by any signed-in staff (read-only sandbox). Saving is gated separately by the
-    # "scheduler" permission, enforced on the POST endpoint and reflected via /api/scheduler's can_edit.
+    # Admin-only (2026-09-03). It used to be an all-staff read-only sandbox, but the Schedules
+    # page (/schedule) replaced that as the way staff view timetables, so the board itself is now
+    # gated on the "scheduler" permission. NOTE: the GET /api/scheduler endpoint deliberately stays
+    # @login_required — /schedule and the teacher dashboard read the saved timetable from it for
+    # every staff member. Saving is still gated on the POST endpoint.
     return send_from_directory(".", "scheduler.html")
 
 @app.route("/rooms")

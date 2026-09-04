@@ -393,6 +393,25 @@ function lastToken(nm){ return String(nm||'').trim().split(/\s+/).slice(-1)[0]; 
 function isSchedTeacher(tid){ return ((SCHED.S||{}).teachers||[]).some(t=>t.id===tid) || tid===AIDE_ID; }
 // group this staff member is the homeroom teacher of (by last name), for non-subject teachers
 function homeroomGroupFor(last){ return ((SCHED.S||{}).classes||[]).find(c=>c.hr && c.hr.split(/[^A-Za-z]+/).includes(last)); }
+// Bridge a current staff member to their identity in the scheduler. The scheduler keys teachers by
+// LAST NAME, so a name change (e.g. Jakobsen -> Soderquist) breaks the match. When the current last
+// name isn't a scheduler teacher, infer it from the classes this staff teaches: their sections match
+// scheduler sessions by grade|subject|slot (the same bridge student schedules use), and those sessions
+// carry the scheduler's teacher id. Returns that id (the most common one), else the last name unchanged.
+function resolveSchedId(staffId, last){
+  if(isSchedTeacher(last)) return last;
+  const votes={};
+  (sectionsByTeacher[staffId]||[]).forEach(sec=>{
+    if(sec.type==='homeroom'||sec.type==='advisory') return;
+    const p=parseSection(sec.name), g=gradeCanon(sec.grade);
+    if(!p.subject||!g) return;
+    (classKeyToSessions[g+'|'+p.subject+'|'+classSlot(p.suffix)]||[]).forEach(pl=>{
+      if(pl.teacherId) votes[pl.teacherId]=(votes[pl.teacherId]||0)+1; });
+  });
+  let best=last, bestN=0;
+  Object.entries(votes).forEach(([tid,n])=>{ if(n>bestN && isSchedTeacher(tid)){ best=tid; bestN=n; } });
+  return best;
+}
 
 // Attach a hover roster to a class cell: resolve the class key to enrolled students and stash the
 // name list in POP_ROSTERS, tagging the cell with its index (read on hover). No-op if no roster.
@@ -508,18 +527,19 @@ function renderTeacher(staffId){
   POP_ROSTERS=[]; hideRosterTip();   // reset hover rosters for this render
   const t=teachersById[staffId]; if(!t){ document.getElementById('out').innerHTML='<div class="empty">Teacher not found.</div>'; return; }
   const last=t.last||'';
+  const schedId=resolveSchedId(staffId,last);   // rename-proof scheduler identity (staff last name may have changed)
   let cells, band, subtitle, stamp;
-  if(isSchedTeacher(last)){
-    cells=buildTeacherCells(last);
-    const sess=teacherSessions[last]||[];
+  if(isSchedTeacher(schedId)){
+    cells=buildTeacherCells(schedId);
+    const sess=teacherSessions[schedId]||[];
     band=sess.some(pl=>bandOfGroup(pl.groupId)!=='lower')?(sess.some(pl=>bandOfGroup(pl.groupId)==='g78')?'g78':'g56'):'lower';
     subtitle='Teacher schedule';
     stamp=`${sess.length} class periods/week · ${ROST.school_year_start}-${String(ROST.school_year_start+1).slice(-2)}`;
   } else {
-    const g=homeroomGroupFor(last);
+    const g=homeroomGroupFor(schedId);
     if(g){ cells=buildGroupCells(g.id); band=bandOfGroup(g.id);
-      DAYS.forEach(d=>{ const he=(SCHED.homeroomEdits||{})[last+'|'+d+'|HR']; cells[d+'|HR']={kind:'fixed',label:he||'Homeroom'};
-        const de=(SCHED.homeroomEdits||{})[last+'|'+d+'|DIS']; cells[d+'|DIS']={kind:'fixed',label:de||'Homeroom'}; });
+      DAYS.forEach(d=>{ const he=(SCHED.homeroomEdits||{})[schedId+'|'+d+'|HR']; cells[d+'|HR']={kind:'fixed',label:he||'Homeroom'};
+        const de=(SCHED.homeroomEdits||{})[schedId+'|'+d+'|DIS']; cells[d+'|DIS']={kind:'fixed',label:de||'Homeroom'}; });
       subtitle=`Homeroom teacher · ${esc(g.name||g.id)}`;
       stamp=`Homeroom-based day (this staff member doesn't teach a timetabled subject) · ${ROST.school_year_start}-${String(ROST.school_year_start+1).slice(-2)}`;
     } else {
@@ -527,19 +547,19 @@ function renderTeacher(staffId){
       const mySecs=sectionsByTeacher[staffId]||[];
       const isHR=mySecs.some(s=>s.type==='homeroom'||s.type==='advisory');
       const he=SCHED.homeroomEdits||{};
-      const hasEdit=DAYS.some(d=>he[last+'|'+d+'|HR']||he[last+'|'+d+'|DIS']);
+      const hasEdit=DAYS.some(d=>he[schedId+'|'+d+'|HR']||he[schedId+'|'+d+'|DIS']);
       if(isHR){
         // Homeroom/advisory teacher with no timetabled class (e.g. an advisory teacher): show the
         // editable HR/DIS homeroom rows (Homeroom by default) that were set in the scheduler.
-        DAYS.forEach(d=>{ cells[d+'|HR']={kind:'fixed',label:he[last+'|'+d+'|HR']||'Homeroom'};
-          cells[d+'|DIS']={kind:'fixed',label:he[last+'|'+d+'|DIS']||'Homeroom'}; });
+        DAYS.forEach(d=>{ cells[d+'|HR']={kind:'fixed',label:he[schedId+'|'+d+'|HR']||'Homeroom'};
+          cells[d+'|DIS']={kind:'fixed',label:he[schedId+'|'+d+'|DIS']||'Homeroom'}; });
         const hrSec=mySecs.find(s=>s.type==='homeroom'||s.type==='advisory');
         subtitle='Homeroom teacher'+(hrSec&&hrSec.name?` · ${esc(hrSec.name)}`:'');
         stamp=`Homeroom periods (set in the scheduler) · ${ROST.school_year_start}-${String(ROST.school_year_start+1).slice(-2)}`;
       } else {
         // Any other active staff: an empty week, but honour HR/DIS labels if the scheduler set them.
-        if(hasEdit) DAYS.forEach(d=>{ const h1=he[last+'|'+d+'|HR']; if(h1) cells[d+'|HR']={kind:'fixed',label:h1};
-          const d1=he[last+'|'+d+'|DIS']; if(d1) cells[d+'|DIS']={kind:'fixed',label:d1}; });
+        if(hasEdit) DAYS.forEach(d=>{ const h1=he[schedId+'|'+d+'|HR']; if(h1) cells[d+'|HR']={kind:'fixed',label:h1};
+          const d1=he[schedId+'|'+d+'|DIS']; if(d1) cells[d+'|DIS']={kind:'fixed',label:d1}; });
         subtitle='Staff schedule';
         stamp=`No timetabled classes · ${ROST.school_year_start}-${String(ROST.school_year_start+1).slice(-2)}`;
       }
