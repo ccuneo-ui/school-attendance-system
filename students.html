@@ -280,6 +280,9 @@
         </div>
       </div>
 
+      <div class="section-title">Parents &amp; Guardians <span style="font-size:11px;font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted)">— edit in Family Manager</span></div>
+      <div id="f-parents" style="margin-bottom:4px"></div>
+
       <div class="section-title">Dismissal Defaults</div>
       <div class="dismissal-grid">
         <div class="dismissal-day"><label>Mon</label><select id="f-mon"></select></div>
@@ -508,7 +511,46 @@ function openModal(studentId) {
   document.getElementById('f-fri').value = s.dismissal_fri || '';
 
   document.getElementById('save-btn').textContent = 'Save Changes';
+  loadStudentFamily(studentId);
   document.getElementById('edit-modal').classList.add('open');
+}
+
+function escHtml(s) {
+  return (s == null ? '' : String(s)).replace(/[&<>"']/g, c =>
+    ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+async function loadStudentFamily(studentId) {
+  const box = document.getElementById('f-parents');
+  box.innerHTML = '<p style="font-size:13px;color:var(--muted);margin:0">Loading…</p>';
+  try {
+    const res = await fetch('/api/students/' + studentId + '/family');
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const parents = await res.json();
+    if (!parents.length) {
+      box.innerHTML = '<p style="font-size:13px;color:var(--muted);margin:0">No parents on file. Add them in the <a href="/family-manager" target="_blank" style="color:var(--people)">Family Manager</a>.</p>';
+      return;
+    }
+    box.innerHTML = parents.map(p => {
+      const nm = ((p.first_name || '') + ' ' + (p.last_name || '')).trim();
+      const rel = p.relationship_type ? ' · ' + escHtml(p.relationship_type) : '';
+      const lines = [];
+      if (p.phone) lines.push('<a href="tel:' + escHtml(p.phone) + '" style="color:var(--people);text-decoration:none">' + escHtml(p.phone) + '</a>');
+      if (p.email) lines.push('<a href="mailto:' + escHtml(p.email) + '" style="color:var(--people);text-decoration:none">' + escHtml(p.email) + '</a>');
+      const pickup = p.can_pickup
+        ? '<span style="font-size:10px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;background:#e8f5e9;color:#2d5016;border-radius:20px;padding:2px 9px">Can pick up</span>'
+        : '';
+      return '<div style="border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:8px">' +
+        '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">' +
+          '<span style="font-weight:600;color:var(--navy)">' + escHtml(nm) +
+            '<span style="font-weight:400;color:var(--muted);text-transform:capitalize">' + rel + '</span></span>' +
+          pickup + '</div>' +
+        (lines.length ? '<div style="font-size:13px;margin-top:5px;display:flex;gap:18px;flex-wrap:wrap">' + lines.join('') + '</div>' : '') +
+      '</div>';
+    }).join('');
+  } catch (e) {
+    box.innerHTML = '<p style="font-size:13px;color:var(--muted);margin:0">Could not load parents.</p>';
+  }
 }
 
 function openAddModal() {
@@ -541,6 +583,7 @@ function openAddModal() {
   document.getElementById('f-thu').value = '';
   document.getElementById('f-fri').value = '';
 
+  document.getElementById('f-parents').innerHTML = '<p style="font-size:13px;color:var(--muted);margin:0">Parents are linked in the Family Manager once the student is saved.</p>';
   document.getElementById('save-btn').textContent = 'Add Student';
   document.getElementById('edit-modal').classList.add('open');
 }

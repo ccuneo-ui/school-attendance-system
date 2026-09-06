@@ -2792,6 +2792,30 @@ def get_students_list():
     finally:
         conn.close()
 
+@app.route("/api/students/<int:student_id>/family")
+@login_required
+def get_student_family(student_id):
+    """Read-only parents/guardians for a student (via their household(s)), for reference
+    in the Student Directory. Editing of parents happens in the Family Manager."""
+    conn = get_db_connection()
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute("""
+                SELECT p.parent_id, p.first_name, p.last_name, p.email, p.phone,
+                       p.relationship_type, p.can_pickup, hm.role,
+                       h.family_name, h.primary_phone, h.primary_email,
+                       sh.is_primary
+                FROM student_households sh
+                JOIN households h        ON h.household_id  = sh.household_id
+                JOIN household_members hm ON hm.household_id = h.household_id
+                JOIN parents p           ON p.parent_id     = hm.parent_id
+                WHERE sh.student_id = %s
+                ORDER BY sh.is_primary DESC, hm.role, p.last_name, p.first_name
+            """, (student_id,))
+            return jsonify(fa(cur))
+    finally:
+        conn.close()
+
 @app.route("/api/students", methods=["POST"])
 @people_required
 def create_student():
