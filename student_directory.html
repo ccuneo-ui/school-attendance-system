@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Student Directory — Mizzentop</title>
+  <link rel="icon" type="image/svg+xml" href="/logo.svg">
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+  <script src="/nav.js" defer></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --navy:#1a2744; --green:#2d5016; --gold:#c8992a; --cream:#f7f3ec;
+      --muted:#6b7280; --border:#e5e0d8; --people:#3a5a7a;
+      --active-bg:#e8f5e9; --active-txt:#2d5016;
+      --inactive-bg:#fce8e8; --inactive-txt:#8a1a1a;
+      --guest-bg:#fff8e1; --guest-txt:#7a5a00;
+    }
+    html, body { min-height:100%; font-family:'DM Sans',sans-serif; background:var(--cream); color:var(--navy); }
+
+    .topbar { background:var(--navy); padding:14px 28px; display:flex; align-items:center; gap:16px; }
+    .topbar a { color:rgba(255,255,255,0.7); text-decoration:none; font-size:13px; font-weight:500; }
+    .topbar a:hover { color:white; }
+    .topbar-sep { color:rgba(255,255,255,0.3); font-size:13px; }
+    .topbar-title { color:white; font-size:13px; font-weight:600; }
+
+    .page { max-width:1200px; margin:0 auto; padding:36px 28px 80px; }
+    .page-header h1 { font-family:'Playfair Display',serif; font-size:32px; font-weight:700; }
+    .page-header p { font-size:14px; color:var(--muted); margin-top:4px; }
+
+    .stats { display:flex; gap:14px; margin:22px 0; flex-wrap:wrap; }
+    .stat-card { background:white; border:1px solid var(--border); border-radius:10px; padding:12px 18px; min-width:104px; }
+    .stat-card .num { font-size:24px; font-weight:700; line-height:1; }
+    .stat-card .lbl { font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.08em; margin-top:4px; }
+
+    .controls { display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-bottom:18px; }
+    .search-box { position:relative; flex:1; min-width:220px; max-width:340px; }
+    .search-box input { width:100%; padding:9px 12px 9px 36px; border:1px solid var(--border); border-radius:8px; font-family:inherit; font-size:14px; background:white; outline:none; }
+    .search-box input:focus { border-color:var(--people); }
+    .search-box svg { position:absolute; left:10px; top:50%; transform:translateY(-50%); width:16px; height:16px; color:var(--muted); }
+    .chips { display:flex; gap:6px; flex-wrap:wrap; }
+    .chip { padding:6px 14px; border-radius:20px; font-size:12px; font-weight:600; cursor:pointer; border:1.5px solid var(--border); background:white; color:var(--muted); }
+    .chip:hover { border-color:var(--people); color:var(--people); }
+    .chip.active { background:var(--people); border-color:var(--people); color:white; }
+
+    .table-wrap { background:white; border:1px solid var(--border); border-radius:12px; overflow:hidden; }
+    table { width:100%; border-collapse:collapse; font-size:14px; }
+    thead th { background:#f4f1eb; padding:10px 16px; text-align:left; font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:.07em; color:var(--muted); border-bottom:1px solid var(--border); white-space:nowrap; }
+    tbody tr { border-bottom:1px solid var(--border); cursor:pointer; }
+    tbody tr:last-child { border-bottom:none; }
+    tbody tr:hover { background:#f9f7f4; }
+    td { padding:11px 16px; vertical-align:middle; }
+    .td-name { font-weight:600; color:var(--navy); }
+    .td-grade, .td-dis { font-size:13px; color:var(--muted); }
+    .td-hr { font-size:13px; color:var(--navy); }
+    .status-pill { display:inline-block; padding:2px 10px; border-radius:20px; font-size:11px; font-weight:700; letter-spacing:.04em; text-transform:uppercase; }
+    .status-active { background:var(--active-bg); color:var(--active-txt); }
+    .status-inactive { background:var(--inactive-bg); color:var(--inactive-txt); }
+    .status-guest { background:var(--guest-bg); color:var(--guest-txt); }
+    .empty-state { text-align:center; padding:60px 20px; color:var(--muted); }
+
+    .modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,.45); z-index:200; display:none; align-items:center; justify-content:center; padding:20px; }
+    .modal-overlay.open { display:flex; }
+    .modal { background:white; border-radius:16px; width:680px; max-width:100%; max-height:90vh; overflow-y:auto; box-shadow:0 24px 80px rgba(0,0,0,.22); }
+    .modal-header { padding:24px 28px 0; display:flex; align-items:flex-start; justify-content:space-between; }
+    .modal-header h2 { font-family:'Playfair Display',serif; font-size:24px; font-weight:700; }
+    .modal-header p { font-size:13px; color:var(--muted); margin-top:3px; }
+    .modal-close { background:none; border:none; cursor:pointer; color:var(--muted); font-size:22px; line-height:1; padding:4px; border-radius:6px; }
+    .modal-close:hover { background:var(--border); color:var(--navy); }
+    .modal-body { padding:14px 28px 26px; }
+    .section-title { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.1em; color:var(--people); margin:20px 0 10px; padding-bottom:6px; border-bottom:1px solid var(--border); }
+    .section-title:first-child { margin-top:4px; }
+    .kv { display:grid; grid-template-columns:1fr 1fr; gap:8px 22px; }
+    .kv.one { grid-template-columns:1fr; }
+    .kv .k { font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); }
+    .kv .v { font-size:14px; color:var(--navy); margin-top:1px; }
+    .kv .v a { color:var(--people); text-decoration:none; }
+    .dis-grid { display:grid; grid-template-columns:repeat(5,1fr); gap:8px; }
+    .dis-grid .d { border:1px solid var(--border); border-radius:8px; padding:7px 4px; text-align:center; }
+    .dis-grid .d .day { font-size:10px; font-weight:600; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); }
+    .dis-grid .d .val { font-size:13px; color:var(--navy); margin-top:2px; text-transform:capitalize; }
+    .contact-card { border:1px solid var(--border); border-radius:10px; padding:11px 13px; margin-bottom:9px; }
+    .cc-top { display:flex; align-items:center; justify-content:space-between; gap:8px; flex-wrap:wrap; }
+    .cc-name { font-weight:600; color:var(--navy); }
+    .cc-rel { font-size:12px; color:var(--muted); text-transform:capitalize; }
+    .cc-lines { margin-top:5px; font-size:13px; display:flex; gap:18px; flex-wrap:wrap; }
+    .cc-lines a { color:var(--people); text-decoration:none; }
+    .badge { font-size:10px; font-weight:700; letter-spacing:.04em; text-transform:uppercase; border-radius:20px; padding:2px 9px; background:var(--active-bg); color:var(--active-txt); }
+    .muted-note { font-size:13px; color:var(--muted); margin:0; }
+  </style>
+</head>
+<body>
+<div class="topbar">
+  <a href="/">← Home</a>
+  <span class="topbar-sep">/</span>
+  <span class="topbar-title">Student Directory</span>
+</div>
+
+<div class="page">
+  <div class="page-header">
+    <h1>Student Directory</h1>
+    <p>Look up any student's profile, contact info, and emergency contacts. Read-only — edit in the People &rsaquo; Student Directory.</p>
+  </div>
+
+  <div class="stats">
+    <div class="stat-card"><div class="num" id="s-total">—</div><div class="lbl">Total</div></div>
+    <div class="stat-card"><div class="num" id="s-active">—</div><div class="lbl">Active</div></div>
+    <div class="stat-card"><div class="num" id="s-inactive">—</div><div class="lbl">Inactive</div></div>
+    <div class="stat-card"><div class="num" id="s-guest">—</div><div class="lbl">Guest</div></div>
+  </div>
+
+  <div class="controls">
+    <div class="search-box">
+      <svg viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="2"/><path d="M21 21l-4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      <input type="text" id="search" placeholder="Search students…" autocomplete="off">
+    </div>
+    <div class="chips" id="chips">
+      <span class="chip active" data-f="all">All</span>
+      <span class="chip" data-f="active">Active</span>
+      <span class="chip" data-f="inactive">Inactive</span>
+      <span class="chip" data-f="guest">Guest</span>
+    </div>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>Name</th><th>Grade</th><th>Status</th><th>Homeroom</th><th>Mon</th><th>Tue</th><th>Wed</th><th>Thu</th><th>Fri</th></tr>
+      </thead>
+      <tbody id="tbody"><tr><td colspan="9" class="empty-state">Loading students…</td></tr></tbody>
+    </table>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal" onclick="if(event.target===this)closeModal()">
+  <div class="modal">
+    <div class="modal-header">
+      <div><h2 id="m-name">Student</h2><p id="m-sub"></p></div>
+      <button class="modal-close" onclick="closeModal()">&times;</button>
+    </div>
+    <div class="modal-body" id="m-body"></div>
+  </div>
+</div>
+
+<script>
+  let STUDENTS = [];
+  let filter = 'all';
+
+  function esc(s){ return (s==null?'':String(s)).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+  function name(s){ return ((s.first_name||'')+' '+(s.last_name||'')).trim(); }
+  function gradeLabel(g){ if(g==null||g==='') return '—'; return /^\d+$/.test(String(g)) ? 'Grade '+g : g; }
+  function statusPill(st){ const k=(st||'').toLowerCase(); const cls={active:'status-active',inactive:'status-inactive',guest:'status-guest'}[k]||'status-active'; return '<span class="status-pill '+cls+'">'+esc(st||'—')+'</span>'; }
+  function dis(v){ return v ? esc(v) : '—'; }
+
+  async function load(){
+    try{
+      const r = await fetch('/api/students');
+      if(!r.ok) throw new Error('HTTP '+r.status);
+      STUDENTS = await r.json();
+      render();
+    }catch(e){
+      document.getElementById('tbody').innerHTML='<tr><td colspan="9" class="empty-state">Could not load students ('+esc(e.message)+').</td></tr>';
+    }
+  }
+
+  function render(){
+    const q=document.getElementById('search').value.trim().toLowerCase();
+    let list=STUDENTS.slice();
+    if(filter!=='all') list=list.filter(s=>(s.status||'').toLowerCase()===filter);
+    if(q) list=list.filter(s=>name(s).toLowerCase().includes(q));
+
+    const tot=STUDENTS.length;
+    const by=k=>STUDENTS.filter(s=>(s.status||'').toLowerCase()===k).length;
+    document.getElementById('s-total').textContent=tot;
+    document.getElementById('s-active').textContent=by('active');
+    document.getElementById('s-inactive').textContent=by('inactive');
+    document.getElementById('s-guest').textContent=by('guest');
+
+    const tb=document.getElementById('tbody');
+    if(!list.length){ tb.innerHTML='<tr><td colspan="9" class="empty-state">No students match.</td></tr>'; return; }
+    tb.innerHTML=list.map(s=>'<tr onclick="openModal('+s.student_id+')">'+
+      '<td class="td-name">'+esc(name(s))+'</td>'+
+      '<td class="td-grade">'+esc(gradeLabel(s.grade))+'</td>'+
+      '<td>'+statusPill(s.status)+'</td>'+
+      '<td class="td-hr">'+esc(s.homeroom_teacher_name||'—')+'</td>'+
+      '<td class="td-dis">'+dis(s.dismissal_mon)+'</td>'+
+      '<td class="td-dis">'+dis(s.dismissal_tue)+'</td>'+
+      '<td class="td-dis">'+dis(s.dismissal_wed)+'</td>'+
+      '<td class="td-dis">'+dis(s.dismissal_thu)+'</td>'+
+      '<td class="td-dis">'+dis(s.dismissal_fri)+'</td>'+
+    '</tr>').join('');
+  }
+
+  function kv(k,v){ return '<div><div class="k">'+esc(k)+'</div><div class="v">'+(v||'—')+'</div></div>'; }
+
+  function openModal(id){
+    const s=STUDENTS.find(x=>x.student_id===id);
+    if(!s) return;
+    document.getElementById('m-name').textContent=name(s);
+    document.getElementById('m-sub').textContent=gradeLabel(s.grade)+' · Student ID '+s.student_id;
+
+    let h='';
+    h+='<div class="section-title">Status &amp; School</div>';
+    h+='<div class="kv">'+
+        kv('Status', statusPill(s.status))+
+        kv('Grade', esc(gradeLabel(s.grade)))+
+        kv('Homeroom', esc(s.homeroom_teacher_name||'—'))+
+        kv('Advisory', esc(s.advisory_teacher_name||'—'))+
+        kv('T3 Elective', esc(s.current_elective_name||'—'))+
+        kv('Enrolled', esc(s.enrollment_date||'—'))+
+      '</div>';
+
+    h+='<div class="section-title">Personal</div>';
+    h+='<div class="kv">'+
+        kv('Date of Birth', esc(s.date_of_birth||'—'))+
+        kv('Email', s.email?'<a href="mailto:'+esc(s.email)+'">'+esc(s.email)+'</a>':'—')+
+        kv('Phone', s.phone?'<a href="tel:'+esc(s.phone)+'">'+esc(s.phone)+'</a>':'—')+
+      '</div>';
+    h+='<div class="kv one" style="margin-top:8px">'+kv('Address', esc(s.address||'—'))+'</div>';
+
+    h+='<div class="section-title">Emergency Contact</div>';
+    if(s.emergency_contact_name||s.emergency_contact_phone){
+      h+='<div class="kv">'+
+          kv('Contact Name', esc(s.emergency_contact_name||'—'))+
+          kv('Contact Phone', s.emergency_contact_phone?'<a href="tel:'+esc(s.emergency_contact_phone)+'">'+esc(s.emergency_contact_phone)+'</a>':'—')+
+        '</div>';
+    } else { h+='<p class="muted-note">None on file.</p>'; }
+
+    h+='<div class="section-title">Parents &amp; Guardians</div><div id="m-parents"><p class="muted-note">Loading…</p></div>';
+
+    h+='<div class="section-title">Dismissal Defaults</div>';
+    h+='<div class="dis-grid">'+
+        ['mon','tue','wed','thu','fri'].map(d=>'<div class="d"><div class="day">'+d+'</div><div class="val">'+dis(s['dismissal_'+d])+'</div></div>').join('')+
+      '</div>';
+    h+='<p class="muted-note" style="margin-top:8px">Before care: '+(s.before_care?'Yes':'No')+'</p>';
+
+    document.getElementById('m-body').innerHTML=h;
+    document.getElementById('modal').classList.add('open');
+    loadParents(id);
+  }
+
+  async function loadParents(id){
+    const box=document.getElementById('m-parents');
+    try{
+      const r=await fetch('/api/students/'+id+'/family');
+      if(!r.ok) throw new Error();
+      const ps=await r.json();
+      if(!ps.length){ box.innerHTML='<p class="muted-note">No parents on file.</p>'; return; }
+      box.innerHTML=ps.map(p=>{
+        const lines=[];
+        if(p.phone) lines.push('<a href="tel:'+esc(p.phone)+'">'+esc(p.phone)+'</a>');
+        if(p.email) lines.push('<a href="mailto:'+esc(p.email)+'">'+esc(p.email)+'</a>');
+        const pickup=p.can_pickup?'<span class="badge">Can pick up</span>':'';
+        return '<div class="contact-card"><div class="cc-top"><span class="cc-name">'+esc(((p.first_name||'')+' '+(p.last_name||'')).trim())+
+          (p.relationship_type?' <span class="cc-rel">· '+esc(p.relationship_type)+'</span>':'')+'</span>'+pickup+'</div>'+
+          (lines.length?'<div class="cc-lines">'+lines.join('')+'</div>':'')+'</div>';
+      }).join('');
+    }catch(e){ box.innerHTML='<p class="muted-note">Could not load parents.</p>'; }
+  }
+
+  function closeModal(){ document.getElementById('modal').classList.remove('open'); }
+
+  document.getElementById('search').addEventListener('input', render);
+  document.getElementById('chips').addEventListener('click', e=>{
+    const c=e.target.closest('.chip'); if(!c) return;
+    filter=c.getAttribute('data-f');
+    document.querySelectorAll('.chip').forEach(x=>x.classList.toggle('active', x===c));
+    render();
+  });
+  document.addEventListener('keydown', e=>{ if(e.key==='Escape') closeModal(); });
+
+  load();
+</script>
+</body>
+</html>

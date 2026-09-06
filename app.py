@@ -118,6 +118,7 @@ SILO_KEYS = {silo["key"]: [p["key"] for p in silo["pages"]] for silo in PERMISSI
 # pages are read-only and deliberately open to any signed-in staff member.
 NAV_REFERENCE = {"key": "reference", "label": "Reference", "pages": [
     {"key": "getting_started",    "label": "Getting Started",     "href": "/getting-started"},
+    {"key": "student_directory_ref", "label": "Student Directory", "href": "/student-directory"},
     {"key": "family_directory",   "label": "Family Directory",    "href": "/family-directory"},
     {"key": "dismissal_staff",    "label": "Dismissal Staff View", "href": "/dismissal-staff"},
     {"key": "bus_dashboard",      "label": "Bus Dashboard",       "href": "/bus-dashboard"},
@@ -2779,10 +2780,12 @@ def get_students_list():
                        s.dismissal_mon,s.dismissal_tue,s.dismissal_wed,s.dismissal_thu,s.dismissal_fri,
                        s.homeroom_teacher_id,
                        s.advisory_teacher_id,
+                       hr.first_name || ' ' || hr.last_name AS homeroom_teacher_name,
                        adv.first_name || ' ' || adv.last_name AS advisory_teacher_name,
                        se.elective_id AS current_elective_id,
                        e.name AS current_elective_name
                 FROM students s
+                LEFT JOIN staff hr ON s.homeroom_teacher_id = hr.staff_id
                 LEFT JOIN staff adv ON s.advisory_teacher_id = adv.staff_id
                 LEFT JOIN student_electives se ON s.student_id = se.student_id AND se.trimester = 3
                 LEFT JOIN electives e ON se.elective_id = e.elective_id
@@ -5667,6 +5670,14 @@ def get_household(household_id):
 @login_required
 def family_directory_page():
     return send_from_directory(".", "family_directory.html")
+
+
+@app.route("/student-directory")
+@login_required
+def student_directory_readonly_page():
+    # Read-only student directory for the Reference silo (any signed-in staff).
+    # The editable version lives at /students (People silo).
+    return send_from_directory(".", "student_directory.html")
 
 
 @app.route("/api/family-directory")

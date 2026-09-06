@@ -1,6 +1,6 @@
 # Changelog
 
-2026-09-06: Student Directory — each student's profile now shows their parents/guardians (name, relationship, phone, email, pickup) as a read-only "Parents & Guardians" section, alongside the existing emergency contact. Editing parents still happens in the Family Manager.
+2026-09-06: New page — read-only Student Directory in the Reference menu (/student-directory, open to any signed-in staff). Same roster and student profiles as the People > Student Directory (contact info, emergency contact, parents/guardians, homeroom/advisory, dismissal defaults), but view-only. Editing still lives in the People silo. Added to the Reference nav group so it also appears on the portal home Reference card.
 
 2026-09-04: Schedules page — the "Look up any student's or teacher's weekly schedule…" subtitle no longer prints. It stays on screen but is hidden from Print / Save PDF, so a printed schedule just shows the person's name and their grid.
 
