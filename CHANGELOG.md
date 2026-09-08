@@ -1,5 +1,7 @@
 # Changelog
 
+2026-09-08: Family Directory — added a grade filter and grade-specific emergency printing. A "Grade" dropdown narrows the list to families with a student in that grade; when a grade is picked, the emergency button becomes "Print Emergency — Grade X" and prints a per-student roster for just that grade (each student with the family's parents/phones/pickup and the student's non-parent emergency contact), so a field-trip chaperone carries only their grade. With no grade selected it still prints the full family emergency directory. Also defaulted the People > Student Directory and the read-only Reference Student Directory to the Active filter on load.
+
 2026-09-06: New page — read-only Student Directory in the Reference menu (/student-directory, open to any signed-in staff). Same roster and student profiles as the People > Student Directory (contact info, emergency contact, parents/guardians, homeroom/advisory, dismissal defaults), but view-only. Editing still lives in the People silo. Added to the Reference nav group so it also appears on the portal home Reference card.
 
 2026-09-04: Schedules page — the "Look up any student's or teacher's weekly schedule…" subtitle no longer prints. It stays on screen but is hidden from Print / Save PDF, so a printed schedule just shows the person's name and their grid.

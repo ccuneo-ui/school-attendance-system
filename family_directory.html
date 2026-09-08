@@ -40,6 +40,8 @@
     .search-box input { width: 100%; padding: 9px 12px 9px 36px; border: 1px solid var(--border); border-radius: 8px; font-family: 'DM Sans', sans-serif; font-size: 14px; background: white; outline: none; }
     .search-box input:focus { border-color: var(--people); }
     .search-box svg { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); width: 16px; height: 16px; color: var(--muted); pointer-events: none; }
+    .grade-select { padding: 9px 12px; border: 1px solid var(--border); border-radius: 8px; font-family: 'DM Sans', sans-serif; font-size: 14px; background: white; color: var(--navy); outline: none; cursor: pointer; }
+    .grade-select:focus { border-color: var(--people); }
 
     /* ── Stats ── */
     .stats { display: flex; gap: 16px; margin-bottom: 24px; flex-wrap: wrap; }
@@ -184,9 +186,9 @@
           <svg viewBox="0 0 24 24" fill="none"><path d="M4 5h16M4 12h16M4 19h10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
           Print Contact Directory
         </button>
-        <button class="btn btn-gold" onclick="printAll()">
+        <button class="btn btn-gold" onclick="printEmergency()">
           <svg viewBox="0 0 24 24" fill="none"><path d="M6 9V2h12v7M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2M6 14h12v8H6z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          Print All Emergency Sheets
+          <span id="emgBtnLabel">Print All Emergency Sheets</span>
         </button>
       </div>
     </div>
@@ -201,6 +203,9 @@
         <svg viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="2"/><path d="M21 21l-4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
         <input type="text" id="search" placeholder="Search by family or student name…" autocomplete="off">
       </div>
+      <select id="grade-filter" class="grade-select" onchange="onGradeChange()" aria-label="Filter by grade">
+        <option value="">All grades</option>
+      </select>
     </div>
 
     <div class="table-wrap">
@@ -281,6 +286,7 @@
       const res = await fetch('/api/family-directory');
       if (!res.ok) throw new Error('HTTP ' + res.status);
       FAMILIES = await res.json();
+      populateGrades();
       render();
     } catch (e) {
       document.getElementById('tbody').innerHTML =
@@ -288,14 +294,38 @@
     }
   }
 
+  const GRADE_ORDER = ['JPK','SPK','PK','K','1','2','3','4','5','6','7','8','N/A'];
+  function gradeRank(g){ const i = GRADE_ORDER.indexOf(String(g)); return i === -1 ? 99 : i; }
+  function currentGrade(){ const el = document.getElementById('grade-filter'); return el ? el.value : ''; }
+
+  function populateGrades(){
+    const sel = document.getElementById('grade-filter');
+    if (!sel) return;
+    const grades = [...new Set(FAMILIES.flatMap(h => (h.students||[]).map(s => String(s.grade||'').trim()).filter(Boolean)))];
+    grades.sort((a,b) => gradeRank(a) - gradeRank(b) || a.localeCompare(b));
+    sel.innerHTML = '<option value="">All grades</option>' +
+      grades.map(g => '<option value="' + esc(g) + '">' + esc(gradeLabel(g)) + '</option>').join('');
+  }
+
+  function onGradeChange(){
+    const g = currentGrade();
+    document.getElementById('emgBtnLabel').textContent =
+      g ? 'Print Emergency — ' + gradeLabel(g) : 'Print All Emergency Sheets';
+    render();
+  }
+
   function render() {
     const q = document.getElementById('search').value.trim().toLowerCase();
+    const g = currentGrade();
     let list = FAMILIES;
     if (q) {
-      list = FAMILIES.filter(h => {
+      list = list.filter(h => {
         if ((h.family_name || '').toLowerCase().includes(q)) return true;
         return (h.students || []).some(s => fullName(s).toLowerCase().includes(q));
       });
+    }
+    if (g) {
+      list = list.filter(h => (h.students || []).some(s => String(s.grade) === String(g)));
     }
     const totalStudents = FAMILIES.reduce((n, h) => n + (h.students || []).length, 0);
     document.getElementById('stat-families').textContent = FAMILIES.length;
@@ -303,7 +333,7 @@
 
     const tb = document.getElementById('tbody');
     if (!list.length) {
-      tb.innerHTML = '<tr><td colspan="4" class="empty-state">No families match “' + esc(q) + '”.</td></tr>';
+      tb.innerHTML = '<tr><td colspan="4" class="empty-state">No families match the current search or grade filter.</td></tr>';
       return;
     }
     tb.innerHTML = list.map(h => {
@@ -569,9 +599,69 @@
     if (h) doPrint(sheetHTML(h));
   }
 
-  function printAll() {
+  // Per-student emergency roster for ONE grade — for field trips, so a chaperone
+  // carries only their grade's students, each with the family's parents/phones and
+  // the student's non-parent emergency contact.
+  function gradeEmergencyHTML(grade) {
+    const today = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+    const rows = [];
+    FAMILIES.forEach(h => (h.students || []).forEach(st => {
+      if (String(st.grade) === String(grade)) rows.push({ st, h });
+    }));
+    rows.sort((a, b) =>
+      (a.st.last_name || '').localeCompare(b.st.last_name || '') ||
+      (a.st.first_name || '').localeCompare(b.st.first_name || ''));
+
+    let s = '<div class="dir">';
+    s += '<div class="dir-head">' +
+         '<div class="dir-brand">Mizzentop Day School</div>' +
+         '<div class="dir-title">' + esc(gradeLabel(grade)) + ' — Emergency Contacts</div>' +
+         '<div class="dir-sub">' + rows.length + ' student' + (rows.length === 1 ? '' : 's') +
+           ' · Generated ' + esc(today) + ' · ✓ = authorized for pickup</div>' +
+         '</div>';
+    if (!rows.length) {
+      s += '<div class="fam">No active students in this grade.</div></div>';
+      return s;
+    }
+    rows.forEach(({ st, h }) => {
+      s += '<div class="fam">';
+      s += '<div class="fam-name">' + esc(fullName(st)) +
+           ' <span class="fam-addr">(' + esc(gradeShort(st.grade)) +
+           (st.homeroom_teacher_name ? ' · ' + esc(st.homeroom_teacher_name) : '') + ')</span></div>';
+      if ((h.parents || []).length) {
+        const par = h.parents.map(p => {
+          const rel = p.relationship_type ? ' <span class="mut">' + esc(p.relationship_type) + '</span>' : '';
+          const ph = p.phone ? ' ' + esc(p.phone) : '';
+          const pick = p.can_pickup ? ' <span class="ok">✓</span>' : ' <span class="mut">(no pickup)</span>';
+          return '<span class="nowrap">' + esc(fullName(p)) + rel + ph + pick + '</span>';
+        }).join(' &nbsp;·&nbsp; ');
+        s += '<div class="fam-line">' + par + '</div>';
+      }
+      if (h.primary_phone && !(h.parents || []).some(p => p.phone)) {
+        s += '<div class="fam-line mut">Home ' + esc(h.primary_phone) + '</div>';
+      }
+      if (st.emergency_contact_name || st.emergency_contact_phone) {
+        s += '<div class="fam-line"><span class="lbl">Emerg:</span> ' +
+             esc(st.emergency_contact_name || '—') +
+             (st.emergency_contact_phone ? ' ' + esc(st.emergency_contact_phone) : '') + '</div>';
+      }
+      if (st.custody_notes) {
+        s += '<div class="fam-line"><span class="lbl">Custody:</span> ' + esc(st.custody_notes) + '</div>';
+      }
+      s += '</div>';
+    });
+    s += '</div>';
+    return s;
+  }
+
+  function printEmergency() {
     if (!FAMILIES.length) { toast('Nothing to print.', true); return; }
-    doPrint(directoryHTML(FAMILIES));
+    const g = currentGrade();
+    if (g) {
+      doPrint(gradeEmergencyHTML(g));
+    } else {
+      doPrint(directoryHTML(FAMILIES));
+    }
   }
 
   function printContactDirectory() {

@@ -150,8 +150,8 @@
       <input type="text" id="search" placeholder="Search students..." oninput="render()">
     </div>
     <div class="filter-chips">
-      <div class="chip active" data-filter="all" onclick="setFilter('all',this)">All <span class="count-badge" id="chip-all">—</span></div>
-      <div class="chip" data-filter="active" onclick="setFilter('active',this)">Active <span class="count-badge" id="chip-active">—</span></div>
+      <div class="chip" data-filter="all" onclick="setFilter('all',this)">All <span class="count-badge" id="chip-all">—</span></div>
+      <div class="chip active" data-filter="active" onclick="setFilter('active',this)">Active <span class="count-badge" id="chip-active">—</span></div>
       <div class="chip" data-filter="inactive" onclick="setFilter('inactive',this)">Inactive <span class="count-badge" id="chip-inactive">—</span></div>
       <div class="chip" data-filter="guest" onclick="setFilter('guest',this)">Guest <span class="count-badge" id="chip-guest">—</span></div>
     </div>
@@ -322,7 +322,7 @@ let DISMISSAL_OPTIONS = [
 
 let allStudents = [];
 let allStaff = [];
-let currentFilter = 'all';
+let currentFilter = 'active';
 let sortKey = 'last_name';
 let sortAsc = true;
 let editingId = null;
