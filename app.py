@@ -2396,6 +2396,19 @@ def api_add_student_note():
         conn.close()
 
 
+@app.route("/api/permission-silos")
+@login_required
+def api_permission_silos():
+    """The permission model itself, so the Staff Directory's permission modal
+    is built from PERMISSION_SILOS instead of a hand-maintained copy that
+    silently goes stale every time a page is added."""
+    return jsonify([
+        {"key": silo["key"], "label": silo["label"],
+         "pages": [{"key": pg["key"], "label": pg["label"]} for pg in silo["pages"]]}
+        for silo in PERMISSION_SILOS
+    ])
+
+
 # ============================================
 # NORTH STAR - student development journal
 # ============================================

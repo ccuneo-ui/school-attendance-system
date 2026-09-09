@@ -106,6 +106,22 @@
     .checkbox-row label { font-size: 13px; color: var(--navy); cursor: pointer; font-weight: 500; }
     .muted-note { font-size: 12px; color: var(--muted); margin-top: -2px; }
 
+    .page-header-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+    .btn-add { appearance: none; border: 1px solid var(--border); background: white; color: var(--people); font-family: 'DM Sans', sans-serif; font-size: 12px; font-weight: 600; padding: 4px 10px; border-radius: 6px; cursor: pointer; }
+    .btn-add:hover { border-color: var(--people); background: #f2f5f8; }
+    .row-remove { appearance: none; border: none; background: none; color: #8a1a1a; font-size: 12px; font-weight: 600; cursor: pointer; padding: 2px 4px; }
+    .row-remove:hover { text-decoration: underline; }
+    .a-field label, .mini-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted); display: block; margin-bottom: 5px; }
+    .attach-input { width: 100%; padding: 9px 12px; border: 1px solid var(--border); border-radius: 8px; font-family: 'DM Sans', sans-serif; font-size: 14px; color: var(--navy); outline: none; }
+    .attach-input:focus { border-color: var(--people); }
+    .attach-results { border: 1px solid var(--border); border-radius: 8px; margin-top: 4px; max-height: 190px; overflow-y: auto; }
+    .attach-results:empty { display: none; }
+    .attach-item { padding: 8px 12px; font-size: 13px; cursor: pointer; border-bottom: 1px solid var(--border); }
+    .attach-item:last-child { border-bottom: none; }
+    .attach-item:hover { background: #f2f5f8; }
+    .chip-attached { display: inline-flex; align-items: center; gap: 6px; background: var(--active-bg); color: var(--active-txt); border-radius: 20px; padding: 3px 6px 3px 11px; font-size: 12px; font-weight: 600; margin: 6px 6px 0 0; }
+    .chip-attached button { border: none; background: none; color: var(--active-txt); cursor: pointer; font-size: 15px; line-height: 1; padding: 0 2px; }
+
     .modal-actions { display: flex; gap: 10px; justify-content: flex-end; padding: 16px 28px 24px; border-top: 1px solid var(--border); position: sticky; bottom: 0; background: white; }
 
     .toast { position: fixed; bottom: 28px; left: 50%; transform: translateX(-50%) translateY(20px); background: var(--navy); color: white; padding: 10px 20px; border-radius: 8px; font-size: 14px; font-weight: 500; opacity: 0; transition: all 0.25s; pointer-events: none; z-index: 500; white-space: nowrap; }
@@ -123,8 +139,13 @@
 
 <div class="page">
   <div class="page-header">
-    <h1>Family Manager</h1>
-    <p>Edit household contact information and parents &amp; guardians. Changes save to the live records. Student details, including each student’s emergency contact, are edited in the Student Directory.</p>
+    <div class="page-header-row">
+      <div>
+        <h1>Family Manager</h1>
+        <p>Edit household contact information and parents &amp; guardians. Changes save to the live records. Student details, including each student’s emergency contact, are edited in the Student Directory.</p>
+      </div>
+      <button class="btn btn-primary" onclick="openAddFamily()" style="white-space:nowrap">＋ Add Family</button>
+    </div>
   </div>
 
   <div class="stats">
@@ -167,6 +188,55 @@
       <button class="btn btn-primary" id="saveBtn" onclick="saveFamily()">
         <svg viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4L19 7" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
         Save Changes
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Add Family modal -->
+<div class="modal-overlay" id="add-modal" onclick="if(event.target===this)closeAdd()">
+  <div class="modal">
+    <div class="modal-header">
+      <div>
+        <h2>Add Family</h2>
+        <p>Create a new household with its parents/guardians and children. Full student details are filled in afterward in the Student Directory.</p>
+      </div>
+      <button class="modal-close" onclick="closeAdd()">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div class="section-title">Household</div>
+      <div class="form-grid">
+        <div class="field span2"><label>Family Name *</label><input type="text" id="a_family_name" placeholder="e.g. Smith"></div>
+        <div class="field span2"><label>Address Line 1</label><input type="text" id="a_addr1"></div>
+        <div class="field span2"><label>Address Line 2</label><input type="text" id="a_addr2"></div>
+        <div class="field"><label>City</label><input type="text" id="a_city"></div>
+        <div class="form-grid" style="grid-column:span 2;grid-template-columns:1fr 1fr;gap:12px">
+          <div class="field"><label>State</label><input type="text" id="a_state"></div>
+          <div class="field"><label>ZIP</label><input type="text" id="a_zip"></div>
+        </div>
+        <div class="field"><label>Primary Phone</label><input type="text" id="a_phone"></div>
+        <div class="field"><label>Primary Email</label><input type="text" id="a_email"></div>
+      </div>
+
+      <div class="section-title">Parents &amp; Guardians <button type="button" class="btn-add" onclick="addParentRow()">＋ Add parent</button></div>
+      <div id="a-parents"></div>
+
+      <div class="section-title">Students <button type="button" class="btn-add" onclick="addStudentRow()">＋ Add student</button></div>
+      <div id="a-students"></div>
+      <p class="muted-note" style="margin-top:2px">Enter each child's name and grade. DOB, dismissal, homeroom and emergency contact are set later in the Student Directory.</p>
+
+      <div style="margin-top:16px">
+        <label class="mini-label">Attach a sibling already enrolled (optional)</label>
+        <input type="text" id="a-attach-search" class="attach-input" placeholder="Search existing students by name…" oninput="attachSearch()" autocomplete="off">
+        <div class="attach-results" id="a-attach-results"></div>
+        <div id="a-attached"></div>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeAdd()">Cancel</button>
+      <button class="btn btn-primary" id="createBtn" onclick="createFamily()">
+        <svg viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>
+        Create Family
       </button>
     </div>
   </div>
@@ -390,8 +460,176 @@
     }
   }
 
+  // ── Add Family ─────────────────────────────────────────────────────────────
+  const GRADES = ['JPK','SPK','K','1','2','3','4','5','6','7','8','N/A'];
+  let addSeq = 0;
+  let ROSTER = [];
+  let rosterLoaded = false;
+  const attachedIds = new Set();
+
+  function postJSON(url, body) {
+    return fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  }
+
+  async function openAddFamily() {
+    ['a_family_name','a_addr1','a_addr2','a_city','a_state','a_zip','a_phone','a_email','a-attach-search']
+      .forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+    document.getElementById('a-parents').innerHTML = '';
+    document.getElementById('a-students').innerHTML = '';
+    document.getElementById('a-attach-results').innerHTML = '';
+    document.getElementById('a-attached').innerHTML = '';
+    attachedIds.clear();
+    addParentRow();
+    addStudentRow();
+    document.getElementById('add-modal').classList.add('open');
+    document.getElementById('a_family_name').focus();
+    if (!rosterLoaded) {
+      try {
+        const r = await fetch('/api/students');
+        if (r.ok) { ROSTER = await r.json(); rosterLoaded = true; }
+      } catch (e) { /* attach is optional */ }
+    }
+  }
+
+  function closeAdd() { document.getElementById('add-modal').classList.remove('open'); }
+
+  function addParentRow() {
+    const n = ++addSeq;
+    const div = document.createElement('div');
+    div.className = 'card-edit';
+    div.setAttribute('data-prow', n);
+    div.innerHTML =
+      '<div class="card-top"><span class="card-name">Parent / Guardian</span>' +
+        '<button type="button" class="row-remove" onclick="this.closest(\'[data-prow]\').remove()">Remove</button></div>' +
+      '<div class="form-grid">' +
+        field('First Name', 'a_p_first_' + n, '') +
+        field('Last Name', 'a_p_last_' + n, '') +
+        field('Relationship', 'a_p_rel_' + n, '') +
+        field('Phone', 'a_p_phone_' + n, '') +
+        '<div class="field span2"><label>Email</label><input type="text" id="a_p_email_' + n + '"></div>' +
+        '<div class="checkbox-row"><input type="checkbox" id="a_p_pickup_' + n + '" checked>' +
+          '<label for="a_p_pickup_' + n + '">Authorized for pickup</label></div>' +
+        '<div class="field"><label>Notes</label><input type="text" id="a_p_notes_' + n + '"></div>' +
+      '</div>';
+    document.getElementById('a-parents').appendChild(div);
+  }
+
+  function addStudentRow() {
+    const n = ++addSeq;
+    const opts = '<option value="">Grade…</option>' + GRADES.map(g => '<option value="' + g + '">' + esc(gradeLabel(g)) + '</option>').join('');
+    const div = document.createElement('div');
+    div.className = 'card-edit';
+    div.setAttribute('data-srow', n);
+    div.innerHTML =
+      '<div class="form-grid" style="grid-template-columns:1fr 1fr 0.8fr;align-items:end">' +
+        field('First Name', 'a_s_first_' + n, '') +
+        field('Last Name', 'a_s_last_' + n, '') +
+        '<div class="field"><label>Grade</label><select id="a_s_grade_' + n + '">' + opts + '</select></div>' +
+      '</div>' +
+      '<div style="text-align:right;margin-top:6px"><button type="button" class="row-remove" onclick="this.closest(\'[data-srow]\').remove()">Remove</button></div>';
+    document.getElementById('a-students').appendChild(div);
+  }
+
+  function attachSearch() {
+    const q = document.getElementById('a-attach-search').value.trim().toLowerCase();
+    const box = document.getElementById('a-attach-results');
+    if (!q) { box.innerHTML = ''; return; }
+    const matches = ROSTER
+      .filter(s => (((s.first_name || '') + ' ' + (s.last_name || '')).toLowerCase().includes(q)) && !attachedIds.has(s.student_id))
+      .slice(0, 8);
+    box.innerHTML = matches.length
+      ? matches.map(s => '<div class="attach-item" onclick="attachStudent(' + s.student_id + ')">' +
+          esc(fullName(s)) + ' <span style="color:var(--muted)">(' + esc(gradeLabel(s.grade)) + ' · ' + esc(s.status || '') + ')</span></div>').join('')
+      : '<div class="attach-item" style="color:var(--muted);cursor:default">No matches</div>';
+  }
+
+  function attachStudent(id) {
+    const s = ROSTER.find(x => x.student_id === id);
+    if (!s) return;
+    attachedIds.add(id);
+    document.getElementById('a-attach-search').value = '';
+    document.getElementById('a-attach-results').innerHTML = '';
+    renderAttached();
+  }
+
+  function renderAttached() {
+    document.getElementById('a-attached').innerHTML = [...attachedIds].map(id => {
+      const s = ROSTER.find(x => x.student_id === id) || {};
+      return '<span class="chip-attached">' + esc(fullName(s)) +
+        ' <button type="button" onclick="detachStudent(' + id + ')" title="Remove">&times;</button></span>';
+    }).join('');
+  }
+
+  function detachStudent(id) { attachedIds.delete(id); renderAttached(); }
+
+  async function createFamily() {
+    const fname = val('a_family_name');
+    if (!fname) { toast('Family name is required.', true); return; }
+    const btn = document.getElementById('createBtn');
+    btn.disabled = true;
+    try {
+      // 1) Household
+      const hres = await postJSON('/api/households', {
+        family_name: fname, status: 'active',
+        address_line_1: val('a_addr1'), address_line_2: val('a_addr2'),
+        city: val('a_city'), state: val('a_state'), zip: val('a_zip'),
+        primary_phone: val('a_phone'), primary_email: val('a_email')
+      });
+      if (!hres.ok) throw new Error('household');
+      const hid = (await hres.json()).household_id;
+
+      // 2) Parents
+      let role = 'primary';
+      for (const row of document.querySelectorAll('[data-prow]')) {
+        const n = row.getAttribute('data-prow');
+        const first = val('a_p_first_' + n), last = val('a_p_last_' + n);
+        if (!first && !last) continue;
+        const pr = await postJSON('/api/parents', {
+          first_name: first, last_name: last,
+          relationship_type: val('a_p_rel_' + n), phone: val('a_p_phone_' + n),
+          email: val('a_p_email_' + n),
+          can_pickup: document.getElementById('a_p_pickup_' + n).checked,
+          notes: val('a_p_notes_' + n)
+        });
+        if (pr.ok) {
+          const pid = (await pr.json()).parent_id;
+          await postJSON('/api/households/' + hid + '/parents', { parent_id: pid, role });
+          role = 'secondary';
+        }
+      }
+
+      // 3) New students
+      for (const row of document.querySelectorAll('[data-srow]')) {
+        const n = row.getAttribute('data-srow');
+        const first = val('a_s_first_' + n), last = val('a_s_last_' + n);
+        if (!first && !last) continue;
+        const sr = await postJSON('/api/students', {
+          first_name: first, last_name: last,
+          grade: document.getElementById('a_s_grade_' + n).value, status: 'active'
+        });
+        if (sr.ok) {
+          const sid = (await sr.json()).student_id;
+          await postJSON('/api/households/' + hid + '/students', { student_id: sid, is_primary: true });
+        }
+      }
+
+      // 4) Attached existing students
+      for (const sid of attachedIds) {
+        await postJSON('/api/households/' + hid + '/students', { student_id: sid, is_primary: true });
+      }
+
+      toast('Family created ✓');
+      closeAdd();
+      await load();
+    } catch (e) {
+      toast('Could not create family (' + e.message + ').', true);
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
   document.getElementById('search').addEventListener('input', render);
-  document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeModal(); closeAdd(); } });
 
   load();
 </script>

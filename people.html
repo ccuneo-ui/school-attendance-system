@@ -239,8 +239,9 @@
   let editingId = null;
   let ME = { is_superadmin:false, can_manage_permissions:false, email:'' };
 
-  // Mirrors PERMISSION_SILOS in app.py. Keep in sync if pages are added.
-  const PERM_SILOS = [
+  // Default shape only — the real list is fetched from /api/permission-silos
+  // at load so this page can never drift from PERMISSION_SILOS in app.py.
+  let PERM_SILOS = [
     { key:'daily_input', label:'Daily Input', pages:[
       ['homeroom_attendance','Homeroom Attendance'],
       ['daily_ops','Daily Ops'],
@@ -248,6 +249,7 @@
       ['program_attendance','Program Attendance'],
       ['aftercare','Before & Aftercare'],
       ['school_store','School Store'],
+      ['north_star','North Star Journal'],
       ['dismissal_options','Activities & Bus Routes'],
     ]},
     { key:'people', label:'People', pages:[
@@ -256,7 +258,10 @@
       ['staff_directory','Staff Directory'],
       ['classes','Classes'],
       ['scheduler','Scheduler'],
+      ['special_services','Special Services'],
       ['rooms','Rooms'],
+      ['report_card_templates','Report Card Templates'],
+      ['report_cards','Report Cards'],
     ]},
     { key:'billing', label:'Billing', pages:[
       ['billing_rates','Billing Rates'],
@@ -266,7 +271,24 @@
       ['financial_aid','Financial Aid'],
     ]},
   ];
-  const DAILY_BASICS = PERM_SILOS[0].pages.map(p=>p[0]).filter(k=>k!=='dismissal_options');
+  let DAILY_BASICS = PERM_SILOS[0].pages.map(p=>p[0]).filter(k=>k!=='dismissal_options');
+
+  // Pull the live permission model from the server so a newly added page shows
+  // up here automatically. Falls back to the list above if the call fails.
+  async function loadPermSilos() {
+    try {
+      const r = await fetch('/api/permission-silos');
+      if (!r.ok) return;
+      const silos = await r.json();
+      if (Array.isArray(silos) && silos.length) {
+        PERM_SILOS = silos.map(s => ({
+          key: s.key, label: s.label, pages: s.pages.map(p => [p.key, p.label])
+        }));
+        const di = PERM_SILOS.filter(s => s.key === 'daily_input')[0];
+        if (di) DAILY_BASICS = di.pages.map(p => p[0]).filter(k => k !== 'dismissal_options');
+      }
+    } catch(e) {}
+  }
 
   async function loadMe() {
     try {
@@ -536,6 +558,7 @@
 
   (async function init() {
     await loadMe();
+    await loadPermSilos();
     buildPermsUI();
     loadStaff();
   })();
