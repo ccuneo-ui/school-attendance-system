@@ -452,8 +452,15 @@ async function submitAttendance() {
     });
     const data = await res.json();
     if (data.success) {
-      showToast(`Saved attendance for ${data.saved_count} students`, 'success');
-      document.getElementById('submitted-badge').classList.add('show');
+      const marked = Object.keys(payload).length;
+      if (data.saved_count < marked) {
+        // Never report success for a partial save — this hid missing students before.
+        console.warn('Attendance save errors:', data.errors);
+        showToast(`Only ${data.saved_count} of ${marked} students saved. Please tell the office.`, 'error');
+      } else {
+        showToast(`Saved attendance for ${data.saved_count} students`, 'success');
+        document.getElementById('submitted-badge').classList.add('show');
+      }
     } else {
       showToast(data.error || 'Error saving', 'error');
     }

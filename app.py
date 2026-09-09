@@ -84,6 +84,7 @@ PERMISSION_SILOS = [
         {"key": "program_attendance",  "label": "Program Attendance",    "href": "/program-attendance"},
         {"key": "aftercare",           "label": "Before & Aftercare",    "href": "/aftercare"},
         {"key": "school_store",        "label": "School Store",          "href": "/school-store"},
+        {"key": "north_star",          "label": "North Star Journal",    "href": "/north-star"},
         {"key": "dismissal_options",   "label": "Activities & Bus Routes","href": "/dismissal-options"},
     ]},
     {"key": "people", "label": "People", "pages": [
@@ -129,6 +130,22 @@ NAV_REFERENCE = {"key": "reference", "label": "Reference", "pages": [
 
 # Order the menus appear in the bar.
 NAV_GROUP_ORDER = ["daily_input", "reference", "people", "billing"]
+
+
+# -- North Star student development journal ---------------------------------
+# Staff log short journal entries against a student under one of these
+# categories. The two "save for ..." toggles on an entry are flags, not
+# categories, so an entry can be a category note AND earmarked for a narrative.
+NORTH_STAR_CATEGORIES = [
+    {"key": "living_values",     "label": "Living Values Shout Out"},
+    {"key": "student_interest",  "label": "Student Interest"},
+    {"key": "academic",          "label": "Academic Note"},
+    {"key": "disciplinary",      "label": "Disciplinary"},
+    {"key": "parent_discussion", "label": "Parent Discussion Note"},
+    {"key": "support",           "label": "Area of Support Needed / Sensitivity"},
+    {"key": "passion_project",   "label": "8th Grade Passion Project"},
+]
+NORTH_STAR_CATEGORY_KEYS = {c["key"] for c in NORTH_STAR_CATEGORIES}
 
 
 def permissions_for_staff(staff):
@@ -867,6 +884,36 @@ def init_db():
             """)
             cur.execute("CREATE INDEX IF NOT EXISTS idx_student_notes_student ON student_notes(student_id)")
 
+            # North Star journal (student development program)
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS north_star_values (
+                    value_id   SERIAL PRIMARY KEY,
+                    name       TEXT NOT NULL,
+                    is_active  BOOLEAN NOT NULL DEFAULT TRUE,
+                    sort_order INTEGER NOT NULL DEFAULT 0
+                )
+            """)
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS north_star_entries (
+                    entry_id        SERIAL PRIMARY KEY,
+                    student_id      INTEGER NOT NULL REFERENCES students(student_id) ON DELETE CASCADE,
+                    category        TEXT NOT NULL,
+                    living_value    TEXT,
+                    body            TEXT NOT NULL,
+                    entry_date      DATE NOT NULL DEFAULT CURRENT_DATE,
+                    school_year     INTEGER,
+                    for_report_card BOOLEAN NOT NULL DEFAULT FALSE,
+                    for_graduation  BOOLEAN NOT NULL DEFAULT FALSE,
+                    author_staff_id INTEGER REFERENCES staff(staff_id) ON DELETE SET NULL,
+                    author_name     TEXT,
+                    created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+            cur.execute("CREATE INDEX IF NOT EXISTS idx_ns_entries_student ON north_star_entries(student_id)")
+            cur.execute("CREATE INDEX IF NOT EXISTS idx_ns_entries_date ON north_star_entries(entry_date)")
+            cur.execute("CREATE INDEX IF NOT EXISTS idx_ns_entries_author ON north_star_entries(author_staff_id)")
+
             # Add trimester, instructor_id, division columns to electives if missing
             for col, typedef in [('trimester', 'INTEGER'), ('instructor_id', 'INTEGER REFERENCES staff(staff_id)'), ('division', 'TEXT')]:
                 cur.execute("""
@@ -1165,6 +1212,11 @@ def rooms_page():
 @require_perm("special_services")
 def special_services_page():
     return send_from_directory(".", "special_services.html")
+
+@app.route("/north-star")
+@require_perm("north_star")
+def north_star_page():
+    return send_from_directory(".", "north_star_journal.html")
 
 @app.route("/staff")
 @app.route("/people")
@@ -1872,6 +1924,47 @@ def get_dismissal_attendance(date):
     finally:
         conn.close()
 
+def _ensure_general_enrollment(cur, student_id, program_id):
+    """Return the student's active enrollment_id for a program, creating or
+    reactivating the enrollment row if it is missing.
+
+    Enrollments in "General Attendance" were originally created by a one-time
+    backfill script. Students added afterwards (new admits, the yearly roll
+    forward, students added on the People page) had no enrollment row, so their
+    attendance was silently skipped on save. This closes that hole.
+    Returns None only if the enrollment row could not be created.
+    Requires a RealDictCursor.
+    """
+    cur.execute("SELECT enrollment_id FROM enrollments WHERE student_id=%s AND program_id=%s AND status='active'",
+                (student_id, program_id))
+    row = fo(cur)
+    if row:
+        return row["enrollment_id"]
+    try:
+        cur.execute("SAVEPOINT ensure_enrollment")
+        # Reactivate a lapsed enrollment rather than creating a duplicate.
+        cur.execute("SELECT enrollment_id FROM enrollments WHERE student_id=%s AND program_id=%s "
+                    "ORDER BY enrollment_id DESC LIMIT 1", (student_id, program_id))
+        row = fo(cur)
+        if row:
+            cur.execute("UPDATE enrollments SET status='active' WHERE enrollment_id=%s", (row["enrollment_id"],))
+            enrollment_id = row["enrollment_id"]
+        else:
+            cur.execute("INSERT INTO enrollments (student_id, program_id, start_date, status) "
+                        "VALUES (%s,%s,CURRENT_DATE,'active') RETURNING enrollment_id",
+                        (student_id, program_id))
+            enrollment_id = fo(cur)["enrollment_id"]
+        cur.execute("RELEASE SAVEPOINT ensure_enrollment")
+        return enrollment_id
+    except Exception as e:
+        try:
+            cur.execute("ROLLBACK TO SAVEPOINT ensure_enrollment")
+        except Exception:
+            pass
+        print("[_ensure_general_enrollment] student %s program %s failed: %s" % (student_id, program_id, e))
+        return None
+
+
 @app.route("/api/dismissal/attendance", methods=["POST"])
 def save_dismissal_attendance():
     data = request.json
@@ -1886,10 +1979,8 @@ def save_dismissal_attendance():
             cur.execute("SELECT program_id FROM programs WHERE program_name='General Attendance' AND status='active' LIMIT 1")
             program = fo(cur)
             if not program: return jsonify({"error":"Program not found"}),404
-            cur.execute("SELECT enrollment_id FROM enrollments WHERE student_id=%s AND program_id=%s AND status='active'",(student_id,program["program_id"]))
-            enrollment = fo(cur)
-            if not enrollment: return jsonify({"error":"Not enrolled"}),404
-            enrollment_id = enrollment["enrollment_id"]
+            enrollment_id = _ensure_general_enrollment(cur, student_id, program["program_id"])
+            if not enrollment_id: return jsonify({"error":"Could not enroll student in General Attendance"}),500
             if not status:
                 cur.execute("DELETE FROM attendance_records WHERE enrollment_id=%s AND attendance_date=%s",(enrollment_id,date))
             else:
@@ -1997,10 +2088,9 @@ def save_homeroom_attendance():
                 note = record.get("note", "")
                 if not status:
                     continue
-                cur.execute("SELECT enrollment_id FROM enrollments WHERE student_id=%s AND program_id=%s AND status='active'", (student_id, program_id))
-                enrollment = fo(cur)
-                if not enrollment:
-                    errors.append(f"No enrollment for student {student_id}")
+                enrollment_id = _ensure_general_enrollment(cur, student_id, program_id)
+                if not enrollment_id:
+                    errors.append(f"Could not record student {student_id} (no General Attendance enrollment)")
                     continue
                 cur.execute("""
                     INSERT INTO attendance_records (enrollment_id, attendance_date, status, recorded_by, notes)
@@ -2008,7 +2098,7 @@ def save_homeroom_attendance():
                     ON CONFLICT (enrollment_id, attendance_date) DO UPDATE SET
                         status = EXCLUDED.status, notes = EXCLUDED.notes,
                         recorded_by = EXCLUDED.recorded_by, recorded_at = CURRENT_TIMESTAMP
-                """, (enrollment["enrollment_id"], date, status, staff_id, note))
+                """, (enrollment_id, date, status, staff_id, note))
                 saved_count += 1
         conn.commit()
         return jsonify({"success": True, "saved_count": saved_count, "errors": errors})
@@ -2299,6 +2389,271 @@ def api_add_student_note():
             row = fo(cur)
             conn.commit()
             return jsonify({"success": True, "note": row}), 201
+    except Exception as e:
+        conn.rollback()
+        return jsonify({"error": str(e)}), 500
+    finally:
+        conn.close()
+
+
+# ============================================
+# NORTH STAR - student development journal
+# ============================================
+
+def _north_star_author(cur):
+    """(staff_id, display name) for the signed-in user."""
+    staff = _staff_row_for_email(cur, session.get("user_email"))
+    if staff:
+        return staff["staff_id"], ("%s %s" % (staff["first_name"], staff["last_name"])).strip()
+    return None, (session.get("user_name") or session.get("user_email") or "")
+
+
+def _can_manage_north_star_values():
+    """Who may edit the Living Values list itself."""
+    return bool(session.get("is_superadmin") or has_perm("staff_directory"))
+
+
+def _ns_shape(row, me_staff_id):
+    """Serialize an entry row for the browser."""
+    r = dict(row)
+    for k in ("entry_date", "created_at", "updated_at"):
+        if r.get(k) is not None and hasattr(r[k], "isoformat"):
+            r[k] = r[k].isoformat()
+    r["can_edit"] = bool(session.get("is_superadmin")) or (
+        me_staff_id is not None and r.get("author_staff_id") == me_staff_id)
+    return r
+
+
+@app.route("/api/north-star/meta")
+@require_perm("north_star")
+def api_north_star_meta():
+    conn = get_db_connection()
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute("""SELECT student_id, first_name, last_name, grade
+                           FROM students WHERE status='active'
+                           ORDER BY last_name, first_name""")
+            students = fa(cur)
+            cur.execute("""SELECT value_id, name FROM north_star_values
+                           WHERE is_active ORDER BY sort_order, name""")
+            values = fa(cur)
+            staff_id, name = _north_star_author(cur)
+        return jsonify({
+            "categories": NORTH_STAR_CATEGORIES,
+            "students": students,
+            "values": values,
+            "me": {"staff_id": staff_id, "name": name},
+            "can_manage_values": _can_manage_north_star_values(),
+        })
+    finally:
+        conn.close()
+
+
+@app.route("/api/north-star/entries")
+@require_perm("north_star")
+def api_north_star_entries():
+    student_id = request.args.get("student_id")
+    category   = (request.args.get("category") or "").strip()
+    mine       = request.args.get("mine") == "1"
+    flag       = (request.args.get("flag") or "").strip()
+    try:
+        limit = min(int(request.args.get("limit") or 60), 400)
+    except ValueError:
+        limit = 60
+
+    conn = get_db_connection()
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            me_id, _unused = _north_star_author(cur)
+            where, params = [], []
+            if student_id:
+                where.append("e.student_id = %s"); params.append(student_id)
+            if category in NORTH_STAR_CATEGORY_KEYS:
+                where.append("e.category = %s"); params.append(category)
+            if flag == "report_card":
+                where.append("e.for_report_card")
+            elif flag == "graduation":
+                where.append("e.for_graduation")
+            if mine:
+                if me_id is None:
+                    return jsonify([])
+                where.append("e.author_staff_id = %s"); params.append(me_id)
+
+            sql = """SELECT e.*, s.first_name AS student_first, s.last_name AS student_last,
+                            s.grade AS student_grade
+                     FROM north_star_entries e
+                     JOIN students s ON s.student_id = e.student_id"""
+            if where:
+                sql += " WHERE " + " AND ".join(where)
+            sql += " ORDER BY e.entry_date DESC, e.entry_id DESC LIMIT %s"
+            cur.execute(sql, params + [limit])
+            return jsonify([_ns_shape(r, me_id) for r in fa(cur)])
+    finally:
+        conn.close()
+
+
+@app.route("/api/north-star/entries", methods=["POST"])
+@require_perm("north_star")
+def api_north_star_create():
+    data = request.json or {}
+    ids = data.get("student_ids")
+    if not ids and data.get("student_id"):
+        ids = [data["student_id"]]
+    ids = [int(i) for i in (ids or [])]
+    category = (data.get("category") or "").strip()
+    body = (data.get("body") or "").strip()
+
+    if not ids:
+        return jsonify({"error": "Pick at least one student."}), 400
+    if category not in NORTH_STAR_CATEGORY_KEYS:
+        return jsonify({"error": "Pick a category."}), 400
+    if not body:
+        return jsonify({"error": "The entry can't be empty."}), 400
+
+    living_value = (data.get("living_value") or "").strip() or None
+    if category != "living_values":
+        living_value = None
+    entry_date = (data.get("entry_date") or "").strip() or datetime.now().strftime("%Y-%m-%d")
+    for_rc = bool(data.get("for_report_card"))
+    for_grad = bool(data.get("for_graduation"))
+
+    conn = get_db_connection()
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            author_id, author_name = _north_star_author(cur)
+            try:
+                sy = current_school_year_start()
+            except Exception:
+                sy = None
+            saved = []
+            for sid in ids:
+                cur.execute("""
+                    INSERT INTO north_star_entries
+                        (student_id, category, living_value, body, entry_date, school_year,
+                         for_report_card, for_graduation, author_staff_id, author_name)
+                    VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                    RETURNING entry_id
+                """, (sid, category, living_value, body, entry_date, sy,
+                      for_rc, for_grad, author_id, author_name))
+                saved.append(fo(cur)["entry_id"])
+            conn.commit()
+        return jsonify({"success": True, "saved": len(saved), "entry_ids": saved}), 201
+    except Exception as e:
+        conn.rollback()
+        return jsonify({"error": str(e)}), 500
+    finally:
+        conn.close()
+
+
+@app.route("/api/north-star/entries/<int:entry_id>", methods=["PUT"])
+@require_perm("north_star")
+def api_north_star_update(entry_id):
+    data = request.json or {}
+    conn = get_db_connection()
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            me_id, _unused = _north_star_author(cur)
+            cur.execute("SELECT * FROM north_star_entries WHERE entry_id=%s", (entry_id,))
+            row = fo(cur)
+            if not row:
+                return jsonify({"error": "Entry not found."}), 404
+            if not (session.get("is_superadmin") or (me_id and row["author_staff_id"] == me_id)):
+                return jsonify({"error": "You can only edit your own entries."}), 403
+
+            category = (data.get("category") or row["category"]).strip()
+            if category not in NORTH_STAR_CATEGORY_KEYS:
+                return jsonify({"error": "Pick a category."}), 400
+            body = (data.get("body") if data.get("body") is not None else row["body"]).strip()
+            if not body:
+                return jsonify({"error": "The entry can't be empty."}), 400
+            living_value = data.get("living_value", row["living_value"])
+            living_value = (living_value or "").strip() or None
+            if category != "living_values":
+                living_value = None
+            entry_date = (data.get("entry_date") or "").strip() or row["entry_date"]
+            for_rc = bool(data["for_report_card"]) if "for_report_card" in data else row["for_report_card"]
+            for_grad = bool(data["for_graduation"]) if "for_graduation" in data else row["for_graduation"]
+
+            cur.execute("""
+                UPDATE north_star_entries
+                   SET category=%s, living_value=%s, body=%s, entry_date=%s,
+                       for_report_card=%s, for_graduation=%s, updated_at=CURRENT_TIMESTAMP
+                 WHERE entry_id=%s
+            """, (category, living_value, body, entry_date, for_rc, for_grad, entry_id))
+            conn.commit()
+        return jsonify({"success": True})
+    except Exception as e:
+        conn.rollback()
+        return jsonify({"error": str(e)}), 500
+    finally:
+        conn.close()
+
+
+@app.route("/api/north-star/entries/<int:entry_id>", methods=["DELETE"])
+@require_perm("north_star")
+def api_north_star_delete(entry_id):
+    conn = get_db_connection()
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            me_id, _unused = _north_star_author(cur)
+            cur.execute("SELECT author_staff_id FROM north_star_entries WHERE entry_id=%s", (entry_id,))
+            row = fo(cur)
+            if not row:
+                return jsonify({"error": "Entry not found."}), 404
+            if not (session.get("is_superadmin") or (me_id and row["author_staff_id"] == me_id)):
+                return jsonify({"error": "You can only delete your own entries."}), 403
+            cur.execute("DELETE FROM north_star_entries WHERE entry_id=%s", (entry_id,))
+            conn.commit()
+        return jsonify({"success": True})
+    except Exception as e:
+        conn.rollback()
+        return jsonify({"error": str(e)}), 500
+    finally:
+        conn.close()
+
+
+@app.route("/api/north-star/values", methods=["POST"])
+@require_perm("north_star")
+def api_north_star_add_value():
+    if not _can_manage_north_star_values():
+        return jsonify({"error": "You don't have permission to edit the Living Values list."}), 403
+    name = ((request.json or {}).get("name") or "").strip()
+    if not name:
+        return jsonify({"error": "Name required."}), 400
+    conn = get_db_connection()
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute("SELECT value_id FROM north_star_values WHERE lower(name)=lower(%s)", (name,))
+            existing = fo(cur)
+            if existing:
+                cur.execute("UPDATE north_star_values SET is_active=TRUE WHERE value_id=%s",
+                            (existing["value_id"],))
+                new_id = existing["value_id"]
+            else:
+                cur.execute("""INSERT INTO north_star_values (name, sort_order)
+                               VALUES (%s, COALESCE((SELECT MAX(sort_order)+1 FROM north_star_values),1))
+                               RETURNING value_id""", (name,))
+                new_id = fo(cur)["value_id"]
+            conn.commit()
+        return jsonify({"success": True, "value_id": new_id}), 201
+    except Exception as e:
+        conn.rollback()
+        return jsonify({"error": str(e)}), 500
+    finally:
+        conn.close()
+
+
+@app.route("/api/north-star/values/<int:value_id>", methods=["DELETE"])
+@require_perm("north_star")
+def api_north_star_remove_value(value_id):
+    if not _can_manage_north_star_values():
+        return jsonify({"error": "You don't have permission to edit the Living Values list."}), 403
+    conn = get_db_connection()
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute("UPDATE north_star_values SET is_active=FALSE WHERE value_id=%s", (value_id,))
+            conn.commit()
+        return jsonify({"success": True})
     except Exception as e:
         conn.rollback()
         return jsonify({"error": str(e)}), 500
@@ -2846,6 +3201,14 @@ def create_student():
                   data.get("dismissal_mon"),data.get("dismissal_tue"),data.get("dismissal_wed"),
                   data.get("dismissal_thu"),data.get("dismissal_fri"),hr_id))
             new_id = cur.fetchone()[0]
+            # Every active student needs a General Attendance enrollment or their
+            # homeroom attendance cannot be saved against them.
+            if data.get("status", "active") == "active":
+                cur.execute("SELECT program_id FROM programs WHERE program_name='General Attendance' AND status='active' LIMIT 1")
+                prog = cur.fetchone()
+                if prog:
+                    cur.execute("INSERT INTO enrollments (student_id, program_id, start_date, status) "
+                                "VALUES (%s,%s,CURRENT_DATE,'active')", (new_id, prog[0]))
         conn.commit()
         return jsonify({"success":True,"student_id":new_id}),201
     except Exception as e:

@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>North Star Journal — Mizzentop Day School</title>
+<link rel="icon" type="image/svg+xml" href="/logo.svg">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=DM+Sans:wght@300;400;500;700&display=swap" rel="stylesheet"/>
+<style>
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+  :root{--navy:#1a2744;--green:#2d5016;--gold:#c8992a;--cream:#f7f3ec;--muted:#6b7280;--light:#e8e2d9;--danger:#9b1c1c;}
+  html,body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--navy);min-height:100%;}
+  .topnav{background:var(--navy);display:flex;align-items:center;gap:16px;padding:0 28px;height:56px;}
+  .topnav .title{color:#fff;font-size:14px;font-weight:500;}
+  .topnav a.home{margin-left:auto;color:rgba(255,255,255,0.85);text-decoration:none;font-size:13px;font-weight:500;border:1px solid rgba(255,255,255,0.25);padding:7px 14px;border-radius:8px;}
+  .topnav a.home:hover{background:rgba(255,255,255,0.1);}
+  .page{max-width:1400px;margin:0 auto;padding:30px 24px 90px;}
+  h1{font-family:'Playfair Display',serif;font-size:30px;margin-bottom:4px;}
+  .sub{color:var(--muted);font-size:14px;margin-bottom:24px;max-width:760px;line-height:1.5;}
+  .cols{display:grid;grid-template-columns:minmax(380px,460px) 1fr;gap:24px;align-items:start;}
+  @media(max-width:980px){.cols{grid-template-columns:1fr;}}
+  .card{background:#fff;border:1px solid var(--light);border-radius:14px;padding:20px;}
+  .card h2{font-family:'Playfair Display',serif;font-size:19px;margin-bottom:2px;}
+  .card .hint{font-size:12px;color:var(--muted);margin-bottom:16px;}
+  label.fl{display:block;font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin:16px 0 7px;}
+  label.fl:first-of-type{margin-top:0;}
+  input[type=text],input[type=date],select,textarea{width:100%;padding:9px 12px;border:1px solid var(--light);border-radius:8px;font-size:13px;font-family:inherit;background:#fff;color:var(--navy);outline:none;}
+  textarea{min-height:110px;resize:vertical;line-height:1.5;}
+  input:focus,select:focus,textarea:focus{border-color:var(--navy);}
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:10px 18px;border-radius:8px;font-size:13px;font-weight:500;font-family:inherit;cursor:pointer;border:none;}
+  .btn-primary{background:var(--navy);color:#fff;}
+  .btn-primary:disabled{opacity:.45;cursor:not-allowed;}
+  .btn-ghost{background:transparent;color:var(--muted);border:1px solid var(--light);}
+  .btn-danger{background:transparent;color:var(--danger);border:1px solid rgba(155,28,28,.35);}
+  .btn-sm{padding:5px 11px;font-size:12px;border-radius:7px;}
+
+  /* student picker */
+  .picker{border:1px solid var(--light);border-radius:10px;overflow:hidden;}
+  .picker .search{border:none;border-bottom:1px solid var(--light);border-radius:0;}
+  .picker .list{max-height:190px;overflow:auto;}
+  .picker .row{display:flex;align-items:center;gap:9px;padding:7px 12px;font-size:13px;cursor:pointer;border-bottom:1px solid #f5f2ec;}
+  .picker .row:hover{background:#faf8f5;}
+  .picker .row.on{background:#f3f6ff;}
+  .picker .row .g{margin-left:auto;font-size:11px;color:var(--muted);}
+  .picker .empty{padding:14px 12px;font-size:12px;color:var(--muted);}
+  .chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:9px;}
+  .chip{display:inline-flex;align-items:center;gap:6px;background:var(--navy);color:#fff;border-radius:999px;padding:4px 6px 4px 11px;font-size:12px;}
+  .chip button{background:rgba(255,255,255,.2);border:none;color:#fff;border-radius:999px;width:16px;height:16px;line-height:1;cursor:pointer;font-size:11px;font-family:inherit;}
+
+  /* category pills */
+  .cats{display:flex;flex-wrap:wrap;gap:7px;}
+  .cat{border:1px solid var(--light);background:#fff;color:var(--navy);border-radius:999px;padding:7px 13px;font-size:12.5px;font-family:inherit;cursor:pointer;}
+  .cat:hover{border-color:var(--navy);}
+  .cat.on{background:var(--navy);color:#fff;border-color:var(--navy);}
+  .checks{display:flex;flex-direction:column;gap:9px;margin-top:14px;padding-top:14px;border-top:1px solid var(--light);}
+  .checks label{display:flex;align-items:center;gap:9px;font-size:13px;cursor:pointer;}
+  .saverow{display:flex;align-items:center;gap:12px;margin-top:18px;}
+  .msg{font-size:12.5px;}
+  .msg.ok{color:var(--green);} .msg.err{color:var(--danger);}
+
+  /* log */
+  .tabs{display:flex;gap:6px;border-bottom:1px solid var(--light);margin-bottom:16px;}
+  .tab{padding:9px 16px;font-size:13px;font-weight:500;cursor:pointer;border:none;background:none;font-family:inherit;color:var(--muted);border-bottom:2px solid transparent;margin-bottom:-1px;}
+  .tab.on{color:var(--navy);border-bottom-color:var(--gold);}
+  .logtools{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:14px;}
+  .logtools select{width:auto;min-width:180px;}
+  .count{font-size:12px;color:var(--muted);margin-left:auto;}
+  .entry{border:1px solid var(--light);border-radius:12px;padding:14px 16px;margin-bottom:10px;background:#fff;}
+  .entry .top{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-bottom:8px;}
+  .badge{font-size:11px;font-weight:600;letter-spacing:.03em;padding:3px 9px;border-radius:999px;background:#eef1f7;color:var(--navy);}
+  .badge.living_values{background:#fdf3d8;color:#7a5c00;}
+  .badge.student_interest{background:#e6f2ea;color:#1f4d2e;}
+  .badge.academic{background:#e8eefc;color:#1b3a7a;}
+  .badge.disciplinary{background:#fbe6e6;color:#7c1d1d;}
+  .badge.parent_discussion{background:#f0e9f7;color:#4a2a6b;}
+  .badge.support{background:#fdece0;color:#7a3d10;}
+  .badge.passion_project{background:#e2f1f5;color:#0f4c5c;}
+  .flagpill{font-size:10.5px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;padding:3px 8px;border-radius:6px;border:1px solid var(--gold);color:#7a5c00;background:#fffaf0;}
+  .who{font-size:12px;color:var(--muted);margin-left:auto;text-align:right;}
+  .sname{font-weight:700;font-size:14px;}
+  .body{font-size:13.5px;line-height:1.55;white-space:pre-wrap;}
+  .acts{display:flex;gap:8px;margin-top:10px;}
+  .placeholder{border:1px dashed var(--light);border-radius:12px;padding:34px 20px;text-align:center;color:var(--muted);font-size:13px;}
+  .editbox{display:flex;flex-direction:column;gap:9px;}
+  .vmanage{font-size:12px;color:var(--muted);margin-top:6px;}
+  .vmanage button{background:none;border:none;color:var(--navy);text-decoration:underline;cursor:pointer;font-family:inherit;font-size:12px;padding:0;}
+  .modal{position:fixed;inset:0;background:rgba(16,20,32,.45);display:none;align-items:center;justify-content:center;padding:20px;z-index:60;}
+  .modal.open{display:flex;}
+  .modal .inner{background:#fff;border-radius:14px;padding:22px;width:100%;max-width:440px;}
+  .modal h3{font-family:'Playfair Display',serif;font-size:19px;margin-bottom:4px;}
+  .vlist{margin:14px 0;display:flex;flex-direction:column;gap:6px;max-height:230px;overflow:auto;}
+  .vrow{display:flex;align-items:center;gap:10px;font-size:13px;border:1px solid var(--light);border-radius:8px;padding:7px 11px;}
+  .vrow .x{margin-left:auto;}
+</style>
+</head>
+<body>
+<div class="topnav">
+  <span class="title">North Star Journal</span>
+  <a class="home" href="/">← Home</a>
+</div>
+
+<div class="page">
+  <h1>North Star Journal</h1>
+  <p class="sub">Log the growth that a report card grade doesn't capture. Pick the student (or students), choose what kind of note this is, and write it down while it's fresh. Entries build a student's North Star file over their time at Mizzentop.</p>
+
+  <div class="cols">
+    <!-- ── entry form ───────────────────────────────────────────── -->
+    <div class="card" id="formcard">
+      <h2>New entry</h2>
+      <p class="hint" id="whoami">&nbsp;</p>
+
+      <label class="fl">Student(s)</label>
+      <div class="picker">
+        <input type="text" class="search" id="ssearch" placeholder="Search students by name…" autocomplete="off">
+        <div class="list" id="slist"></div>
+      </div>
+      <div class="chips" id="schips"></div>
+
+      <label class="fl">Date</label>
+      <input type="date" id="edate">
+
+      <label class="fl">Entry type</label>
+      <div class="cats" id="cats"></div>
+
+      <div id="valuewrap" style="display:none">
+        <label class="fl">Living value</label>
+        <select id="value"><option value="">— choose a value —</option></select>
+        <div class="vmanage" id="vmanage"></div>
+      </div>
+
+      <label class="fl">Entry</label>
+      <textarea id="body" placeholder="What happened, what you noticed, what it says about this student…"></textarea>
+
+      <div class="checks">
+        <label><input type="checkbox" id="frc"> Save for report card narrative</label>
+        <label><input type="checkbox" id="fgrad"> Save for graduation narrative</label>
+      </div>
+
+      <div class="saverow">
+        <button class="btn btn-primary" id="save">Save entry</button>
+        <button class="btn btn-ghost" id="clear">Clear</button>
+        <span class="msg" id="msg"></span>
+      </div>
+    </div>
+
+    <!-- ── log ──────────────────────────────────────────────────── -->
+    <div class="card">
+      <div class="tabs">
+        <button class="tab on" data-tab="student">Student log</button>
+        <button class="tab" data-tab="mine">My recent entries</button>
+      </div>
+      <div class="logtools">
+        <select id="filtercat"><option value="">All entry types</option></select>
+        <select id="filterflag">
+          <option value="">All entries</option>
+          <option value="report_card">Report card narrative only</option>
+          <option value="graduation">Graduation narrative only</option>
+        </select>
+        <span class="count" id="count"></span>
+      </div>
+      <div id="log"></div>
+    </div>
+  </div>
+</div>
+
+<div class="modal" id="vmodal">
+  <div class="inner">
+    <h3>Living Values</h3>
+    <p class="hint">These appear in the dropdown on a Living Values Shout Out.</p>
+    <div class="vlist" id="vlist"></div>
+    <input type="text" id="vnew" placeholder="Add a value — one at a time, or paste several separated by commas">
+    <div class="saverow">
+      <button class="btn btn-primary btn-sm" id="vadd">Add</button>
+      <button class="btn btn-ghost btn-sm" id="vclose">Done</button>
+      <span class="msg" id="vmsg"></span>
+    </div>
+  </div>
+</div>
+
+<script src="/nav.js" defer></script>
+<script>
+(function(){
+  var META = {categories:[], students:[], values:[], me:{}, can_manage_values:false};
+  var selected = [];          // student_ids chosen for the new entry
+  var focusStudent = null;    // whose log the right-hand panel is showing
+  var category = "";
+  var tab = "student";
+  var editingId = null;
+
+  var $ = function(id){ return document.getElementById(id); };
+  function esc(s){ return String(s==null?"":s).replace(/[&<>"']/g,function(c){
+    return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]; }); }
+  function catLabel(k){ for(var i=0;i<META.categories.length;i++){ if(META.categories[i].key===k) return META.categories[i].label; } return k; }
+  function studentName(s){ return s.first_name + " " + s.last_name; }
+  function fmtDate(iso){
+    if(!iso) return "";
+    var p = String(iso).slice(0,10).split("-");
+    if(p.length!==3) return iso;
+    var d = new Date(+p[0], +p[1]-1, +p[2]);
+    return d.toLocaleDateString(undefined,{month:"short", day:"numeric", year:"numeric"});
+  }
+  function msg(el, text, kind){
+    var m = $(el); m.textContent = text || ""; m.className = "msg" + (kind ? " " + kind : "");
+    if(text){ setTimeout(function(){ if(m.textContent===text){ m.textContent=""; m.className="msg"; } }, 4000); }
+  }
+
+  // ── load ────────────────────────────────────────────────────────────────
+  function load(){
+    fetch("/api/north-star/meta").then(function(r){
+      if(!r.ok) throw new Error("Could not load the journal.");
+      return r.json();
+    }).then(function(d){
+      META = d;
+      $("whoami").textContent = "Signing entries as " + (META.me.name || "you") + ".";
+      renderCats();
+      renderValues();
+      renderFilters();
+      renderStudentList("");
+      $("edate").value = new Date().toISOString().slice(0,10);
+      renderLog();
+    }).catch(function(e){
+      $("log").innerHTML = '<div class="placeholder">' + esc(e.message) + '</div>';
+    });
+  }
+
+  // ── students ────────────────────────────────────────────────────────────
+  function renderStudentList(q){
+    q = (q||"").toLowerCase().trim();
+    var rows = META.students.filter(function(s){
+      return !q || studentName(s).toLowerCase().indexOf(q) > -1;
+    }).slice(0, 200);
+    if(!rows.length){ $("slist").innerHTML = '<div class="empty">No students match.</div>'; return; }
+    $("slist").innerHTML = rows.map(function(s){
+      var on = selected.indexOf(s.student_id) > -1;
+      return '<div class="row' + (on?" on":"") + '" data-id="' + s.student_id + '">' +
+               '<input type="checkbox" ' + (on?"checked":"") + ' tabindex="-1">' +
+               '<span>' + esc(studentName(s)) + '</span>' +
+               '<span class="g">' + esc(s.grade==null?"":("Grade " + s.grade)) + '</span>' +
+             '</div>';
+    }).join("");
+  }
+
+  function toggleStudent(id){
+    var i = selected.indexOf(id);
+    if(i > -1){ selected.splice(i,1); }
+    else { selected.push(id); focusStudent = id; }
+    if(selected.length && selected.indexOf(focusStudent) === -1){ focusStudent = selected[selected.length-1]; }
+    renderStudentList($("ssearch").value);
+    renderChips();
+    if(tab === "student") renderLog();
+  }
+
+  function renderChips(){
+    $("schips").innerHTML = selected.map(function(id){
+      var s = META.students.filter(function(x){ return x.student_id===id; })[0];
+      if(!s) return "";
+      return '<span class="chip">' + esc(studentName(s)) +
+             '<button data-id="' + id + '" title="Remove">×</button></span>';
+    }).join("");
+  }
+
+  // ── categories & values ─────────────────────────────────────────────────
+  function renderCats(){
+    $("cats").innerHTML = META.categories.map(function(c){
+      return '<button type="button" class="cat' + (category===c.key?" on":"") + '" data-key="' + c.key + '">' +
+             esc(c.label) + '</button>';
+    }).join("");
+    $("valuewrap").style.display = (category === "living_values") ? "" : "none";
+  }
+
+  function renderValues(){
+    var sel = $("value");
+    var cur = sel.value;
+    sel.innerHTML = '<option value="">— choose a value —</option>' + META.values.map(function(v){
+      return '<option value="' + esc(v.name) + '">' + esc(v.name) + '</option>';
+    }).join("");
+    sel.value = cur;
+    var vm = $("vmanage");
+    if(META.can_manage_values){
+      vm.innerHTML = (META.values.length ? "" : "No Living Values set up yet. ") +
+                     '<button type="button" id="vopen">Manage the Living Values list</button>';
+      $("vopen").onclick = openValues;
+    } else {
+      vm.innerHTML = META.values.length ? "" : "No Living Values have been set up yet — ask an admin to add them.";
+    }
+  }
+
+  function renderFilters(){
+    $("filtercat").innerHTML = '<option value="">All entry types</option>' + META.categories.map(function(c){
+      return '<option value="' + c.key + '">' + esc(c.label) + '</option>';
+    }).join("");
+  }
+
+  // ── save ────────────────────────────────────────────────────────────────
+  function save(){
+    var body = $("body").value.trim();
+    if(!selected.length) return msg("msg","Pick at least one student.","err");
+    if(!category)        return msg("msg","Choose an entry type.","err");
+    if(!body)            return msg("msg","Write something first.","err");
+
+    var payload = {
+      student_ids: selected,
+      category: category,
+      living_value: category === "living_values" ? $("value").value : "",
+      body: body,
+      entry_date: $("edate").value,
+      for_report_card: $("frc").checked,
+      for_graduation: $("fgrad").checked
+    };
+    $("save").disabled = true;
+    fetch("/api/north-star/entries", {
+      method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify(payload)
+    }).then(function(r){ return r.json().then(function(d){ return {ok:r.ok, d:d}; }); })
+      .then(function(res){
+        $("save").disabled = false;
+        if(!res.ok){ return msg("msg", res.d.error || "Could not save.", "err"); }
+        msg("msg", "Saved to " + res.d.saved + " student" + (res.d.saved===1?"":"s") + ".", "ok");
+        $("body").value = "";
+        $("frc").checked = false; $("fgrad").checked = false;
+        renderLog();
+      }).catch(function(){ $("save").disabled = false; msg("msg","Could not save.","err"); });
+  }
+
+  function clearForm(){
+    selected = []; category = ""; $("body").value = "";
+    $("frc").checked = false; $("fgrad").checked = false; $("value").value = "";
+    $("ssearch").value = "";
+    renderCats(); renderChips(); renderStudentList(""); msg("msg","");
+  }
+
+  // ── log ─────────────────────────────────────────────────────────────────
+  function renderLog(){
+    var params = [];
+    if(tab === "student"){
+      if(!focusStudent){
+        $("count").textContent = "";
+        $("log").innerHTML = '<div class="placeholder">Pick a student on the left to see their North Star file.</div>';
+        return;
+      }
+      params.push("student_id=" + focusStudent);
+    } else {
+      params.push("mine=1");
+    }
+    if($("filtercat").value)  params.push("category=" + $("filtercat").value);
+    if($("filterflag").value) params.push("flag=" + $("filterflag").value);
+    params.push("limit=200");
+
+    $("log").innerHTML = '<div class="placeholder">Loading…</div>';
+    fetch("/api/north-star/entries?" + params.join("&")).then(function(r){ return r.json(); })
+      .then(function(rows){
+        if(!rows.length){
+          $("count").textContent = "";
+          $("log").innerHTML = '<div class="placeholder">No entries yet.</div>';
+          return;
+        }
+        $("count").textContent = rows.length + " entr" + (rows.length===1?"y":"ies");
+        var header = "";
+        if(tab === "student"){
+          var s = META.students.filter(function(x){ return x.student_id===focusStudent; })[0];
+          if(s) header = '<div style="margin-bottom:12px"><span class="sname">' + esc(studentName(s)) + '</span>' +
+                         (s.grade==null?"":' <span style="color:var(--muted);font-size:12px">· Grade ' + esc(s.grade) + '</span>') + '</div>';
+        }
+        $("log").innerHTML = header + rows.map(entryHtml).join("");
+        wireEntries(rows);
+      }).catch(function(){
+        $("log").innerHTML = '<div class="placeholder">Could not load entries.</div>';
+      });
+  }
+
+  function entryHtml(e){
+    var flags = "";
+    if(e.for_report_card) flags += '<span class="flagpill">Report card</span>';
+    if(e.for_graduation)  flags += '<span class="flagpill">Graduation</span>';
+    var who = esc(e.author_name || "") + " · " + fmtDate(e.entry_date);
+    var name = (tab === "mine")
+      ? '<span class="sname">' + esc(e.student_first + " " + e.student_last) + '</span>' : "";
+    return '<div class="entry" data-id="' + e.entry_id + '">' +
+             '<div class="top">' + name +
+               '<span class="badge ' + esc(e.category) + '">' + esc(catLabel(e.category)) + '</span>' +
+               (e.living_value ? '<span class="badge">' + esc(e.living_value) + '</span>' : "") +
+               flags +
+               '<span class="who">' + who + '</span>' +
+             '</div>' +
+             '<div class="body">' + esc(e.body) + '</div>' +
+             (e.can_edit ? '<div class="acts">' +
+                 '<button class="btn btn-ghost btn-sm act-edit">Edit</button>' +
+                 '<button class="btn btn-danger btn-sm act-del">Delete</button>' +
+               '</div>' : "") +
+           '</div>';
+  }
+
+  function wireEntries(rows){
+    var byId = {}; rows.forEach(function(e){ byId[e.entry_id] = e; });
+    Array.prototype.forEach.call($("log").querySelectorAll(".entry"), function(node){
+      var e = byId[+node.getAttribute("data-id")];
+      var ed = node.querySelector(".act-edit"), dl = node.querySelector(".act-del");
+      if(ed) ed.onclick = function(){ startEdit(node, e); };
+      if(dl) dl.onclick = function(){
+        if(!confirm("Delete this entry? This can't be undone.")) return;
+        fetch("/api/north-star/entries/" + e.entry_id, {method:"DELETE"})
+          .then(function(r){ return r.json(); })
+          .then(function(d){ if(d.error) alert(d.error); renderLog(); });
+      };
+    });
+  }
+
+  function startEdit(node, e){
+    var opts = META.categories.map(function(c){
+      return '<option value="' + c.key + '"' + (c.key===e.category?" selected":"") + '>' + esc(c.label) + '</option>';
+    }).join("");
+    node.innerHTML =
+      '<div class="editbox">' +
+        '<select class="e-cat">' + opts + '</select>' +
+        '<textarea class="e-body">' + esc(e.body) + '</textarea>' +
+        '<label style="font-size:13px"><input type="checkbox" class="e-rc"' + (e.for_report_card?" checked":"") + '> Save for report card narrative</label>' +
+        '<label style="font-size:13px"><input type="checkbox" class="e-grad"' + (e.for_graduation?" checked":"") + '> Save for graduation narrative</label>' +
+        '<div class="acts">' +
+          '<button class="btn btn-primary btn-sm e-save">Save changes</button>' +
+          '<button class="btn btn-ghost btn-sm e-cancel">Cancel</button>' +
+        '</div>' +
+      '</div>';
+    node.querySelector(".e-cancel").onclick = renderLog;
+    node.querySelector(".e-save").onclick = function(){
+      var payload = {
+        category: node.querySelector(".e-cat").value,
+        body: node.querySelector(".e-body").value,
+        for_report_card: node.querySelector(".e-rc").checked,
+        for_graduation: node.querySelector(".e-grad").checked,
+        living_value: e.living_value || ""
+      };
+      fetch("/api/north-star/entries/" + e.entry_id, {
+        method:"PUT", headers:{"Content-Type":"application/json"}, body: JSON.stringify(payload)
+      }).then(function(r){ return r.json(); })
+        .then(function(d){ if(d.error) alert(d.error); renderLog(); });
+    };
+  }
+
+  // ── living values manager ───────────────────────────────────────────────
+  function openValues(){ $("vmodal").classList.add("open"); renderVList(); }
+  function renderVList(){
+    $("vlist").innerHTML = META.values.length ? META.values.map(function(v){
+      return '<div class="vrow"><span>' + esc(v.name) + '</span>' +
+             '<button class="btn btn-danger btn-sm x" data-id="' + v.value_id + '">Remove</button></div>';
+    }).join("") : '<div class="placeholder" style="padding:16px">No values yet.</div>';
+    Array.prototype.forEach.call($("vlist").querySelectorAll(".x"), function(b){
+      b.onclick = function(){
+        fetch("/api/north-star/values/" + b.getAttribute("data-id"), {method:"DELETE"})
+          .then(function(r){ return r.json(); })
+          .then(function(d){ if(d.error) return msg("vmsg", d.error, "err"); refreshValues(); });
+      };
+    });
+  }
+  function refreshValues(){
+    fetch("/api/north-star/meta").then(function(r){ return r.json(); }).then(function(d){
+      META.values = d.values; renderValues(); renderVList();
+    });
+  }
+  function addValues(){
+    var raw = $("vnew").value.split(",").map(function(s){ return s.trim(); }).filter(Boolean);
+    if(!raw.length) return;
+    var chain = Promise.resolve();
+    raw.forEach(function(name){
+      chain = chain.then(function(){
+        return fetch("/api/north-star/values", {
+          method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({name:name})
+        }).then(function(r){ return r.json(); });
+      });
+    });
+    chain.then(function(){ $("vnew").value = ""; refreshValues(); msg("vmsg","Added.","ok"); });
+  }
+
+  // ── wiring ──────────────────────────────────────────────────────────────
+  $("ssearch").addEventListener("input", function(){ renderStudentList(this.value); });
+  $("slist").addEventListener("click", function(ev){
+    var row = ev.target.closest(".row"); if(!row) return;
+    toggleStudent(+row.getAttribute("data-id"));
+  });
+  $("schips").addEventListener("click", function(ev){
+    if(ev.target.tagName === "BUTTON") toggleStudent(+ev.target.getAttribute("data-id"));
+  });
+  $("cats").addEventListener("click", function(ev){
+    var b = ev.target.closest(".cat"); if(!b) return;
+    category = (category === b.getAttribute("data-key")) ? "" : b.getAttribute("data-key");
+    renderCats();
+  });
+  $("save").onclick = save;
+  $("clear").onclick = clearForm;
+  $("filtercat").onchange = renderLog;
+  $("filterflag").onchange = renderLog;
+  Array.prototype.forEach.call(document.querySelectorAll(".tab"), function(t){
+    t.onclick = function(){
+      Array.prototype.forEach.call(document.querySelectorAll(".tab"), function(x){ x.classList.remove("on"); });
+      t.classList.add("on"); tab = t.getAttribute("data-tab"); renderLog();
+    };
+  });
+  $("vadd").onclick = addValues;
+  $("vnew").addEventListener("keydown", function(ev){ if(ev.key === "Enter"){ ev.preventDefault(); addValues(); } });
+  $("vclose").onclick = function(){ $("vmodal").classList.remove("open"); };
+  $("vmodal").addEventListener("click", function(ev){ if(ev.target === $("vmodal")) $("vmodal").classList.remove("open"); });
+
+  load();
+})();
+</script>
+</body>
+</html>

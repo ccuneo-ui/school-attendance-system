@@ -348,7 +348,15 @@ async function saveAttendance(){
       body: JSON.stringify({ date: DATA.date, staff_id: DATA.teacher.staff_id, attendance: payload })
     });
     const j = await res.json();
-    if (j.success){ DATA.homeroom.attendance_taken = true; document.getElementById('saved-badge').classList.add('show'); render(); }
+    if (j.success){
+      const marked = Object.keys(payload).length;
+      if (j.saved_count < marked){
+        console.warn('Attendance save errors:', j.errors);
+        alert('Only ' + j.saved_count + ' of ' + marked + ' students were saved. Please tell the office.');
+      } else {
+        DATA.homeroom.attendance_taken = true; document.getElementById('saved-badge').classList.add('show'); render();
+      }
+    }
     else alert(j.error || 'Could not save attendance.');
   } catch(e){ alert('Could not save attendance.'); }
   finally { const b = document.getElementById('save-att'); if(b){ b.disabled=false; b.textContent='Save attendance'; } }
