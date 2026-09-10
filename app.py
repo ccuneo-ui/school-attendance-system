@@ -1082,6 +1082,11 @@ def serve_logo():
     return send_from_directory(".", "logo.svg")
 
 
+@app.route("/logo.png")
+def serve_logo_png():
+    return send_from_directory(".", "logo.png", mimetype="image/png")
+
+
 # ============================================
 # GLOBAL NAV BAR
 # ============================================

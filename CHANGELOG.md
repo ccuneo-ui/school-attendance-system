@@ -1,5 +1,7 @@
 # Changelog
 
+2026-09-10: Email signature — switched the logo and social icons to PNG (navy) so they render correctly in Apple Mail as well as Gmail; the SVG versions showed as broken images or a file-icon attachment.
+
 2026-09-09: Corrected the Lower School period times (Pre-K through grade 6). Periods 1–4 now read 8:25–9:09, 9:12–9:56, 9:59–10:43, and 10:46–11:30 (they had drifted to an 8:30 start); Period 5 onward is unchanged. Fixed in both the Schedules page and the scheduler board so the two match. Grades 5–6 already showed these times; middle school (7–8) keeps its own P4 end of 11:35.
 
 2026-09-09: Family Manager — added a "＋ Add Family" button to create a new household from scratch: enter the family's contact info, add one or more parents/guardians, quick-add each child by name + grade (they're created as active students and get their General Attendance enrollment automatically), and optionally attach a sibling already enrolled. Full student details (DOB, dismissal, homeroom, emergency contact) are still completed afterward in the Student Directory. Reuses the existing household/parent/student create + link endpoints; no schema change.
