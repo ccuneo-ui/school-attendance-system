@@ -345,10 +345,12 @@
               '</label></div>';
     html += '</div>';
 
-    // Parents
-    html += '<div class="section-title">Parents &amp; Guardians</div>';
+    // Parents (editable, and added here — this is where parents/guardians live)
+    html += '<div class="section-title">Parents &amp; Guardians ' +
+            '<button type="button" class="btn-add" onclick="addEditParentRow()">＋ Add parent/guardian</button></div>';
+    html += '<div id="edit-parents">';
     if (!(h.parents || []).length) {
-      html += '<p class="muted-note">No parent records on file. Add parents from the Student Directory.</p>';
+      html += '<p class="muted-note" id="edit-parents-empty">No parents/guardians on file yet — use “＋ Add parent/guardian” above.</p>';
     } else {
       html += h.parents.map(p => {
         const id = p.parent_id;
@@ -369,6 +371,7 @@
         '</div>';
       }).join('');
     }
+    html += '</div><div id="edit-new-parents"></div>';
 
     // Students — read-only context. Student details, incl. the per-student emergency
     // contact, are edited in the Student Directory (kept on the student because
@@ -450,6 +453,28 @@
       const results = await Promise.all(calls);
       const bad = results.find(r => !r.ok);
       if (bad) throw new Error('HTTP ' + bad.status);
+
+      // Newly added parents/guardians: create each, then link to this household.
+      const hadParents = (h.parents || []).length > 0;
+      let role = hadParents ? 'secondary' : 'primary';
+      for (const row of document.querySelectorAll('#edit-new-parents [data-newparent]')) {
+        const n = row.getAttribute('data-newparent');
+        const first = val('np_first_' + n), last = val('np_last_' + n);
+        if (!first && !last) continue;
+        const pr = await postJSON('/api/parents', {
+          first_name: first, last_name: last,
+          relationship_type: val('np_rel_' + n), phone: val('np_phone_' + n),
+          email: val('np_email_' + n),
+          can_pickup: document.getElementById('np_pickup_' + n).checked,
+          notes: val('np_notes_' + n)
+        });
+        if (!pr.ok) throw new Error('adding parent');
+        const pid = (await pr.json()).parent_id;
+        const lr = await postJSON('/api/households/' + currentId + '/parents', { parent_id: pid, role });
+        if (!lr.ok) throw new Error('linking parent');
+        role = 'secondary';
+      }
+
       toast('Saved ✓');
       closeModal();
       await load();
@@ -458,6 +483,30 @@
     } finally {
       btn.disabled = false;
     }
+  }
+
+  // Add an empty parent/guardian row to the EDIT modal (created + linked on Save).
+  function addEditParentRow() {
+    const n = ++addSeq;
+    const empty = document.getElementById('edit-parents-empty');
+    if (empty) empty.remove();
+    const div = document.createElement('div');
+    div.className = 'card-edit';
+    div.setAttribute('data-newparent', n);
+    div.innerHTML =
+      '<div class="card-top"><span class="card-name">New parent / guardian</span>' +
+        '<button type="button" class="row-remove" onclick="this.closest(\'[data-newparent]\').remove()">Remove</button></div>' +
+      '<div class="form-grid">' +
+        field('First Name', 'np_first_' + n, '') +
+        field('Last Name', 'np_last_' + n, '') +
+        field('Relationship', 'np_rel_' + n, '') +
+        field('Phone', 'np_phone_' + n, '') +
+        '<div class="field span2"><label>Email</label><input type="text" id="np_email_' + n + '"></div>' +
+        '<div class="checkbox-row"><input type="checkbox" id="np_pickup_' + n + '" checked>' +
+          '<label for="np_pickup_' + n + '">Authorized for pickup</label></div>' +
+        '<div class="field"><label>Notes</label><input type="text" id="np_notes_' + n + '"></div>' +
+      '</div>';
+    document.getElementById('edit-new-parents').appendChild(div);
   }
 
   // ── Add Family ─────────────────────────────────────────────────────────────

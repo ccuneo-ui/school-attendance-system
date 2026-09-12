@@ -1,5 +1,7 @@
 # Changelog
 
+2026-09-12: Family Manager — you can now add a parent/guardian to an existing family. The edit form has a "＋ Add parent/guardian" button; on Save the new parent is created and linked to the household (as primary if the family had none, otherwise secondary). This fixes a dead end where Family Manager told you to add parents in the Student Directory while the Student Directory told you to add them in Family Manager — parents live in Family Manager, and the Student Directory correctly points there.
+
 2026-09-10: Email signature — switched the logo and social icons to PNG (navy) so they render correctly in Apple Mail as well as Gmail; the SVG versions showed as broken images or a file-icon attachment.
 
 2026-09-09: Corrected the Lower School period times (Pre-K through grade 6). Periods 1–4 now read 8:25–9:09, 9:12–9:56, 9:59–10:43, and 10:46–11:30 (they had drifted to an 8:30 start); Period 5 onward is unchanged. Fixed in both the Schedules page and the scheduler board so the two match. Grades 5–6 already showed these times; middle school (7–8) keeps its own P4 end of 11:35.
