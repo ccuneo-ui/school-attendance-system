@@ -1,5 +1,7 @@
 # Changelog
 
+2026-09-14: Schedules page — the weekly grid is easier to read, on screen and in the printed PDF. Cell text is a touch larger, class names are bolder, the second line (subject · room) is a darker grey, and everything in each box is now centered. No layout or content change, just the type.
+
 2026-09-12: Family Manager — you can now add a parent/guardian to an existing family. The edit form has a "＋ Add parent/guardian" button; on Save the new parent is created and linked to the household (as primary if the family had none, otherwise secondary). This fixes a dead end where Family Manager told you to add parents in the Student Directory while the Student Directory told you to add them in Family Manager — parents live in Family Manager, and the Student Directory correctly points there.
 
 2026-09-10: Email signature — switched the logo and social icons to PNG (navy) so they render correctly in Apple Mail as well as Gmail; the SVG versions showed as broken images or a file-icon attachment.
