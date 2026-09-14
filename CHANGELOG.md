@@ -1,5 +1,7 @@
 # Changelog
 
+2026-09-14: Seeded the school's twelve Living Values (Happiness, Honesty, Peace, Humility, Unity, Simplicity, Freedom, Cooperation, Respect, Tolerance / Acceptance, Love, Responsibility) into the North Star Journal's value picker.
+2026-09-14: North Star Journal entries can now carry more than one entry type — tick as many as apply, and each shows as its own badge on the student's log. Existing entries keep the type they had.
 2026-09-14: Schedules page — the weekly grid is easier to read, on screen and in the printed PDF. Cell text is a touch larger, class names are bolder, the second line (subject · room) is a darker grey, and everything in each box is now centered. No layout or content change, just the type.
 
 2026-09-12: Family Manager — you can now add a parent/guardian to an existing family. The edit form has a "＋ Add parent/guardian" button; on Save the new parent is created and linked to the household (as primary if the family had none, otherwise secondary). This fixes a dead end where Family Manager told you to add parents in the Student Directory while the Student Directory told you to add them in Family Manager — parents live in Family Manager, and the Student Directory correctly points there.

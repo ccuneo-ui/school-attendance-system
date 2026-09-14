@@ -910,9 +910,27 @@ def init_db():
                     updated_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             """)
+            # Seed the Living Values the school actually uses, once, only if the
+            # list has never been populated. Edits/removals made on the page
+            # stick: this never runs again after the first row exists.
+            cur.execute("SELECT COUNT(*) FROM north_star_values")
+            if cur.fetchone()[0] == 0:
+                for i, v in enumerate([
+                    "Happiness", "Honesty", "Peace", "Humility", "Unity", "Simplicity",
+                    "Freedom", "Cooperation", "Respect", "Tolerance / Acceptance",
+                    "Love", "Responsibility",
+                ], start=1):
+                    cur.execute("INSERT INTO north_star_values (name, sort_order) VALUES (%s,%s)", (v, i))
+
             cur.execute("CREATE INDEX IF NOT EXISTS idx_ns_entries_student ON north_star_entries(student_id)")
             cur.execute("CREATE INDEX IF NOT EXISTS idx_ns_entries_date ON north_star_entries(entry_date)")
             cur.execute("CREATE INDEX IF NOT EXISTS idx_ns_entries_author ON north_star_entries(author_staff_id)")
+            # An entry can carry more than one type. `categories` is the real
+            # list; the older single `category` column is kept in step (first
+            # selected) so nothing that reads it breaks.
+            cur.execute("ALTER TABLE north_star_entries ADD COLUMN IF NOT EXISTS categories TEXT[]")
+            cur.execute("""UPDATE north_star_entries SET categories = ARRAY[category]
+                            WHERE categories IS NULL AND category IS NOT NULL""")
 
             # Add trimester, instructor_id, division columns to electives if missing
             for col, typedef in [('trimester', 'INTEGER'), ('instructor_id', 'INTEGER REFERENCES staff(staff_id)'), ('division', 'TEXT')]:
@@ -2431,9 +2449,27 @@ def _can_manage_north_star_values():
     return bool(session.get("is_superadmin") or has_perm("staff_directory"))
 
 
+def _ns_categories(data, fallback=None):
+    """Clean a submitted list of entry types: known keys only, order kept, no
+    duplicates. Accepts the older single `category` field too."""
+    cats = data.get("categories")
+    if cats is None and data.get("category"):
+        cats = [data.get("category")]
+    if cats is None:
+        cats = fallback or []
+    out = []
+    for c in cats:
+        c = (c or "").strip()
+        if c in NORTH_STAR_CATEGORY_KEYS and c not in out:
+            out.append(c)
+    return out
+
+
 def _ns_shape(row, me_staff_id):
     """Serialize an entry row for the browser."""
     r = dict(row)
+    cats = r.get("categories") or ([r["category"]] if r.get("category") else [])
+    r["categories"] = [c for c in cats if c in NORTH_STAR_CATEGORY_KEYS]
     for k in ("entry_date", "created_at", "updated_at"):
         if r.get(k) is not None and hasattr(r[k], "isoformat"):
             r[k] = r[k].isoformat()
@@ -2487,7 +2523,8 @@ def api_north_star_entries():
             if student_id:
                 where.append("e.student_id = %s"); params.append(student_id)
             if category in NORTH_STAR_CATEGORY_KEYS:
-                where.append("e.category = %s"); params.append(category)
+                where.append("%s = ANY(COALESCE(e.categories, ARRAY[e.category]))")
+                params.append(category)
             if flag == "report_card":
                 where.append("e.for_report_card")
             elif flag == "graduation":
@@ -2518,18 +2555,19 @@ def api_north_star_create():
     if not ids and data.get("student_id"):
         ids = [data["student_id"]]
     ids = [int(i) for i in (ids or [])]
-    category = (data.get("category") or "").strip()
+    cats = _ns_categories(data)
     body = (data.get("body") or "").strip()
 
     if not ids:
         return jsonify({"error": "Pick at least one student."}), 400
-    if category not in NORTH_STAR_CATEGORY_KEYS:
-        return jsonify({"error": "Pick a category."}), 400
+    if not cats:
+        return jsonify({"error": "Pick at least one entry type."}), 400
     if not body:
         return jsonify({"error": "The entry can't be empty."}), 400
 
+    category = cats[0]
     living_value = (data.get("living_value") or "").strip() or None
-    if category != "living_values":
+    if "living_values" not in cats:
         living_value = None
     entry_date = (data.get("entry_date") or "").strip() or datetime.now().strftime("%Y-%m-%d")
     for_rc = bool(data.get("for_report_card"))
@@ -2547,11 +2585,11 @@ def api_north_star_create():
             for sid in ids:
                 cur.execute("""
                     INSERT INTO north_star_entries
-                        (student_id, category, living_value, body, entry_date, school_year,
-                         for_report_card, for_graduation, author_staff_id, author_name)
-                    VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                        (student_id, category, categories, living_value, body, entry_date,
+                         school_year, for_report_card, for_graduation, author_staff_id, author_name)
+                    VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
                     RETURNING entry_id
-                """, (sid, category, living_value, body, entry_date, sy,
+                """, (sid, category, cats, living_value, body, entry_date, sy,
                       for_rc, for_grad, author_id, author_name))
                 saved.append(fo(cur)["entry_id"])
             conn.commit()
@@ -2578,15 +2616,16 @@ def api_north_star_update(entry_id):
             if not (session.get("is_superadmin") or (me_id and row["author_staff_id"] == me_id)):
                 return jsonify({"error": "You can only edit your own entries."}), 403
 
-            category = (data.get("category") or row["category"]).strip()
-            if category not in NORTH_STAR_CATEGORY_KEYS:
-                return jsonify({"error": "Pick a category."}), 400
+            cats = _ns_categories(data, fallback=(row.get("categories") or [row["category"]]))
+            if not cats:
+                return jsonify({"error": "Pick at least one entry type."}), 400
+            category = cats[0]
             body = (data.get("body") if data.get("body") is not None else row["body"]).strip()
             if not body:
                 return jsonify({"error": "The entry can't be empty."}), 400
             living_value = data.get("living_value", row["living_value"])
             living_value = (living_value or "").strip() or None
-            if category != "living_values":
+            if "living_values" not in cats:
                 living_value = None
             entry_date = (data.get("entry_date") or "").strip() or row["entry_date"]
             for_rc = bool(data["for_report_card"]) if "for_report_card" in data else row["for_report_card"]
@@ -2594,10 +2633,10 @@ def api_north_star_update(entry_id):
 
             cur.execute("""
                 UPDATE north_star_entries
-                   SET category=%s, living_value=%s, body=%s, entry_date=%s,
+                   SET category=%s, categories=%s, living_value=%s, body=%s, entry_date=%s,
                        for_report_card=%s, for_graduation=%s, updated_at=CURRENT_TIMESTAMP
                  WHERE entry_id=%s
-            """, (category, living_value, body, entry_date, for_rc, for_grad, entry_id))
+            """, (category, cats, living_value, body, entry_date, for_rc, for_grad, entry_id))
             conn.commit()
         return jsonify({"success": True})
     except Exception as e:

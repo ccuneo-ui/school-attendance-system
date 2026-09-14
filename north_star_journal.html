@@ -52,6 +52,9 @@
   .cat{border:1px solid var(--light);background:#fff;color:var(--navy);border-radius:999px;padding:7px 13px;font-size:12.5px;font-family:inherit;cursor:pointer;}
   .cat:hover{border-color:var(--navy);}
   .cat.on{background:var(--navy);color:#fff;border-color:var(--navy);}
+  .cat .tick{margin-right:5px;font-size:11px;}
+  .e-cats{display:flex;flex-wrap:wrap;gap:6px 14px;}
+  .e-catpick{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;}
   .checks{display:flex;flex-direction:column;gap:9px;margin-top:14px;padding-top:14px;border-top:1px solid var(--light);}
   .checks label{display:flex;align-items:center;gap:9px;font-size:13px;cursor:pointer;}
   .saverow{display:flex;align-items:center;gap:12px;margin-top:18px;}
@@ -119,7 +122,7 @@
       <label class="fl">Date</label>
       <input type="date" id="edate">
 
-      <label class="fl">Entry type</label>
+      <label class="fl">Entry type <span style="text-transform:none;letter-spacing:0;font-weight:400">— tick as many as apply</span></label>
       <div class="cats" id="cats"></div>
 
       <div id="valuewrap" style="display:none">
@@ -183,7 +186,7 @@
   var META = {categories:[], students:[], values:[], me:{}, can_manage_values:false};
   var selected = [];          // student_ids chosen for the new entry
   var focusStudent = null;    // whose log the right-hand panel is showing
-  var category = "";
+  var cats = [];            // entry types ticked for the new entry
   var tab = "student";
   var editingId = null;
 
@@ -262,10 +265,11 @@
   // ── categories & values ─────────────────────────────────────────────────
   function renderCats(){
     $("cats").innerHTML = META.categories.map(function(c){
-      return '<button type="button" class="cat' + (category===c.key?" on":"") + '" data-key="' + c.key + '">' +
-             esc(c.label) + '</button>';
+      var on = cats.indexOf(c.key) > -1;
+      return '<button type="button" class="cat' + (on?" on":"") + '" data-key="' + c.key + '">' +
+             (on ? '<span class="tick">\u2713</span>' : '') + esc(c.label) + '</button>';
     }).join("");
-    $("valuewrap").style.display = (category === "living_values") ? "" : "none";
+    $("valuewrap").style.display = (cats.indexOf("living_values") > -1) ? "" : "none";
   }
 
   function renderValues(){
@@ -295,13 +299,13 @@
   function save(){
     var body = $("body").value.trim();
     if(!selected.length) return msg("msg","Pick at least one student.","err");
-    if(!category)        return msg("msg","Choose an entry type.","err");
+    if(!cats.length)     return msg("msg","Choose at least one entry type.","err");
     if(!body)            return msg("msg","Write something first.","err");
 
     var payload = {
       student_ids: selected,
-      category: category,
-      living_value: category === "living_values" ? $("value").value : "",
+      categories: cats,
+      living_value: cats.indexOf("living_values") > -1 ? $("value").value : "",
       body: body,
       entry_date: $("edate").value,
       for_report_card: $("frc").checked,
@@ -322,7 +326,7 @@
   }
 
   function clearForm(){
-    selected = []; category = ""; $("body").value = "";
+    selected = []; cats = []; $("body").value = "";
     $("frc").checked = false; $("fgrad").checked = false; $("value").value = "";
     $("ssearch").value = "";
     renderCats(); renderChips(); renderStudentList(""); msg("msg","");
@@ -376,7 +380,8 @@
       ? '<span class="sname">' + esc(e.student_first + " " + e.student_last) + '</span>' : "";
     return '<div class="entry" data-id="' + e.entry_id + '">' +
              '<div class="top">' + name +
-               '<span class="badge ' + esc(e.category) + '">' + esc(catLabel(e.category)) + '</span>' +
+               (e.categories || [e.category]).map(function(k){
+                 return '<span class="badge ' + esc(k) + '">' + esc(catLabel(k)) + '</span>'; }).join("") +
                (e.living_value ? '<span class="badge">' + esc(e.living_value) + '</span>' : "") +
                flags +
                '<span class="who">' + who + '</span>' +
@@ -405,12 +410,14 @@
   }
 
   function startEdit(node, e){
+    var have = e.categories || [e.category];
     var opts = META.categories.map(function(c){
-      return '<option value="' + c.key + '"' + (c.key===e.category?" selected":"") + '>' + esc(c.label) + '</option>';
+      return '<label class="e-catpick"><input type="checkbox" class="e-cat" value="' + c.key + '"' +
+             (have.indexOf(c.key) > -1 ? " checked" : "") + '> ' + esc(c.label) + '</label>';
     }).join("");
     node.innerHTML =
       '<div class="editbox">' +
-        '<select class="e-cat">' + opts + '</select>' +
+        '<div class="e-cats">' + opts + '</div>' +
         '<textarea class="e-body">' + esc(e.body) + '</textarea>' +
         '<label style="font-size:13px"><input type="checkbox" class="e-rc"' + (e.for_report_card?" checked":"") + '> Save for report card narrative</label>' +
         '<label style="font-size:13px"><input type="checkbox" class="e-grad"' + (e.for_graduation?" checked":"") + '> Save for graduation narrative</label>' +
@@ -421,8 +428,10 @@
       '</div>';
     node.querySelector(".e-cancel").onclick = renderLog;
     node.querySelector(".e-save").onclick = function(){
+      var picked = Array.prototype.map.call(node.querySelectorAll(".e-cat:checked"), function(i){ return i.value; });
+      if(!picked.length){ alert("Pick at least one entry type."); return; }
       var payload = {
-        category: node.querySelector(".e-cat").value,
+        categories: picked,
         body: node.querySelector(".e-body").value,
         for_report_card: node.querySelector(".e-rc").checked,
         for_graduation: node.querySelector(".e-grad").checked,
@@ -480,7 +489,9 @@
   });
   $("cats").addEventListener("click", function(ev){
     var b = ev.target.closest(".cat"); if(!b) return;
-    category = (category === b.getAttribute("data-key")) ? "" : b.getAttribute("data-key");
+    var k = b.getAttribute("data-key");
+    var i = cats.indexOf(k);
+    if(i > -1){ cats.splice(i, 1); } else { cats.push(k); }
     renderCats();
   });
   $("save").onclick = save;
