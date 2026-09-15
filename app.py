@@ -126,6 +126,7 @@ NAV_REFERENCE = {"key": "reference", "label": "Reference", "pages": [
     {"key": "attendance_report",  "label": "Attendance Report",   "href": "/homeroom-attendance-report"},
     {"key": "person_schedules",   "label": "Student & Teacher Schedules", "href": "/schedule"},
     {"key": "signature",          "label": "Email Signature Generator", "href": "/signature"},
+    {"key": "daily_absences",     "label": "Daily Absences",      "href": "/daily-absences"},
 ]}
 
 # Order the menus appear in the bar.
@@ -1261,6 +1262,13 @@ def homeroom_attendance_page():
 @login_required
 def homeroom_attendance_report_page():
     return send_from_directory(".", "homeroom_attendance_report.html")
+
+@app.route("/daily-absences")
+@login_required
+def daily_absences_page():
+    # Read-only, school-wide list of who is out on a given day (Reference silo).
+    # Replaces the daily absence email. Open to any signed-in staff member.
+    return send_from_directory(".", "daily_absences.html")
 
 @app.route("/program-attendance")
 @require_perm("program_attendance")
@@ -2926,6 +2934,114 @@ def get_homeroom_attendance_report_csv():
         mimetype="text/csv",
         headers={"Content-Disposition": f"attachment; filename=attendance_report_{teacher_slug}_full_year.csv"}
     )
+
+# ── Daily Absences (Reference, view-only) ────────────────────────────────────
+# Full absences vs. partial-day statuses, using the same status values the
+# homeroom attendance page / attendance report write to attendance_records.
+DAILY_ABSENCE_STATUSES = {
+    "absent":        ("Absent",          "absence"),
+    "excused":       ("Excused Absence", "absence"),
+    "tardy":         ("Tardy",           "partial"),
+    "excused_tardy": ("Excused Tardy",   "partial"),
+    "ed":            ("Early Dismissal", "partial"),
+}
+DAILY_ABSENCE_GRADE_ORDER = ["JPK", "SPK", "PK", "K", "1", "2", "3", "4", "5", "6", "7", "8"]
+
+
+def _school_today_iso():
+    """Today's date in school-local time (the server clock may be UTC)."""
+    try:
+        from zoneinfo import ZoneInfo
+        return datetime.now(ZoneInfo("America/New_York")).strftime("%Y-%m-%d")
+    except Exception:
+        return datetime.now().strftime("%Y-%m-%d")
+
+
+def _daily_absence_grade_rank(g):
+    g = str(g or "").strip().upper()
+    return DAILY_ABSENCE_GRADE_ORDER.index(g) if g in DAILY_ABSENCE_GRADE_ORDER else 99
+
+
+@app.route("/api/daily-absences")
+@login_required
+def get_daily_absences():
+    from datetime import date as dt_date
+    date_str = (request.args.get("date") or "").strip() or _school_today_iso()
+    try:
+        dt_date.fromisoformat(date_str)
+    except ValueError:
+        return jsonify({"error": "date must be YYYY-MM-DD"}), 400
+
+    conn = get_db_connection()
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute("SELECT program_id FROM programs WHERE program_name='General Attendance' AND status='active' LIMIT 1")
+            program = fo(cur)
+            if not program:
+                return jsonify({"error": "General Attendance program not found"}), 404
+            program_id = program["program_id"]
+
+            # Has any attendance been recorded for this date at all? Lets the page
+            # tell "nobody is out" apart from "attendance not taken yet".
+            cur.execute("""
+                SELECT COUNT(*) AS n
+                FROM attendance_records a
+                JOIN enrollments e ON a.enrollment_id = e.enrollment_id
+                WHERE e.program_id = %s AND a.attendance_date = %s
+            """, (program_id, date_str))
+            records_on_date = (fo(cur) or {}).get("n", 0)
+
+            cur.execute("""
+                SELECT s.student_id, s.first_name, s.last_name, s.grade,
+                       a.status,
+                       t.first_name AS hr_first, t.last_name AS hr_last
+                FROM attendance_records a
+                JOIN enrollments e ON a.enrollment_id = e.enrollment_id
+                JOIN students s    ON e.student_id = s.student_id
+                LEFT JOIN staff t  ON t.staff_id = s.homeroom_teacher_id
+                WHERE e.program_id = %s
+                  AND a.attendance_date = %s
+                  AND a.status IN ('absent', 'excused', 'tardy', 'excused_tardy', 'ed')
+            """, (program_id, date_str))
+            rows = fa(cur)
+    finally:
+        conn.close()
+
+    students = []
+    for r in rows:
+        label, kind = DAILY_ABSENCE_STATUSES.get(r["status"], (r["status"], "partial"))
+        hr = " ".join(x for x in [r.get("hr_first"), r.get("hr_last")] if x)
+        students.append({
+            "student_id":   r["student_id"],
+            "first_name":   r["first_name"],
+            "last_name":    r["last_name"],
+            "grade":        r["grade"],
+            "homeroom":     hr,
+            "status":       r["status"],
+            "status_label": label,
+            "kind":         kind,   # "absence" (full day) or "partial"
+        })
+    students.sort(key=lambda s: (_daily_absence_grade_rank(s["grade"]), str(s["grade"] or ""),
+                                 (s["last_name"] or "").lower(), (s["first_name"] or "").lower()))
+
+    by_grade = {}
+    for s in students:
+        g = str(s["grade"] or "")
+        c = by_grade.setdefault(g, {"grade": g, "total": 0, "absences": 0, "partial": 0})
+        c["total"] += 1
+        c["absences" if s["kind"] == "absence" else "partial"] += 1
+
+    return jsonify({
+        "date":            date_str,
+        "today":           _school_today_iso(),
+        "records_on_date": records_on_date,
+        "total":           len(students),
+        "total_absences":  sum(1 for s in students if s["kind"] == "absence"),
+        "total_partial":   sum(1 for s in students if s["kind"] == "partial"),
+        "grades":          list(by_grade.values()),
+        "students":        students,
+    })
+
 
 @app.route("/api/homeroom-attendance-report/student/<int:student_id>")
 @login_required
