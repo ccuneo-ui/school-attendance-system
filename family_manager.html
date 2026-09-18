@@ -65,6 +65,9 @@
     .btn-secondary:hover { background: #d5cfc6; }
     .btn-primary { background: var(--people); color: white; }
     .btn-primary:hover { background: #2e4a66; }
+    .btn-danger { background: white; color: #8a1a1a; border: 1px solid #e3b7b7; }
+    .btn-danger:hover { background: #fbf1f1; }
+    .btn-danger.armed { background: #8a1a1a; color: white; border-color: #8a1a1a; }
     .btn:disabled { opacity: 0.55; cursor: not-allowed; }
 
     .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 200; display: none; align-items: center; justify-content: center; padding: 20px; }
@@ -183,12 +186,15 @@
       <button class="modal-close" onclick="closeModal()">&times;</button>
     </div>
     <div class="modal-body" id="m-body"></div>
-    <div class="modal-actions">
-      <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
-      <button class="btn btn-primary" id="saveBtn" onclick="saveFamily()">
-        <svg viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4L19 7" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        Save Changes
-      </button>
+    <div class="modal-actions" style="justify-content:space-between">
+      <button class="btn btn-danger" id="deleteFamilyBtn" onclick="deleteFamily()" title="Deletes this family record only. Students stay in the system." style="display:none">Delete family</button>
+      <div style="display:flex;gap:10px">
+        <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+        <button class="btn btn-primary" id="saveBtn" onclick="saveFamily()">
+          <svg viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4L19 7" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          Save Changes
+        </button>
+      </div>
     </div>
   </div>
 </div>
@@ -319,6 +325,8 @@
     document.getElementById('m-family').textContent = 'Edit — ' + h.family_name;
     const nKids = (h.students || []).length;
     document.getElementById('m-sub').textContent = nKids + ' student' + (nKids === 1 ? '' : 's') + ' on file';
+    resetDelete();
+    document.getElementById('deleteFamilyBtn').style.display = IS_SUPERADMIN ? '' : 'none';
 
     let html = '';
 
@@ -400,7 +408,49 @@
 
   function closeModal() {
     document.getElementById('modal').classList.remove('open');
+    resetDelete();
     currentId = null;
+  }
+
+  // ── Delete a family (household) — superadmin only. Two-step confirm.
+  // Deletes only the household + its links; students and parents stay in the system.
+  let IS_SUPERADMIN = false;
+  let deleteArmed = false, deleteTimer = null;
+
+  function resetDelete() {
+    deleteArmed = false;
+    if (deleteTimer) { clearTimeout(deleteTimer); deleteTimer = null; }
+    const btn = document.getElementById('deleteFamilyBtn');
+    if (btn) { btn.textContent = 'Delete family'; btn.classList.remove('armed'); btn.disabled = false; }
+  }
+
+  function deleteFamily() {
+    const btn = document.getElementById('deleteFamilyBtn');
+    if (!deleteArmed) {
+      deleteArmed = true;
+      btn.textContent = 'Click again to delete';
+      btn.classList.add('armed');
+      deleteTimer = setTimeout(resetDelete, 4000);
+      return;
+    }
+    performDelete();
+  }
+
+  async function performDelete() {
+    const btn = document.getElementById('deleteFamilyBtn');
+    if (deleteTimer) { clearTimeout(deleteTimer); deleteTimer = null; }
+    btn.disabled = true;
+    try {
+      const r = await fetch('/api/households/' + currentId, { method: 'DELETE' });
+      if (r.status === 403) { toast('Only a superadmin can delete a family.', true); resetDelete(); return; }
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      toast('Family deleted');
+      closeModal();
+      await load();
+    } catch (e) {
+      toast('Delete failed (' + e.message + ').', true);
+      resetDelete();
+    }
   }
 
   async function saveFamily() {
@@ -680,6 +730,7 @@
   document.getElementById('search').addEventListener('input', render);
   document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeModal(); closeAdd(); } });
 
+  fetch('/api/session').then(r => r.ok ? r.json() : null).then(s => { IS_SUPERADMIN = !!(s && s.is_superadmin); }).catch(() => {});
   load();
 </script>
 <script src="/nav.js" defer></script>

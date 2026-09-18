@@ -1,5 +1,7 @@
 # Changelog
 
+2026-09-18: Family Manager — added a "Delete family" button (superadmin only) to the edit form, to clean up bogus household records the Finalsite import created (e.g. a single parent turned into their own "family" duplicating a child who already belongs to the real family). It's a two-click confirm; it deletes only the household and its links — the students and parents stay in the system, so a child double-listed under a bogus family simply drops that extra link and remains under the correct one.
+
 2026-09-14: Seeded the school's twelve Living Values (Happiness, Honesty, Peace, Humility, Unity, Simplicity, Freedom, Cooperation, Respect, Tolerance / Acceptance, Love, Responsibility) into the North Star Journal's value picker.
 2026-09-14: North Star Journal entries can now carry more than one entry type — tick as many as apply, and each shows as its own badge on the student's log. Existing entries keep the type they had.
 2026-09-14: Schedules page — the weekly grid is easier to read, on screen and in the printed PDF. Cell text is a touch larger, class names are bolder, the second line (subject · room) is a darker grey, and everything in each box is now centered. No layout or content change, just the type.
