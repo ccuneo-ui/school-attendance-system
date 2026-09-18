@@ -121,11 +121,6 @@
     <p>Manage staff records, roles, and system permissions.</p>
   </div>
 
-  <div class="tabs">
-    <div class="tab active" onclick="switchTab('staff')">Staff</div>
-    <div class="tab" onclick="switchTab('students')">Students <span style="font-size:11px;color:var(--muted);margin-left:4px;">(coming soon)</span></div>
-  </div>
-
   <div class="toolbar">
     <div class="search-wrap">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
@@ -133,7 +128,7 @@
     </div>
     <select class="filter-select" id="statusFilter" onchange="filterTable()">
       <option value="">All statuses</option>
-      <option value="active">Active</option>
+      <option value="active" selected>Active</option>
       <option value="inactive">Inactive</option>
     </select>
     <select class="filter-select" id="roleFilter" onchange="filterTable()">
@@ -388,7 +383,7 @@
     try {
       const res = await fetch('/api/people/staff');
       allStaff = await res.json();
-      renderTable(allStaff);
+      filterTable();
     } catch(e) {
       showToast('Failed to load staff', 'error');
     }
@@ -540,11 +535,6 @@
     } catch {
       showToast('Something went wrong', 'error');
     }
-  }
-
-  function switchTab(tab) {
-    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-    event.target.classList.add('active');
   }
 
   function capitalize(s) { return s ? s.charAt(0).toUpperCase() + s.slice(1) : ''; }
