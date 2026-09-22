@@ -1,5 +1,6 @@
 # Changelog
 
+2026-09-22: M Card and School Store logs now have a Prepaid button; prepaid charges (e.g. paid directly in Blackbaud) stay on the log but are left off the monthly Billing Report, and show as "Prepaid" in the student charge lookup.
 2026-09-18: Staff directory (People) — now defaults to the Active filter on load instead of "All statuses," and removed the obsolete "Students (coming soon)" tab now that the Student Directory is its own page.
 
 2026-09-18: Family Manager — added a "Delete family" button (superadmin only) to the edit form, to clean up bogus household records the Finalsite import created (e.g. a single parent turned into their own "family" duplicating a child who already belongs to the real family). It's a two-click confirm; it deletes only the household and its links — the students and parents stay in the system, so a child double-listed under a bogus family simply drops that extra link and remains under the correct one.

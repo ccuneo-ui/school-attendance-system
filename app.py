@@ -982,6 +982,11 @@ def init_db():
                 )
             """)
 
+            # Prepaid flag: family already paid (e.g. via Blackbaud), so the
+            # charge stays on the log but is left off the monthly billing report.
+            cur.execute("ALTER TABLE mcard_charges ADD COLUMN IF NOT EXISTS prepaid BOOLEAN NOT NULL DEFAULT FALSE")
+            cur.execute("ALTER TABLE store_purchases ADD COLUMN IF NOT EXISTS prepaid BOOLEAN NOT NULL DEFAULT FALSE")
+
             # Seed store items if empty
             cur.execute("SELECT COUNT(*) FROM store_items")
             if cur.fetchone()[0] == 0:
@@ -1450,7 +1455,8 @@ def get_mcard_charges():
             cur.execute("""
                 SELECT m.charge_id, m.student_id,
                        s.first_name || ' ' || s.last_name AS student_name,
-                       s.grade, m.charge_date, m.quantity, m.recorded_at
+                       s.grade, m.charge_date, m.quantity, m.recorded_at,
+                       COALESCE(m.prepaid, FALSE) AS prepaid
                 FROM mcard_charges m JOIN students s ON m.student_id=s.student_id
                 ORDER BY m.charge_date DESC, m.recorded_at DESC
             """)
@@ -1512,6 +1518,36 @@ def delete_mcard_charge(charge_id):
             cur.execute("DELETE FROM mcard_charges WHERE charge_id=%s",(charge_id,))
         conn.commit()
         return jsonify({"success":True})
+    finally:
+        conn.close()
+
+
+@app.route("/api/mcard/charges/<int:charge_id>/prepaid", methods=["PATCH"])
+@login_required
+def set_mcard_prepaid(charge_id):
+    """Mark/unmark an M Card charge as prepaid (left off the monthly billing report)."""
+    from datetime import date as _date
+    prepaid = bool((request.get_json(silent=True) or {}).get("prepaid"))
+    first_of_month = datetime.today().date().replace(day=1)
+    conn = get_db_connection()
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute("SELECT charge_date FROM mcard_charges WHERE charge_id=%s", (charge_id,))
+            row = cur.fetchone()
+            if not row:
+                return jsonify({"error": "Charge not found"}), 404
+            try:
+                charge_dt = _date.fromisoformat(str(row["charge_date"]))
+            except ValueError:
+                charge_dt = datetime.today().date()
+            if charge_dt < first_of_month and not session.get("can_manage_billing"):
+                return jsonify({"error": "This month is closed for changes or additions. Please contact the billing office at businessoffice@mizzentop.org."}), 403
+            cur.execute("UPDATE mcard_charges SET prepaid=%s WHERE charge_id=%s", (prepaid, charge_id))
+        conn.commit()
+        return jsonify({"success": True, "prepaid": prepaid})
+    except Exception as e:
+        conn.rollback()
+        return jsonify({"error": str(e)}), 500
     finally:
         conn.close()
 
@@ -1695,6 +1731,35 @@ def delete_store_purchase(purchase_id):
             cur.execute("DELETE FROM store_purchases WHERE purchase_id=%s", (purchase_id,))
             conn.commit()
         return jsonify({"deleted": True})
+    except Exception as e:
+        conn.rollback()
+        return jsonify({"error": str(e)}), 500
+    finally:
+        conn.close()
+
+
+@app.route("/api/store/purchases/<int:purchase_id>/prepaid", methods=["PATCH"])
+@login_required
+def set_store_prepaid(purchase_id):
+    """Mark/unmark a School Store purchase as prepaid (left off the monthly billing report)."""
+    from datetime import date as dt_date
+    prepaid = bool((request.get_json(silent=True) or {}).get("prepaid"))
+    conn = get_db_connection()
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute("SELECT purchase_date FROM store_purchases WHERE purchase_id=%s", (purchase_id,))
+            row = cur.fetchone()
+            if not row:
+                return jsonify({"error": "Not found"}), 404
+            try:
+                pd = dt_date.fromisoformat(str(row["purchase_date"]))
+                if pd < dt_date.today().replace(day=1) and not session.get("can_manage_billing"):
+                    return jsonify({"error": "This month is closed for changes or additions. Please contact the billing office at businessoffice@mizzentop.org."}), 403
+            except ValueError:
+                pass
+            cur.execute("UPDATE store_purchases SET prepaid=%s WHERE purchase_id=%s", (prepaid, purchase_id))
+        conn.commit()
+        return jsonify({"success": True, "prepaid": prepaid})
     except Exception as e:
         conn.rollback()
         return jsonify({"error": str(e)}), 500
@@ -4677,6 +4742,7 @@ def api_billing_report():
                     SELECT student_id, SUM(quantity) AS qty
                     FROM   mcard_charges
                     WHERE  charge_date::date >= %s AND charge_date::date <= %s
+                      AND  NOT COALESCE(prepaid, FALSE)
                     GROUP  BY student_id
                 """, (first_day, last_day))
                 mcard = {r["student_id"]: int(r["qty"]) for r in cur.fetchall()}
@@ -4748,6 +4814,7 @@ def api_billing_report():
                     SELECT student_id, SUM(quantity * unit_price) AS store_total
                     FROM   store_purchases
                     WHERE  purchase_date::date >= %s AND purchase_date::date <= %s
+                      AND  NOT COALESCE(prepaid, FALSE)
                     GROUP  BY student_id
                 """, (first_day, last_day))
                 store_totals = {r["student_id"]: float(r["store_total"]) for r in cur.fetchall()}
@@ -4897,7 +4964,8 @@ def api_billing_student_detail():
 
                 # 1. M Card charges
                 cur.execute("""
-                    SELECT charge_date, quantity, recorded_at
+                    SELECT charge_date, quantity, recorded_at,
+                           COALESCE(prepaid, FALSE) AS prepaid
                     FROM   mcard_charges
                     WHERE  student_id = %s
                       AND  charge_date::date >= %s AND charge_date::date <= %s
@@ -4905,12 +4973,14 @@ def api_billing_student_detail():
                 """, (student_id, first_day, last_day))
                 for r in cur.fetchall():
                     qty = int(r["quantity"])
+                    is_pre = bool(r.get("prepaid"))
                     rows.append({
                         "date": str(r["charge_date"]), "program_key": "mcard",
                         "program_label": "M Card Snack",
-                        "detail": f"{qty} snack{'s' if qty != 1 else ''}",
+                        "detail": f"{qty} snack{'s' if qty != 1 else ''}" + (" · Prepaid" if is_pre else ""),
                         "recorded_by": "—",
-                        "amount": round(qty * rates["mcard_snack"], 2),
+                        "amount": 0.0 if is_pre else round(qty * rates["mcard_snack"], 2),
+                        "prepaid": is_pre,
                     })
 
                 # 2. Program attendance
@@ -4985,7 +5055,8 @@ def api_billing_student_detail():
                 # 4. School Store purchases
                 cur.execute("""
                     SELECT sp.purchase_date, si.name AS item_name, sp.color, sp.size,
-                           sp.quantity, sp.unit_price, sp.recorded_by
+                           sp.quantity, sp.unit_price, sp.recorded_by,
+                           COALESCE(sp.prepaid, FALSE) AS prepaid
                     FROM   store_purchases sp
                     JOIN   store_items si ON sp.item_id = si.item_id
                     WHERE  sp.student_id = %s
@@ -5001,12 +5072,16 @@ def api_billing_student_detail():
                     if r.get("size"):
                         parts.append(r["size"])
                     detail = f"{qty}x {' / '.join(parts)} @ ${price:.2f}"
+                    is_pre = bool(r.get("prepaid"))
+                    if is_pre:
+                        detail += " · Prepaid"
                     rows.append({
                         "date": str(r["purchase_date"]), "program_key": "store",
                         "program_label": "School Store",
                         "detail": detail,
                         "recorded_by": r.get("recorded_by") or "—",
-                        "amount": round(qty * price, 2),
+                        "amount": 0.0 if is_pre else round(qty * price, 2),
+                        "prepaid": is_pre,
                     })
 
                 # 5. Lunch — single monthly line item (status + pizza), same math as report

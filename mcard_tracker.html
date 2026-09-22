@@ -61,6 +61,11 @@
     .grade-pill { background: var(--navy); color: #fff; font-size: 11px; font-weight: 600; border-radius: 6px; padding: 2px 8px; display: inline-block; }
     .btn-remove { background: none; border: 2px solid #e2d9c8; color: var(--muted); border-radius: 8px; padding: 5px 12px; font-size: 12px; font-family: 'DM Sans', sans-serif; cursor: pointer; transition: all 0.15s; font-weight: 600; }
     .btn-remove:hover { border-color: var(--red); color: var(--red); background: #fff0f0; }
+    .btn-prepaid { background: none; border: 2px solid #e2d9c8; color: var(--muted); border-radius: 8px; padding: 5px 12px; font-size: 12px; font-family: 'DM Sans', sans-serif; cursor: pointer; transition: all 0.15s; font-weight: 600; margin-right: 6px; }
+    .btn-prepaid:hover { border-color: #2eaa6e; color: #2eaa6e; }
+    .btn-prepaid.on { background: #2eaa6e; border-color: #2eaa6e; color: #fff; }
+    .prepaid-tag { color: #2eaa6e; font-size: 12px; font-weight: 600; margin-right: 6px; }
+    tr.is-prepaid td { opacity: 0.75; }
     .empty-state { text-align: center; padding: 48px 20px; color: var(--muted); font-size: 15px; }
     .empty-state span { font-size: 40px; display: block; margin-bottom: 10px; }
     .error-banner { background: #fff0f0; border: 2px solid var(--red); color: var(--red); border-radius: 12px; padding: 14px 20px; margin-bottom: 20px; font-size: 14px; font-weight: 600; display: none; }
@@ -215,6 +220,19 @@
     } catch(e) { showFlash('Error removing charge.', true); }
   }
 
+  async function togglePrepaid(id) {
+    const charge = charges.find(c => c.charge_id === id);
+    if (!charge) return;
+    const newVal = !charge.prepaid;
+    try {
+      const res = await fetch(`${API_BASE}/api/mcard/charges/${id}/prepaid`, { method: 'PATCH', headers: {'Content-Type':'application/json'}, body: JSON.stringify({prepaid: newVal}) });
+      const result = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(result.error || 'Error updating charge.');
+      charge.prepaid = newVal; renderTable();
+      showFlash(newVal ? 'Marked prepaid. It won\'t appear on the monthly bill.' : 'Prepaid removed. It will be billed.', false);
+    } catch(e) { showFlash(e.message || 'Error updating charge.', true); }
+  }
+
   function renderTable() {
     const search = document.getElementById('searchInput').value.toLowerCase();
     const filtered = charges.filter(c => c.student_name.toLowerCase().includes(search));
@@ -232,9 +250,9 @@
       const firstOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
       const isLocked = d < firstOfMonth && !canManageBilling;
       const removeBtn = isLocked
-        ? '<span style="color:var(--muted);font-size:12px;font-style:italic">🔒 Closed</span>'
-        : `<button class="btn-remove" onclick="removeCharge(${c.charge_id})">Remove</button>`;
-      html += `<tr><td style="color:var(--muted);font-size:13px">${filtered.length - i}</td><td style="font-weight:600">${esc(c.student_name)}</td><td><span class="grade-pill">${esc(c.grade || '?')}</span></td><td style="color:var(--muted)">${dateStr}</td><td><span class="charge-badge">+${c.quantity || 1}</span></td><td>${removeBtn}</td></tr>`;
+        ? (c.prepaid ? '<span class="prepaid-tag">Prepaid</span>' : '') + '<span style="color:var(--muted);font-size:12px;font-style:italic">🔒 Closed</span>'
+        : `<button class="btn-prepaid${c.prepaid ? ' on' : ''}" onclick="togglePrepaid(${c.charge_id})" title="Family already paid (e.g. Blackbaud). Leaves this off the monthly bill.">${c.prepaid ? '✓ Prepaid' : 'Prepaid'}</button><button class="btn-remove" onclick="removeCharge(${c.charge_id})">Remove</button>`;
+      html += `<tr${c.prepaid ? ' class="is-prepaid"' : ''}><td style="color:var(--muted);font-size:13px">${filtered.length - i}</td><td style="font-weight:600">${esc(c.student_name)}</td><td><span class="grade-pill">${esc(c.grade || '?')}</span></td><td style="color:var(--muted)">${dateStr}</td><td><span class="charge-badge">+${c.quantity || 1}</span></td><td>${removeBtn}</td></tr>`;
     });
     html += '</tbody></table>';
     wrap.innerHTML = html;
@@ -250,8 +268,8 @@
 
   function exportCSV() {
     if (charges.length === 0) { alert('No charges to export.'); return; }
-    let csv = 'Student ID,Student Name,Grade,Date\n';
-    [...charges].sort((a,b) => b.charge_date.localeCompare(a.charge_date)).forEach(c => { csv += `${c.student_id},"${c.student_name}","${c.grade}","${c.charge_date}"\n`; });
+    let csv = 'Student ID,Student Name,Grade,Date,Prepaid\n';
+    [...charges].sort((a,b) => b.charge_date.localeCompare(a.charge_date)).forEach(c => { csv += `${c.student_id},"${c.student_name}","${c.grade}","${c.charge_date}",${c.prepaid ? 'Yes' : 'No'}\n`; });
     const grouped = {};
     charges.forEach(c => { if (!grouped[c.student_id]) grouped[c.student_id] = {name: c.student_name, grade: c.grade, count: 0}; grouped[c.student_id].count++; });
     csv += '\nStudent Summary\nStudent ID,Name,Grade,Total Charges\n';

@@ -55,6 +55,11 @@
     .btn-secondary:hover { background: var(--navy); color: #fff; }
     .btn-danger { background: none; border: 2px solid #e2d9c8; color: var(--muted); border-radius: 8px; padding: 5px 12px; font-size: 12px; font-family: 'DM Sans', sans-serif; cursor: pointer; transition: all 0.15s; font-weight: 600; }
     .btn-danger:hover { border-color: var(--red); color: var(--red); background: #fff0f0; }
+    .btn-prepaid { background: none; border: 2px solid #e2d9c8; color: var(--muted); border-radius: 8px; padding: 5px 12px; font-size: 12px; font-family: 'DM Sans', sans-serif; cursor: pointer; transition: all 0.15s; font-weight: 600; margin-right: 6px; white-space: nowrap; }
+    .btn-prepaid:hover { border-color: var(--green); color: var(--green); }
+    .btn-prepaid.on { background: var(--green); border-color: var(--green); color: #fff; }
+    .prepaid-tag { color: var(--green); font-size: 12px; font-weight: 600; margin-right: 6px; }
+    tr.is-prepaid td { opacity: 0.75; }
     .btn-sm { padding: 6px 14px; font-size: 12px; border-radius: 8px; height: auto; }
 
     /* Table card */
@@ -407,18 +412,18 @@
       return;
     }
     const firstOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
-    let total = 0;
+    let total = 0, prepaidTotal = 0;
     let html = `<table><thead><tr><th>Date</th><th>Student</th><th>Item</th><th>Color</th><th>Size</th><th class="r">Qty</th><th class="r">Unit Price</th><th class="r">Total</th><th>Recorded By</th><th></th></tr></thead><tbody>`;
     purchases.forEach(p => {
       const d = new Date(p.purchase_date + 'T12:00:00');
       const dateStr = d.toLocaleDateString('en-US', {month:'short', day:'numeric'});
       const lineTotal = (p.quantity || 1) * (p.unit_price || 0);
-      total += lineTotal;
+      if (p.prepaid) prepaidTotal += lineTotal; else total += lineTotal;
       const isLocked = d < firstOfMonth && !canManageBilling;
       const delBtn = isLocked
-        ? '<span style="color:var(--muted);font-size:12px;font-style:italic">Closed</span>'
-        : `<button class="btn-danger" onclick="deletePurchase(${p.purchase_id})">Remove</button>`;
-      html += `<tr>
+        ? (p.prepaid ? '<span class="prepaid-tag">Prepaid</span>' : '') + '<span style="color:var(--muted);font-size:12px;font-style:italic">Closed</span>'
+        : `<span style="white-space:nowrap"><button class="btn-prepaid${p.prepaid ? ' on' : ''}" onclick="togglePrepaid(${p.purchase_id})" title="Family already paid (e.g. Blackbaud). Leaves this off the monthly bill.">${p.prepaid ? '✓ Prepaid' : 'Prepaid'}</button><button class="btn-danger" onclick="deletePurchase(${p.purchase_id})">Remove</button></span>`;
+      html += `<tr${p.prepaid ? ' class="is-prepaid"' : ''}>
         <td style="color:var(--muted)">${dateStr}</td>
         <td style="font-weight:600">${esc(p.first_name+' '+p.last_name)}</td>
         <td>${esc(p.item_name||'')}</td>
@@ -433,7 +438,22 @@
     });
     html += '</tbody></table>';
     wrap.innerHTML = html;
-    totalEl.textContent = `Month Total: $${total.toFixed(2)}`;
+    totalEl.textContent = prepaidTotal > 0
+      ? `To Bill: $${total.toFixed(2)} · Prepaid: $${prepaidTotal.toFixed(2)}`
+      : `Month Total: $${total.toFixed(2)}`;
+  }
+
+  async function togglePrepaid(id) {
+    const p = purchases.find(x => x.purchase_id === id);
+    if (!p) return;
+    const newVal = !p.prepaid;
+    try {
+      const res = await fetch(`${API}/api/store/purchases/${id}/prepaid`, {method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify({prepaid: newVal})});
+      const result = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(result.error || 'Error updating purchase.');
+      p.prepaid = newVal; renderPurchases();
+      showFlash(newVal ? 'Marked prepaid. It won\'t appear on the monthly bill.' : 'Prepaid removed. It will be billed.', false);
+    } catch(e) { showFlash(e.message || 'Error updating purchase.', true); }
   }
 
   async function deletePurchase(id) {

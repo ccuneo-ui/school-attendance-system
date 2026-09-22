@@ -1107,7 +1107,7 @@
         <td><span class="prog-chip chip-${esc(r.program_key)}">${esc(r.program_label)}</span></td>
         <td>${esc(r.detail)}</td>
         <td class="recorded-by">${esc(r.recorded_by||'—')}</td>
-        <td class="r">$${(r.amount||0).toFixed(2)}</td>`;
+        <td class="r">${r.prepaid ? '<span style="color:#2eaa6e;font-weight:600">Prepaid</span>' : '$'+(r.amount||0).toFixed(2)}</td>`;
       tbody.appendChild(tr);
     });
 
