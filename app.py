@@ -3656,6 +3656,28 @@ def delete_people_staff(staff_id):
 # PROGRAM ATTENDANCE (OG, Homework Center, 1-1 Tutoring)
 # ============================================
 
+@app.route("/api/program-attendance/staff")
+@require_perm("program_attendance")
+def get_program_attendance_staff():
+    """Active staff names for the Teacher picker on Program Attendance.
+    Gated on program_attendance (not staff_directory) and returns names only,
+    so tutors can pick themselves without seeing the full staff directory."""
+    me = (session.get("user_email") or "").lower()
+    conn = get_db_connection()
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute("SELECT first_name, last_name, title, role, email FROM staff WHERE status='active' ORDER BY last_name, first_name")
+            rows = fa(cur)
+        out = [{"first_name": r["first_name"], "last_name": r["last_name"],
+                "title": r.get("title") or "", "role": r.get("role") or "",
+                "status": "active",
+                "is_me": bool(me) and (r.get("email") or "").lower() == me}
+               for r in rows]
+        return jsonify(out)
+    finally:
+        conn.close()
+
+
 @app.route("/api/program-attendance/students")
 @login_required
 def get_program_attendance_students():

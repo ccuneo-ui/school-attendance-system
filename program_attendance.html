@@ -557,10 +557,16 @@
   // ── Staff / Teachers ──
   async function loadStaff() {
     try {
-      const res = await fetch('/api/people/staff');
+      const res = await fetch('/api/program-attendance/staff');
       const data = await res.json();
-      allStaff = data.filter(s => s.status === 'active');
+      if (!res.ok || !Array.isArray(data)) throw new Error((data && data.error) || 'HTTP ' + res.status);
+      allStaff = data;
+      // Pre-fill the teacher box with the signed-in staff member
+      const me = allStaff.find(s => s.is_me);
+      const box = document.getElementById('teacherSearch');
+      if (me && !box.value.trim()) selectTeacher(`${me.first_name} ${me.last_name}`);
     } catch(e) {
+      showToast("Couldn't load the teacher list. Try refreshing the page.");
       console.error('Failed to load staff:', e);
     }
   }

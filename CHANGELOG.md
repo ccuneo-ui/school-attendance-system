@@ -1,5 +1,6 @@
 # Changelog
 
+2026-09-22: Program Attendance — the Teacher picker now works for all staff with Program Attendance access (it previously showed "No matches" unless you also had Staff Directory access), and it pre-fills with your own name.
 2026-09-22: M Card and School Store logs now have a Prepaid button; prepaid charges (e.g. paid directly in Blackbaud) stay on the log but are left off the monthly Billing Report, and show as "Prepaid" in the student charge lookup.
 2026-09-18: Staff directory (People) — now defaults to the Active filter on load instead of "All statuses," and removed the obsolete "Students (coming soon)" tab now that the Student Directory is its own page.
 
