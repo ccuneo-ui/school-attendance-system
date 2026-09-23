@@ -96,6 +96,7 @@
     .status-sel.s-home        { color: var(--muted); }
     .status-sel.s-monthly     { background: #e7f2e0; color: var(--green); border-color: #bcd9ab; }
     .status-sel.s-fullYearPaid{ background: #fbf1d9; color: #8a6a1a; border-color: #e8c98a; }
+    .status-sel.s-monthlyPrepaid{ background: #e0f0ee; color: #12776a; border-color: #9fd3cc; }
 
     .pizza { display: flex; align-items: center; justify-content: center; gap: 4px; margin-top: 4px; height: 20px; }
     .pz-btn {
@@ -105,8 +106,15 @@
     }
     .pz-btn:hover { background: var(--light-bg); }
     .pz-n { font-size: 11px; font-weight: 700; min-width: 14px; }
-    .pizza .pz-minus, .pizza .pz-n { display: none; }
-    .pizza.has .pz-minus, .pizza.has .pz-n { display: flex; }
+    .pz-pre {
+      border: 1px solid var(--border); background: var(--white); color: var(--muted);
+      border-radius: 5px; font-size: 9px; font-weight: 700; letter-spacing: 0.03em;
+      padding: 0 4px; height: 18px; cursor: pointer; line-height: 1;
+    }
+    .pz-pre:hover { border-color: #12776a; color: #12776a; }
+    .pz-pre.on { background: #12776a; border-color: #12776a; color: #fff; }
+    .pizza .pz-minus, .pizza .pz-n, .pizza .pz-pre { display: none; }
+    .pizza.has .pz-minus, .pizza.has .pz-n, .pizza.has .pz-pre { display: flex; align-items: center; }
     .pizza.has .pz-add { background: #fdf4e3; border-color: #e8c98a; }
 
     .col-total { min-width: 86px; font-weight: 700; font-family: 'Playfair Display', serif; }
@@ -172,7 +180,9 @@
     <select id="statusFilter">
       <option value="all">All</option>
       <option value="monthly">Monthly</option>
+      <option value="monthlyPrepaid">Monthly · Prepaid</option>
       <option value="fullYearPaid">Full Year Paid</option>
+      <option value="prepaid">Any Prepaid</option>
       <option value="home">Home</option>
       <option value="pizza">Has Pizza</option>
     </select>
@@ -210,7 +220,8 @@
 
   function cellOf(stu, mk){
     const c = (stu.months && stu.months[mk]) || {};
-    return { status: c.status || 'home', pizza: parseInt(c.pizzaCount || 0) || 0 };
+    return { status: c.status || 'home', pizza: parseInt(c.pizzaCount || 0) || 0,
+             pizzaPrepaid: !!c.pizzaPrepaid };
   }
 
   function monthCharge(grade, status, pizza, mk){
@@ -218,7 +229,7 @@
     const dc = state.lunch_days[mk] || { ec:0, g18:0 };
     const days = ec ? dc.ec : dc.g18;
     const rate = ec ? state.rates.lunch_rate_ec : state.rates.lunch_rate_1_8;
-    const statusCharge = status === 'monthly' ? days * rate : 0;
+    const statusCharge = (status === 'monthly' || status === 'monthlyPrepaid') ? days * rate : 0;
     const pizzaCharge = (pizza || 0) * rate;
     return { days, rate, statusCharge, pizzaCharge };
   }
@@ -321,6 +332,7 @@
       const anyMatch = state.month_keys.some(mk => {
         const c = cellOf(stu, mk);
         if (sf === 'pizza') return c.pizza > 0;
+        if (sf === 'prepaid') return c.status === 'monthlyPrepaid' || (c.pizza > 0 && c.pizzaPrepaid);
         return c.status === sf;
       });
       if (!anyMatch) return false;
@@ -360,12 +372,14 @@
         `<select class="status-sel s-${c.status}" data-act="status">` +
           `<option value="home"${c.status==='home'?' selected':''}>Home</option>` +
           `<option value="monthly"${c.status==='monthly'?' selected':''}>Monthly</option>` +
+          `<option value="monthlyPrepaid"${c.status==='monthlyPrepaid'?' selected':''}>Monthly · Prepaid</option>` +
           `<option value="fullYearPaid"${c.status==='fullYearPaid'?' selected':''}>Full Year Paid</option>` +
         `</select>` +
         `<div class="pizza${hasPz}">` +
           `<button class="pz-btn pz-minus" data-act="pz" data-d="-1">−</button>` +
           `<span class="pz-n">${c.pizza}</span>` +
           `<button class="pz-btn pz-add" data-act="pz" data-d="1" title="Pizza">🍕</button>` +
+          `<button class="pz-pre${c.pizzaPrepaid?' on':''}" data-act="pzpre" title="Pizza already paid (e.g. Blackbaud) — keeps it off the monthly bill">Pre</button>` +
         `</div>` +
       `</td>`;
     });
@@ -380,12 +394,13 @@
 
   function findStudent(sid){ return state.students.find(s => String(s.student_id) === String(sid)); }
 
-  function setCell(stu, mk, status, pizza){
+  function setCell(stu, mk, status, pizza, pizzaPrepaid){
     stu.months = stu.months || {};
     const cur = stu.months[mk] || {};
     stu.months[mk] = {
       status: status != null ? status : (cur.status || 'home'),
-      pizzaCount: pizza != null ? pizza : (parseInt(cur.pizzaCount||0)||0)
+      pizzaCount: pizza != null ? pizza : (parseInt(cur.pizzaCount||0)||0),
+      pizzaPrepaid: pizzaPrepaid != null ? !!pizzaPrepaid : !!cur.pizzaPrepaid
     };
   }
 
@@ -408,21 +423,27 @@
       const td = btn.closest('.mcell'); const mk = td.dataset.mk;
       const c = cellOf(stu, mk);
       const next = Math.max(0, c.pizza + parseInt(btn.dataset.d));
-      setCell(stu, mk, null, next);
+      setCell(stu, mk, null, next, next === 0 ? false : null);
+      saveCell(stu, mk);
+      render();
+    } else if (act === 'pzpre'){
+      const td = btn.closest('.mcell'); const mk = td.dataset.mk;
+      const c = cellOf(stu, mk);
+      setCell(stu, mk, null, null, !c.pizzaPrepaid);
       saveCell(stu, mk);
       render();
     } else if (act === 'allfy'){
       const months = {};
       state.month_keys.forEach(mk => {
         const c = cellOf(stu, mk);
-        setCell(stu, mk, 'fullYearPaid', c.pizza);
-        months[mk] = { status: 'fullYearPaid', pizzaCount: c.pizza };
+        setCell(stu, mk, 'fullYearPaid', c.pizza, c.pizzaPrepaid);
+        months[mk] = { status: 'fullYearPaid', pizzaCount: c.pizza, pizzaPrepaid: c.pizzaPrepaid };
       });
       saveBulk(stu, months);
       render();
     } else if (act === 'reset'){
       const months = {};
-      state.month_keys.forEach(mk => { setCell(stu, mk, 'home', 0); months[mk] = { status:'home', pizzaCount:0 }; });
+      state.month_keys.forEach(mk => { setCell(stu, mk, 'home', 0, false); months[mk] = { status:'home', pizzaCount:0, pizzaPrepaid:false }; });
       saveBulk(stu, months);
       render();
     }
@@ -447,7 +468,7 @@
     saveTimers[key] = setTimeout(() => {
       const c = cellOf(stu, mk);
       postSave({ student_id: stu.student_id, school_year: state.school_year, grade: stu.grade,
-                 month: mk, status: c.status, pizzaCount: c.pizza });
+                 month: mk, status: c.status, pizzaCount: c.pizza, pizzaPrepaid: c.pizzaPrepaid });
     }, 500);
   }
 
@@ -475,7 +496,7 @@
       const anyFy = state.month_keys.some(k => cellOf(s,k).status === 'fullYearPaid');
       const c = cellOf(s, mk);
       if (anyFy) fy++;
-      if (c.status === 'monthly') mo++;
+      if (c.status === 'monthly' || c.status === 'monthlyPrepaid') mo++;
       else if (c.status === 'home' && c.pizza > 0) pz++;
       else if (c.status === 'home') hm++;
     });

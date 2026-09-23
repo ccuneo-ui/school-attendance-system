@@ -194,6 +194,21 @@
     tbody tr:hover { background: var(--mist); }
     tbody tr.grade-hdr { background: #f3f0eb; }
     tbody tr.grade-hdr td { font-size: 10px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.12em; color: var(--muted); padding: 6px 14px; }
+    tbody tr.fam-hdr { background: #f3efe6; }
+    tbody tr.fam-hdr td { padding: 9px 14px; border-top: 2px solid var(--border); }
+    tbody tr.fam-hdr:hover { background: #f3efe6; }
+    .fam-name { font-family: 'Playfair Display', serif; font-size: 15px; font-weight: 700; color: var(--navy); }
+    .fam-meta { font-size: 11px; color: var(--muted); margin-left: 10px; }
+    .fam-total { font-weight: 700; font-variant-numeric: tabular-nums; color: var(--navy); }
+    .flag { display: inline-block; font-size: 10px; font-weight: 600; color: #8a6a1a; background: #fbf1d9; border: 1px solid #e8c98a; border-radius: 5px; padding: 1px 5px; margin-left: 6px; vertical-align: middle; }
+    .flag.warn { color: #a33333; background: #fff0f0; border-color: #f0c0c0; }
+    .grp-toggle { display: inline-flex; gap: 4px; }
+    .grp-btn {
+      background: var(--white); border: 1px solid var(--border); border-radius: 999px;
+      padding: 5px 14px; font-family: 'DM Sans', sans-serif; font-size: 12px;
+      font-weight: 600; color: var(--muted); cursor: pointer;
+    }
+    .grp-btn.active { background: var(--navy); color: var(--white); border-color: var(--navy); }
     tbody td { padding: 11px 14px; vertical-align: middle; }
     tbody td.r { text-align: right; font-variant-numeric: tabular-nums; }
     .zero { color: #ccc; }
@@ -266,6 +281,13 @@
   </div>
   <button class="btn-generate" onclick="generateReport()">Generate Report</button>
   <button class="btn-export" id="exportBtn" onclick="exportCSV()">⬇ Export CSV</button>
+  <div class="ctrl-group">
+    <span class="ctrl-label">Group by</span>
+    <div class="grp-toggle">
+      <button class="grp-btn active" data-mode="family" onclick="setGroupMode('family',this)">Family</button>
+      <button class="grp-btn" data-mode="grade" onclick="setGroupMode('grade',this)">Grade</button>
+    </div>
+  </div>
   <div class="grade-pills" id="gradePills">
     <div class="grade-pill active" data-grade="all" onclick="filterGrade('all',this)">All Grades</div>
   </div>
@@ -724,6 +746,7 @@
   // ═══════════════════════════════════════
   let reportData = [];
   let activeGrade = 'all';
+  let groupMode = 'family';
   let curMonth, curYear;
 
   (function init() {
@@ -749,7 +772,7 @@
       if(data.error) throw new Error(data.error);
       reportData = data.students || [];
       buildGradePills(reportData);
-      render(reportData);
+      render(currentFiltered());
     } catch(err) {
       document.getElementById('stateLoading').style.display = 'none';
       document.getElementById('stateEmpty').style.display   = '';
@@ -779,10 +802,70 @@
     activeGrade=grade;
     document.querySelectorAll('.grade-pill').forEach(p=>p.classList.remove('active'));
     el.classList.add('active');
-    const filtered = grade==='all' ? reportData
-                   : grade==='guest' ? reportData.filter(s=>s.is_guest)
-                   : reportData.filter(s=>!s.is_guest && s.grade===grade);
+    applyFilter();
+  }
+
+  function setGroupMode(mode, el) {
+    groupMode = mode;
+    document.querySelectorAll('.grp-btn').forEach(b=>b.classList.remove('active'));
+    el.classList.add('active');
+    if (reportData.length) applyFilter();
+  }
+
+  function applyFilter() {
+    const filtered = currentFiltered();
     renderTable(filtered); renderSummary(filtered);
+  }
+
+  function currentFiltered() {
+    let list = activeGrade==='all' ? reportData
+             : activeGrade==='guest' ? reportData.filter(s=>s.is_guest)
+             : reportData.filter(s=>!s.is_guest && s.grade===activeGrade);
+    // In family view a grade filter keeps whole families, so an invoice total is
+    // never shown with one sibling missing.
+    if (groupMode==='family' && activeGrade!=='all') {
+      const hh  = new Set(list.filter(s=>s.household_id!=null).map(s=>s.household_id));
+      const ids = new Set(list.map(s=>s.student_id));
+      list = reportData.filter(s => ids.has(s.student_id) ||
+                                    (s.household_id!=null && hh.has(s.household_id)));
+    }
+    return list;
+  }
+
+  // Sections for the table and the CSV — family blocks or grade blocks.
+  function buildSections(students) {
+    if (groupMode === 'grade') {
+      const byGrade={}; const guests=[];
+      students.forEach(s=>{
+        if(s.is_guest){ guests.push(s); return; }
+        (byGrade[s.grade] = byGrade[s.grade] || []).push(s);
+      });
+      const secs = Object.keys(byGrade)
+        .sort((a,b)=>(parseInt(a)||0)-(parseInt(b)||0))
+        .map(g=>({label:`Grade ${g}`, list:byGrade[g], family:false}));
+      if(guests.length) secs.push({label:'Guests', list:guests, family:false});
+      return secs;
+    }
+    const byFam=new Map(); const noFam=[];
+    students.forEach(s=>{
+      if(s.household_id==null){ noFam.push(s); return; }
+      if(!byFam.has(s.household_id)) byFam.set(s.household_id, []);
+      byFam.get(s.household_id).push(s);
+    });
+    const secs=[...byFam.entries()].map(([hid,list])=>({
+      label: list[0].family_name || ('Household '+hid),
+      list, family:true, hid,
+      contact: list[0].family_contact || '',
+      email:   list[0].family_email   || ''
+    })).sort((a,b)=>a.label.localeCompare(b.label));
+    if(noFam.length) secs.push({label:'No family on file', list:noFam, family:true, hid:null,
+                                contact:'', email:'', orphan:true});
+    return secs;
+  }
+
+  function rowTotal(s) {
+    return (s.mcard||0)+(s.beforecare||0)+(s.aftercare||0)+(s.og_tutoring||0)
+         + (s.homework_center||0)+(s.one_on_one||0)+(s.school_store||0)+(s.lunch||0);
   }
 
   function render(students) {
@@ -823,33 +906,50 @@
       tbody.innerHTML='<tr><td colspan="11" style="text-align:center;padding:2rem;color:var(--muted);">No billing activity for this period.</td></tr>';
       return;
     }
-    // Enrolled students group by grade; guests go in their own "Guests" section at the bottom.
-    const byGrade={}; const guests=[];
-    students.forEach(s=>{
-      if(s.is_guest){ guests.push(s); return; }
-      if(!byGrade[s.grade]) byGrade[s.grade]=[]; byGrade[s.grade].push(s);
-    });
-    const sortedGrades=Object.keys(byGrade).sort((a,b)=>(parseInt(a)||0)-(parseInt(b)||0));
-    const sections=sortedGrades.map(g=>({label:`Grade ${g}`, list:byGrade[g]}));
-    if(guests.length) sections.push({label:'Guests', list:guests});
+    const sections = buildSections(students);
     let gm=0,gbc=0,gac=0,gog=0,ghw=0,goo=0,gss=0,gls=0;
 
     sections.forEach(sec => {
-      const hr=document.createElement('tr'); hr.className='grade-hdr';
-      hr.innerHTML=`<td colspan="11">${sec.label}</td>`; tbody.appendChild(hr);
+      const secTotal = sec.list.reduce((n,s)=>n+rowTotal(s),0);
+      const hr=document.createElement('tr');
+      if (sec.family) {
+        hr.className='fam-hdr';
+        const meta = sec.orphan
+          ? '<span class="fam-meta">not linked to a family yet — add them in Family Manager</span>'
+          : (sec.contact || sec.email
+              ? `<span class="fam-meta">${esc(sec.contact)}${sec.contact&&sec.email?' · ':''}${esc(sec.email)}</span>`
+              : '<span class="fam-meta">no billing contact on file</span>');
+        const kids = sec.list.length;
+        hr.innerHTML = `<td colspan="10"><span class="fam-name">${esc(sec.label)}</span>`
+                     + `<span class="fam-meta">${kids} student${kids!==1?'s':''}</span>${meta}</td>`
+                     + `<td class="r fam-total">$${secTotal.toFixed(2)}</td>`;
+      } else {
+        hr.className='grade-hdr';
+        hr.innerHTML=`<td colspan="11">${esc(sec.label)}</td>`;
+      }
+      tbody.appendChild(hr);
+
       sec.list.forEach(s => {
         gm+=s.mcard||0; gbc+=s.beforecare||0; gac+=s.aftercare||0;
-        gog+=s.og_tutoring||0; ghw+=s.homework_center||0; goo+=s.one_on_one||0; gss+=s.school_store||0; gls+=s.lunch||0;
-        const t=(s.mcard||0)+(s.beforecare||0)+(s.aftercare||0)+(s.og_tutoring||0)+(s.homework_center||0)+(s.one_on_one||0)+(s.school_store||0)+(s.lunch||0);
+        gog+=s.og_tutoring||0; ghw+=s.homework_center||0; goo+=s.one_on_one||0;
+        gss+=s.school_store||0; gls+=s.lunch||0;
+        const t=rowTotal(s);
+        let flags='';
+        if(s.family_multi) flags += '<span class="flag">2 households</span>';
+        if(s.family_no_primary) flags += '<span class="flag warn">no primary household</span>';
         const tr=document.createElement('tr');
-        tr.innerHTML=`<td class="student-name">${esc(s.name)}</td><td>${s.is_guest?'Guest':esc(s.grade)}</td><td class="r">${money(s.mcard)}</td><td class="r">${money(s.beforecare)}</td><td class="r">${money(s.aftercare)}</td><td class="r">${money(s.og_tutoring)}</td><td class="r">${money(s.homework_center)}</td><td class="r">${money(s.one_on_one)}</td><td class="r">${money(s.school_store)}</td><td class="r">${money(s.lunch)}</td><td class="r" style="font-weight:600;">${t>0?'$'+t.toFixed(2):'<span class="zero">—</span>'}</td>`;
+        tr.innerHTML=`<td class="student-name">${esc(s.name)}${flags}</td><td>${s.is_guest?'Guest':esc(s.grade)}</td><td class="r">${money(s.mcard)}</td><td class="r">${money(s.beforecare)}</td><td class="r">${money(s.aftercare)}</td><td class="r">${money(s.og_tutoring)}</td><td class="r">${money(s.homework_center)}</td><td class="r">${money(s.one_on_one)}</td><td class="r">${money(s.school_store)}</td><td class="r">${money(s.lunch)}</td><td class="r" style="font-weight:600;">${t>0?'$'+t.toFixed(2):'<span class="zero">&mdash;</span>'}</td>`;
         tbody.appendChild(tr);
       });
     });
 
     const gt=gm+gbc+gac+gog+ghw+goo+gss+gls;
+    const famCount = groupMode==='family' ? sections.length : 0;
+    const lead = groupMode==='family'
+      ? `${famCount} famil${famCount!==1?'ies':'y'} · ${students.length} student${students.length!==1?'s':''} — Total`
+      : `${students.length} student${students.length!==1?'s':''} — Total`;
     const tr=document.createElement('tr'); tr.className='total-row';
-    tr.innerHTML=`<td colspan="2">${students.length} student${students.length!==1?'s':''} — Total</td><td class="r">$${gm.toFixed(2)}</td><td class="r">$${gbc.toFixed(2)}</td><td class="r">$${gac.toFixed(2)}</td><td class="r">$${gog.toFixed(2)}</td><td class="r">$${ghw.toFixed(2)}</td><td class="r">$${goo.toFixed(2)}</td><td class="r">$${gss.toFixed(2)}</td><td class="r">$${gls.toFixed(2)}</td><td class="r">$${gt.toFixed(2)}</td>`;
+    tr.innerHTML=`<td colspan="2">${lead}</td><td class="r">$${gm.toFixed(2)}</td><td class="r">$${gbc.toFixed(2)}</td><td class="r">$${gac.toFixed(2)}</td><td class="r">$${gog.toFixed(2)}</td><td class="r">$${ghw.toFixed(2)}</td><td class="r">$${goo.toFixed(2)}</td><td class="r">$${gss.toFixed(2)}</td><td class="r">$${gls.toFixed(2)}</td><td class="r">$${gt.toFixed(2)}</td>`;
     tbody.appendChild(tr);
   }
 
@@ -857,7 +957,13 @@
     let mc=0,bc=0,ac=0,pg=0,mq=0,ps=0,cd=0,ss=0,ls=0;
     students.forEach(s=>{ mc+=s.mcard||0; bc+=s.beforecare||0; ac+=s.aftercare||0; pg+=(s.og_tutoring||0)+(s.homework_center||0)+(s.one_on_one||0); ss+=s.school_store||0; ls+=s.lunch||0; mq+=s.mcard_qty||0; ps+=s.program_sessions||0; cd+=s.care_days||0; });
     document.getElementById('sTotalBilling').textContent  = '$'+(mc+bc+ac+pg+ss+ls).toFixed(2);
-    document.getElementById('sTotalStudents').textContent = `${students.length} student${students.length!==1?'s':''}`;
+    const famIds = new Set(students.filter(s=>s.household_id!=null).map(s=>s.household_id));
+    const orphans = students.filter(s=>s.household_id==null).length;
+    const famN = famIds.size + (orphans ? 1 : 0);
+    document.getElementById('sTotalStudents').textContent = groupMode==='family'
+      ? `${famIds.size} famil${famIds.size!==1?'ies':'y'} · ${students.length} student${students.length!==1?'s':''}`
+        + (orphans ? ` · ${orphans} unlinked` : '')
+      : `${students.length} student${students.length!==1?'s':''}`;
     document.getElementById('sMcard').textContent         = '$'+mc.toFixed(2);
     document.getElementById('sMcardSub').textContent      = `${mq} snack${mq!==1?'s':''}`;
     document.getElementById('sProgram').textContent       = '$'+pg.toFixed(2);
@@ -869,17 +975,33 @@
   function exportCSV() {
     const months=['January','February','March','April','May','June','July','August','September','October','November','December'];
     const label=`${months[curMonth-1]}_${curYear}`;
-    const filtered = activeGrade==='all' ? reportData
-                   : activeGrade==='guest' ? reportData.filter(s=>s.is_guest)
-                   : reportData.filter(s=>!s.is_guest && s.grade===activeGrade);
-    const rows=[['Student','Grade','M Card','Before Care','Aftercare','OG Tutoring','Homework Center','1-on-1 Tutoring','School Store','Lunch','Total']];
-    filtered.forEach(s=>{
-      const t=(s.mcard||0)+(s.beforecare||0)+(s.aftercare||0)+(s.og_tutoring||0)+(s.homework_center||0)+(s.one_on_one||0)+(s.school_store||0)+(s.lunch||0);
-      rows.push([s.name,(s.is_guest?'Guest':s.grade),(s.mcard||0).toFixed(2),(s.beforecare||0).toFixed(2),(s.aftercare||0).toFixed(2),(s.og_tutoring||0).toFixed(2),(s.homework_center||0).toFixed(2),(s.one_on_one||0).toFixed(2),(s.school_store||0).toFixed(2),(s.lunch||0).toFixed(2),t.toFixed(2)]);
+    const sections = buildSections(currentFiltered());
+    const rows=[['Family','Billing Contact','Billing Email','Student','Grade','M Card','Before Care','Aftercare','OG Tutoring','Homework Center','1-on-1 Tutoring','School Store','Lunch','Total']];
+    const F = n => (n||0).toFixed(2);
+
+    sections.forEach(sec => {
+      const fam = sec.family ? sec.label : '';
+      const sub = {mcard:0,beforecare:0,aftercare:0,og_tutoring:0,homework_center:0,one_on_one:0,school_store:0,lunch:0,total:0};
+      sec.list.forEach(s => {
+        const t = rowTotal(s);
+        ['mcard','beforecare','aftercare','og_tutoring','homework_center','one_on_one','school_store','lunch']
+          .forEach(k => sub[k] += (s[k]||0));
+        sub.total += t;
+        rows.push([fam, sec.contact||'', sec.email||'', s.name, (s.is_guest?'Guest':s.grade),
+                   F(s.mcard),F(s.beforecare),F(s.aftercare),F(s.og_tutoring),
+                   F(s.homework_center),F(s.one_on_one),F(s.school_store),F(s.lunch),F(t)]);
+      });
+      if (sec.family) {
+        rows.push([fam, sec.contact||'', sec.email||'', 'FAMILY TOTAL', '',
+                   F(sub.mcard),F(sub.beforecare),F(sub.aftercare),F(sub.og_tutoring),
+                   F(sub.homework_center),F(sub.one_on_one),F(sub.school_store),F(sub.lunch),F(sub.total)]);
+        rows.push([]);
+      }
     });
-    const csv=rows.map(r=>r.map(c=>`"${c}"`).join(',')).join('\n');
+
+    const csv=rows.map(r=>r.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n');
     const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
-    a.download=`Mizzentop_Billing_${label}.csv`; a.click();
+    a.download=`Mizzentop_Billing_${groupMode==='family'?'ByFamily_':''}${label}.csv`; a.click();
   }
 
   // ═══════════════════════════════════════

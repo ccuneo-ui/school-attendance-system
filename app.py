@@ -12,6 +12,7 @@ from datetime import datetime
 import os
 import re
 import json
+import uuid
 
 def parse_time_to_minutes(time_str):
     """Parse 'HH:MM', 'H:MM PM', etc. into total minutes since midnight."""
@@ -930,6 +931,28 @@ def init_db():
             # list; the older single `category` column is kept in step (first
             # selected) so nothing that reads it breaks.
             cur.execute("ALTER TABLE north_star_entries ADD COLUMN IF NOT EXISTS categories TEXT[]")
+            # One save covering several students writes one row per student, all
+            # sharing a group_id so each can show who else was included.
+            cur.execute("ALTER TABLE north_star_entries ADD COLUMN IF NOT EXISTS group_id TEXT")
+            cur.execute("CREATE INDEX IF NOT EXISTS idx_ns_entries_group ON north_star_entries(group_id)")
+            # Backfill group saves made before the column existed: rows from one
+            # submission share author, date, body and created_at exactly.
+            cur.execute("""
+                UPDATE north_star_entries e
+                   SET group_id = g.gid
+                  FROM (SELECT md5(COALESCE(author_staff_id::text,'') || entry_date::text
+                                   || body || created_at::text) AS gid,
+                               author_staff_id, entry_date, body, created_at
+                          FROM north_star_entries
+                         WHERE group_id IS NULL
+                         GROUP BY author_staff_id, entry_date, body, created_at
+                        HAVING COUNT(*) > 1) g
+                 WHERE e.group_id IS NULL
+                   AND e.entry_date = g.entry_date
+                   AND e.body = g.body
+                   AND e.created_at = g.created_at
+                   AND COALESCE(e.author_staff_id, -1) = COALESCE(g.author_staff_id, -1)
+            """)
             cur.execute("""UPDATE north_star_entries SET categories = ARRAY[category]
                             WHERE categories IS NULL AND category IS NOT NULL""")
 
@@ -2608,7 +2631,14 @@ def api_north_star_entries():
                 where.append("e.author_staff_id = %s"); params.append(me_id)
 
             sql = """SELECT e.*, s.first_name AS student_first, s.last_name AS student_last,
-                            s.grade AS student_grade
+                            s.grade AS student_grade,
+                            (SELECT string_agg(s2.first_name || ' ' || s2.last_name, ', '
+                                               ORDER BY s2.last_name, s2.first_name)
+                               FROM north_star_entries e2
+                               JOIN students s2 ON s2.student_id = e2.student_id
+                              WHERE e.group_id IS NOT NULL
+                                AND e2.group_id = e.group_id
+                                AND e2.entry_id <> e.entry_id) AS group_others
                      FROM north_star_entries e
                      JOIN students s ON s.student_id = e.student_id"""
             if where:
@@ -2654,16 +2684,18 @@ def api_north_star_create():
                 sy = current_school_year_start()
             except Exception:
                 sy = None
+            group_id = uuid.uuid4().hex if len(ids) > 1 else None
             saved = []
             for sid in ids:
                 cur.execute("""
                     INSERT INTO north_star_entries
                         (student_id, category, categories, living_value, body, entry_date,
-                         school_year, for_report_card, for_graduation, author_staff_id, author_name)
-                    VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                         school_year, for_report_card, for_graduation, author_staff_id,
+                         author_name, group_id)
+                    VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
                     RETURNING entry_id
                 """, (sid, category, cats, living_value, body, entry_date, sy,
-                      for_rc, for_grad, author_id, author_name))
+                      for_rc, for_grad, author_id, author_name, group_id))
                 saved.append(fo(cur)["entry_id"])
             conn.commit()
         return jsonify({"success": True, "saved": len(saved), "entry_ids": saved}), 201
@@ -4125,7 +4157,7 @@ def delete_billing_rate(rate_id):
 # ============================================
 
 LUNCH_EC_GRADES = {"JPK", "SPK", "K"}
-LUNCH_STATUSES = {"home", "monthly", "fullYearPaid"}
+LUNCH_STATUSES = {"home", "monthly", "monthlyPrepaid", "fullYearPaid"}
 
 
 # ============================================
@@ -4209,7 +4241,8 @@ def _lunch_clean_cell(cell):
         pizza = int(cell.get("pizzaCount", 0) or 0)
     except (ValueError, TypeError):
         pizza = 0
-    return {"status": status, "pizzaCount": max(0, pizza)}
+    return {"status": status, "pizzaCount": max(0, pizza),
+            "pizzaPrepaid": bool(cell.get("pizzaPrepaid"))}
 
 
 def _lunch_rates(cur, as_of_date):
@@ -4258,7 +4291,7 @@ def _lunch_month_charge(grade, status, pizza_count, day_count, rates):
     ec = _lunch_is_ec(grade)
     lunch_days = day_count.get("ec", 0) if ec else day_count.get("g18", 0)
     rate = rates["lunch_rate_ec"] if ec else rates["lunch_rate_1_8"]
-    status_charge = lunch_days * rate if status == "monthly" else 0.0
+    status_charge = lunch_days * rate if status in ("monthly", "monthlyPrepaid") else 0.0
     pizza_charge = max(0, int(pizza_count or 0)) * rate
     return lunch_days, rate, round(status_charge, 2), round(pizza_charge, 2)
 
@@ -4363,6 +4396,7 @@ def api_lunch_enrollment_save():
                 months_doc[mk] = _lunch_clean_cell({
                     "status": data.get("status", prev.get("status", "home")),
                     "pizzaCount": data.get("pizzaCount", prev.get("pizzaCount", 0)),
+                    "pizzaPrepaid": data.get("pizzaPrepaid", prev.get("pizzaPrepaid", False)),
                 })
             else:
                 return jsonify({"error": "month or months required"}), 400
@@ -4853,6 +4887,40 @@ def api_billing_report():
                 """)
                 student_rows = cur.fetchall()
 
+                # 6b. Billing family. The school invoices per FAMILY, so every
+                #     student's charges roll up to their primary household.
+                #     A student linked to two households (split custody) bills to
+                #     the one flagged primary; ties fall back to the lowest id and
+                #     are flagged so the office can fix it in Family Manager.
+                cur.execute("""
+                    SELECT sh.student_id, sh.household_id,
+                           COALESCE(sh.is_primary, FALSE) AS is_primary,
+                           h.family_name, h.primary_email
+                    FROM   student_households sh
+                    JOIN   households h ON h.household_id = sh.household_id
+                    ORDER  BY sh.student_id,
+                              CASE WHEN COALESCE(sh.is_primary, FALSE) THEN 0 ELSE 1 END,
+                              sh.household_id
+                """)
+                fam_by_student, fam_link_count = {}, {}
+                for r in cur.fetchall():
+                    _sid = r["student_id"]
+                    fam_link_count[_sid] = fam_link_count.get(_sid, 0) + 1
+                    fam_by_student.setdefault(_sid, r)
+
+                # Billing contact per household: the member marked primary, else the first.
+                cur.execute("""
+                    SELECT hm.household_id, p.first_name, p.last_name, p.email
+                    FROM   household_members hm
+                    JOIN   parents p ON p.parent_id = hm.parent_id
+                    ORDER  BY hm.household_id,
+                              CASE WHEN hm.role = 'primary' THEN 0 ELSE 1 END,
+                              p.parent_id
+                """)
+                contact_by_household = {}
+                for r in cur.fetchall():
+                    contact_by_household.setdefault(r["household_id"], r)
+
                 # 7. Lunch-day counts for the month (from school calendar)
                 cur.execute("""
                     SELECT category_key, COUNT(*) AS n FROM calendar_day_tags
@@ -4902,9 +4970,15 @@ def api_billing_report():
             if le:
                 grade_used  = (le.get("grade_at_time_of_record") or "").strip() or s["grade"]
                 lunch_cell  = (le.get("months") or {}).get(lunch_mk) or {}
+                l_status    = lunch_cell.get("status", "home")
                 _, _, l_status_charge, l_pizza_charge = _lunch_month_charge(
-                    grade_used, lunch_cell.get("status", "home"),
+                    grade_used, l_status,
                     lunch_cell.get("pizzaCount", 0), lunch_dc, lunch_rates)
+                # Prepaid (paid directly through Blackbaud) stays off the monthly bill
+                if l_status == "monthlyPrepaid":
+                    l_status_charge = 0.0
+                if lunch_cell.get("pizzaPrepaid"):
+                    l_pizza_charge = 0.0
                 lunch_amt = round(l_status_charge + l_pizza_charge, 2)
 
             if not any([mc_qty, bc_days, ac_hours, og_units, hw_units, oo_units, store_amt, lunch_amt]):
@@ -4917,11 +4991,25 @@ def api_billing_report():
             hw_amt     = hw_units * rates["homework_hourly"]
             oo_amt     = oo_units * rates["tutoring_session"]
 
+            fam      = fam_by_student.get(sid)
+            fam_hh   = fam["household_id"] if fam else None
+            fam_ct   = contact_by_household.get(fam_hh) if fam_hh else None
+            fam_cname = (f"{fam_ct['first_name']} {fam_ct['last_name']}".strip()
+                         if fam_ct else "")
+            fam_email = ((fam_ct.get("email") if fam_ct else "")
+                         or (fam.get("primary_email") if fam else "") or "")
+
             results.append({
                 "student_id":       sid,
                 "name":             f"{s['last_name']}, {s['first_name']}",
                 "grade":            str(s["grade"]),
                 "is_guest":         (s.get("status") == "guest"),
+                "household_id":     fam_hh,
+                "family_name":      (fam["family_name"] if fam else None),
+                "family_contact":   fam_cname,
+                "family_email":     fam_email,
+                "family_multi":     bool(fam and fam_link_count.get(sid, 0) > 1),
+                "family_no_primary": bool(fam and not fam["is_primary"]),
                 "mcard":            round(mcard_amt, 2),
                 "mcard_qty":        mc_qty,
                 "beforecare":       round(before_amt, 2),
@@ -5129,21 +5217,37 @@ def api_billing_student_detail():
                     lunch_cell = (_le.get("months") or {}).get(lunch_mk) or {}
                     status     = lunch_cell.get("status", "home")
                     pizza_ct   = int(lunch_cell.get("pizzaCount", 0) or 0)
+                    pizza_pre  = bool(lunch_cell.get("pizzaPrepaid"))
+                    lunch_pre  = status == "monthlyPrepaid"
                     l_days, l_rate, l_status_charge, l_pizza_charge = _lunch_month_charge(
                         grade_used, status, pizza_ct, lunch_dc, lunch_rates)
-                    lunch_amt = round(l_status_charge + l_pizza_charge, 2)
-                    if lunch_amt:
-                        bits = []
-                        if l_status_charge:
-                            bits.append(f"Monthly · {l_days} lunch day{'s' if l_days != 1 else ''} @ ${l_rate:.2f}")
-                        if l_pizza_charge:
-                            bits.append(f"{pizza_ct} pizza @ ${l_rate:.2f}")
+                    # Billed and prepaid parts are listed separately so a prepaid
+                    # month still shows up in a dispute lookup, marked Prepaid.
+                    billed_bits, pre_bits = [], []
+                    if l_status_charge:
+                        txt = f"Monthly · {l_days} lunch day{'s' if l_days != 1 else ''} @ ${l_rate:.2f}"
+                        (pre_bits if lunch_pre else billed_bits).append(txt)
+                    if l_pizza_charge:
+                        txt = f"{pizza_ct} pizza @ ${l_rate:.2f}"
+                        (pre_bits if pizza_pre else billed_bits).append(txt)
+                    billed_amt = round((0.0 if lunch_pre else l_status_charge)
+                                       + (0.0 if pizza_pre else l_pizza_charge), 2)
+                    if billed_bits:
                         rows.append({
                             "date": str(first_day), "program_key": "lunch",
                             "program_label": "Lunch",
-                            "detail": " · ".join(bits) or "Lunch",
+                            "detail": " · ".join(billed_bits),
                             "recorded_by": "—",
-                            "amount": lunch_amt,
+                            "amount": billed_amt,
+                        })
+                    if pre_bits:
+                        rows.append({
+                            "date": str(first_day), "program_key": "lunch",
+                            "program_label": "Lunch",
+                            "detail": " · ".join(pre_bits) + " · Prepaid",
+                            "recorded_by": "—",
+                            "amount": 0.0,
+                            "prepaid": True,
                         })
 
         finally:

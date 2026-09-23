@@ -1,5 +1,8 @@
 # Changelog
 
+2026-09-23: Billing Report can now group by family - charges roll up to each student's primary household with the billing contact shown, students not yet linked to a family land in a "No family on file" section, and the CSV export carries family columns plus a FAMILY TOTAL row per family.
+2026-09-23: Lunch Dashboard — added a "Monthly · Prepaid" status and a "Pre" toggle on the pizza counter for families who pay directly in Blackbaud; prepaid lunch and pizza stay out of the monthly Billing Report but still count in the Year Total.
+2026-09-23: North Star Journal — added an "All recent entries" tab showing the whole school's latest entries, and entries saved for several students at once now carry a "Group entry" badge that names the other students on hover or click.
 2026-09-22: Program Attendance — the Teacher picker now works for all staff with Program Attendance access (it previously showed "No matches" unless you also had Staff Directory access), and it pre-fills with your own name.
 2026-09-22: M Card and School Store logs now have a Prepaid button; prepaid charges (e.g. paid directly in Blackbaud) stay on the log but are left off the monthly Billing Report, and show as "Prepaid" in the student charge lookup.
 2026-09-18: Staff directory (People) — now defaults to the Active filter on load instead of "All statuses," and removed the obsolete "Students (coming soon)" tab now that the Student Directory is its own page.

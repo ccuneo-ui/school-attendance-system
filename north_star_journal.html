@@ -78,6 +78,9 @@
   .badge.parent_discussion{background:#f0e9f7;color:#4a2a6b;}
   .badge.support{background:#fdece0;color:#7a3d10;}
   .badge.passion_project{background:#e2f1f5;color:#0f4c5c;}
+  .groupbadge{font-family:inherit;border:1px dashed var(--navy);background:#eef1f7;color:var(--navy);cursor:pointer;}
+  .groupbadge:hover{background:#e2e7f2;}
+  .grouplist{font-size:12px;color:var(--muted);margin:-2px 0 8px;}
   .flagpill{font-size:10.5px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;padding:3px 8px;border-radius:6px;border:1px solid var(--gold);color:#7a5c00;background:#fffaf0;}
   .who{font-size:12px;color:var(--muted);margin-left:auto;text-align:right;}
   .sname{font-weight:700;font-size:14px;}
@@ -150,6 +153,7 @@
     <div class="card">
       <div class="tabs">
         <button class="tab on" data-tab="student">Student log</button>
+        <button class="tab" data-tab="all">All recent entries</button>
         <button class="tab" data-tab="mine">My recent entries</button>
       </div>
       <div class="logtools">
@@ -342,9 +346,9 @@
         return;
       }
       params.push("student_id=" + focusStudent);
-    } else {
+    } else if(tab === "mine"){
       params.push("mine=1");
-    }
+    }   // "all" = everything, newest first
     if($("filtercat").value)  params.push("category=" + $("filtercat").value);
     if($("filterflag").value) params.push("flag=" + $("filterflag").value);
     params.push("limit=200");
@@ -376,7 +380,7 @@
     if(e.for_report_card) flags += '<span class="flagpill">Report card</span>';
     if(e.for_graduation)  flags += '<span class="flagpill">Graduation</span>';
     var who = esc(e.author_name || "") + " · " + fmtDate(e.entry_date);
-    var name = (tab === "mine")
+    var name = (tab !== "student")
       ? '<span class="sname">' + esc(e.student_first + " " + e.student_last) + '</span>' : "";
     return '<div class="entry" data-id="' + e.entry_id + '">' +
              '<div class="top">' + name +
@@ -384,8 +388,12 @@
                  return '<span class="badge ' + esc(k) + '">' + esc(catLabel(k)) + '</span>'; }).join("") +
                (e.living_value ? '<span class="badge">' + esc(e.living_value) + '</span>' : "") +
                flags +
+               (e.group_others ? '<button type="button" class="badge groupbadge" ' +
+                   'title="Also logged for: ' + esc(e.group_others) + '">Group entry</button>' : "") +
                '<span class="who">' + who + '</span>' +
              '</div>' +
+             (e.group_others ? '<div class="grouplist" hidden>Also logged for ' +
+                 esc(e.group_others) + '</div>' : "") +
              '<div class="body">' + esc(e.body) + '</div>' +
              (e.can_edit ? '<div class="acts">' +
                  '<button class="btn btn-ghost btn-sm act-edit">Edit</button>' +
@@ -398,6 +406,8 @@
     var byId = {}; rows.forEach(function(e){ byId[e.entry_id] = e; });
     Array.prototype.forEach.call($("log").querySelectorAll(".entry"), function(node){
       var e = byId[+node.getAttribute("data-id")];
+      var gb = node.querySelector(".groupbadge"), gl = node.querySelector(".grouplist");
+      if(gb && gl) gb.onclick = function(){ gl.hidden = !gl.hidden; };
       var ed = node.querySelector(".act-edit"), dl = node.querySelector(".act-del");
       if(ed) ed.onclick = function(){ startEdit(node, e); };
       if(dl) dl.onclick = function(){
