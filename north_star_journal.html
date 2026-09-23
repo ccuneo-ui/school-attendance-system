@@ -152,8 +152,8 @@
     <!-- ── log ──────────────────────────────────────────────────── -->
     <div class="card">
       <div class="tabs">
-        <button class="tab on" data-tab="student">Student log</button>
-        <button class="tab" data-tab="all">All recent entries</button>
+        <button class="tab on" data-tab="all">All recent entries</button>
+        <button class="tab" data-tab="student">Student log</button>
         <button class="tab" data-tab="mine">My recent entries</button>
       </div>
       <div class="logtools">
@@ -191,7 +191,7 @@
   var selected = [];          // student_ids chosen for the new entry
   var focusStudent = null;    // whose log the right-hand panel is showing
   var cats = [];            // entry types ticked for the new entry
-  var tab = "student";
+  var tab = "all";
   var editingId = null;
 
   var $ = function(id){ return document.getElementById(id); };
@@ -254,7 +254,8 @@
     if(selected.length && selected.indexOf(focusStudent) === -1){ focusStudent = selected[selected.length-1]; }
     renderStudentList($("ssearch").value);
     renderChips();
-    if(tab === "student") renderLog();
+    if(selected.length){ setTab("student"); }
+    else if(tab === "student"){ focusStudent = null; setTab("all"); }
   }
 
   function renderChips(){
@@ -337,6 +338,14 @@
   }
 
   // ── log ─────────────────────────────────────────────────────────────────
+  function setTab(name){
+    tab = name;
+    Array.prototype.forEach.call(document.querySelectorAll(".tab"), function(x){
+      x.classList.toggle("on", x.getAttribute("data-tab") === name);
+    });
+    renderLog();
+  }
+
   function renderLog(){
     var params = [];
     if(tab === "student"){
@@ -509,10 +518,7 @@
   $("filtercat").onchange = renderLog;
   $("filterflag").onchange = renderLog;
   Array.prototype.forEach.call(document.querySelectorAll(".tab"), function(t){
-    t.onclick = function(){
-      Array.prototype.forEach.call(document.querySelectorAll(".tab"), function(x){ x.classList.remove("on"); });
-      t.classList.add("on"); tab = t.getAttribute("data-tab"); renderLog();
-    };
+    t.onclick = function(){ setTab(t.getAttribute("data-tab")); };
   });
   $("vadd").onclick = addValues;
   $("vnew").addEventListener("keydown", function(ev){ if(ev.key === "Enter"){ ev.preventDefault(); addValues(); } });
