@@ -2606,6 +2606,9 @@ def api_north_star_entries():
     category   = (request.args.get("category") or "").strip()
     mine       = request.args.get("mine") == "1"
     flag       = (request.args.get("flag") or "").strip()
+    # collapse=1 folds a group save (one note, several students) down to a
+    # single row so a school-wide feed isn't 12 copies of the same shout-out.
+    collapse   = request.args.get("collapse") == "1"
     try:
         limit = min(int(request.args.get("limit") or 60), 400)
     except ValueError:
@@ -2638,12 +2641,24 @@ def api_north_star_entries():
                                JOIN students s2 ON s2.student_id = e2.student_id
                               WHERE e.group_id IS NOT NULL
                                 AND e2.group_id = e.group_id
-                                AND e2.entry_id <> e.entry_id) AS group_others
+                                AND e2.entry_id <> e.entry_id) AS group_others,
+                            (SELECT COUNT(*) FROM north_star_entries e3
+                              WHERE e.group_id IS NOT NULL
+                                AND e3.group_id = e.group_id) AS group_size
                      FROM north_star_entries e
                      JOIN students s ON s.student_id = e.student_id"""
             if where:
                 sql += " WHERE " + " AND ".join(where)
-            sql += " ORDER BY e.entry_date DESC, e.entry_id DESC LIMIT %s"
+            if collapse:
+                # One row per group (ungrouped entries key off their own id).
+                sql = ("SELECT * FROM ("
+                       "  SELECT DISTINCT ON (COALESCE(x.group_id, x.entry_id::text)) x.*"
+                       "    FROM (" + sql + ") x"
+                       "   ORDER BY COALESCE(x.group_id, x.entry_id::text),"
+                       "            x.entry_date DESC, x.entry_id DESC"
+                       ") y ORDER BY y.entry_date DESC, y.entry_id DESC LIMIT %s")
+            else:
+                sql += " ORDER BY e.entry_date DESC, e.entry_id DESC LIMIT %s"
             cur.execute(sql, params + [limit])
             return jsonify([_ns_shape(r, me_id) for r in fa(cur)])
     finally:

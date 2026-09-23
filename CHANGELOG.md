@@ -1,5 +1,6 @@
 # Changelog
 
+2026-09-23: North Star Journal — the All recent entries feed now shows a group save once ("Elena Sakib + 5 more", badge naming the count) instead of repeating the same note for every student; the per-student copies still show in each student's own log.
 2026-09-23: Billing Report can now group by family - charges roll up to each student's primary household with the billing contact shown, students not yet linked to a family land in a "No family on file" section, and the CSV export carries family columns plus a FAMILY TOTAL row per family.
 2026-09-23: Lunch Dashboard — added a "Monthly · Prepaid" status and a "Pre" toggle on the pizza counter for families who pay directly in Blackbaud; prepaid lunch and pizza stay out of the monthly Billing Report but still count in the Year Total.
 2026-09-23: North Star Journal — added an "All recent entries" tab showing the whole school's latest entries, and entries saved for several students at once now carry a "Group entry" badge that names the other students on hover or click.
