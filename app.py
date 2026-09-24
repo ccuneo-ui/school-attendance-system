@@ -3502,6 +3502,98 @@ def create_student():
     finally:
         conn.close()
 
+@app.route("/api/students/<int:keep_id>/merge-duplicate", methods=["POST"])
+@superadmin_required
+def merge_duplicate_student(keep_id):
+    """Fold a duplicate student record into the one being kept, then delete the duplicate.
+    Body: {"duplicate_id": int, "dry_run": bool}. Every table with a student_id column is
+    re-pointed from the duplicate to the kept record. Where the kept record already has an
+    equivalent row (unique conflict), the kept record's row wins and the duplicate's is dropped.
+    Enrollments are matched by program so attendance history lands on the kept enrollment."""
+    data = request.json or {}
+    try:
+        dup_id = int(data.get("duplicate_id"))
+    except (TypeError, ValueError):
+        return jsonify({"error": "duplicate_id is required"}), 400
+    dry_run = bool(data.get("dry_run"))
+    if dup_id == keep_id:
+        return jsonify({"error": "Pick two different students."}), 400
+    conn = get_db_connection()
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute("SELECT student_id, first_name, last_name, grade FROM students WHERE student_id IN (%s,%s)",
+                        (keep_id, dup_id))
+            found = {r["student_id"]: r for r in fa(cur)}
+            if keep_id not in found or dup_id not in found:
+                return jsonify({"error": "Student not found."}), 404
+
+            summary = {}   # table -> {"moved": n, "dropped": n}
+            def note(tbl, key, n=1):
+                if n:
+                    summary.setdefault(tbl, {"moved": 0, "dropped": 0})[key] += n
+
+            # 1) Enrollments (+ their attendance_records), matched by program.
+            cur.execute("SELECT enrollment_id, program_id FROM enrollments WHERE student_id=%s", (dup_id,))
+            for de in fa(cur):
+                cur.execute("SELECT enrollment_id FROM enrollments WHERE student_id=%s AND program_id=%s "
+                            "ORDER BY (status='active') DESC, enrollment_id LIMIT 1", (keep_id, de["program_id"]))
+                ke = fo(cur)
+                if not ke:
+                    cur.execute("UPDATE enrollments SET student_id=%s WHERE enrollment_id=%s", (keep_id, de["enrollment_id"]))
+                    note("enrollments", "moved")
+                    continue
+                # Move attendance to the kept enrollment unless that date is already recorded there.
+                cur.execute("""UPDATE attendance_records a SET enrollment_id=%s
+                               WHERE a.enrollment_id=%s AND NOT EXISTS (
+                                   SELECT 1 FROM attendance_records k
+                                   WHERE k.enrollment_id=%s AND k.attendance_date=a.attendance_date)""",
+                            (ke["enrollment_id"], de["enrollment_id"], ke["enrollment_id"]))
+                note("attendance_records", "moved", cur.rowcount)
+                cur.execute("DELETE FROM attendance_records WHERE enrollment_id=%s", (de["enrollment_id"],))
+                note("attendance_records", "dropped", cur.rowcount)
+                cur.execute("DELETE FROM enrollments WHERE enrollment_id=%s", (de["enrollment_id"],))
+                note("enrollments", "dropped")
+
+            # 2) Every other table with a student_id column.
+            cur.execute("""SELECT c.table_name FROM information_schema.columns c
+                           JOIN information_schema.tables t
+                             ON t.table_schema=c.table_schema AND t.table_name=c.table_name
+                           WHERE c.table_schema='public' AND c.column_name='student_id'
+                             AND t.table_type='BASE TABLE'
+                             AND c.table_name NOT IN ('students','enrollments')
+                           ORDER BY c.table_name""")
+            tables = [r["table_name"] for r in fa(cur)]
+            for tbl in tables:
+                q = 'SELECT ctid::text AS rid FROM "%s" WHERE student_id=%%s' % tbl
+                cur.execute(q, (dup_id,))
+                for row in fa(cur):
+                    cur.execute("SAVEPOINT mrg")
+                    try:
+                        cur.execute('UPDATE "%s" SET student_id=%%s WHERE ctid=%%s::tid' % tbl, (keep_id, row["rid"]))
+                        cur.execute("RELEASE SAVEPOINT mrg")
+                        note(tbl, "moved")
+                    except psycopg2.IntegrityError:
+                        cur.execute("ROLLBACK TO SAVEPOINT mrg")
+                        cur.execute('DELETE FROM "%s" WHERE ctid=%%s::tid' % tbl, (row["rid"],))
+                        cur.execute("RELEASE SAVEPOINT mrg")
+                        note(tbl, "dropped")
+
+            # 3) The duplicate itself.
+            cur.execute("DELETE FROM students WHERE student_id=%s", (dup_id,))
+
+        if dry_run:
+            conn.rollback()
+        else:
+            conn.commit()
+        return jsonify({"success": True, "dry_run": dry_run, "kept": found[keep_id],
+                        "removed": found[dup_id], "summary": summary})
+    except Exception as e:
+        conn.rollback()
+        return jsonify({"error": str(e)}), 500
+    finally:
+        conn.close()
+
+
 @app.route("/api/students/<int:student_id>", methods=["PUT"])
 @people_required
 def update_student(student_id):

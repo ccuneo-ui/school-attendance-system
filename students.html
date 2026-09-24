@@ -118,6 +118,19 @@
     .toast { position: fixed; bottom: 28px; left: 50%; transform: translateX(-50%) translateY(20px); background: var(--navy); color: white; padding: 10px 20px; border-radius: 8px; font-size: 14px; font-weight: 500; opacity: 0; transition: all 0.25s; pointer-events: none; z-index: 500; white-space: nowrap; }
     .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
     .toast.error { background: #8a1a1a; }
+
+    /* ── Merge duplicate (superadmin) ── */
+    .btn-merge { margin-right: auto; background: none; color: #8a1a1a; border: 1px solid #e3c4c4; }
+    .btn-merge:hover { background: #fbeeee; }
+    .btn-danger { background: #8a1a1a; color: white; }
+    .btn-danger:hover { background: #6e1414; }
+    .dup-badge { font-size: 10px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; background: #fbeeee; color: #8a1a1a; border-radius: 20px; padding: 2px 8px; margin-left: 8px; vertical-align: middle; }
+    .merge-cmp { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 14px; }
+    .merge-cmp th, .merge-cmp td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
+    .merge-cmp th { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); font-weight: 600; }
+    .merge-cmp td:first-child { color: var(--muted); width: 32%; }
+    .merge-note { font-size: 13px; color: var(--muted); line-height: 1.5; margin: 0 0 12px; }
+    .merge-summary { font-size: 13px; background: var(--cream); border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px; margin-top: 14px; line-height: 1.6; }
   </style>
 </head>
 <body>
@@ -305,8 +318,35 @@
 
     </div>
     <div class="modal-actions">
+      <button class="btn btn-merge" id="merge-btn" style="display:none" onclick="openMerge()">Merge a duplicate…</button>
       <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
       <button class="btn btn-primary" id="save-btn" onclick="saveStudent()">Save Changes</button>
+    </div>
+  </div>
+</div>
+
+<!-- Merge duplicate (superadmin only) -->
+<div class="modal-overlay" id="merge-modal">
+  <div class="modal" style="width:640px">
+    <div class="modal-header">
+      <div>
+        <h2 id="merge-title">Merge duplicate</h2>
+        <p>The record you opened is kept. The duplicate's family links, attendance and other history move onto it, then the duplicate is deleted.</p>
+      </div>
+      <button class="modal-close" onclick="closeMerge()">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div class="field">
+        <label>Duplicate record to remove</label>
+        <select id="merge-dup" onchange="renderMergeCompare()"></select>
+      </div>
+      <div id="merge-compare"></div>
+      <div id="merge-summary"></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeMerge()">Cancel</button>
+      <button class="btn btn-secondary" id="merge-preview-btn" onclick="runMerge(true)">Preview</button>
+      <button class="btn btn-danger" id="merge-go-btn" onclick="runMerge(false)" disabled>Merge &amp; delete duplicate</button>
     </div>
   </div>
 </div>
@@ -454,8 +494,12 @@ function render() {
     tbody.innerHTML = '<tr><td colspan="9" class="empty-state">No students found</td></tr>';
     return;
   }
+  const nk = x => ((x.first_name || '') + ' ' + (x.last_name || '')).trim().toLowerCase();
+  const nameCounts = {};
+  allStudents.forEach(x => { nameCounts[nk(x)] = (nameCounts[nk(x)] || 0) + 1; });
   tbody.innerHTML = students.map(s => {
-    const name = `${s.last_name}, ${s.first_name}`;
+    const dupBadge = nameCounts[nk(s)] > 1 ? '<span class="dup-badge" title="Another student record has this exact name">Possible duplicate</span>' : '';
+    const name = `${s.last_name}, ${s.first_name}${dupBadge}`;
     const statusClass = `status-${s.status || 'inactive'}`;
     const statusLabel = s.status ? s.status.charAt(0).toUpperCase() + s.status.slice(1) : '—';
     const dis = (v) => v || '<span style="color:#ccc">—</span>';
@@ -511,6 +555,7 @@ function openModal(studentId) {
   document.getElementById('f-fri').value = s.dismissal_fri || '';
 
   document.getElementById('save-btn').textContent = 'Save Changes';
+  document.getElementById('merge-btn').style.display = IS_SUPERADMIN ? '' : 'none';
   loadStudentFamily(studentId);
   document.getElementById('edit-modal').classList.add('open');
 }
@@ -585,6 +630,7 @@ function openAddModal() {
 
   document.getElementById('f-parents').innerHTML = '<p style="font-size:13px;color:var(--muted);margin:0">Parents are linked in the Family Manager once the student is saved.</p>';
   document.getElementById('save-btn').textContent = 'Add Student';
+  document.getElementById('merge-btn').style.display = 'none';
   document.getElementById('edit-modal').classList.add('open');
 }
 
@@ -677,6 +723,101 @@ function showToast(msg, isError = false) {
 // Close modal on overlay click
 document.getElementById('edit-modal').addEventListener('click', function(e) {
   if (e.target === this) closeModal();
+});
+
+// ── Merge duplicate (superadmin only) ──
+let IS_SUPERADMIN = false;
+fetch('/api/session').then(r => r.ok ? r.json() : null).then(x => { IS_SUPERADMIN = !!(x && x.is_superadmin); }).catch(() => {});
+
+let mergeKeepId = null;
+const nameKey = s => ((s.first_name || '') + ' ' + (s.last_name || '')).trim().toLowerCase();
+
+function openMerge() {
+  mergeKeepId = editingId;
+  const keep = allStudents.find(x => x.student_id === mergeKeepId);
+  if (!keep) return;
+  const same = allStudents.filter(x => x.student_id !== keep.student_id && nameKey(x) === nameKey(keep));
+  const others = allStudents.filter(x => x.student_id !== keep.student_id && nameKey(x) !== nameKey(keep));
+  const opt = x => '<option value="' + x.student_id + '">' + escHtml(x.last_name + ', ' + x.first_name) +
+    ' · Grade ' + escHtml(x.grade || '—') + ' · ID ' + x.student_id + ' · ' + escHtml(x.status || '') + '</option>';
+  document.getElementById('merge-dup').innerHTML =
+    '<option value="">Choose the duplicate…</option>' +
+    (same.length ? '<optgroup label="Same name">' + same.map(opt).join('') + '</optgroup>' : '') +
+    '<optgroup label="All other students">' + others.map(opt).join('') + '</optgroup>';
+  if (same.length === 1) document.getElementById('merge-dup').value = same[0].student_id;
+  document.getElementById('merge-title').textContent = 'Merge a duplicate into ' + keep.first_name + ' ' + keep.last_name + ' (ID ' + keep.student_id + ')';
+  document.getElementById('merge-modal').classList.add('open');
+  renderMergeCompare();
+}
+
+function closeMerge() { document.getElementById('merge-modal').classList.remove('open'); }
+
+async function renderMergeCompare() {
+  const dupId = parseInt(document.getElementById('merge-dup').value, 10);
+  document.getElementById('merge-summary').innerHTML = '';
+  document.getElementById('merge-go-btn').disabled = true;
+  const box = document.getElementById('merge-compare');
+  if (!dupId) { box.innerHTML = ''; return; }
+  const keep = allStudents.find(x => x.student_id === mergeKeepId);
+  const dup = allStudents.find(x => x.student_id === dupId);
+  const fam = async id => {
+    try { const r = await fetch('/api/students/' + id + '/family'); const p = r.ok ? await r.json() : [];
+      return p.length ? [...new Set(p.map(x => x.family_name || ''))].filter(Boolean).join(', ') || (p.length + ' parent(s)') : '—';
+    } catch (e) { return '?'; }
+  };
+  const [kf, df] = await Promise.all([fam(keep.student_id), fam(dup.student_id)]);
+  const row = (label, a, b) => '<tr><td>' + label + '</td><td>' + escHtml(a || '—') + '</td><td>' + escHtml(b || '—') + '</td></tr>';
+  box.innerHTML = '<table class="merge-cmp"><tr><th></th><th>Keep (ID ' + keep.student_id + ')</th><th>Remove (ID ' + dup.student_id + ')</th></tr>' +
+    row('Name', keep.first_name + ' ' + keep.last_name, dup.first_name + ' ' + dup.last_name) +
+    row('Grade / status', (keep.grade || '—') + ' · ' + keep.status, (dup.grade || '—') + ' · ' + dup.status) +
+    row('Date of birth', keep.date_of_birth, dup.date_of_birth) +
+    row('Emergency contact', keep.emergency_contact_name, dup.emergency_contact_name) +
+    row('Homeroom', keep.homeroom_teacher_name, dup.homeroom_teacher_name) +
+    row('Family', kf, df) +
+    '</table><p class="merge-note" style="margin-top:10px">Only the kept record\'s profile details are kept. If the duplicate has a detail you need, copy it over first. Click Preview to see what will move.</p>';
+}
+
+function mergeSummaryHtml(res, dry) {
+  const rows = Object.entries(res.summary || {});
+  const lines = rows.length
+    ? rows.map(([t, v]) => '<div><b>' + escHtml(t.replace(/_/g, ' ')) + '</b>: ' +
+        (v.moved ? v.moved + ' moved' : '') + (v.moved && v.dropped ? ', ' : '') +
+        (v.dropped ? v.dropped + ' already on the kept record (dropped)' : '') + '</div>').join('')
+    : '<div>No linked records on the duplicate.</div>';
+  return '<div class="merge-summary">' + (dry ? '<b>Preview only, nothing changed yet.</b><br>' : '<b>Done.</b><br>') + lines +
+    '<div>Student ID ' + res.removed.student_id + ' ' + (dry ? 'will be' : 'was') + ' deleted.</div></div>';
+}
+
+async function runMerge(dry) {
+  const dupId = parseInt(document.getElementById('merge-dup').value, 10);
+  if (!dupId) { showToast('Choose the duplicate first', true); return; }
+  if (!dry && !confirm('Merge ID ' + dupId + ' into ID ' + mergeKeepId + ' and delete ID ' + dupId + '? This cannot be undone.')) return;
+  const pb = document.getElementById('merge-preview-btn'), gb = document.getElementById('merge-go-btn');
+  pb.disabled = gb.disabled = true;
+  try {
+    const r = await fetch('/api/students/' + mergeKeepId + '/merge-duplicate', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ duplicate_id: dupId, dry_run: dry })
+    });
+    const res = await r.json().catch(() => ({}));
+    if (!r.ok || !res.success) throw new Error(res.error || ('HTTP ' + r.status));
+    document.getElementById('merge-summary').innerHTML = mergeSummaryHtml(res, dry);
+    if (dry) { gb.disabled = false; }
+    else {
+      allStudents = allStudents.filter(x => x.student_id !== dupId);
+      render();
+      showToast('Duplicate merged and removed');
+      setTimeout(() => { closeMerge(); closeModal(); location.reload(); }, 1600);
+    }
+  } catch (e) {
+    showToast('Merge failed: ' + e.message, true);
+  } finally {
+    pb.disabled = false;
+  }
+}
+
+document.getElementById('merge-modal').addEventListener('click', function(e) {
+  if (e.target === this) closeMerge();
 });
 
 init();

@@ -229,10 +229,10 @@
 
       <div class="section-title">Students <button type="button" class="btn-add" onclick="addStudentRow()">＋ Add student</button></div>
       <div id="a-students"></div>
-      <p class="muted-note" style="margin-top:2px">Enter each child's name and grade. DOB, dismissal, homeroom and emergency contact are set later in the Student Directory.</p>
+      <p class="muted-note" style="margin-top:2px">Only for children who are <b>not</b> in the Student Directory yet. Each name here creates a brand new student record. For a child who is already enrolled, use the search box below instead.</p>
 
       <div style="margin-top:16px">
-        <label class="mini-label">Attach a sibling already enrolled (optional)</label>
+        <label class="mini-label">Link a student who is already in the Student Directory</label>
         <input type="text" id="a-attach-search" class="attach-input" placeholder="Search existing students by name…" oninput="attachSearch()" autocomplete="off">
         <div class="attach-results" id="a-attach-results"></div>
         <div id="a-attached"></div>
@@ -665,6 +665,26 @@
     const fname = val('a_family_name');
     if (!fname) { toast('Family name is required.', true); return; }
     const btn = document.getElementById('createBtn');
+
+    // Guard against re-creating a student who already exists (this is how duplicates happened).
+    if (!rosterLoaded) {
+      try { const r = await fetch('/api/students'); if (r.ok) { ROSTER = await r.json(); rosterLoaded = true; } } catch (e) {}
+    }
+    const nk = (f, l) => ((f || '') + ' ' + (l || '')).trim().toLowerCase();
+    for (const row of [...document.querySelectorAll('[data-srow]')]) {
+      const n = row.getAttribute('data-srow');
+      const first = val('a_s_first_' + n), last = val('a_s_last_' + n);
+      if (!first && !last) continue;
+      const match = ROSTER.find(s => nk(s.first_name, s.last_name) === nk(first, last));
+      if (!match) continue;
+      const ok = confirm(first + ' ' + last + ' is already in the Student Directory (' + gradeLabel(match.grade) + ', ' + (match.status || '') +
+        ').\n\nClick OK to link the existing record to this family instead of creating a second copy.\nClick Cancel to go back and review.');
+      if (!ok) return;
+      attachedIds.add(match.student_id);
+      row.remove();
+    }
+    renderAttached();
+
     btn.disabled = true;
     try {
       // 1) Household
