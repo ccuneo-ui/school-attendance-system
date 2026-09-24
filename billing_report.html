@@ -200,6 +200,8 @@
     .fam-name { font-family: 'Playfair Display', serif; font-size: 15px; font-weight: 700; color: var(--navy); }
     .fam-meta { font-size: 11px; color: var(--muted); margin-left: 10px; }
     .fam-total { font-weight: 700; font-variant-numeric: tabular-nums; color: var(--navy); }
+    .fam-credit { display: inline-block; font-size: 11px; font-weight: 600; color: #12776a; background: #e0f0ee; border: 1px solid #9fd3cc; border-radius: 6px; padding: 2px 7px; margin-left: 8px; }
+    .fam-gross { font-size: 11px; color: var(--muted); font-weight: 400; }
     .flag { display: inline-block; font-size: 10px; font-weight: 600; color: #8a6a1a; background: #fbf1d9; border: 1px solid #e8c98a; border-radius: 5px; padding: 1px 5px; margin-left: 6px; vertical-align: middle; }
     .flag.warn { color: #a33333; background: #fff0f0; border-color: #f0c0c0; }
     .grp-toggle { display: inline-flex; gap: 4px; }
@@ -747,6 +749,7 @@
   let reportData = [];
   let activeGrade = 'all';
   let groupMode = 'family';
+  let familyCredits = {};   // household_id -> {applied, balance} for the shown month
   let curMonth, curYear;
 
   (function init() {
@@ -771,6 +774,7 @@
       const data = await res.json();
       if(data.error) throw new Error(data.error);
       reportData = data.students || [];
+      familyCredits = data.family_credits || {};
       buildGradePills(reportData);
       render(currentFiltered());
     } catch(err) {
@@ -907,10 +911,14 @@
       return;
     }
     const sections = buildSections(students);
-    let gm=0,gbc=0,gac=0,gog=0,ghw=0,goo=0,gss=0,gls=0;
+    let gm=0,gbc=0,gac=0,gog=0,ghw=0,goo=0,gss=0,gls=0,creditsShown=0;
 
     sections.forEach(sec => {
       const secTotal = sec.list.reduce((n,s)=>n+rowTotal(s),0);
+      const cr = (sec.hid!=null && familyCredits[String(sec.hid)]) || null;
+      const applied = cr ? (cr.applied||0) : 0;
+      const netTotal = Math.max(0, secTotal - applied);
+      creditsShown += applied;
       const hr=document.createElement('tr');
       if (sec.family) {
         hr.className='fam-hdr';
@@ -920,9 +928,15 @@
               ? `<span class="fam-meta">${esc(sec.contact)}${sec.contact&&sec.email?' · ':''}${esc(sec.email)}</span>`
               : '<span class="fam-meta">no billing contact on file</span>');
         const kids = sec.list.length;
+        const creditChip = applied > 0
+          ? `<span class="fam-credit">M Card credit &minus;$${applied.toFixed(2)} · $${(cr.balance||0).toFixed(2)} left</span>`
+          : (cr && (cr.balance||0) > 0 ? `<span class="fam-credit">M Card credit $${cr.balance.toFixed(2)} available</span>` : '');
+        const totalCell = applied > 0
+          ? `<span class="fam-gross">$${secTotal.toFixed(2)} &minus; $${applied.toFixed(2)}</span><br>$${netTotal.toFixed(2)}`
+          : `$${secTotal.toFixed(2)}`;
         hr.innerHTML = `<td colspan="10"><span class="fam-name">${esc(sec.label)}</span>`
-                     + `<span class="fam-meta">${kids} student${kids!==1?'s':''}</span>${meta}</td>`
-                     + `<td class="r fam-total">$${secTotal.toFixed(2)}</td>`;
+                     + `<span class="fam-meta">${kids} student${kids!==1?'s':''}</span>${meta}${creditChip}</td>`
+                     + `<td class="r fam-total">${totalCell}</td>`;
       } else {
         hr.className='grade-hdr';
         hr.innerHTML=`<td colspan="11">${esc(sec.label)}</td>`;
@@ -943,20 +957,25 @@
       });
     });
 
-    const gt=gm+gbc+gac+gog+ghw+goo+gss+gls;
+    const gt=gm+gbc+gac+gog+ghw+goo+gss+gls-creditsShown;
     const famCount = groupMode==='family' ? sections.length : 0;
     const lead = groupMode==='family'
       ? `${famCount} famil${famCount!==1?'ies':'y'} · ${students.length} student${students.length!==1?'s':''} — Total`
       : `${students.length} student${students.length!==1?'s':''} — Total`;
     const tr=document.createElement('tr'); tr.className='total-row';
-    tr.innerHTML=`<td colspan="2">${lead}</td><td class="r">$${gm.toFixed(2)}</td><td class="r">$${gbc.toFixed(2)}</td><td class="r">$${gac.toFixed(2)}</td><td class="r">$${gog.toFixed(2)}</td><td class="r">$${ghw.toFixed(2)}</td><td class="r">$${goo.toFixed(2)}</td><td class="r">$${gss.toFixed(2)}</td><td class="r">$${gls.toFixed(2)}</td><td class="r">$${gt.toFixed(2)}</td>`;
+    tr.innerHTML=`<td colspan="2">${lead}${creditsShown>0?` · less $${creditsShown.toFixed(2)} M Card credit`:''}</td><td class="r">$${gm.toFixed(2)}</td><td class="r">$${gbc.toFixed(2)}</td><td class="r">$${gac.toFixed(2)}</td><td class="r">$${gog.toFixed(2)}</td><td class="r">$${ghw.toFixed(2)}</td><td class="r">$${goo.toFixed(2)}</td><td class="r">$${gss.toFixed(2)}</td><td class="r">$${gls.toFixed(2)}</td><td class="r">$${gt.toFixed(2)}</td>`;
     tbody.appendChild(tr);
   }
 
   function renderSummary(students) {
     let mc=0,bc=0,ac=0,pg=0,mq=0,ps=0,cd=0,ss=0,ls=0;
     students.forEach(s=>{ mc+=s.mcard||0; bc+=s.beforecare||0; ac+=s.aftercare||0; pg+=(s.og_tutoring||0)+(s.homework_center||0)+(s.one_on_one||0); ss+=s.school_store||0; ls+=s.lunch||0; mq+=s.mcard_qty||0; ps+=s.program_sessions||0; cd+=s.care_days||0; });
-    document.getElementById('sTotalBilling').textContent  = '$'+(mc+bc+ac+pg+ss+ls).toFixed(2);
+    let creditNet = 0;
+    if (groupMode==='family') {
+      const seen = new Set(students.filter(s=>s.household_id!=null).map(s=>s.household_id));
+      seen.forEach(hid => { const c = familyCredits[String(hid)]; if (c) creditNet += (c.applied||0); });
+    }
+    document.getElementById('sTotalBilling').textContent  = '$'+Math.max(0,(mc+bc+ac+pg+ss+ls-creditNet)).toFixed(2);
     const famIds = new Set(students.filter(s=>s.household_id!=null).map(s=>s.household_id));
     const orphans = students.filter(s=>s.household_id==null).length;
     const famN = famIds.size + (orphans ? 1 : 0);
@@ -992,9 +1011,17 @@
                    F(s.homework_center),F(s.one_on_one),F(s.school_store),F(s.lunch),F(t)]);
       });
       if (sec.family) {
-        rows.push([fam, sec.contact||'', sec.email||'', 'FAMILY TOTAL', '',
-                   F(sub.mcard),F(sub.beforecare),F(sub.aftercare),F(sub.og_tutoring),
-                   F(sub.homework_center),F(sub.one_on_one),F(sub.school_store),F(sub.lunch),F(sub.total)]);
+        const cr = (sec.hid!=null && familyCredits[String(sec.hid)]) || null;
+        const applied = cr ? (cr.applied||0) : 0;
+        if (applied > 0) {
+          rows.push([fam, sec.contact||'', sec.email||'', 'M CARD PREPAID CREDIT APPLIED',
+                     `balance left ${F(cr.balance)}`,
+                     F(-applied),'','','','','','','',F(-applied)]);
+        }
+        rows.push([fam, sec.contact||'', sec.email||'', 'FAMILY TOTAL — DUE', '',
+                   F(sub.mcard-applied),F(sub.beforecare),F(sub.aftercare),F(sub.og_tutoring),
+                   F(sub.homework_center),F(sub.one_on_one),F(sub.school_store),F(sub.lunch),
+                   F(Math.max(0, sub.total-applied))]);
         rows.push([]);
       }
     });

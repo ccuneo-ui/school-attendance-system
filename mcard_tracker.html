@@ -72,6 +72,29 @@
     .flash { position: fixed; top: 38%; left: 50%; transform: translateX(-50%) scale(0.95); background: var(--green); color: #fff; padding: 22px 36px; border-radius: 16px; font-weight: 600; font-size: 16px; line-height: 1.5; text-align: center; max-width: 580px; width: 90%; box-shadow: 0 16px 48px rgba(0,0,0,0.28); opacity: 0; transition: opacity 0.2s, transform 0.2s; pointer-events: none; z-index: 9999; }
     .flash.show { opacity: 1; transform: translateX(-50%) scale(1); }
     .flash.error { background: var(--red); }
+    .flash.warn { background: #b8860b; }
+    .tabs { display: flex; gap: 8px; margin-bottom: 22px; }
+    .tab {
+      background: var(--card-bg); border: 2px solid var(--border); color: var(--muted);
+      padding: 10px 22px; border-radius: 12px; font-family: 'DM Sans', sans-serif;
+      font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.15s;
+    }
+    .tab:hover { border-color: var(--gold-dark); color: var(--navy); }
+    .tab.active { background: var(--navy); border-color: var(--navy); color: #fff; }
+    .txt-input { width: 100%; padding: 12px 14px; border: 2px solid var(--border); border-radius: 12px; font-size: 15px; font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(--text); outline: none; }
+    .txt-input:focus { border-color: var(--gold-dark); background: #fff; }
+    .credit-grid { grid-template-columns: 2fr 1fr 1fr 1fr; }
+    @media (max-width: 640px) { .credit-grid { grid-template-columns: 1fr; } }
+    .fam-preview { margin-top: 16px; font-size: 14px; color: var(--muted); display: none; }
+    .fam-preview.show { display: block; }
+    .fam-preview b { color: var(--navy); }
+    .bal-pill { font-family: 'Fraunces', serif; font-weight: 700; font-size: 15px; color: var(--green); }
+    .bal-pill.low { color: #b8860b; }
+    .bal-pill.out { color: var(--red); }
+    .low-tag { display: inline-block; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; background: #fdf4e3; border: 1px solid #e8c98a; color: #8a6a1a; border-radius: 6px; padding: 2px 6px; margin-left: 8px; }
+    tr.voided td { opacity: 0.45; text-decoration: line-through; }
+    .btn-void { background: none; border: 2px solid #e2d9c8; color: var(--muted); border-radius: 8px; padding: 5px 12px; font-size: 12px; font-family: 'DM Sans', sans-serif; cursor: pointer; font-weight: 600; }
+    .btn-void:hover { border-color: var(--red); color: var(--red); background: #fff0f0; }
   </style>
 </head>
 <body>
@@ -86,6 +109,13 @@
 
 <div class="container">
   <div class="error-banner" id="errorBanner">⚠️ Could not connect to server. Please check your connection.</div>
+
+  <div class="tabs">
+    <button class="tab active" id="tabCharges" onclick="switchTab('charges')">Charge Log</button>
+    <button class="tab" id="tabCredits" onclick="switchTab('credits')">Prepayments</button>
+  </div>
+
+  <div id="panelCharges">
   <div class="form-card">
     <h2>🛒 Add Snack Charge</h2>
     <div class="form-grid">
@@ -120,6 +150,54 @@
       </div>
     </div>
     <div id="tableWrap"><div class="empty-state"><span>⏳</span>Loading...</div></div>
+  </div>
+  </div><!-- /panelCharges -->
+
+  <div id="panelCredits" style="display:none">
+    <div class="form-card">
+      <h2>💳 Record a Prepayment</h2>
+      <div class="form-grid credit-grid">
+        <div>
+          <label>Family</label>
+          <div class="student-select-wrap">
+            <input type="text" id="familySearch" placeholder="Type a family or student name..." autocomplete="off">
+            <div class="dropdown-list" id="familyDropdown"></div>
+          </div>
+        </div>
+        <div><label for="creditDate">Date</label><input type="date" id="creditDate"></div>
+        <div><label for="creditAmount">Amount</label><input type="text" id="creditAmount" class="txt-input" placeholder="0.00" inputmode="decimal"></div>
+        <div>
+          <label for="creditMethod">Method</label>
+          <select id="creditMethod" class="txt-input">
+            <option>Check</option><option>Cash</option><option>Blackbaud</option><option>Other</option>
+          </select>
+        </div>
+        <div style="grid-column:1/-1;display:flex;gap:14px;align-items:end;flex-wrap:wrap">
+          <div style="flex:1;min-width:200px"><label for="creditNote">Note (optional)</label><input type="text" id="creditNote" class="txt-input" placeholder="Check #1234"></div>
+          <button class="btn-add" id="creditBtn" onclick="addCredit()">Add to Balance</button>
+        </div>
+      </div>
+      <div class="fam-preview" id="famPreview"></div>
+    </div>
+
+    <div class="summary-strip">
+      <div class="stat-box"><div class="val" id="statOnAccount">—</div><div class="lbl">On Account</div></div>
+      <div class="stat-box"><div class="val" id="statFamilies">—</div><div class="lbl">Families With Balance</div></div>
+      <div class="stat-box"><div class="val" id="statLow">—</div><div class="lbl">Running Low</div></div>
+    </div>
+
+    <div class="table-card" style="margin-bottom:28px">
+      <div class="table-header">
+        <h2>Family Balances</h2>
+        <input class="search-input" id="balanceFilter" placeholder="Filter families..." oninput="renderBalances()">
+      </div>
+      <div id="balanceWrap"><div class="empty-state"><span>⏳</span>Loading...</div></div>
+    </div>
+
+    <div class="table-card">
+      <div class="table-header"><h2>Payment Log</h2></div>
+      <div id="creditLogWrap"><div class="empty-state"><span>⏳</span>Loading...</div></div>
+    </div>
   </div>
 </div>
 
@@ -198,7 +276,17 @@
       const student = allStudents.find(s => s.student_id === selectedStudentId);
       charges.unshift({charge_id: result.charge_id, student_id: selectedStudentId, student_name: selectedStudentName, grade: student ? student.grade : '', charge_date: date, quantity});
       searchInput.value = ''; selectedStudentId = null; selectedStudentName = ''; searchInput.focus();
-      renderTable(); showFlash('+' + quantity + ' snack' + (quantity > 1 ? 's' : '') + ' added for ' + nameForFlash + '!', false);
+      renderTable();
+      const fam = result.family;
+      if (fam && fam.low) {
+        const msg = fam.balance > 0
+          ? `⚠️ ${fam.family_name} family M Card balance is now $${fam.balance.toFixed(2)}. Ask ${nameForFlash} to remind their parents to add to it.`
+          : `⚠️ ${fam.family_name} family M Card balance is used up. Ask ${nameForFlash} to remind their parents — charges from here go on the monthly bill.`;
+        showFlash(msg, false, 'warn');
+      } else {
+        showFlash('+' + quantity + ' snack' + (quantity > 1 ? 's' : '') + ' added for ' + nameForFlash + '!', false);
+      }
+      if (fam) loadFamilies();
     } catch(e) { showFlash('Error saving charge. Try again.', true); }
     btn1.disabled = false; btn2.disabled = false; btn1.textContent = '+ 1 Snack'; btn2.textContent = '+ 2 Snacks';
   }
@@ -258,10 +346,14 @@
     wrap.innerHTML = html;
   }
 
-  function showFlash(msg, isError) {
+  function showFlash(msg, isError, kind) {
     const f = document.getElementById('flash');
-    f.textContent = msg; f.classList.toggle('error', isError); f.classList.add('show');
-    setTimeout(() => f.classList.remove('show'), isError ? 5000 : 2200);
+    f.textContent = msg;
+    f.classList.toggle('error', !!isError);
+    f.classList.toggle('warn', kind === 'warn');
+    f.classList.add('show');
+    const ms = isError ? 5000 : (kind === 'warn' ? 7000 : 2200);
+    setTimeout(() => f.classList.remove('show'), ms);
   }
 
   function esc(str) { return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
@@ -278,7 +370,170 @@
     const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `mcard-charges-${today}.csv`; a.click();
   }
 
-  Promise.all([loadStudents(), loadCharges()]);
+  // ── Prepayments tab ──
+  let families = [], creditEntries = [], lowThreshold = 10,
+      selectedFamilyId = null, selectedFamilyName = '';
+  document.getElementById('creditDate').value = today;
+
+  function switchTab(tab) {
+    const onCredits = tab === 'credits';
+    document.getElementById('panelCharges').style.display = onCredits ? 'none' : '';
+    document.getElementById('panelCredits').style.display = onCredits ? '' : 'none';
+    document.getElementById('tabCharges').classList.toggle('active', !onCredits);
+    document.getElementById('tabCredits').classList.toggle('active', onCredits);
+    if (onCredits && !families.length) { loadFamilies(); loadCredits(); }
+  }
+
+  async function loadFamilies() {
+    try {
+      const res = await fetch(`${API_BASE}/api/mcard/families`);
+      const data = await res.json();
+      families = data.families || [];
+      if (data.low_threshold != null) lowThreshold = data.low_threshold;
+      renderBalances();
+      if (selectedFamilyId) showFamilyPreview();
+    } catch(e) { document.getElementById('balanceWrap').innerHTML = '<div class="empty-state"><span>⚠️</span>Could not load family balances.</div>'; }
+  }
+
+  async function loadCredits() {
+    try {
+      const res = await fetch(`${API_BASE}/api/mcard/credits`);
+      creditEntries = await res.json();
+      renderCreditLog();
+    } catch(e) { document.getElementById('creditLogWrap').innerHTML = '<div class="empty-state"><span>⚠️</span>Could not load the payment log.</div>'; }
+  }
+
+  const famInput = document.getElementById('familySearch');
+  const famDrop  = document.getElementById('familyDropdown');
+
+  famInput.addEventListener('input', () => {
+    selectedFamilyId = null; selectedFamilyName = '';
+    document.getElementById('famPreview').classList.remove('show');
+    const q = famInput.value.trim().toLowerCase();
+    if (!q) { famDrop.classList.remove('open'); return; }
+    // match on the family name or on any child's name
+    const matches = families.filter(f =>
+      (f.family_name || '').toLowerCase().includes(q) ||
+      (f.students || []).some(n => n.toLowerCase().includes(q))
+    ).slice(0, 20);
+    famDrop.innerHTML = matches.length
+      ? matches.map(f => `<div class="dropdown-item" data-id="${f.household_id}" data-name="${esc(f.family_name)}"><span>${esc(f.family_name)}<span style="color:var(--muted);font-size:12px"> · ${esc((f.students||[]).join(', ') || 'no students linked')}</span></span><span class="grade-tag">$${(f.balance||0).toFixed(2)}</span></div>`).join('')
+      : '<div class="dropdown-empty">No families found</div>';
+    famDrop.querySelectorAll('.dropdown-item').forEach(el => {
+      el.addEventListener('mousedown', ev => {
+        ev.preventDefault();
+        selectedFamilyId = parseInt(el.dataset.id);
+        selectedFamilyName = el.dataset.name;
+        famInput.value = selectedFamilyName;
+        famDrop.classList.remove('open');
+        showFamilyPreview();
+      });
+    });
+    famDrop.classList.add('open');
+  });
+  document.addEventListener('click', e => { if (!e.target.closest('#panelCredits .student-select-wrap')) famDrop.classList.remove('open'); });
+
+  function showFamilyPreview() {
+    const f = families.find(x => x.household_id === selectedFamilyId);
+    const p = document.getElementById('famPreview');
+    if (!f) { p.classList.remove('show'); return; }
+    p.innerHTML = `Current balance <b>$${(f.balance||0).toFixed(2)}</b>`
+      + ` · added to date $${(f.credits_total||0).toFixed(2)}`
+      + ` · used $${(f.applied_total||0).toFixed(2)}`
+      + ` · students: ${esc((f.students||[]).join(', ') || 'none linked yet')}`;
+    p.classList.add('show');
+  }
+
+  async function addCredit() {
+    if (!selectedFamilyId) { famInput.focus(); showFlash('Please pick a family from the list.', true); return; }
+    const amount = parseFloat(String(document.getElementById('creditAmount').value).replace(/[$,\s]/g, ''));
+    if (!amount || isNaN(amount)) { document.getElementById('creditAmount').focus(); showFlash('Enter an amount.', true); return; }
+    const btn = document.getElementById('creditBtn');
+    btn.disabled = true; btn.textContent = 'Saving...';
+    try {
+      const res = await fetch(`${API_BASE}/api/mcard/credits`, {
+        method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({
+          household_id: selectedFamilyId,
+          entry_date: document.getElementById('creditDate').value,
+          amount,
+          method: document.getElementById('creditMethod').value,
+          note: document.getElementById('creditNote').value
+        })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Could not save that payment.');
+      showFlash(`$${amount.toFixed(2)} added for ${selectedFamilyName}. Balance is now $${(data.balance||0).toFixed(2)}.`, false);
+      document.getElementById('creditAmount').value = '';
+      document.getElementById('creditNote').value = '';
+      await Promise.all([loadFamilies(), loadCredits()]);
+    } catch(e) { showFlash(e.message || 'Error saving payment.', true); }
+    btn.disabled = false; btn.textContent = 'Add to Balance';
+  }
+
+  async function voidCredit(id) {
+    const entry = creditEntries.find(c => c.credit_id === id);
+    if (entry && !confirm(`Void the $${Number(entry.amount).toFixed(2)} entry for ${entry.family_name}? It stays in the log, marked voided.`)) return;
+    try {
+      const res = await fetch(`${API_BASE}/api/mcard/credits/${id}/void`, {method: 'POST'});
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Could not void that entry.');
+      showFlash('Entry voided.', false);
+      await Promise.all([loadFamilies(), loadCredits()]);
+    } catch(e) { showFlash(e.message || 'Error voiding entry.', true); }
+  }
+
+  function renderBalances() {
+    const q = (document.getElementById('balanceFilter').value || '').toLowerCase();
+    const active = families.filter(f => (f.credits_total || 0) !== 0 || (f.balance || 0) !== 0);
+    const onAccount = active.reduce((n,f) => n + Math.max(0, f.balance || 0), 0);
+    const withBal = active.filter(f => (f.balance || 0) > 0).length;
+    const low = active.filter(f => (f.balance || 0) <= lowThreshold).length;
+    document.getElementById('statOnAccount').textContent = '$' + onAccount.toFixed(2);
+    document.getElementById('statFamilies').textContent  = withBal;
+    document.getElementById('statLow').textContent       = low;
+
+    const rows = active.filter(f =>
+      !q || (f.family_name || '').toLowerCase().includes(q) ||
+      (f.students || []).some(n => n.toLowerCase().includes(q)));
+    const wrap = document.getElementById('balanceWrap');
+    if (!rows.length) { wrap.innerHTML = '<div class="empty-state"><span>💳</span>No family balances yet. Record a prepayment above.</div>'; return; }
+    rows.sort((a,b) => (b.balance||0) - (a.balance||0) || String(a.family_name).localeCompare(String(b.family_name)));
+    let html = '<table><thead><tr><th>Family</th><th>Students</th><th>Added</th><th>Used</th><th>Balance</th></tr></thead><tbody>';
+    rows.forEach(f => {
+      const bal = f.balance || 0;
+      const cls = bal <= 0 ? 'out' : (bal <= lowThreshold ? 'low' : '');
+      const tag = bal <= 0 ? '<span class="low-tag">used up</span>'
+                : (bal <= lowThreshold ? '<span class="low-tag">running low</span>' : '');
+      html += `<tr><td style="font-weight:600">${esc(f.family_name)}${tag}</td>`
+            + `<td style="color:var(--muted);font-size:13px">${esc((f.students||[]).join(', ') || '—')}</td>`
+            + `<td>$${(f.credits_total||0).toFixed(2)}</td>`
+            + `<td>$${(f.applied_total||0).toFixed(2)}</td>`
+            + `<td><span class="bal-pill ${cls}">$${bal.toFixed(2)}</span></td></tr>`;
+    });
+    wrap.innerHTML = html + '</tbody></table>';
+  }
+
+  function renderCreditLog() {
+    const wrap = document.getElementById('creditLogWrap');
+    if (!creditEntries.length) { wrap.innerHTML = '<div class="empty-state"><span>🧾</span>No prepayments recorded yet.</div>'; return; }
+    let html = '<table><thead><tr><th>Date</th><th>Family</th><th>Amount</th><th>Method</th><th>Note</th><th>Recorded By</th><th></th></tr></thead><tbody>';
+    creditEntries.forEach(c => {
+      const d = new Date(c.entry_date + 'T12:00:00');
+      const dateStr = d.toLocaleDateString('en-US', {month:'short', day:'numeric', year:'numeric'});
+      html += `<tr class="${c.voided ? 'voided' : ''}">`
+            + `<td style="color:var(--muted)">${dateStr}</td>`
+            + `<td style="font-weight:600">${esc(c.family_name)}</td>`
+            + `<td style="font-weight:600">$${Number(c.amount).toFixed(2)}</td>`
+            + `<td>${esc(c.method || '—')}</td>`
+            + `<td style="color:var(--muted);font-size:13px">${esc(c.note || '')}</td>`
+            + `<td style="color:var(--muted);font-size:12px">${esc(c.recorded_by || '—')}</td>`
+            + `<td>${c.voided ? '' : `<button class="btn-void" onclick="voidCredit(${c.credit_id})">Void</button>`}</td></tr>`;
+    });
+    wrap.innerHTML = html + '</tbody></table>';
+  }
+
+  Promise.all([loadStudents(), loadCharges(), loadFamilies()]);
 </script>
 <script src="/nav.js" defer></script>
 </body>

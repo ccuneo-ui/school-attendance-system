@@ -1005,6 +1005,25 @@ def init_db():
                 )
             """)
 
+            # Family M Card prepayments — a positive balance a family's students
+            # draw down before M Card charges reach the monthly bill.
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS mcard_credits (
+                    credit_id    SERIAL PRIMARY KEY,
+                    household_id INTEGER NOT NULL REFERENCES households(household_id) ON DELETE CASCADE,
+                    entry_date   TEXT NOT NULL,
+                    amount       NUMERIC(10,2) NOT NULL,
+                    method       TEXT DEFAULT '',
+                    note         TEXT DEFAULT '',
+                    recorded_by  TEXT DEFAULT '',
+                    voided       BOOLEAN NOT NULL DEFAULT FALSE,
+                    voided_by    TEXT DEFAULT '',
+                    voided_at    TIMESTAMP,
+                    created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+            cur.execute("CREATE INDEX IF NOT EXISTS idx_mcard_credits_hh ON mcard_credits(household_id)")
+
             # Prepaid flag: family already paid (e.g. via Blackbaud), so the
             # charge stays on the log but is left off the monthly billing report.
             cur.execute("ALTER TABLE mcard_charges ADD COLUMN IF NOT EXISTS prepaid BOOLEAN NOT NULL DEFAULT FALSE")
@@ -1513,8 +1532,23 @@ def add_mcard_charge():
                 return jsonify({"error":"Student not found"}),404
             cur.execute("INSERT INTO mcard_charges (student_id,charge_date,quantity) VALUES (%s,%s,%s) RETURNING charge_id",(student_id,charge_date,quantity))
             charge_id = cur.fetchone()["charge_id"]
-        conn.commit()
-        return jsonify({"success":True,"charge_id":charge_id})
+            conn.commit()
+            # Family prepaid balance after this charge, so the page can tell staff
+            # to remind the student when the account is running low.
+            family = None
+            try:
+                hh = _primary_household_map(cur).get(student_id)
+                if hh:
+                    st = _mcard_credit_state(cur, datetime.today().date().strftime("%Y-%m")).get(hh)
+                    if st and st["credits_total"]:
+                        cur.execute("SELECT family_name FROM households WHERE household_id=%s", (hh,))
+                        _h = cur.fetchone()
+                        family = {"family_name": (_h or {}).get("family_name", ""),
+                                  "balance": st["balance"],
+                                  "low": st["balance"] <= MCARD_LOW_BALANCE}
+            except Exception:
+                family = None
+        return jsonify({"success":True,"charge_id":charge_id,"family":family})
     except Exception as e:
         conn.rollback()
         return jsonify({"error":str(e)}),500
@@ -1568,6 +1602,283 @@ def set_mcard_prepaid(charge_id):
             cur.execute("UPDATE mcard_charges SET prepaid=%s WHERE charge_id=%s", (prepaid, charge_id))
         conn.commit()
         return jsonify({"success": True, "prepaid": prepaid})
+    except Exception as e:
+        conn.rollback()
+        return jsonify({"error": str(e)}), 500
+    finally:
+        conn.close()
+
+
+# ============================================
+# M CARD FAMILY PREPAYMENTS (credit balances)
+# ============================================
+
+# Balance at or below this prompts staff to remind the student to tell their parents.
+MCARD_LOW_BALANCE = 10.00
+
+
+def _primary_household_map(cur):
+    """student_id -> billing household_id (the primary one; lowest id breaks a tie)."""
+    cur.execute("""
+        SELECT student_id, household_id, COALESCE(is_primary, FALSE) AS is_primary
+        FROM   student_households
+        ORDER  BY student_id,
+                  CASE WHEN COALESCE(is_primary, FALSE) THEN 0 ELSE 1 END,
+                  household_id
+    """)
+    out = {}
+    for r in cur.fetchall():
+        out.setdefault(r["student_id"], r["household_id"])
+    return out
+
+
+def _mcard_snack_rate_rows(cur):
+    cur.execute("""
+        SELECT rate_value, effective_from
+        FROM   billing_rates
+        WHERE  rate_key = 'mcard_snack'
+        ORDER  BY effective_from::date
+    """)
+    return [(str(r["effective_from"])[:10], float(r["rate_value"])) for r in cur.fetchall()]
+
+
+def _mcard_rate_on(rate_rows, day):
+    rate = 1.50
+    for eff, val in rate_rows:
+        if eff <= day:
+            rate = val
+        else:
+            break
+    return rate
+
+
+def _mcard_credit_state(cur, through_mk):
+    """Family M Card credit ledger, walked month by month through 'YYYY-MM'.
+
+    Each month adds that month's prepayments to the family's balance, then draws
+    down whatever that month's M Card charges need (charges already flagged
+    prepaid are skipped — they never hit the bill in the first place). Credits
+    therefore only ever apply to charges from the month the money arrived
+    onward, so a past invoice is never re-opened by a new payment.
+
+    Returns {household_id: {applied, balance, credits_total, applied_total}}.
+    """
+    cur.execute("""
+        SELECT household_id, to_char(entry_date::date, 'YYYY-MM') AS mk, SUM(amount) AS amt
+        FROM   mcard_credits
+        WHERE  NOT voided
+        GROUP  BY household_id, to_char(entry_date::date, 'YYYY-MM')
+    """)
+    credits = {}
+    for r in cur.fetchall():
+        credits.setdefault(r["household_id"], {})[r["mk"]] = float(r["amt"])
+    if not credits:
+        return {}
+
+    hh_of     = _primary_household_map(cur)
+    rate_rows = _mcard_snack_rate_rows(cur)
+
+    cur.execute("""
+        SELECT student_id, to_char(charge_date::date, 'YYYY-MM') AS mk, SUM(quantity) AS qty
+        FROM   mcard_charges
+        WHERE  NOT COALESCE(prepaid, FALSE)
+        GROUP  BY student_id, to_char(charge_date::date, 'YYYY-MM')
+    """)
+    charges = {}
+    for r in cur.fetchall():
+        hh = hh_of.get(r["student_id"])
+        if hh is None or hh not in credits:
+            continue
+        rate = _mcard_rate_on(rate_rows, r["mk"] + "-01")
+        charges.setdefault(hh, {})
+        charges[hh][r["mk"]] = charges[hh].get(r["mk"], 0.0) + int(r["qty"]) * rate
+
+    out = {}
+    for hh, cmap in credits.items():
+        chmap = charges.get(hh, {})
+        bal = applied_here = credits_total = applied_total = 0.0
+        for mk in sorted(set(cmap) | set(chmap)):
+            if mk > through_mk:
+                break
+            added = cmap.get(mk, 0.0)
+            bal += added
+            credits_total += added
+            draw = round(min(bal, chmap.get(mk, 0.0)), 2) if bal > 0 else 0.0
+            bal = round(bal - draw, 2)
+            applied_total += draw
+            if mk == through_mk:
+                applied_here = draw
+        out[hh] = {"applied": round(applied_here, 2), "balance": round(bal, 2),
+                   "credits_total": round(credits_total, 2),
+                   "applied_total": round(applied_total, 2)}
+    return out
+
+
+def _household_contacts(cur):
+    """household_id -> {'contact': 'First Last', 'email': '...'} (primary member first)."""
+    cur.execute("""
+        SELECT hm.household_id, p.first_name, p.last_name, p.email
+        FROM   household_members hm
+        JOIN   parents p ON p.parent_id = hm.parent_id
+        ORDER  BY hm.household_id,
+                  CASE WHEN hm.role = 'primary' THEN 0 ELSE 1 END,
+                  p.parent_id
+    """)
+    out = {}
+    for r in cur.fetchall():
+        out.setdefault(r["household_id"], {
+            "contact": f"{r['first_name']} {r['last_name']}".strip(),
+            "email": r["email"] or "",
+        })
+    return out
+
+
+@app.route("/api/mcard/families")
+@require_perm("mcard")
+def api_mcard_families():
+    """Every family, their students, and their current M Card credit balance."""
+    this_mk = datetime.today().date().strftime("%Y-%m")
+    conn = get_db_connection()
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute("""
+                SELECT household_id, family_name, primary_email
+                FROM   households
+                ORDER  BY family_name
+            """)
+            households = cur.fetchall()
+            contacts = _household_contacts(cur)
+            hh_of    = _primary_household_map(cur)
+            state    = _mcard_credit_state(cur, this_mk)
+
+            cur.execute("""
+                SELECT student_id, first_name, last_name, grade
+                FROM   students
+                WHERE  status IN ('active', 'guest')
+                ORDER  BY last_name, first_name
+            """)
+            kids = {}
+            for s in cur.fetchall():
+                hh = hh_of.get(s["student_id"])
+                if hh is None:
+                    continue
+                kids.setdefault(hh, []).append(f"{s['first_name']} {s['last_name']}")
+
+        out = []
+        for h in households:
+            hid = h["household_id"]
+            st  = state.get(hid, {})
+            ct  = contacts.get(hid, {})
+            out.append({
+                "household_id":  hid,
+                "family_name":   h["family_name"],
+                "contact":       ct.get("contact", ""),
+                "email":         ct.get("email") or h.get("primary_email") or "",
+                "students":      kids.get(hid, []),
+                "credits_total": st.get("credits_total", 0.0),
+                "applied_total": st.get("applied_total", 0.0),
+                "balance":       st.get("balance", 0.0),
+            })
+        return jsonify({"families": out, "low_threshold": MCARD_LOW_BALANCE})
+    finally:
+        conn.close()
+
+
+@app.route("/api/mcard/credits")
+@require_perm("mcard")
+def api_mcard_credits():
+    """Prepayment entries, newest first. Optional ?household_id= for one family."""
+    hh = request.args.get("household_id")
+    conn = get_db_connection()
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            if hh:
+                cur.execute("""
+                    SELECT c.*, h.family_name
+                    FROM   mcard_credits c JOIN households h ON h.household_id = c.household_id
+                    WHERE  c.household_id = %s
+                    ORDER  BY c.entry_date DESC, c.credit_id DESC
+                """, (int(hh),))
+            else:
+                cur.execute("""
+                    SELECT c.*, h.family_name
+                    FROM   mcard_credits c JOIN households h ON h.household_id = c.household_id
+                    ORDER  BY c.entry_date DESC, c.credit_id DESC
+                    LIMIT  300
+                """)
+            rows = cur.fetchall()
+        for r in rows:
+            r["amount"] = float(r["amount"])
+        return jsonify(rows)
+    finally:
+        conn.close()
+
+
+@app.route("/api/mcard/credits", methods=["POST"])
+@require_perm("mcard")
+def add_mcard_credit():
+    data = request.get_json(silent=True) or {}
+    try:
+        household_id = int(data.get("household_id") or 0)
+        amount = round(float(data.get("amount") or 0), 2)
+    except (TypeError, ValueError):
+        return jsonify({"error": "Invalid family or amount"}), 400
+    entry_date = (data.get("entry_date") or "").strip()
+    if not household_id or not entry_date:
+        return jsonify({"error": "Family and date are required"}), 400
+    if amount == 0:
+        return jsonify({"error": "Amount can't be zero"}), 400
+    # Negative entries (refunds / corrections) are allowed but only for billing staff.
+    if amount < 0 and not session.get("can_manage_billing"):
+        return jsonify({"error": "Only billing staff can enter a negative adjustment."}), 403
+    from datetime import date as _date
+    try:
+        _date.fromisoformat(entry_date)
+    except ValueError:
+        return jsonify({"error": "Invalid date"}), 400
+
+    conn = get_db_connection()
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute("SELECT household_id FROM households WHERE household_id=%s", (household_id,))
+            if not cur.fetchone():
+                return jsonify({"error": "Family not found"}), 404
+            cur.execute("""
+                INSERT INTO mcard_credits (household_id, entry_date, amount, method, note, recorded_by)
+                VALUES (%s,%s,%s,%s,%s,%s) RETURNING credit_id
+            """, (household_id, entry_date, amount,
+                  (data.get("method") or "").strip(), (data.get("note") or "").strip(),
+                  session.get("user_name", "unknown")))
+            credit_id = cur.fetchone()["credit_id"]
+            conn.commit()
+            state = _mcard_credit_state(cur, datetime.today().date().strftime("%Y-%m"))
+        return jsonify({"success": True, "credit_id": credit_id,
+                        "balance": state.get(household_id, {}).get("balance", 0.0)})
+    except Exception as e:
+        conn.rollback()
+        return jsonify({"error": str(e)}), 500
+    finally:
+        conn.close()
+
+
+@app.route("/api/mcard/credits/<int:credit_id>/void", methods=["POST"])
+@require_perm("mcard")
+def void_mcard_credit(credit_id):
+    """Entries are never deleted — voiding keeps the paper trail."""
+    conn = get_db_connection()
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute("SELECT voided FROM mcard_credits WHERE credit_id=%s", (credit_id,))
+            row = cur.fetchone()
+            if not row:
+                return jsonify({"error": "Entry not found"}), 404
+            cur.execute("""
+                UPDATE mcard_credits
+                SET voided=TRUE, voided_by=%s, voided_at=CURRENT_TIMESTAMP
+                WHERE credit_id=%s
+            """, (session.get("user_name", "unknown"), credit_id))
+        conn.commit()
+        return jsonify({"success": True})
     except Exception as e:
         conn.rollback()
         return jsonify({"error": str(e)}), 500
@@ -5028,6 +5339,10 @@ def api_billing_report():
                 for r in cur.fetchall():
                     contact_by_household.setdefault(r["household_id"], r)
 
+                # 6c. Family M Card prepaid credit applied to this month, and what
+                #     is left on the account afterwards.
+                credit_state = _mcard_credit_state(cur, f"{year}-{month:02d}")
+
                 # 7. Lunch-day counts for the month (from school calendar)
                 cur.execute("""
                     SELECT category_key, COUNT(*) AS n FROM calendar_day_tags
@@ -5131,6 +5446,7 @@ def api_billing_report():
             })
 
         return jsonify({"month": month, "year": year, "students": results, "rates": rates,
+                        "family_credits": {str(k): v for k, v in credit_state.items()},
                         "lunch_days_prek_k": lunch_days_prek_k, "lunch_days_1_8": lunch_days_1_8})
 
     except Exception as e:
