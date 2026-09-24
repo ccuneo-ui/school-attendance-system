@@ -300,6 +300,18 @@ def superadmin_required(f):
     return decorated
 
 
+def billing_required(f):
+    """API gate for money settings only billing staff should touch."""
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if not session.get("user_email"):
+            return jsonify({"error": "Not signed in"}), 401
+        if not session.get("can_manage_billing"):
+            return jsonify({"error": "Billing permission required."}), 403
+        return f(*args, **kwargs)
+    return decorated
+
+
 def people_required(f):
     @wraps(f)
     def decorated(*args, **kwargs):
@@ -1002,6 +1014,22 @@ def init_db():
                     purchase_date TEXT NOT NULL,
                     recorded_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     recorded_by   TEXT
+                )
+            """)
+
+            # Negotiated monthly cap on before-care + aftercare for a family.
+            # One row per household; start_month (and optional end_month) keep an
+            # already-invoiced month from changing when a deal starts or lapses.
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS care_caps (
+                    cap_id       SERIAL PRIMARY KEY,
+                    household_id INTEGER NOT NULL UNIQUE REFERENCES households(household_id) ON DELETE CASCADE,
+                    cap_amount   NUMERIC(10,2) NOT NULL,
+                    start_month  TEXT NOT NULL,
+                    end_month    TEXT,
+                    note         TEXT DEFAULT '',
+                    updated_by   TEXT DEFAULT '',
+                    updated_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             """)
 
@@ -1877,6 +1905,121 @@ def void_mcard_credit(credit_id):
                 SET voided=TRUE, voided_by=%s, voided_at=CURRENT_TIMESTAMP
                 WHERE credit_id=%s
             """, (session.get("user_name", "unknown"), credit_id))
+        conn.commit()
+        return jsonify({"success": True})
+    except Exception as e:
+        conn.rollback()
+        return jsonify({"error": str(e)}), 500
+    finally:
+        conn.close()
+
+
+# ============================================
+# BEFORE/AFTERCARE MONTHLY CAPS (per family)
+# ============================================
+
+def _care_caps_for_month(cur, mk):
+    """{household_id: cap_amount} for caps in force during 'YYYY-MM'."""
+    cur.execute("""
+        SELECT household_id, cap_amount
+        FROM   care_caps
+        WHERE  start_month <= %s
+          AND  (end_month IS NULL OR end_month = '' OR end_month >= %s)
+    """, (mk, mk))
+    return {r["household_id"]: float(r["cap_amount"]) for r in cur.fetchall()}
+
+
+@app.route("/api/care-caps")
+@billing_required
+def api_care_caps():
+    conn = get_db_connection()
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute("""
+                SELECT c.*, h.family_name
+                FROM   care_caps c JOIN households h ON h.household_id = c.household_id
+                ORDER  BY h.family_name
+            """)
+            caps = cur.fetchall()
+            hh_of = _primary_household_map(cur)
+            cur.execute("""
+                SELECT student_id, first_name, last_name
+                FROM   students
+                WHERE  status IN ('active', 'guest')
+                ORDER  BY last_name, first_name
+            """)
+            kids = {}
+            for s in cur.fetchall():
+                hh = hh_of.get(s["student_id"])
+                if hh is not None:
+                    kids.setdefault(hh, []).append(f"{s['first_name']} {s['last_name']}")
+        for c in caps:
+            c["cap_amount"] = float(c["cap_amount"])
+            c["students"] = kids.get(c["household_id"], [])
+        return jsonify(caps)
+    finally:
+        conn.close()
+
+
+@app.route("/api/care-caps", methods=["POST"])
+@billing_required
+def save_care_cap():
+    """Create or update a family's monthly before/aftercare cap."""
+    import re as _re
+    data = request.get_json(silent=True) or {}
+    try:
+        household_id = int(data.get("household_id") or 0)
+        cap_amount = round(float(data.get("cap_amount")), 2)
+    except (TypeError, ValueError):
+        return jsonify({"error": "Invalid family or cap amount"}), 400
+    start_month = (data.get("start_month") or "").strip()
+    end_month   = (data.get("end_month") or "").strip() or None
+    if not household_id:
+        return jsonify({"error": "Pick a family"}), 400
+    if cap_amount < 0:
+        return jsonify({"error": "A cap can't be negative"}), 400
+    month_re = _re.compile(r"^\d{4}-(0[1-9]|1[0-2])$")
+    if not month_re.match(start_month):
+        return jsonify({"error": "Start month must look like 2026-09"}), 400
+    if end_month and not month_re.match(end_month):
+        return jsonify({"error": "End month must look like 2027-06"}), 400
+    if end_month and end_month < start_month:
+        return jsonify({"error": "End month can't be before the start month"}), 400
+
+    conn = get_db_connection()
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute("SELECT household_id FROM households WHERE household_id=%s", (household_id,))
+            if not cur.fetchone():
+                return jsonify({"error": "Family not found"}), 404
+            cur.execute("""
+                INSERT INTO care_caps (household_id, cap_amount, start_month, end_month, note, updated_by, updated_at)
+                VALUES (%s,%s,%s,%s,%s,%s,CURRENT_TIMESTAMP)
+                ON CONFLICT (household_id) DO UPDATE SET
+                    cap_amount=EXCLUDED.cap_amount,
+                    start_month=EXCLUDED.start_month,
+                    end_month=EXCLUDED.end_month,
+                    note=EXCLUDED.note,
+                    updated_by=EXCLUDED.updated_by,
+                    updated_at=CURRENT_TIMESTAMP
+            """, (household_id, cap_amount, start_month, end_month,
+                  (data.get("note") or "").strip(), session.get("user_name", "unknown")))
+        conn.commit()
+        return jsonify({"success": True})
+    except Exception as e:
+        conn.rollback()
+        return jsonify({"error": str(e)}), 500
+    finally:
+        conn.close()
+
+
+@app.route("/api/care-caps/<int:household_id>", methods=["DELETE"])
+@billing_required
+def delete_care_cap(household_id):
+    conn = get_db_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM care_caps WHERE household_id=%s", (household_id,))
         conn.commit()
         return jsonify({"success": True})
     except Exception as e:
@@ -5343,6 +5486,9 @@ def api_billing_report():
                 #     is left on the account afterwards.
                 credit_state = _mcard_credit_state(cur, f"{year}-{month:02d}")
 
+                # 6d. Negotiated before/aftercare caps in force this month.
+                care_caps = _care_caps_for_month(cur, f"{year}-{month:02d}")
+
                 # 7. Lunch-day counts for the month (from school calendar)
                 cur.execute("""
                     SELECT category_key, COUNT(*) AS n FROM calendar_day_tags
@@ -5445,8 +5591,18 @@ def api_billing_report():
                 "care_days":        bc_days + ac_days,
             })
 
+        # A capped family pays at most the cap for before-care + aftercare combined,
+        # so the report carries what the family actually ran up and the overage.
+        cap_info = {}
+        for hid, cap in care_caps.items():
+            care_total = round(sum((r["beforecare"] or 0) + (r["aftercare"] or 0)
+                                   for r in results if r["household_id"] == hid), 2)
+            cap_info[str(hid)] = {"cap": cap, "care_total": care_total,
+                                  "over": round(max(0.0, care_total - cap), 2)}
+
         return jsonify({"month": month, "year": year, "students": results, "rates": rates,
                         "family_credits": {str(k): v for k, v in credit_state.items()},
+                        "family_caps": cap_info,
                         "lunch_days_prek_k": lunch_days_prek_k, "lunch_days_1_8": lunch_days_1_8})
 
     except Exception as e:

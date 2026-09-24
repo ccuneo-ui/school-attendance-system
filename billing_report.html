@@ -201,6 +201,7 @@
     .fam-meta { font-size: 11px; color: var(--muted); margin-left: 10px; }
     .fam-total { font-weight: 700; font-variant-numeric: tabular-nums; color: var(--navy); }
     .fam-credit { display: inline-block; font-size: 11px; font-weight: 600; color: #12776a; background: #e0f0ee; border: 1px solid #9fd3cc; border-radius: 6px; padding: 2px 7px; margin-left: 8px; }
+    .fam-cap { display: inline-block; font-size: 11px; font-weight: 600; color: #8a6a1a; background: #fbf1d9; border: 1px solid #e8c98a; border-radius: 6px; padding: 2px 7px; margin-left: 8px; }
     .fam-gross { font-size: 11px; color: var(--muted); font-weight: 400; }
     .flag { display: inline-block; font-size: 10px; font-weight: 600; color: #8a6a1a; background: #fbf1d9; border: 1px solid #e8c98a; border-radius: 5px; padding: 1px 5px; margin-left: 6px; vertical-align: middle; }
     .flag.warn { color: #a33333; background: #fff0f0; border-color: #f0c0c0; }
@@ -750,6 +751,7 @@
   let activeGrade = 'all';
   let groupMode = 'family';
   let familyCredits = {};   // household_id -> {applied, balance} for the shown month
+  let familyCaps = {};      // household_id -> {cap, care_total, over} for the shown month
   let curMonth, curYear;
 
   (function init() {
@@ -775,6 +777,7 @@
       if(data.error) throw new Error(data.error);
       reportData = data.students || [];
       familyCredits = data.family_credits || {};
+      familyCaps    = data.family_caps || {};
       buildGradePills(reportData);
       render(currentFiltered());
     } catch(err) {
@@ -911,14 +914,17 @@
       return;
     }
     const sections = buildSections(students);
-    let gm=0,gbc=0,gac=0,gog=0,ghw=0,goo=0,gss=0,gls=0,creditsShown=0;
+    let gm=0,gbc=0,gac=0,gog=0,ghw=0,goo=0,gss=0,gls=0,creditsShown=0,capsShown=0;
 
     sections.forEach(sec => {
       const secTotal = sec.list.reduce((n,s)=>n+rowTotal(s),0);
       const cr = (sec.hid!=null && familyCredits[String(sec.hid)]) || null;
       const applied = cr ? (cr.applied||0) : 0;
-      const netTotal = Math.max(0, secTotal - applied);
+      const cap = (sec.hid!=null && familyCaps[String(sec.hid)]) || null;
+      const capOver = cap ? (cap.over||0) : 0;
+      const netTotal = Math.max(0, secTotal - applied - capOver);
       creditsShown += applied;
+      capsShown += capOver;
       const hr=document.createElement('tr');
       if (sec.family) {
         hr.className='fam-hdr';
@@ -931,11 +937,17 @@
         const creditChip = applied > 0
           ? `<span class="fam-credit">M Card credit &minus;$${applied.toFixed(2)} · $${(cr.balance||0).toFixed(2)} left</span>`
           : (cr && (cr.balance||0) > 0 ? `<span class="fam-credit">M Card credit $${cr.balance.toFixed(2)} available</span>` : '');
-        const totalCell = applied > 0
-          ? `<span class="fam-gross">$${secTotal.toFixed(2)} &minus; $${applied.toFixed(2)}</span><br>$${netTotal.toFixed(2)}`
+        const capChip = cap
+          ? (capOver > 0
+              ? `<span class="fam-cap">Care cap $${cap.cap.toFixed(2)} · &minus;$${capOver.toFixed(2)} over</span>`
+              : `<span class="fam-cap">Care cap $${cap.cap.toFixed(2)} · under</span>`)
+          : '';
+        const deducted = applied + capOver;
+        const totalCell = deducted > 0
+          ? `<span class="fam-gross">$${secTotal.toFixed(2)} &minus; $${deducted.toFixed(2)}</span><br>$${netTotal.toFixed(2)}`
           : `$${secTotal.toFixed(2)}`;
         hr.innerHTML = `<td colspan="10"><span class="fam-name">${esc(sec.label)}</span>`
-                     + `<span class="fam-meta">${kids} student${kids!==1?'s':''}</span>${meta}${creditChip}</td>`
+                     + `<span class="fam-meta">${kids} student${kids!==1?'s':''}</span>${meta}${creditChip}${capChip}</td>`
                      + `<td class="r fam-total">${totalCell}</td>`;
       } else {
         hr.className='grade-hdr';
@@ -957,13 +969,13 @@
       });
     });
 
-    const gt=gm+gbc+gac+gog+ghw+goo+gss+gls-creditsShown;
+    const gt=gm+gbc+gac+gog+ghw+goo+gss+gls-creditsShown-capsShown;
     const famCount = groupMode==='family' ? sections.length : 0;
     const lead = groupMode==='family'
       ? `${famCount} famil${famCount!==1?'ies':'y'} · ${students.length} student${students.length!==1?'s':''} — Total`
       : `${students.length} student${students.length!==1?'s':''} — Total`;
     const tr=document.createElement('tr'); tr.className='total-row';
-    tr.innerHTML=`<td colspan="2">${lead}${creditsShown>0?` · less $${creditsShown.toFixed(2)} M Card credit`:''}</td><td class="r">$${gm.toFixed(2)}</td><td class="r">$${gbc.toFixed(2)}</td><td class="r">$${gac.toFixed(2)}</td><td class="r">$${gog.toFixed(2)}</td><td class="r">$${ghw.toFixed(2)}</td><td class="r">$${goo.toFixed(2)}</td><td class="r">$${gss.toFixed(2)}</td><td class="r">$${gls.toFixed(2)}</td><td class="r">$${gt.toFixed(2)}</td>`;
+    tr.innerHTML=`<td colspan="2">${lead}${creditsShown>0?` · less $${creditsShown.toFixed(2)} M Card credit`:''}${capsShown>0?` · less $${capsShown.toFixed(2)} care caps`:''}</td><td class="r">$${gm.toFixed(2)}</td><td class="r">$${gbc.toFixed(2)}</td><td class="r">$${gac.toFixed(2)}</td><td class="r">$${gog.toFixed(2)}</td><td class="r">$${ghw.toFixed(2)}</td><td class="r">$${goo.toFixed(2)}</td><td class="r">$${gss.toFixed(2)}</td><td class="r">$${gls.toFixed(2)}</td><td class="r">$${gt.toFixed(2)}</td>`;
     tbody.appendChild(tr);
   }
 
@@ -973,7 +985,10 @@
     let creditNet = 0;
     if (groupMode==='family') {
       const seen = new Set(students.filter(s=>s.household_id!=null).map(s=>s.household_id));
-      seen.forEach(hid => { const c = familyCredits[String(hid)]; if (c) creditNet += (c.applied||0); });
+      seen.forEach(hid => {
+        const c = familyCredits[String(hid)]; if (c) creditNet += (c.applied||0);
+        const k = familyCaps[String(hid)];    if (k) creditNet += (k.over||0);
+      });
     }
     document.getElementById('sTotalBilling').textContent  = '$'+Math.max(0,(mc+bc+ac+pg+ss+ls-creditNet)).toFixed(2);
     const famIds = new Set(students.filter(s=>s.household_id!=null).map(s=>s.household_id));
@@ -1013,15 +1028,26 @@
       if (sec.family) {
         const cr = (sec.hid!=null && familyCredits[String(sec.hid)]) || null;
         const applied = cr ? (cr.applied||0) : 0;
+        const cap = (sec.hid!=null && familyCaps[String(sec.hid)]) || null;
+        const capOver = cap ? (cap.over||0) : 0;
         if (applied > 0) {
           rows.push([fam, sec.contact||'', sec.email||'', 'M CARD PREPAID CREDIT APPLIED',
                      `balance left ${F(cr.balance)}`,
                      F(-applied),'','','','','','','',F(-applied)]);
         }
+        if (capOver > 0) {
+          rows.push([fam, sec.contact||'', sec.email||'', 'BEFORE/AFTERCARE CAP ADJUSTMENT',
+                     `cap ${F(cap.cap)} on ${F(cap.care_total)} of care`,
+                     '',F(-capOver),'','','','','','',F(-capOver)]);
+        }
+        // Take the overage off aftercare first, then before care, so neither
+        // column can go negative and the columns still add to the total.
+        const acCut = Math.min(sub.aftercare, capOver);
+        const bcCut = capOver - acCut;
         rows.push([fam, sec.contact||'', sec.email||'', 'FAMILY TOTAL — DUE', '',
-                   F(sub.mcard-applied),F(sub.beforecare),F(sub.aftercare),F(sub.og_tutoring),
+                   F(sub.mcard-applied),F(sub.beforecare-bcCut),F(sub.aftercare-acCut),F(sub.og_tutoring),
                    F(sub.homework_center),F(sub.one_on_one),F(sub.school_store),F(sub.lunch),
-                   F(Math.max(0, sub.total-applied))]);
+                   F(Math.max(0, sub.total-applied-capOver))]);
         rows.push([]);
       }
     });

@@ -119,6 +119,34 @@
       padding: 1px 6px; font-size: 11px; color: var(--muted); margin-left: 6px;
     }
 
+    /* ── Care caps tab ── */
+    .caps-card {
+      background: var(--white); border: 1px solid var(--border); border-radius: 12px;
+      padding: 20px 22px; margin-bottom: 18px;
+    }
+    .caps-card h3 { font-size: 15px; margin-bottom: 4px; }
+    .caps-intro { font-size: 13px; color: var(--muted); margin-bottom: 16px; line-height: 1.5; }
+    .caps-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .caps-table th {
+      text-align: left; font-size: 11px; font-weight: 500; color: var(--muted);
+      text-transform: uppercase; letter-spacing: 0.06em; padding: 8px 10px;
+      border-bottom: 1px solid var(--border);
+    }
+    .caps-table td { padding: 10px; border-bottom: 1px solid var(--border); }
+    .caps-table tr:last-child td { border-bottom: none; }
+    .cap-amt { font-weight: 700; color: var(--navy); }
+    .cap-btn {
+      border: 1px solid var(--border); background: var(--white); color: var(--muted);
+      border-radius: 6px; padding: 4px 10px; font-size: 12px; font-weight: 600;
+      font-family: 'DM Sans', sans-serif; cursor: pointer; margin-right: 5px;
+    }
+    .cap-btn:hover { border-color: var(--navy); color: var(--navy); }
+    .cap-btn.danger:hover { border-color: var(--red); color: var(--red); }
+    .caps-input {
+      padding: 8px 12px; border: 1px solid var(--border); border-radius: 8px;
+      font-family: 'DM Sans', sans-serif; font-size: 13px; background: var(--white);
+    }
+
     /* ── Time grid ── */
     .time-grid { display: flex; flex-wrap: wrap; gap: 4px; }
     .time-btn {
@@ -288,10 +316,13 @@
     <button class="tab-btn" onclick="switchTab('aftercare')">
       <span class="tab-dot dot-after"></span>Aftercare
     </button>
+    <button class="tab-btn" id="capsTabBtn" style="display:none;" onclick="switchTab('caps')">
+      Care Caps
+    </button>
   </div>
 
   <!-- Date bar -->
-  <div class="date-bar">
+  <div class="date-bar" id="dateBar">
     <button onclick="changeDate(-1)">◀</button>
     <input type="date" id="sessionDate" onchange="loadRecords()">
     <button onclick="changeDate(1)">▶</button>
@@ -317,7 +348,7 @@
   </div>
 
   <!-- Add record -->
-  <div class="add-section">
+  <div class="add-section" id="addSection">
     <h3 id="addTitle">Record Before Care Attendance</h3>
     <div class="add-row">
       <div class="field student-search">
@@ -342,7 +373,7 @@
   </div>
 
   <!-- Records -->
-  <div class="records-card">
+  <div class="records-card" id="recordsCard">
     <div class="records-header">
       <h3 id="recordsTitle">Today's Records</h3>
       <span class="records-count" id="recordsCount">0 records</span>
@@ -361,6 +392,48 @@
       <tbody id="recordsBody"></tbody>
     </table>
     <div class="empty-state" id="emptyState">No records for this date yet.</div>
+  </div>
+
+  <!-- Care caps (billing staff only) -->
+  <div id="capsSection" style="display:none;">
+    <div class="caps-card">
+      <h3 id="capFormTitle">Set a Family Cap</h3>
+      <p class="caps-intro">
+        A cap is the most a family is billed for before care and aftercare <b>combined</b> in one month,
+        across all their children. It applies from the start month onward. Months already invoiced keep
+        whatever cap was in force then, so set an end month rather than deleting when a deal lapses.
+      </p>
+      <div class="add-row">
+        <div class="field student-search">
+          <label>Family</label>
+          <input type="text" id="capFamilySearch" placeholder="Family or student name…" autocomplete="off">
+          <div class="search-dropdown" id="capFamilyDropdown"></div>
+          <input type="hidden" id="capHouseholdId">
+        </div>
+        <div class="field">
+          <label>Monthly Cap</label>
+          <input type="text" id="capAmount" class="caps-input" placeholder="300.00" inputmode="decimal" style="width:120px">
+        </div>
+        <div class="field">
+          <label>Starts</label>
+          <input type="month" id="capStart" class="caps-input">
+        </div>
+        <div class="field">
+          <label>Ends (optional)</label>
+          <input type="month" id="capEnd" class="caps-input">
+        </div>
+        <div class="field" style="flex:1;min-width:180px">
+          <label>Note</label>
+          <input type="text" id="capNote" class="caps-input" placeholder="Agreed with Head of School, Aug 2026" style="width:100%">
+        </div>
+        <button class="btn-record btn-after" id="capSaveBtn" onclick="saveCap()">Save Cap</button>
+      </div>
+    </div>
+
+    <div class="caps-card">
+      <h3 style="margin-bottom:14px">Families With a Cap</h3>
+      <div id="capsTableWrap"><p class="caps-intro" style="margin:0">Loading…</p></div>
+    </div>
   </div>
 </div>
 
@@ -421,10 +494,149 @@
     setToday();
     loadStudents();
     document.addEventListener('click', (e) => {
-      if (!e.target.closest('.student-search'))
+      if (!e.target.closest('.student-search')) {
         document.getElementById('searchDropdown').classList.remove('open');
+        document.getElementById('capFamilyDropdown').classList.remove('open');
+      }
     });
+    // The caps tab only exists for billing staff.
+    fetch('/api/session', {credentials: 'include'})
+      .then(r => r.json())
+      .then(d => { if (d && d.can_manage_billing) document.getElementById('capsTabBtn').style.display = ''; })
+      .catch(() => {});
+    const now = new Date();
+    document.getElementById('capStart').value = now.toISOString().slice(0, 7);
   });
+
+  // ── Care caps ──
+  let capFamilies = [], caps = [];
+
+  async function loadCaps() {
+    try {
+      if (!capFamilies.length) {
+        const fr = await fetch('/api/mcard/families');
+        if (fr.ok) capFamilies = (await fr.json()).families || [];
+      }
+      const res = await fetch('/api/care-caps');
+      if (!res.ok) throw new Error((await res.json().catch(()=>({}))).error || 'Could not load caps.');
+      caps = await res.json();
+      renderCaps();
+    } catch(e) {
+      document.getElementById('capsTableWrap').innerHTML =
+        `<p class="caps-intro" style="margin:0">${e.message}</p>`;
+    }
+  }
+
+  const capInput = document.getElementById('capFamilySearch');
+  const capDrop  = document.getElementById('capFamilyDropdown');
+  capInput.addEventListener('input', () => {
+    document.getElementById('capHouseholdId').value = '';
+    const q = capInput.value.trim().toLowerCase();
+    if (!q) { capDrop.classList.remove('open'); return; }
+    const matches = capFamilies.filter(f =>
+      (f.family_name || '').toLowerCase().includes(q) ||
+      (f.students || []).some(n => n.toLowerCase().includes(q))).slice(0, 15);
+    capDrop.innerHTML = matches.length
+      ? matches.map(f => `<div class="search-option" data-id="${f.household_id}" data-name="${escAttr(f.family_name)}">${escHtml(f.family_name)}<span class="grade-tag">${escHtml((f.students||[]).join(', ') || 'no students linked')}</span></div>`).join('')
+      : '<div class="search-option">No families found</div>';
+    capDrop.querySelectorAll('.search-option[data-id]').forEach(el => {
+      el.addEventListener('mousedown', ev => {
+        ev.preventDefault();
+        document.getElementById('capHouseholdId').value = el.dataset.id;
+        capInput.value = el.dataset.name;
+        capDrop.classList.remove('open');
+      });
+    });
+    capDrop.classList.add('open');
+  });
+  capInput.addEventListener('focus', () => { if (capInput.value.trim()) capInput.dispatchEvent(new Event('input')); });
+
+  async function saveCap() {
+    const hid = parseInt(document.getElementById('capHouseholdId').value || 0);
+    const amt = parseFloat(String(document.getElementById('capAmount').value).replace(/[$,\s]/g, ''));
+    if (!hid) { capInput.focus(); showToast('Pick a family from the list'); return; }
+    if (isNaN(amt)) { document.getElementById('capAmount').focus(); showToast('Enter a cap amount'); return; }
+    const btn = document.getElementById('capSaveBtn');
+    btn.disabled = true; btn.textContent = 'Saving…';
+    try {
+      const res = await fetch('/api/care-caps', {
+        method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({
+          household_id: hid, cap_amount: amt,
+          start_month: document.getElementById('capStart').value,
+          end_month: document.getElementById('capEnd').value,
+          note: document.getElementById('capNote').value
+        })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Could not save that cap.');
+      showToast('Cap saved');
+      clearCapForm();
+      loadCaps();
+    } catch(e) { showToast(e.message); }
+    btn.disabled = false; btn.textContent = 'Save Cap';
+  }
+
+  function clearCapForm() {
+    document.getElementById('capHouseholdId').value = '';
+    capInput.value = '';
+    document.getElementById('capAmount').value = '';
+    document.getElementById('capEnd').value = '';
+    document.getElementById('capNote').value = '';
+    document.getElementById('capFormTitle').textContent = 'Set a Family Cap';
+  }
+
+  function editCap(hid) {
+    const c = caps.find(x => x.household_id === hid);
+    if (!c) return;
+    document.getElementById('capHouseholdId').value = hid;
+    capInput.value = c.family_name;
+    document.getElementById('capAmount').value = Number(c.cap_amount).toFixed(2);
+    document.getElementById('capStart').value = c.start_month || '';
+    document.getElementById('capEnd').value = c.end_month || '';
+    document.getElementById('capNote').value = c.note || '';
+    document.getElementById('capFormTitle').textContent = 'Editing ' + c.family_name;
+    window.scrollTo({top: 0, behavior: 'smooth'});
+  }
+
+  async function deleteCap(hid) {
+    const c = caps.find(x => x.household_id === hid);
+    if (!confirm(`Delete the cap for ${c ? c.family_name : 'this family'}? Past months lose it too — set an end month instead if the deal simply ended.`)) return;
+    try {
+      const res = await fetch('/api/care-caps/' + hid, {method: 'DELETE'});
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Could not delete that cap.');
+      showToast('Cap deleted');
+      loadCaps();
+    } catch(e) { showToast(e.message); }
+  }
+
+  function monthLabel(mk) {
+    if (!mk) return '—';
+    const [y, m] = mk.split('-');
+    const names = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    return `${names[parseInt(m,10)-1] || m} ${y}`;
+  }
+
+  function renderCaps() {
+    const wrap = document.getElementById('capsTableWrap');
+    if (!caps.length) { wrap.innerHTML = '<p class="caps-intro" style="margin:0">No family caps set.</p>'; return; }
+    let html = '<table class="caps-table"><thead><tr><th>Family</th><th>Students</th><th>Monthly Cap</th><th>Starts</th><th>Ends</th><th>Note</th><th></th></tr></thead><tbody>';
+    caps.forEach(c => {
+      html += `<tr><td style="font-weight:600">${escHtml(c.family_name)}</td>`
+            + `<td style="color:var(--muted)">${escHtml((c.students||[]).join(', ') || '—')}</td>`
+            + `<td class="cap-amt">$${Number(c.cap_amount).toFixed(2)}</td>`
+            + `<td>${monthLabel(c.start_month)}</td>`
+            + `<td>${c.end_month ? monthLabel(c.end_month) : 'ongoing'}</td>`
+            + `<td style="color:var(--muted)">${escHtml(c.note || '')}</td>`
+            + `<td style="white-space:nowrap"><button class="cap-btn" onclick="editCap(${c.household_id})">Edit</button>`
+            + `<button class="cap-btn danger" onclick="deleteCap(${c.household_id})">Delete</button></td></tr>`;
+    });
+    wrap.innerHTML = html + '</tbody></table>';
+  }
+
+  function escHtml(s) { return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+  function escAttr(s) { return escHtml(s).replace(/"/g,'&quot;'); }
 
   function buildCheckinGrid() {
     document.getElementById('checkinTimeGrid').innerHTML = CHECKIN_SLOTS.map((t, i) =>
@@ -440,11 +652,21 @@
 
   // ── Tab switching ──
   function switchTab(tab) {
+    const idx = tab === 'beforecare' ? 0 : (tab === 'aftercare' ? 1 : 2);
+    document.querySelectorAll('.tab-btn').forEach((btn, i) => {
+      btn.classList.toggle('active', i === idx);
+    });
+    // Care Caps is a settings view, not a daily log — hide the day-to-day UI.
+    const onCaps = tab === 'caps';
+    ['dateBar','statsRow','addSection','rosterSection','recordsCard'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.style.display = onCaps ? 'none' : '';
+    });
+    document.getElementById('capsSection').style.display = onCaps ? '' : 'none';
+    if (onCaps) { loadCaps(); return; }
+
     currentTab = tab;
     const isBefore = tab === 'beforecare';
-    document.querySelectorAll('.tab-btn').forEach((btn, i) => {
-      btn.classList.toggle('active', i === (isBefore ? 0 : 1));
-    });
     document.getElementById('checkinTimeField').style.display = isBefore ? 'none' : '';
     const btn = document.getElementById('btnRecord');
     btn.className = 'btn-record ' + (isBefore ? 'btn-before' : 'btn-after');
@@ -455,6 +677,7 @@
     document.getElementById('col4Header').style.display = isBefore ? 'none' : '';
     document.getElementById('col5Header').style.display = isBefore ? 'none' : '';
     document.getElementById('rosterSection').style.display = isBefore ? 'none' : '';
+    document.getElementById('recordsCard').style.display = '';
     document.getElementById('statCheckedInCard').style.display = isBefore ? 'none' : '';
     document.getElementById('statCheckedOutCard').style.display = isBefore ? 'none' : '';
     loadRecords();

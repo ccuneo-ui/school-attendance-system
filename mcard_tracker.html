@@ -381,7 +381,9 @@
     document.getElementById('panelCredits').style.display = onCredits ? '' : 'none';
     document.getElementById('tabCharges').classList.toggle('active', !onCredits);
     document.getElementById('tabCredits').classList.toggle('active', onCredits);
-    if (onCredits && !families.length) { loadFamilies(); loadCredits(); }
+    // Always refresh on the way in: balances load at page start, so gating this
+    // on an empty list meant the payment log never fetched at all.
+    if (onCredits) { loadFamilies(); loadCredits(); }
   }
 
   async function loadFamilies() {
