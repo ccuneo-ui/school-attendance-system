@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Student Directory — Mizzentop</title>
+  <title>Student Manager — Mizzentop</title>
   <link rel="icon" type="image/svg+xml" href="/logo.svg">
   <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
   <style>
@@ -138,13 +138,13 @@
 <div class="topbar">
   <a href="/">← Home</a>
   <span class="topbar-sep">/</span>
-  <span class="topbar-title">Student Directory</span>
+  <span class="topbar-title">Student Manager</span>
 </div>
 
 <div class="page">
   <div class="page-header">
     <div>
-      <h1>Student Directory</h1>
+      <h1>Student Manager</h1>
       <p>View and edit student profiles, status, and dismissal defaults</p>
     </div>
     <button class="btn btn-primary" onclick="openAddModal()">+ Add Student</button>
@@ -720,10 +720,8 @@ function showToast(msg, isError = false) {
   setTimeout(() => t.classList.remove('show'), 3000);
 }
 
-// Close modal on overlay click
-document.getElementById('edit-modal').addEventListener('click', function(e) {
-  if (e.target === this) closeModal();
-});
+// Clicking the dark area outside the form does NOT close it — an accidental
+// click used to wipe everything typed. Use Cancel or the × instead.
 
 // ── Merge duplicate (superadmin only) ──
 let IS_SUPERADMIN = false;
@@ -816,9 +814,7 @@ async function runMerge(dry) {
   }
 }
 
-document.getElementById('merge-modal').addEventListener('click', function(e) {
-  if (e.target === this) closeMerge();
-});
+// Backdrop clicks are ignored here too — close with Cancel or the ×.
 
 init();
 </script>

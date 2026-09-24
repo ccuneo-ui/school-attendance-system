@@ -87,7 +87,8 @@
     <div class="panel" id="panel"><div class="empty">Select a template to review or edit it.</div></div>
   </div>
 </div>
-<div class="modal-overlay" id="newModal" onclick="if(event.target===this)closeNewModal()">
+<!-- Backdrop clicks are ignored on purpose: close with Cancel or the ×. -->
+<div class="modal-overlay" id="newModal">
   <div class="modal">
     <h2>New report card template</h2>
     <label class="fld">Template name</label>

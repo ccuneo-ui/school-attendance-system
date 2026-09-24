@@ -524,8 +524,7 @@ async function refreshServices(){
   }catch(e){}
 }
 
-document.getElementById('modal').addEventListener('click',e=>{ if(e.target.id==='modal') closeModal(); });
-document.addEventListener('keydown',e=>{ if(e.key==='Escape') closeModal(); });
+// Backdrop clicks and Escape are ignored on purpose: close with Cancel or the ×.
 load();
 </script>
 </body>

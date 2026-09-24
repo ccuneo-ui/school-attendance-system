@@ -89,7 +89,7 @@ PERMISSION_SILOS = [
         {"key": "dismissal_options",   "label": "Activities & Bus Routes","href": "/dismissal-options"},
     ]},
     {"key": "people", "label": "People", "pages": [
-        {"key": "students",        "label": "Student Directory", "href": "/students"},
+        {"key": "students",        "label": "Student Manager",   "href": "/students"},
         {"key": "family_manager",  "label": "Family Manager",    "href": "/family-manager"},
         {"key": "staff_directory", "label": "Staff Directory",   "href": "/staff"},
         {"key": "classes",         "label": "Classes",           "href": "/classes"},
@@ -3750,7 +3750,7 @@ def get_students_list():
 @login_required
 def get_student_family(student_id):
     """Read-only parents/guardians for a student (via their household(s)), for reference
-    in the Student Directory. Editing of parents happens in the Family Manager."""
+    in the Student Manager. Editing of parents happens in the Family Manager."""
     conn = get_db_connection()
     try:
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:

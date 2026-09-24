@@ -1,5 +1,6 @@
 # Changelog
 
+2026-09-24: Edit windows in the People section no longer close when you click outside them (or press Escape) - use Cancel or the X - so a stray click can't wipe what you typed; renamed the editable Student Directory page to "Student Manager" to end the clash with the read-only Reference page of the same name.
 2026-09-24: M Card page has a new Prepayments tab - staff record family prepayments, every student in that family draws the balance down before charges reach the monthly bill, the Billing Report shows the credit applied and what's left, and recording a snack charge warns staff when a family's balance is running low.
 2026-09-24: Student Directory flags possible duplicate students and lets the superadmin merge a duplicate into the real record; Add Family now catches an already-enrolled student and links them instead of creating a second copy.
 2026-09-23: North Star Journal — the All recent entries feed now shows a group save once ("Elena Sakib + 5 more", badge naming the count) instead of repeating the same note for every student; the per-student copies still show in each student's own log.

@@ -165,7 +165,8 @@
 </div>
 
 <!-- MODAL -->
-<div class="modal-overlay" id="modalOverlay" onclick="closeModalOnOverlay(event)">
+<!-- Backdrop clicks are ignored on purpose: close with Cancel or the ×. -->
+<div class="modal-overlay" id="modalOverlay">
   <div class="modal">
     <div class="modal-header">
       <h2 id="modalTitle">Add Staff Member</h2>
@@ -248,7 +249,7 @@
       ['dismissal_options','Activities & Bus Routes'],
     ]},
     { key:'people', label:'People', pages:[
-      ['students','Student Directory'],
+      ['students','Student Manager'],
       ['family_manager','Family Manager'],
       ['staff_directory','Staff Directory'],
       ['classes','Classes'],
@@ -470,7 +471,7 @@
   }
 
   function closeModal() { document.getElementById('modalOverlay').classList.remove('open'); }
-  function closeModalOnOverlay(e) { if (e.target === document.getElementById('modalOverlay')) closeModal(); }
+
 
   document.getElementById('firstName').addEventListener('blur', autoEmail);
   document.getElementById('lastName').addEventListener('blur', autoEmail);

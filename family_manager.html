@@ -145,7 +145,7 @@
     <div class="page-header-row">
       <div>
         <h1>Family Manager</h1>
-        <p>Edit household contact information and parents &amp; guardians. Changes save to the live records. Student details, including each student’s emergency contact, are edited in the Student Directory.</p>
+        <p>Edit household contact information and parents &amp; guardians. Changes save to the live records. Student details, including each student’s emergency contact, are edited in the Student Manager.</p>
       </div>
       <button class="btn btn-primary" onclick="openAddFamily()" style="white-space:nowrap">＋ Add Family</button>
     </div>
@@ -176,7 +176,9 @@
 </div>
 
 <!-- Edit modal -->
-<div class="modal-overlay" id="modal" onclick="if(event.target===this)closeModal()">
+<!-- Backdrop clicks are ignored on purpose: close with Cancel or the × so a
+     stray click can't discard everything typed. -->
+<div class="modal-overlay" id="modal">
   <div class="modal">
     <div class="modal-header">
       <div>
@@ -200,12 +202,12 @@
 </div>
 
 <!-- Add Family modal -->
-<div class="modal-overlay" id="add-modal" onclick="if(event.target===this)closeAdd()">
+<div class="modal-overlay" id="add-modal">
   <div class="modal">
     <div class="modal-header">
       <div>
         <h2>Add Family</h2>
-        <p>Create a new household with its parents/guardians and children. Full student details are filled in afterward in the Student Directory.</p>
+        <p>Create a new household with its parents/guardians and children. Full student details are filled in afterward in the Student Manager.</p>
       </div>
       <button class="modal-close" onclick="closeAdd()">&times;</button>
     </div>
@@ -229,10 +231,10 @@
 
       <div class="section-title">Students <button type="button" class="btn-add" onclick="addStudentRow()">＋ Add student</button></div>
       <div id="a-students"></div>
-      <p class="muted-note" style="margin-top:2px">Only for children who are <b>not</b> in the Student Directory yet. Each name here creates a brand new student record. For a child who is already enrolled, use the search box below instead.</p>
+      <p class="muted-note" style="margin-top:2px">Only for children who are <b>not</b> in the Student Manager yet. Each name here creates a brand new student record. For a child who is already enrolled, use the search box below instead.</p>
 
       <div style="margin-top:16px">
-        <label class="mini-label">Link a student who is already in the Student Directory</label>
+        <label class="mini-label">Link a student who is already in the Student Manager</label>
         <input type="text" id="a-attach-search" class="attach-input" placeholder="Search existing students by name…" oninput="attachSearch()" autocomplete="off">
         <div class="attach-results" id="a-attach-results"></div>
         <div id="a-attached"></div>
@@ -382,9 +384,9 @@
     html += '</div><div id="edit-new-parents"></div>';
 
     // Students — read-only context. Student details, incl. the per-student emergency
-    // contact, are edited in the Student Directory (kept on the student because
+    // contact, are edited in the Student Manager (kept on the student because
     // half-siblings in one family can have different emergency contacts).
-    html += '<div class="section-title">Students <span class="muted-note" style="text-transform:none;letter-spacing:0">edit in Student Directory</span></div>';
+    html += '<div class="section-title">Students <span class="muted-note" style="text-transform:none;letter-spacing:0">edit in Student Manager</span></div>';
     html += (h.students || []).map(s => {
       const statusPill = s.status === 'active'
         ? '<span class="pill pill-active">Active</span>'
@@ -395,7 +397,7 @@
       '</div>';
     }).join('');
     html += '<p class="muted-note" style="margin-top:4px">To edit a student’s details or emergency contact, open the ' +
-            '<a href="/students" target="_blank" style="color:var(--people);text-decoration:none">Student Directory</a>.</p>';
+            '<a href="/students" target="_blank" style="color:var(--people);text-decoration:none">Student Manager</a>.</p>';
 
     document.getElementById('m-body').innerHTML = html;
     document.getElementById('modal').classList.add('open');
@@ -677,7 +679,7 @@
       if (!first && !last) continue;
       const match = ROSTER.find(s => nk(s.first_name, s.last_name) === nk(first, last));
       if (!match) continue;
-      const ok = confirm(first + ' ' + last + ' is already in the Student Directory (' + gradeLabel(match.grade) + ', ' + (match.status || '') +
+      const ok = confirm(first + ' ' + last + ' is already in the Student Manager (' + gradeLabel(match.grade) + ', ' + (match.status || '') +
         ').\n\nClick OK to link the existing record to this family instead of creating a second copy.\nClick Cancel to go back and review.');
       if (!ok) return;
       attachedIds.add(match.student_id);
@@ -748,7 +750,7 @@
   }
 
   document.getElementById('search').addEventListener('input', render);
-  document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeModal(); closeAdd(); } });
+  // Escape no longer closes these either — same reason as the backdrop.
 
   fetch('/api/session').then(r => r.ok ? r.json() : null).then(s => { IS_SUPERADMIN = !!(s && s.is_superadmin); }).catch(() => {});
   load();
