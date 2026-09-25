@@ -1,5 +1,6 @@
 # Changelog
 
+2026-09-25: Family Manager's Edit screen can now link an existing student to a family and unlink one, instead of only at family creation.
 2026-09-24: Before & Aftercare has a new billing-only Care Caps tab - set a negotiated monthly cap on before care + aftercare combined for a family, effective from a start month (with an optional end month); the Billing Report shows the cap and the overage on the family block and takes it off the family's total.
 2026-09-24: Edit windows in the People section no longer close when you click outside them (or press Escape) - use Cancel or the X - so a stray click can't wipe what you typed; renamed the editable Student Directory page to "Student Manager" to end the clash with the read-only Reference page of the same name.
 2026-09-24: M Card page has a new Prepayments tab - staff record family prepayments, every student in that family draws the balance down before charges reach the monthly bill, the Billing Report shows the credit applied and what's left, and recording a snack charge warns staff when a family's balance is running low.

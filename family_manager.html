@@ -383,24 +383,103 @@
     }
     html += '</div><div id="edit-new-parents"></div>';
 
-    // Students — read-only context. Student details, incl. the per-student emergency
-    // contact, are edited in the Student Manager (kept on the student because
-    // half-siblings in one family can have different emergency contacts).
-    html += '<div class="section-title">Students <span class="muted-note" style="text-transform:none;letter-spacing:0">edit in Student Manager</span></div>';
-    html += (h.students || []).map(s => {
-      const statusPill = s.status === 'active'
-        ? '<span class="pill pill-active">Active</span>'
-        : '<span class="pill pill-inactive">' + esc(s.status || 'inactive') + '</span>';
-      return '<div class="card-edit" style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px">' +
-        '<span class="card-name">' + esc(fullName(s)) +
-          ' <span class="kid-grade">' + esc(gradeLabel(s.grade)) + '</span></span>' + statusPill +
+    // Students. Details (incl. emergency contact) are still edited in the Student Manager,
+    // but linking/unlinking a student to this family happens here (applied on Save).
+    html += '<div class="section-title">Students <span class="muted-note" style="text-transform:none;letter-spacing:0">details edited in Student Manager</span></div>';
+    html += '<div id="edit-students"></div>';
+    html += '<div style="margin-top:10px">' +
+      '<label class="mini-label">Link a student who is already in the Student Manager</label>' +
+      '<input type="text" id="e-link-search" class="attach-input" placeholder="Search students by name…" oninput="editLinkSearch()" autocomplete="off">' +
+      '<div class="attach-results" id="e-link-results"></div>' +
       '</div>';
-    }).join('');
-    html += '<p class="muted-note" style="margin-top:4px">To edit a student’s details or emergency contact, open the ' +
-            '<a href="/students" target="_blank" style="color:var(--people);text-decoration:none">Student Manager</a>.</p>';
+    html += '<p class="muted-note" style="margin-top:6px">Linking and unlinking take effect when you click Save Changes. Unlinking only removes the student from this family; the student record is not deleted. ' +
+            'To edit a student’s details or emergency contact, open the ' +
+            '<a href="/students" target="_blank" style="color:var(--people);text-decoration:none">Student Manager</a>. ' +
+            'To add a brand new child who is not in the system yet, add them in the Student Manager first, then link them here.</p>';
 
     document.getElementById('m-body').innerHTML = html;
+    editLinkIds.clear();
+    editUnlinkIds.clear();
+    renderEditStudents();
+    ensureRoster();
     document.getElementById('modal').classList.add('open');
+  }
+
+  // ── Link / unlink students on an existing family (pending until Save) ──
+  const editLinkIds = new Set();
+  const editUnlinkIds = new Set();
+
+  async function ensureRoster() {
+    if (rosterLoaded) return;
+    try { const r = await fetch('/api/students'); if (r.ok) { ROSTER = await r.json(); rosterLoaded = true; } } catch (e) {}
+  }
+
+  // Which families (other than this one) a student already belongs to.
+  function otherFamiliesOf(studentId) {
+    return FAMILIES.filter(f => f.household_id !== currentId && (f.students || []).some(x => x.student_id === studentId))
+                   .map(f => f.family_name);
+  }
+
+  function renderEditStudents() {
+    const h = findFamily(currentId);
+    const box = document.getElementById('edit-students');
+    if (!h || !box) return;
+    const pill = s => s.status === 'active'
+      ? '<span class="pill pill-active">Active</span>'
+      : '<span class="pill pill-inactive">' + esc(s.status || 'inactive') + '</span>';
+    const card = (s, tag, btn) =>
+      '<div class="card-edit" style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px' +
+        (tag === 'unlink' ? ';opacity:.55' : '') + '">' +
+        '<span class="card-name"' + (tag === 'unlink' ? ' style="text-decoration:line-through"' : '') + '>' + esc(fullName(s)) +
+          ' <span class="kid-grade">' + esc(gradeLabel(s.grade)) + '</span>' +
+          (tag === 'new' ? ' <span class="muted-note">(will be linked)</span>' : '') +
+          (tag === 'unlink' ? ' <span class="muted-note">(will be unlinked)</span>' : '') + '</span>' +
+        '<span style="display:flex;align-items:center;gap:10px">' + pill(s) + btn + '</span>' +
+      '</div>';
+    let out = (h.students || []).map(s => {
+      const pending = editUnlinkIds.has(s.student_id);
+      return card(s, pending ? 'unlink' : '',
+        '<button type="button" class="row-remove" onclick="toggleUnlink(' + s.student_id + ')">' + (pending ? 'Undo' : 'Unlink') + '</button>');
+    }).join('');
+    out += [...editLinkIds].map(id => {
+      const s = ROSTER.find(x => x.student_id === id) || { student_id: id };
+      return card(s, 'new', '<button type="button" class="row-remove" onclick="cancelLink(' + id + ')">Remove</button>');
+    }).join('');
+    box.innerHTML = out || '<p class="muted-note">No students linked yet.</p>';
+  }
+
+  function toggleUnlink(id) {
+    if (editUnlinkIds.has(id)) editUnlinkIds.delete(id); else editUnlinkIds.add(id);
+    renderEditStudents();
+  }
+  function cancelLink(id) { editLinkIds.delete(id); renderEditStudents(); }
+
+  async function editLinkSearch() {
+    await ensureRoster();
+    const h = findFamily(currentId) || {};
+    const onFamily = new Set((h.students || []).map(x => x.student_id));
+    const q = document.getElementById('e-link-search').value.trim().toLowerCase();
+    const box = document.getElementById('e-link-results');
+    if (!q) { box.innerHTML = ''; return; }
+    const matches = ROSTER
+      .filter(s => ((s.first_name || '') + ' ' + (s.last_name || '')).toLowerCase().includes(q))
+      .filter(s => !onFamily.has(s.student_id) && !editLinkIds.has(s.student_id))
+      .slice(0, 8);
+    box.innerHTML = matches.length
+      ? matches.map(s => {
+          const fams = otherFamiliesOf(s.student_id);
+          return '<div class="attach-item" onclick="editLinkStudent(' + s.student_id + ')">' + esc(fullName(s)) +
+            ' <span style="color:var(--muted)">(' + esc(gradeLabel(s.grade)) + ' · ' + esc(s.status || '') + ')' +
+            (fams.length ? ' · already in ' + esc(fams.join(', ')) : ' · no family yet') + '</span></div>';
+        }).join('')
+      : '<div class="attach-item" style="color:var(--muted);cursor:default">No matches</div>';
+  }
+
+  function editLinkStudent(id) {
+    editLinkIds.add(id);
+    document.getElementById('e-link-search').value = '';
+    document.getElementById('e-link-results').innerHTML = '';
+    renderEditStudents();
   }
 
   function field(label, id, value, extraClass) {
@@ -459,6 +538,12 @@
     const h = findFamily(currentId);
     if (!h) return;
     if (!val('f_family_name')) { toast('Family name cannot be empty.', true); return; }
+
+    const remaining = (h.students || []).filter(x => !editUnlinkIds.has(x.student_id)).length + editLinkIds.size;
+    if (remaining === 0) {
+      toast('A family needs at least one student. Link another student first, or delete the family.', true);
+      return;
+    }
 
     const btn = document.getElementById('saveBtn');
     btn.disabled = true;
@@ -525,6 +610,16 @@
         const lr = await postJSON('/api/households/' + currentId + '/parents', { parent_id: pid, role });
         if (!lr.ok) throw new Error('linking parent');
         role = 'secondary';
+      }
+
+      // Student links / unlinks.
+      for (const sid of editLinkIds) {
+        const r = await postJSON('/api/households/' + currentId + '/students', { student_id: sid, is_primary: true });
+        if (!r.ok) throw new Error('linking student');
+      }
+      for (const sid of editUnlinkIds) {
+        const r = await fetch('/api/households/' + currentId + '/students/' + sid, { method: 'DELETE' });
+        if (!r.ok) throw new Error('unlinking student');
       }
 
       toast('Saved ✓');
