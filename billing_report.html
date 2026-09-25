@@ -457,7 +457,7 @@
 
 
 <!-- ═══════════════════════════════════════════════════════ -->
-<!-- STUDENT DETAIL / DISPUTE LOOKUP                        -->
+<!-- FAMILY DETAIL / DISPUTE LOOKUP                         -->
 <!-- ═══════════════════════════════════════════════════════ -->
 <style>
   .divider {
@@ -479,6 +479,12 @@
   }
 
   .detail-section { padding: 0 32px 48px; max-width: 1100px; margin: 0 auto; }
+  tr.detail-kid td {
+    background: #f3f0eb; font-weight: 600; color: var(--navy);
+    font-size: 12px; padding: 8px 14px;
+  }
+  tr.detail-adj td { background: #f8f6f2; font-weight: 600; }
+  tr.detail-none td { color: var(--muted); font-style: italic; font-weight: 400; }
 
   .detail-controls {
     background: var(--white);
@@ -661,20 +667,20 @@
 <!-- Divider -->
 <div class="divider" style="padding-top:8px;" id="detailDivider">
   <div class="divider-line"></div>
-  <div class="divider-label">Student Detail / Dispute Lookup</div>
+  <div class="divider-label">Family Detail / Dispute Lookup</div>
   <div class="divider-line"></div>
 </div>
 
 <div class="detail-section" id="detailSection">
   <!-- Controls -->
   <div class="detail-controls">
-    <h3>Student Charge Detail</h3>
-    <p>Look up every charge for a single student by month — use this to resolve billing questions.</p>
+    <h3>Family Charge Detail</h3>
+    <p>Look up every charge for a family by month, child by child — use this to resolve billing questions.</p>
 
     <div class="ctrl-group">
-      <span class="ctrl-label">Student</span>
+      <span class="ctrl-label">Family</span>
       <div class="search-wrap">
-        <input type="text" id="studentSearch" placeholder="Type student name…" autocomplete="off"
+        <input type="text" id="studentSearch" placeholder="Family or student name…" autocomplete="off"
                oninput="onStudentSearch()" onblur="scheduleCloseList()">
         <div class="autocomplete-list" id="autocompleteList"></div>
       </div>
@@ -1177,9 +1183,9 @@
   // ═══════════════════════════════════════
   // STUDENT DETAIL
   // ═══════════════════════════════════════
-  let allStudents = [];
-  let selectedStudentId = null;
-  let selectedStudentName = '';
+  let detailFamilies = [];
+  let selectedFamilyId = null;
+  let selectedFamilyName = '';
   let lastDetailData = null;
 
   (function initDetail() {
@@ -1190,41 +1196,46 @@
     const dy = document.getElementById('detailYear');
     for(let y=now.getFullYear(); y>=now.getFullYear()-3; y--) { const o=new Option(y,y); if(y===now.getFullYear()) o.selected=true; dy.appendChild(o); }
 
-    fetch('/api/students?status=active')
+    fetch('/api/billing/families')
       .then(r=>r.json())
       .then(data => {
-        allStudents = (data.students||data||[]).map(s=>({
-          id: s.student_id,
-          name: `${s.last_name}, ${s.first_name}`,
-          grade: s.grade
+        detailFamilies = (data||[]).map(f=>({
+          id: f.household_id,
+          name: f.family_name || ('Household ' + f.household_id),
+          students: f.students || []
         })).sort((a,b)=>a.name.localeCompare(b.name));
       })
       .catch(()=>{});
   })();
 
+  // Matches on the family name OR any child's name, since staff know the kid.
   function onStudentSearch() {
     const q = document.getElementById('studentSearch').value.trim().toLowerCase();
-    selectedStudentId = null;
+    selectedFamilyId = null;
     document.getElementById('lookupBtn').disabled = true;
 
     const list = document.getElementById('autocompleteList');
     if(q.length < 1) { list.classList.remove('open'); return; }
 
-    const matches = allStudents.filter(s => s.name.toLowerCase().includes(q)).slice(0, 8);
+    const matches = detailFamilies.filter(f =>
+      f.name.toLowerCase().includes(q) ||
+      f.students.some(n => n.toLowerCase().includes(q))).slice(0, 8);
     if(!matches.length) { list.classList.remove('open'); return; }
 
-    list.innerHTML = matches.map(s =>
-      `<div class="autocomplete-item" onmousedown="selectStudent(${s.id},'${esc(s.name)}','${esc(s.grade)}')">
-        ${esc(s.name)}<span class="grade-tag">Gr ${esc(s.grade)}</span>
+    list.innerHTML = matches.map(f =>
+      `<div class="autocomplete-item" data-id="${f.id}" onmousedown="selectFamily(${f.id})">
+        ${esc(f.name)}<span class="grade-tag">${esc(f.students.join(', ') || 'no students linked')}</span>
       </div>`
     ).join('');
     list.classList.add('open');
   }
 
-  function selectStudent(id, name, grade) {
-    selectedStudentId = id;
-    selectedStudentName = name;
-    document.getElementById('studentSearch').value = name;
+  function selectFamily(id) {
+    const f = detailFamilies.find(x => x.id === id);
+    if(!f) return;
+    selectedFamilyId = id;
+    selectedFamilyName = f.name;
+    document.getElementById('studentSearch').value = f.name;
     document.getElementById('autocompleteList').classList.remove('open');
     document.getElementById('lookupBtn').disabled = false;
   }
@@ -1234,7 +1245,7 @@
   }
 
   async function runLookup() {
-    if(!selectedStudentId) return;
+    if(!selectedFamilyId) return;
     const month = document.getElementById('detailMonth').value;
     const year  = document.getElementById('detailYear').value;
 
@@ -1242,7 +1253,7 @@
     btn.textContent = 'Loading…'; btn.disabled = true;
 
     try {
-      const res  = await fetch(`/api/billing/student-detail?student_id=${selectedStudentId}&month=${month}&year=${year}`);
+      const res  = await fetch(`/api/billing/family-detail?household_id=${selectedFamilyId}&month=${month}&year=${year}`);
       if(!res.ok) throw new Error(`Server error ${res.status}`);
       const data = await res.json();
       if(data.error) throw new Error(data.error);
@@ -1257,62 +1268,110 @@
 
   function renderDetail(data, month, year) {
     const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
-    document.getElementById('detailStudentName').textContent = selectedStudentName;
-    document.getElementById('detailPeriod').textContent = `${months[month-1]} ${year}`;
+    document.getElementById('detailStudentName').textContent = data.family_name || selectedFamilyName;
+    const who = [data.contact, data.email].filter(Boolean).join(' · ');
+    document.getElementById('detailPeriod').textContent =
+      `${months[month-1]} ${year}${who ? ' · ' + who : ''}`;
     document.getElementById('detailResult').classList.add('show');
 
-    const rows = data.rows || [];
     const tbody = document.getElementById('detailTbody');
     const tfoot = document.getElementById('detailTfoot');
     tbody.innerHTML = '';
     tfoot.innerHTML = '';
 
-    if(!rows.length) {
-      tbody.innerHTML = '<tr><td colspan="5" class="detail-empty">No charges found for this student in this period.</td></tr>';
+    const kids = data.students || [];
+    const anyRows = kids.some(k => (k.rows || []).length);
+    if(!anyRows) {
+      tbody.innerHTML = '<tr><td colspan="5" class="detail-empty">No charges found for this family in this period.</td></tr>';
       document.getElementById('detailTotalBadge').textContent = '$0.00';
+      document.getElementById('detailExportBtn').style.display = 'none';
       return;
     }
 
-    let grandTotal = 0;
-    rows.forEach(r => {
-      grandTotal += r.amount||0;
-      const tr = document.createElement('tr');
-      tr.innerHTML = `
-        <td>${esc(r.date)}</td>
-        <td><span class="prog-chip chip-${esc(r.program_key)}">${esc(r.program_label)}</span></td>
-        <td>${esc(r.detail)}</td>
-        <td class="recorded-by">${esc(r.recorded_by||'—')}</td>
-        <td class="r">${r.prepaid ? '<span style="color:#2eaa6e;font-weight:600">Prepaid</span>' : '$'+(r.amount||0).toFixed(2)}</td>`;
-      tbody.appendChild(tr);
+    let lineCount = 0;
+    kids.forEach(k => {
+      const rows = k.rows || [];
+      const hdr = document.createElement('tr');
+      hdr.className = 'detail-kid';
+      hdr.innerHTML = `<td colspan="4">${esc(k.name)} <span style="font-weight:400;color:var(--muted)">· ${esc(k.grade)}</span></td>`
+                    + `<td class="r">$${(k.total||0).toFixed(2)}</td>`;
+      tbody.appendChild(hdr);
+
+      if(!rows.length) {
+        const tr = document.createElement('tr');
+        tr.className = 'detail-none';
+        tr.innerHTML = '<td colspan="5">No charges this month.</td>';
+        tbody.appendChild(tr);
+        return;
+      }
+      rows.forEach(r => {
+        lineCount++;
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${esc(r.date)}</td>
+          <td><span class="prog-chip chip-${esc(r.program_key)}">${esc(r.program_label)}</span></td>
+          <td>${esc(r.detail)}</td>
+          <td class="recorded-by">${esc(r.recorded_by||'—')}</td>
+          <td class="r">${r.prepaid ? '<span style="color:#2eaa6e;font-weight:600">Prepaid</span>' : '$'+(r.amount||0).toFixed(2)}</td>`;
+        tbody.appendChild(tr);
+      });
     });
 
+    // Family-level adjustments sit below the children, the way the invoice reads.
+    const cr = data.credit, cap = data.cap;
+    if(cr && cr.applied > 0) {
+      const tr = document.createElement('tr');
+      tr.className = 'detail-adj';
+      tr.innerHTML = `<td colspan="4">M Card prepaid credit applied <span style="font-weight:400;color:var(--muted)">· $${(cr.balance||0).toFixed(2)} left on account</span></td>`
+                   + `<td class="r">&minus;$${cr.applied.toFixed(2)}</td>`;
+      tbody.appendChild(tr);
+    }
+    if(cap && cap.over > 0) {
+      const tr = document.createElement('tr');
+      tr.className = 'detail-adj';
+      tr.innerHTML = `<td colspan="4">Before/aftercare cap <span style="font-weight:400;color:var(--muted)">· $${cap.cap.toFixed(2)} cap on $${cap.care_total.toFixed(2)} of care</span></td>`
+                   + `<td class="r">&minus;$${cap.over.toFixed(2)}</td>`;
+      tbody.appendChild(tr);
+    }
+
+    const due = data.total_due != null ? data.total_due : (data.gross || 0);
     tfoot.innerHTML = `<tr>
-      <td colspan="4">Total — ${rows.length} charge${rows.length!==1?'s':''}</td>
-      <td class="r">$${grandTotal.toFixed(2)}</td>
+      <td colspan="4">Family total — ${kids.length} student${kids.length!==1?'s':''}, ${lineCount} charge${lineCount!==1?'s':''}</td>
+      <td class="r">$${due.toFixed(2)}</td>
     </tr>`;
 
-    document.getElementById('detailTotalBadge').textContent = '$' + grandTotal.toFixed(2);
-    document.getElementById('detailExportBtn').style.display = rows.length ? 'flex' : 'none';
+    document.getElementById('detailTotalBadge').textContent = '$' + due.toFixed(2);
+    document.getElementById('detailExportBtn').style.display = 'flex';
   }
 
   function exportDetailCSV() {
-    if(!lastDetailData || !lastDetailData.rows) return;
+    if(!lastDetailData || !lastDetailData.students) return;
     const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
     const m = document.getElementById('detailMonth').value;
     const y = document.getElementById('detailYear').value;
     const label = `${months[m-1]}_${y}`;
-    const safeName = selectedStudentName.replace(/,\s*/,'_').replace(/\s+/g,'_');
+    const safeName = String(lastDetailData.family_name || selectedFamilyName).replace(/[^A-Za-z0-9]+/g,'_');
 
-    const rows = [['Date','Program','Detail','Recorded By','Amount']];
-    lastDetailData.rows.forEach(r => {
-      rows.push([r.date, r.program_label, r.detail, r.recorded_by||'—', (r.amount||0).toFixed(2)]);
+    const rows = [['Student','Date','Program','Detail','Recorded By','Amount']];
+    (lastDetailData.students || []).forEach(k => {
+      (k.rows || []).forEach(r => {
+        rows.push([k.name, r.date, r.program_label, r.detail, r.recorded_by||'—', (r.amount||0).toFixed(2)]);
+      });
+      rows.push([k.name,'','','','Student subtotal',(k.total||0).toFixed(2)]);
     });
-    rows.push(['','','','Total', lastDetailData.total.toFixed(2)]);
+    const cr = lastDetailData.credit, cap = lastDetailData.cap;
+    if(cr && cr.applied > 0) {
+      rows.push(['','','','M Card prepaid credit applied',`balance left ${(cr.balance||0).toFixed(2)}`,(-cr.applied).toFixed(2)]);
+    }
+    if(cap && cap.over > 0) {
+      rows.push(['','','','Before/aftercare cap adjustment',`cap ${cap.cap.toFixed(2)} on ${cap.care_total.toFixed(2)}`,(-cap.over).toFixed(2)]);
+    }
+    rows.push(['','','','','FAMILY TOTAL DUE',(lastDetailData.total_due||0).toFixed(2)]);
 
     const csv = rows.map(r => r.map(c => `"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n');
     const a = document.createElement('a');
     a.href = URL.createObjectURL(new Blob([csv], {type:'text/csv'}));
-    a.download = `Mizzentop_Detail_${safeName}_${label}.csv`;
+    a.download = `Mizzentop_FamilyDetail_${safeName}_${label}.csv`;
     a.click();
   }
 

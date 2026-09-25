@@ -5611,12 +5611,220 @@ def api_billing_report():
         return jsonify({"error": str(e)}), 500
 
 
+def _student_charge_rows(cur, student_id, year, month, first_day, last_day):
+    """Every billable line for one student in one month, oldest first.
+
+    Shared by the single-student lookup and the family lookup so both always
+    show the same numbers.
+    """
+    import math
+
+    # Rates for this month
+    cur.execute("""
+        SELECT DISTINCT ON (rate_key) rate_key, rate_value
+        FROM   billing_rates
+        WHERE  effective_from::date <= %s
+        ORDER  BY rate_key, effective_from::date DESC
+    """, (first_day,))
+    rates = {r["rate_key"]: float(r["rate_value"]) for r in cur.fetchall()}
+    defaults = {
+        "mcard_snack": 1.50, "beforecare_session": 5.00,
+        "aftercare_hourly": 15.00, "og_session": 30.00,
+        "homework_hourly": 15.00, "tutoring_session": 30.00,
+    }
+    for k, v in defaults.items():
+        rates.setdefault(k, v)
+
+    rows = []
+
+    # 1. M Card charges
+    cur.execute("""
+        SELECT charge_date, quantity, recorded_at,
+               COALESCE(prepaid, FALSE) AS prepaid
+        FROM   mcard_charges
+        WHERE  student_id = %s
+          AND  charge_date::date >= %s AND charge_date::date <= %s
+        ORDER  BY charge_date, recorded_at
+    """, (student_id, first_day, last_day))
+    for r in cur.fetchall():
+        qty = int(r["quantity"])
+        is_pre = bool(r.get("prepaid"))
+        rows.append({
+            "date": str(r["charge_date"]), "program_key": "mcard",
+            "program_label": "M Card Snack",
+            "detail": f"{qty} snack{'s' if qty != 1 else ''}" + (" · Prepaid" if is_pre else ""),
+            "recorded_by": "—",
+            "amount": 0.0 if is_pre else round(qty * rates["mcard_snack"], 2),
+            "prepaid": is_pre,
+        })
+
+    # 2. Program attendance
+    cur.execute("""
+        SELECT session_date, program_type, units, teacher, duration_minutes, recorded_by
+        FROM   program_attendance
+        WHERE  student_id = %s
+          AND  session_date::date >= %s AND session_date::date <= %s
+        ORDER  BY session_date, program_type
+    """, (student_id, first_day, last_day))
+    prog_labels = {
+        "og":         ("OG Tutoring",    "og",         "og_session",         "session"),
+        "homework":   ("Homework Center","homework",   "homework_hourly",     "hr"),
+        "tutoring":   ("1-on-1 Tutoring","tutoring",   "tutoring_session",   "session"),
+        "beforecare": ("Before Care",    "beforecare", "beforecare_session",  "session"),
+    }
+    for r in cur.fetchall():
+        pt    = r["program_type"]
+        units = float(r["units"])
+        label, key, rate_key, unit_word = prog_labels.get(
+            pt, (pt.replace("_"," ").title(), pt, "og_session", "unit"))
+        if pt == "tutoring":
+            dm = int(r.get("duration_minutes") or 60)
+            weight = dm / 60.0
+            amount = weight * rates[rate_key]
+            dur_str = "1 hr" if dm == 60 else f"{dm} min"
+            detail = f"{dur_str} session"
+        else:
+            amount = units * rates[rate_key]
+            detail = f"{units:g} {unit_word}{'s' if units != 1 else ''}"
+        if r.get("teacher"):
+            detail += f" · Teacher: {r['teacher']}"
+        rows.append({
+            "date": str(r["session_date"]), "program_key": key,
+            "program_label": label, "detail": detail,
+            "recorded_by": r.get("recorded_by") or "—",
+            "amount": round(amount, 2),
+        })
+
+    # 3. Aftercare
+    cur.execute("""
+        SELECT session_date, checkin_time, pickup_time, recorded_by
+        FROM   aftercare_attendance
+        WHERE  student_id = %s
+          AND  session_date::date >= %s AND session_date::date <= %s
+          AND  pickup_time IS NOT NULL
+        ORDER  BY session_date
+    """, (student_id, first_day, last_day))
+
+    def ac_hours(checkin_str, pickup_str):
+        try:
+            start_min = parse_time_to_minutes(checkin_str) if checkin_str else 16 * 60 + 30
+            end_min   = parse_time_to_minutes(pickup_str)
+            elapsed   = max(0, end_min - start_min)
+            return 1.0 if elapsed <= 60 else 1.0 + math.ceil((elapsed-60)/15)*15/60.0
+        except Exception:
+            return 0.0
+
+    for r in cur.fetchall():
+        hrs    = ac_hours(r.get("checkin_time"), r["pickup_time"])
+        amount = hrs * rates["aftercare_hourly"]
+        checkin = r.get("checkin_time") or "4:30 PM"
+        pickup  = r.get("pickup_time")  or "—"
+        rows.append({
+            "date": str(r["session_date"]), "program_key": "aftercare",
+            "program_label": "Aftercare",
+            "detail": f"In: {checkin} · Out: {pickup} ({hrs:g} hr{'s' if hrs!=1 else ''})",
+            "recorded_by": r.get("recorded_by") or "—",
+            "amount": round(amount, 2),
+        })
+
+    # 4. School Store purchases
+    cur.execute("""
+        SELECT sp.purchase_date, si.name AS item_name, sp.color, sp.size,
+               sp.quantity, sp.unit_price, sp.recorded_by,
+               COALESCE(sp.prepaid, FALSE) AS prepaid
+        FROM   store_purchases sp
+        JOIN   store_items si ON sp.item_id = si.item_id
+        WHERE  sp.student_id = %s
+          AND  sp.purchase_date::date >= %s AND sp.purchase_date::date <= %s
+        ORDER  BY sp.purchase_date
+    """, (student_id, first_day, last_day))
+    for r in cur.fetchall():
+        qty = int(r["quantity"])
+        price = float(r["unit_price"])
+        parts = [r["item_name"]]
+        if r.get("color"):
+            parts.append(r["color"])
+        if r.get("size"):
+            parts.append(r["size"])
+        detail = f"{qty}x {' / '.join(parts)} @ ${price:.2f}"
+        is_pre = bool(r.get("prepaid"))
+        if is_pre:
+            detail += " · Prepaid"
+        rows.append({
+            "date": str(r["purchase_date"]), "program_key": "store",
+            "program_label": "School Store",
+            "detail": detail,
+            "recorded_by": r.get("recorded_by") or "—",
+            "amount": 0.0 if is_pre else round(qty * price, 2),
+            "prepaid": is_pre,
+        })
+
+    # 5. Lunch — single monthly line item (status + pizza), same math as report
+    lunch_mk          = f"{year}-{month:02d}"
+    lunch_school_year = _lunch_school_year_for(year, month)
+    lunch_rates       = _lunch_rates(cur, first_day)
+    lunch_dc          = _lunch_day_counts(cur, [lunch_mk]).get(lunch_mk, {"ec": 0, "g18": 0})
+    cur.execute("""
+        SELECT student_id, grade
+        FROM   students
+        WHERE  student_id = %s
+    """, (student_id,))
+    _sr = cur.fetchone()
+    cur.execute("""
+        SELECT months, grade_at_time_of_record
+        FROM   lunch_enrollment
+        WHERE  student_id = %s AND school_year = %s
+    """, (student_id, lunch_school_year))
+    _le = cur.fetchone()
+    if _le:
+        grade_used = (_le.get("grade_at_time_of_record") or "").strip() or (
+            (_sr or {}).get("grade") or "")
+        lunch_cell = (_le.get("months") or {}).get(lunch_mk) or {}
+        status     = lunch_cell.get("status", "home")
+        pizza_ct   = int(lunch_cell.get("pizzaCount", 0) or 0)
+        pizza_pre  = bool(lunch_cell.get("pizzaPrepaid"))
+        lunch_pre  = status == "monthlyPrepaid"
+        l_days, l_rate, l_status_charge, l_pizza_charge = _lunch_month_charge(
+            grade_used, status, pizza_ct, lunch_dc, lunch_rates)
+        # Billed and prepaid parts are listed separately so a prepaid
+        # month still shows up in a dispute lookup, marked Prepaid.
+        billed_bits, pre_bits = [], []
+        if l_status_charge:
+            txt = f"Monthly · {l_days} lunch day{'s' if l_days != 1 else ''} @ ${l_rate:.2f}"
+            (pre_bits if lunch_pre else billed_bits).append(txt)
+        if l_pizza_charge:
+            txt = f"{pizza_ct} pizza @ ${l_rate:.2f}"
+            (pre_bits if pizza_pre else billed_bits).append(txt)
+        billed_amt = round((0.0 if lunch_pre else l_status_charge)
+                           + (0.0 if pizza_pre else l_pizza_charge), 2)
+        if billed_bits:
+            rows.append({
+                "date": str(first_day), "program_key": "lunch",
+                "program_label": "Lunch",
+                "detail": " · ".join(billed_bits),
+                "recorded_by": "—",
+                "amount": billed_amt,
+            })
+        if pre_bits:
+            rows.append({
+                "date": str(first_day), "program_key": "lunch",
+                "program_label": "Lunch",
+                "detail": " · ".join(pre_bits) + " · Prepaid",
+                "recorded_by": "—",
+                "amount": 0.0,
+                "prepaid": True,
+            })
+
+    rows.sort(key=lambda x: x['date'])
+    return rows
+
+
+
 @app.route("/api/billing/student-detail")
 @login_required
 def api_billing_student_detail():
     """Day-by-day charge breakdown for a single student in a given month."""
     import calendar as cal_mod
-    import math
     from datetime import date as dt_date
 
     try:
@@ -5632,207 +5840,10 @@ def api_billing_student_detail():
         conn = get_db_connection()
         try:
             with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
-
-                # Rates for this month
-                cur.execute("""
-                    SELECT DISTINCT ON (rate_key) rate_key, rate_value
-                    FROM   billing_rates
-                    WHERE  effective_from::date <= %s
-                    ORDER  BY rate_key, effective_from::date DESC
-                """, (first_day,))
-                rates = {r["rate_key"]: float(r["rate_value"]) for r in cur.fetchall()}
-                defaults = {
-                    "mcard_snack": 1.50, "beforecare_session": 5.00,
-                    "aftercare_hourly": 15.00, "og_session": 30.00,
-                    "homework_hourly": 15.00, "tutoring_session": 30.00,
-                }
-                for k, v in defaults.items():
-                    rates.setdefault(k, v)
-
-                rows = []
-
-                # 1. M Card charges
-                cur.execute("""
-                    SELECT charge_date, quantity, recorded_at,
-                           COALESCE(prepaid, FALSE) AS prepaid
-                    FROM   mcard_charges
-                    WHERE  student_id = %s
-                      AND  charge_date::date >= %s AND charge_date::date <= %s
-                    ORDER  BY charge_date, recorded_at
-                """, (student_id, first_day, last_day))
-                for r in cur.fetchall():
-                    qty = int(r["quantity"])
-                    is_pre = bool(r.get("prepaid"))
-                    rows.append({
-                        "date": str(r["charge_date"]), "program_key": "mcard",
-                        "program_label": "M Card Snack",
-                        "detail": f"{qty} snack{'s' if qty != 1 else ''}" + (" · Prepaid" if is_pre else ""),
-                        "recorded_by": "—",
-                        "amount": 0.0 if is_pre else round(qty * rates["mcard_snack"], 2),
-                        "prepaid": is_pre,
-                    })
-
-                # 2. Program attendance
-                cur.execute("""
-                    SELECT session_date, program_type, units, teacher, duration_minutes, recorded_by
-                    FROM   program_attendance
-                    WHERE  student_id = %s
-                      AND  session_date::date >= %s AND session_date::date <= %s
-                    ORDER  BY session_date, program_type
-                """, (student_id, first_day, last_day))
-                prog_labels = {
-                    "og":         ("OG Tutoring",    "og",         "og_session",         "session"),
-                    "homework":   ("Homework Center","homework",   "homework_hourly",     "hr"),
-                    "tutoring":   ("1-on-1 Tutoring","tutoring",   "tutoring_session",   "session"),
-                    "beforecare": ("Before Care",    "beforecare", "beforecare_session",  "session"),
-                }
-                for r in cur.fetchall():
-                    pt    = r["program_type"]
-                    units = float(r["units"])
-                    label, key, rate_key, unit_word = prog_labels.get(
-                        pt, (pt.replace("_"," ").title(), pt, "og_session", "unit"))
-                    if pt == "tutoring":
-                        dm = int(r.get("duration_minutes") or 60)
-                        weight = dm / 60.0
-                        amount = weight * rates[rate_key]
-                        dur_str = "1 hr" if dm == 60 else f"{dm} min"
-                        detail = f"{dur_str} session"
-                    else:
-                        amount = units * rates[rate_key]
-                        detail = f"{units:g} {unit_word}{'s' if units != 1 else ''}"
-                    if r.get("teacher"):
-                        detail += f" · Teacher: {r['teacher']}"
-                    rows.append({
-                        "date": str(r["session_date"]), "program_key": key,
-                        "program_label": label, "detail": detail,
-                        "recorded_by": r.get("recorded_by") or "—",
-                        "amount": round(amount, 2),
-                    })
-
-                # 3. Aftercare
-                cur.execute("""
-                    SELECT session_date, checkin_time, pickup_time, recorded_by
-                    FROM   aftercare_attendance
-                    WHERE  student_id = %s
-                      AND  session_date::date >= %s AND session_date::date <= %s
-                      AND  pickup_time IS NOT NULL
-                    ORDER  BY session_date
-                """, (student_id, first_day, last_day))
-
-                def ac_hours(checkin_str, pickup_str):
-                    try:
-                        start_min = parse_time_to_minutes(checkin_str) if checkin_str else 16 * 60 + 30
-                        end_min   = parse_time_to_minutes(pickup_str)
-                        elapsed   = max(0, end_min - start_min)
-                        return 1.0 if elapsed <= 60 else 1.0 + math.ceil((elapsed-60)/15)*15/60.0
-                    except Exception:
-                        return 0.0
-
-                for r in cur.fetchall():
-                    hrs    = ac_hours(r.get("checkin_time"), r["pickup_time"])
-                    amount = hrs * rates["aftercare_hourly"]
-                    checkin = r.get("checkin_time") or "4:30 PM"
-                    pickup  = r.get("pickup_time")  or "—"
-                    rows.append({
-                        "date": str(r["session_date"]), "program_key": "aftercare",
-                        "program_label": "Aftercare",
-                        "detail": f"In: {checkin} · Out: {pickup} ({hrs:g} hr{'s' if hrs!=1 else ''})",
-                        "recorded_by": r.get("recorded_by") or "—",
-                        "amount": round(amount, 2),
-                    })
-
-                # 4. School Store purchases
-                cur.execute("""
-                    SELECT sp.purchase_date, si.name AS item_name, sp.color, sp.size,
-                           sp.quantity, sp.unit_price, sp.recorded_by,
-                           COALESCE(sp.prepaid, FALSE) AS prepaid
-                    FROM   store_purchases sp
-                    JOIN   store_items si ON sp.item_id = si.item_id
-                    WHERE  sp.student_id = %s
-                      AND  sp.purchase_date::date >= %s AND sp.purchase_date::date <= %s
-                    ORDER  BY sp.purchase_date
-                """, (student_id, first_day, last_day))
-                for r in cur.fetchall():
-                    qty = int(r["quantity"])
-                    price = float(r["unit_price"])
-                    parts = [r["item_name"]]
-                    if r.get("color"):
-                        parts.append(r["color"])
-                    if r.get("size"):
-                        parts.append(r["size"])
-                    detail = f"{qty}x {' / '.join(parts)} @ ${price:.2f}"
-                    is_pre = bool(r.get("prepaid"))
-                    if is_pre:
-                        detail += " · Prepaid"
-                    rows.append({
-                        "date": str(r["purchase_date"]), "program_key": "store",
-                        "program_label": "School Store",
-                        "detail": detail,
-                        "recorded_by": r.get("recorded_by") or "—",
-                        "amount": 0.0 if is_pre else round(qty * price, 2),
-                        "prepaid": is_pre,
-                    })
-
-                # 5. Lunch — single monthly line item (status + pizza), same math as report
-                lunch_mk          = f"{year}-{month:02d}"
-                lunch_school_year = _lunch_school_year_for(year, month)
-                lunch_rates       = _lunch_rates(cur, first_day)
-                lunch_dc          = _lunch_day_counts(cur, [lunch_mk]).get(lunch_mk, {"ec": 0, "g18": 0})
-                cur.execute("""
-                    SELECT student_id, grade
-                    FROM   students
-                    WHERE  student_id = %s
-                """, (student_id,))
-                _sr = cur.fetchone()
-                cur.execute("""
-                    SELECT months, grade_at_time_of_record
-                    FROM   lunch_enrollment
-                    WHERE  student_id = %s AND school_year = %s
-                """, (student_id, lunch_school_year))
-                _le = cur.fetchone()
-                if _le:
-                    grade_used = (_le.get("grade_at_time_of_record") or "").strip() or (
-                        (_sr or {}).get("grade") or "")
-                    lunch_cell = (_le.get("months") or {}).get(lunch_mk) or {}
-                    status     = lunch_cell.get("status", "home")
-                    pizza_ct   = int(lunch_cell.get("pizzaCount", 0) or 0)
-                    pizza_pre  = bool(lunch_cell.get("pizzaPrepaid"))
-                    lunch_pre  = status == "monthlyPrepaid"
-                    l_days, l_rate, l_status_charge, l_pizza_charge = _lunch_month_charge(
-                        grade_used, status, pizza_ct, lunch_dc, lunch_rates)
-                    # Billed and prepaid parts are listed separately so a prepaid
-                    # month still shows up in a dispute lookup, marked Prepaid.
-                    billed_bits, pre_bits = [], []
-                    if l_status_charge:
-                        txt = f"Monthly · {l_days} lunch day{'s' if l_days != 1 else ''} @ ${l_rate:.2f}"
-                        (pre_bits if lunch_pre else billed_bits).append(txt)
-                    if l_pizza_charge:
-                        txt = f"{pizza_ct} pizza @ ${l_rate:.2f}"
-                        (pre_bits if pizza_pre else billed_bits).append(txt)
-                    billed_amt = round((0.0 if lunch_pre else l_status_charge)
-                                       + (0.0 if pizza_pre else l_pizza_charge), 2)
-                    if billed_bits:
-                        rows.append({
-                            "date": str(first_day), "program_key": "lunch",
-                            "program_label": "Lunch",
-                            "detail": " · ".join(billed_bits),
-                            "recorded_by": "—",
-                            "amount": billed_amt,
-                        })
-                    if pre_bits:
-                        rows.append({
-                            "date": str(first_day), "program_key": "lunch",
-                            "program_label": "Lunch",
-                            "detail": " · ".join(pre_bits) + " · Prepaid",
-                            "recorded_by": "—",
-                            "amount": 0.0,
-                            "prepaid": True,
-                        })
-
+                rows = _student_charge_rows(cur, student_id, year, month, first_day, last_day)
         finally:
             conn.close()
 
-        rows.sort(key=lambda x: x["date"])
         return jsonify({
             "student_id": student_id, "month": month, "year": year,
             "rows": rows, "total": round(sum(r["amount"] for r in rows), 2),
@@ -5842,6 +5853,116 @@ def api_billing_student_detail():
         import traceback
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/billing/families")
+@login_required
+def api_billing_families():
+    """Families and their students, for the charge-detail family picker."""
+    conn = get_db_connection()
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute("SELECT household_id, family_name FROM households ORDER BY family_name")
+            households = cur.fetchall()
+            hh_of = _primary_household_map(cur)
+            cur.execute("""
+                SELECT student_id, first_name, last_name
+                FROM   students
+                WHERE  status IN ('active', 'guest')
+                ORDER  BY last_name, first_name
+            """)
+            kids = {}
+            for s in cur.fetchall():
+                hh = hh_of.get(s["student_id"])
+                if hh is not None:
+                    kids.setdefault(hh, []).append(f"{s['first_name']} {s['last_name']}")
+        return jsonify([{ "household_id": h["household_id"],
+                          "family_name": h["family_name"],
+                          "students": kids.get(h["household_id"], []) } for h in households])
+    finally:
+        conn.close()
+
+
+@app.route("/api/billing/family-detail")
+@login_required
+def api_billing_family_detail():
+    """Every charge for every child in one family for a month, plus that family's
+    M Card prepaid credit and any before/aftercare cap — the invoice as the
+    bookkeeper sends it."""
+    import calendar as cal_mod
+    from datetime import date as dt_date
+
+    try:
+        household_id = int(request.args.get("household_id", 0))
+        month = int(request.args.get("month", 0))
+        year  = int(request.args.get("year",  0))
+        if not household_id or not (1 <= month <= 12) or year < 2020:
+            return jsonify({"error": "Invalid parameters"}), 400
+
+        first_day = dt_date(year, month, 1)
+        last_day  = dt_date(year, month, cal_mod.monthrange(year, month)[1])
+        mk = f"{year}-{month:02d}"
+
+        conn = get_db_connection()
+        try:
+            with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+                cur.execute("SELECT family_name FROM households WHERE household_id=%s", (household_id,))
+                hh = cur.fetchone()
+                if not hh:
+                    return jsonify({"error": "Family not found"}), 404
+                contact = _household_contacts(cur).get(household_id, {})
+                hh_of   = _primary_household_map(cur)
+                sids    = [sid for sid, h in hh_of.items() if h == household_id]
+
+                students = []
+                if sids:
+                    cur.execute("""
+                        SELECT student_id, first_name, last_name, grade, status
+                        FROM   students
+                        WHERE  student_id = ANY(%s)
+                        ORDER  BY last_name, first_name
+                    """, (sids,))
+                    roster = cur.fetchall()
+                    for s in roster:
+                        rows = _student_charge_rows(cur, s["student_id"], year, month,
+                                                    first_day, last_day)
+                        students.append({
+                            "student_id": s["student_id"],
+                            "name": f"{s['last_name']}, {s['first_name']}",
+                            "grade": "Guest" if s.get("status") == "guest" else str(s["grade"]),
+                            "rows": rows,
+                            "total": round(sum(r["amount"] for r in rows), 2),
+                        })
+
+                credit = _mcard_credit_state(cur, mk).get(household_id)
+                cap    = _care_caps_for_month(cur, mk).get(household_id)
+        finally:
+            conn.close()
+
+        gross = round(sum(s["total"] for s in students), 2)
+        credit_applied = round(credit["applied"], 2) if credit else 0.0
+        care_total = round(sum(r["amount"] for s in students for r in s["rows"]
+                               if r["program_key"] in ("beforecare", "aftercare")), 2)
+        cap_over = round(max(0.0, care_total - cap), 2) if cap is not None else 0.0
+
+        return jsonify({
+            "household_id": household_id,
+            "family_name": hh["family_name"],
+            "contact": contact.get("contact", ""),
+            "email": contact.get("email", ""),
+            "month": month, "year": year,
+            "students": students,
+            "gross": gross,
+            "credit": ({"applied": credit_applied, "balance": credit["balance"]} if credit else None),
+            "cap": ({"cap": cap, "care_total": care_total, "over": cap_over} if cap is not None else None),
+            "total_due": round(max(0.0, gross - credit_applied - cap_over), 2),
+        })
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
+
 
 
 # ============================================
