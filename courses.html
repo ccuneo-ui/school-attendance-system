@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Courses — Mizzentop Day School</title>
+<link rel="icon" type="image/svg+xml" href="/logo.svg">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet"/>
+<style>
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+  :root{--navy:#1a2744;--green:#2d5016;--gold:#c8992a;--cream:#f7f3ec;--muted:#6b7280;--light:#e8e2d9;--danger:#9b1c1c;}
+  html,body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--navy);min-height:100%;}
+  .topnav{background:var(--navy);display:flex;align-items:center;gap:16px;padding:0 28px;height:56px;}
+  .topnav .title{color:#fff;font-size:14px;font-weight:500;}
+  .topnav a.home{margin-left:auto;color:rgba(255,255,255,0.85);text-decoration:none;font-size:13px;font-weight:500;border:1px solid rgba(255,255,255,0.25);padding:7px 14px;border-radius:8px;}
+  .page{max-width:980px;margin:0 auto;padding:36px 24px 80px;}
+  h1{font-family:'Playfair Display',serif;font-size:30px;margin-bottom:4px;}
+  .sub{color:var(--muted);font-size:14px;margin-bottom:22px;line-height:1.5;}
+  .sub a{color:var(--navy);font-weight:500;}
+  .card{background:#fff;border:1px solid var(--light);border-radius:12px;padding:18px 20px;margin-bottom:22px;}
+  .card h2{font-size:15px;font-weight:500;margin-bottom:12px;}
+  .grid{display:grid;grid-template-columns:2fr 1.3fr 1fr 1fr;gap:12px;align-items:end;}
+  label.fld{display:block;font-size:11px;font-weight:500;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);margin-bottom:5px;}
+  input[type=text],select{width:100%;padding:9px 12px;border:1px solid var(--light);border-radius:8px;font-size:14px;font-family:inherit;background:#fff;color:var(--navy);outline:none;}
+  input[type=text]:focus,select:focus{border-color:var(--navy);}
+  .gradeboxes{display:flex;flex-wrap:wrap;gap:6px;margin-top:4px;}
+  .gradeboxes label{display:inline-flex;align-items:center;gap:4px;font-size:13px;border:1px solid var(--light);border-radius:14px;padding:3px 10px;cursor:pointer;background:#fff;}
+  .gradeboxes input{accent-color:var(--navy);}
+  .row2{display:flex;gap:18px;align-items:center;margin-top:12px;flex-wrap:wrap;}
+  .chk{display:inline-flex;align-items:center;gap:6px;font-size:13px;}
+  .btn{display:inline-flex;align-items:center;gap:6px;padding:9px 16px;border-radius:8px;font-size:13px;font-weight:500;font-family:inherit;cursor:pointer;border:none;}
+  .btn-primary{background:var(--navy);color:#fff;}
+  .btn-ghost{background:transparent;color:var(--muted);border:1px solid var(--light);}
+  .btn-sm{padding:5px 11px;font-size:12px;}
+  .actions{margin-left:auto;display:flex;gap:8px;}
+  .table-wrap{background:#fff;border:1px solid var(--light);border-radius:12px;overflow:hidden;}
+  table{width:100%;border-collapse:collapse;}
+  th{background:#f9f7f4;text-align:left;padding:10px 14px;font-size:11px;font-weight:500;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--light);}
+  td{padding:10px 14px;font-size:14px;border-bottom:1px solid #f3f0eb;vertical-align:middle;}
+  tr.area td{background:#fbf9f5;font-size:12px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);}
+  tr.inactive td{color:var(--muted);}
+  .name-cell{font-weight:500;}
+  .muted{color:var(--muted);font-size:12px;}
+  .pill{display:inline-block;font-size:11px;font-weight:600;padding:2px 9px;border-radius:12px;}
+  .pill-on{background:rgba(45,80,22,.12);color:var(--green);}
+  .pill-off{background:#eee;color:var(--muted);}
+  .empty{text-align:center;color:var(--muted);padding:40px;}
+  .toolbar{display:flex;gap:10px;align-items:center;margin-bottom:12px;}
+  .toolbar select{width:auto;}
+  .toast{position:fixed;bottom:24px;right:24px;background:var(--navy);color:#fff;padding:12px 20px;border-radius:10px;font-size:13px;font-weight:500;transform:translateY(80px);opacity:0;transition:all .3s;pointer-events:none;}
+  .toast.show{transform:translateY(0);opacity:1;}
+  .toast.error{background:var(--danger);}
+  @media(max-width:720px){.grid{grid-template-columns:1fr;}}
+</style>
+</head>
+<body>
+<nav class="topnav"><span class="title">Courses</span><a class="home" href="/">← Home</a></nav>
+<div class="page">
+  <h1>Courses</h1>
+  <div class="sub">The courses the school offers, e.g. <i>Pre-Algebra</i>, <i>Earth Science</i>, <i>Spanish 1B</i>. Link each class to its course on the <a href="/classes">Classes</a> page. A student's courses are the classes they're enrolled in, and those course names are what print on their report cards and progress reports. The subject area decides where the course sits on the card (e.g. a Math course fills the Math row).</div>
+
+  <div class="card">
+    <h2 id="formTitle">Add a course</h2>
+    <div class="grid">
+      <div><label class="fld">Course name</label><input type="text" id="f-name" placeholder="e.g. Pre-Algebra"></div>
+      <div><label class="fld">Subject area</label><select id="f-area"></select></div>
+      <div><label class="fld">Level (optional)</label><input type="text" id="f-level" placeholder="e.g. Honors, Level 2"></div>
+      <div><label class="fld">Sort order</label><input type="text" id="f-sort" placeholder="0"></div>
+    </div>
+    <div style="margin-top:12px;"><label class="fld">Grades</label><div class="gradeboxes" id="f-grades"></div></div>
+    <div class="row2">
+      <label class="chk"><input type="checkbox" id="f-card" checked> Shows on report cards &amp; progress reports</label>
+      <div class="actions">
+        <button class="btn btn-ghost" id="f-cancel" style="display:none" onclick="resetForm()">Cancel</button>
+        <button class="btn btn-primary" id="f-save" onclick="save()">Add Course</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toolbar">
+    <label class="fld" style="margin:0">Show grade</label>
+    <select id="gradeFilter" onchange="render()"></select>
+    <label class="chk" style="margin-left:10px"><input type="checkbox" id="showInactive" onchange="render()"> Show inactive</label>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Course</th><th>Grades</th><th>This year</th><th>On card</th><th>Status</th><th style="text-align:right;">Actions</th></tr></thead>
+      <tbody id="rows"><tr><td colspan="6" class="empty">Loading…</td></tr></tbody>
+    </table>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+<script>
+  const GRADES=['JPK','SPK','K','1','2','3','4','5','6','7','8'];
+  function toast(m,e){const t=document.getElementById('toast');t.textContent=m;t.className='toast show'+(e?' error':'');clearTimeout(toast._t);toast._t=setTimeout(()=>t.className='toast',2400);}
+  async function api(path,opts){const r=await fetch(path,opts);const d=await r.json().catch(()=>({}));if(!r.ok||d.error)throw new Error(d.error||('HTTP '+r.status));return d;}
+  function esc(s){const d=document.createElement('div');d.textContent=s==null?'':s;return d.innerHTML;}
+  let courses=[], areas=[], editId=null;
+
+  // Specials usually don't get a row on report cards; untick "shows on card" when one is picked.
+  const SPECIAL_AREAS=['ART','MUSIC','PE','STEAM','TECH','LIBRARY','HEALTH','OTHER'];
+  document.getElementById('f-area').addEventListener('change',e=>{ if(!editId) document.getElementById('f-card').checked=!SPECIAL_AREAS.includes(e.target.value); });
+  document.getElementById('f-grades').innerHTML=GRADES.map(g=>`<label><input type="checkbox" value="${g}"> ${g}</label>`).join('');
+  document.getElementById('gradeFilter').innerHTML='<option value="">All grades</option>'+GRADES.map(g=>`<option value="${g}">${g}</option>`).join('');
+
+  async function load(){
+    try{ const d=await api('/api/courses'); courses=d.courses||[]; areas=d.subject_areas||[]; }
+    catch(e){ toast('Could not load courses',true); courses=[]; }
+    const sel=document.getElementById('f-area'); const cur=sel.value;
+    sel.innerHTML=areas.map(a=>`<option value="${a.key}">${esc(a.label)}</option>`).join('');
+    if(cur) sel.value=cur;
+    render();
+  }
+  function areaLabel(k){const a=areas.find(x=>x.key===k);return a?a.label:k;}
+  function render(){
+    const tb=document.getElementById('rows');
+    const g=document.getElementById('gradeFilter').value;
+    const showIn=document.getElementById('showInactive').checked;
+    let list=courses.filter(c=>(showIn||c.active)&&(!g||(c.grades||[]).includes(g)));
+    if(!list.length){tb.innerHTML='<tr><td colspan="6" class="empty">'+(courses.length?'No courses match.':'No courses yet. Add your first one above.')+'</td></tr>';return;}
+    let html='',last=null;
+    for(const c of list){
+      if(c.subject_area!==last){last=c.subject_area;html+=`<tr class="area"><td colspan="6">${esc(areaLabel(last))}</td></tr>`;}
+      html+=`<tr class="${c.active?'':'inactive'}">
+        <td class="name-cell">${esc(c.name)}${c.level?` <span class="muted">· ${esc(c.level)}</span>`:''}</td>
+        <td>${esc((c.grades||[]).join(', '))||'<span class="muted">any</span>'}</td>
+        <td class="muted">${c.section_count} class${c.section_count==1?'':'es'} · ${c.student_count} student${c.student_count==1?'':'s'}</td>
+        <td>${c.on_report_card?'Yes':'<span class="muted">No</span>'}</td>
+        <td><span class="pill ${c.active?'pill-on':'pill-off'}">${c.active?'Active':'Inactive'}</span></td>
+        <td style="text-align:right;white-space:nowrap;">
+          <button class="btn btn-ghost btn-sm" onclick="edit(${c.course_id})">Edit</button>
+          <button class="btn btn-ghost btn-sm" onclick="toggle(${c.course_id},${c.active?'false':'true'})">${c.active?'Deactivate':'Reactivate'}</button>
+        </td></tr>`;
+    }
+    tb.innerHTML=html;
+  }
+  function formBody(){
+    return {
+      name:document.getElementById('f-name').value.trim(),
+      subject_area:document.getElementById('f-area').value,
+      level:document.getElementById('f-level').value.trim(),
+      sort_order:document.getElementById('f-sort').value.trim()||0,
+      grades:[...document.querySelectorAll('#f-grades input:checked')].map(x=>x.value),
+      on_report_card:document.getElementById('f-card').checked
+    };
+  }
+  function resetForm(){
+    editId=null;
+    document.getElementById('formTitle').textContent='Add a course';
+    document.getElementById('f-save').textContent='Add Course';
+    document.getElementById('f-cancel').style.display='none';
+    ['f-name','f-level','f-sort'].forEach(id=>document.getElementById(id).value='');
+    document.querySelectorAll('#f-grades input').forEach(x=>x.checked=false);
+    document.getElementById('f-card').checked=true;
+  }
+  function edit(id){
+    const c=courses.find(x=>x.course_id===id); if(!c)return;
+    editId=id;
+    document.getElementById('formTitle').textContent='Edit course';
+    document.getElementById('f-save').textContent='Save Changes';
+    document.getElementById('f-cancel').style.display='';
+    document.getElementById('f-name').value=c.name;
+    document.getElementById('f-area').value=c.subject_area;
+    document.getElementById('f-level').value=c.level||'';
+    document.getElementById('f-sort').value=c.sort_order||'';
+    document.querySelectorAll('#f-grades input').forEach(x=>x.checked=(c.grades||[]).includes(x.value));
+    document.getElementById('f-card').checked=!!c.on_report_card;
+    window.scrollTo({top:0,behavior:'smooth'});
+  }
+  async function save(){
+    const body=formBody();
+    if(!body.name){toast('Course name is required',true);return;}
+    try{
+      if(editId){ await api('/api/courses/'+editId,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}); toast('Saved'); }
+      else{ await api('/api/courses',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}); toast('Course added'); }
+      const keepArea=body.subject_area; resetForm(); document.getElementById('f-area').value=keepArea; load();
+    }catch(e){ toast(e.message||'Could not save',true); }
+  }
+  async function toggle(id,active){
+    try{ await api('/api/courses/'+id,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({active})}); toast(active?'Reactivated':'Deactivated'); load(); }
+    catch(e){ toast(e.message||'Could not update',true); }
+  }
+  load();
+</script>
+<script src="/nav.js" defer></script>
+</body>
+</html>

@@ -30,6 +30,11 @@
   .term-tabs button.on{background:var(--navy);color:#fff;}
   select.pick{padding:8px 11px;border:1px solid var(--light);border-radius:8px;font-size:13px;font-family:inherit;background:#fff;color:var(--navy);}
   .ctx{color:var(--muted);font-size:13px;margin-left:auto;}
+  .mode-tabs{display:inline-flex;gap:4px;background:#ece6db;border-radius:10px;padding:4px;margin-bottom:14px;}
+  .mode-tabs button{border:none;background:transparent;font-family:inherit;font-size:14px;font-weight:500;color:var(--muted);padding:8px 16px;border-radius:7px;cursor:pointer;}
+  .mode-tabs button.on{background:#fff;color:var(--navy);box-shadow:0 1px 2px rgba(0,0,0,.08);}
+  td.past{color:var(--muted);text-align:center;font-weight:500;}
+  th.cur{background:#eef2f8 !important;}
   .layout{display:grid;grid-template-columns:300px 1fr;gap:20px;}
   @media(max-width:860px){.layout{grid-template-columns:1fr;}}
   .list{background:#fff;border:1px solid var(--light);border-radius:12px;overflow:hidden;}
@@ -79,11 +84,16 @@
 <body>
 <nav class="topnav"><span class="title">Report Cards</span><a href="/">← Home</a></nav>
 <div class="page">
-  <h1>Report Cards</h1>
-  <div class="sub">Fill in each student's marks and comments for the trimester. The right card is matched to each student's grade automatically.</div>
+  <div class="mode-tabs" id="modeTabs">
+    <button id="mode-report_card" onclick="setMode('report_card')">Report Cards</button>
+    <button id="mode-progress" onclick="setMode('progress')">Mid-Trimester Progress Reports</button>
+  </div>
+  <h1 id="pageTitle">Report Cards</h1>
+  <div class="sub" id="pageSub">Fill in each student's marks and comments for the trimester. The right card is matched to each student's grade automatically.</div>
   <div class="controls">
     <div class="term-tabs" id="termTabs"></div>
     <span id="adminPick"></span>
+    <button class="btn btn-ghost btn-sm" id="printBtn" onclick="printBatch()">Print all</button>
     <span class="ctx" id="ctxLabel"></span>
   </div>
   <div class="layout">
@@ -97,7 +107,36 @@
   async function api(p,o){const r=await fetch(p,o);const d=await r.json().catch(()=>({}));if(!r.ok||d.error)throw new Error(d.error||('HTTP '+r.status));return d;}
   function esc(s){const d=document.createElement('div');d.textContent=s==null?'':s;return d.innerHTML;}
 
-  const S={ctx:null,term:null,teacherId:null,sectionId:null,selId:null,cur:null};
+  const S={ctx:null,term:null,teacherId:null,sectionId:null,selId:null,cur:null,
+           purpose:(new URLSearchParams(location.search).get('mode')==='progress'?'progress':'report_card')};
+  const MODE_TEXT={
+    report_card:{title:'Report Cards',sub:"Fill in each student's marks and comments for the trimester. The right card is matched to each student's grade automatically.",empty:'Select a student to fill in their report card.',print:'Print report cards'},
+    progress:{title:'Mid-Trimester Progress Reports',sub:"Enter each student's estimated grade at the middle of the trimester. Subjects come from each student's own classes, and earlier trimesters are shown for reference.",empty:'Select a student to fill in their progress report.',print:'Print progress reports'}
+  };
+  function emptyMsg(){ return '<div class="empty">'+MODE_TEXT[S.purpose].empty+'</div>'; }
+  function applyMode(){
+    ['report_card','progress'].forEach(k=>document.getElementById('mode-'+k).classList.toggle('on',k===S.purpose));
+    document.getElementById('pageTitle').textContent=MODE_TEXT[S.purpose].title;
+    document.getElementById('pageSub').textContent=MODE_TEXT[S.purpose].sub;
+    document.getElementById('printBtn').textContent=MODE_TEXT[S.purpose].print;
+    // Report card printing (Phase 3) isn't built yet; progress reports print now.
+    document.getElementById('printBtn').style.display=(S.purpose==='progress')?'':'none';
+  }
+  function setMode(m){
+    if(m===S.purpose) return;
+    S.purpose=m; S.selId=null;
+    const u=new URL(location.href); if(m==='progress') u.searchParams.set('mode','progress'); else u.searchParams.delete('mode');
+    history.replaceState(null,'',u);
+    applyMode(); document.getElementById('panel').innerHTML=emptyMsg(); loadRoster();
+  }
+  function printUrl(studentId){
+    let q='/report-cards/print?purpose='+S.purpose+'&term='+encodeURIComponent(S.term);
+    if(studentId) q+='&student_id='+studentId;
+    else if(S.sectionId) q+='&section_id='+S.sectionId;
+    else if(S.teacherId) q+='&teacher_id='+S.teacherId;
+    return q;
+  }
+  function printBatch(){ window.open(printUrl(null),'_blank'); }
 
   async function init(){
     try{ S.ctx=await api('/api/report/entry/context'); }
@@ -110,6 +149,7 @@
     if(!S.ctx.is_admin && !S.ctx.has_homeroom && (S.ctx.my_sections||[]).length){
       S.sectionId=S.ctx.my_sections[0].section_id;
     }
+    applyMode();
     renderControls();
     loadRoster();
   }
@@ -134,13 +174,13 @@
     ap.innerHTML=html;
   }
   function setScope(v){ S.sectionId=v?+v:null; S.selId=null; renderControls();
-    document.getElementById('panel').innerHTML='<div class="empty">Select a student to fill in their report card.</div>'; loadRoster(); }
-  function setTerm(k){ S.term=k; S.selId=null; renderControls(); document.getElementById('panel').innerHTML='<div class="empty">Select a student to fill in their report card.</div>'; loadRoster(); }
-  function setTeacher(id){ S.teacherId=+id; S.selId=null; document.getElementById('panel').innerHTML='<div class="empty">Select a student to fill in their report card.</div>'; loadRoster(); }
+    document.getElementById('panel').innerHTML=emptyMsg(); loadRoster(); }
+  function setTerm(k){ S.term=k; S.selId=null; renderControls(); document.getElementById('panel').innerHTML=emptyMsg(); loadRoster(); }
+  function setTeacher(id){ S.teacherId=+id; S.selId=null; document.getElementById('panel').innerHTML=emptyMsg(); loadRoster(); }
 
   async function loadRoster(){
     const el=document.getElementById('stuList');
-    let q='/api/report/entry/roster?term='+encodeURIComponent(S.term);
+    let q='/api/report/entry/roster?purpose='+S.purpose+'&term='+encodeURIComponent(S.term);
     if(S.sectionId) q+='&section_id='+S.sectionId;
     else if(S.teacherId) q+='&teacher_id='+S.teacherId;
     let data;
@@ -164,7 +204,7 @@
     S.selId=id;
     document.querySelectorAll('.stu-item').forEach(x=>x.classList.remove('active'));
     const el=document.getElementById('panel'); el.innerHTML='<div class="empty">Loading…</div>';
-    try{ S.cur=await api('/api/report/entry/student?student_id='+id+'&term='+encodeURIComponent(S.term)); }
+    try{ S.cur=await api('/api/report/entry/student?purpose='+S.purpose+'&student_id='+id+'&term='+encodeURIComponent(S.term)); }
     catch(e){ el.innerHTML=`<div class="empty">${esc(e.message)}</div>`; return; }
     // re-highlight
     const items=[...document.querySelectorAll('.stu-item')];
@@ -173,6 +213,14 @@
     renderForm();
   }
 
+  // Subjects rows for this student: their real courses (from the classes they're in)
+  // in place of the template's generic subjects. Falls back to the template rows.
+  function subjRows(P,si){
+    const r=(P.subject_rows||{})[String(si)];
+    if(r) return r;
+    const sec=P.template.structure.sections[si]||{};
+    return (sec.rows||[]).map((label,ri)=>({key:String(ri),label,generic:true}));
+  }
   function levelsFor(key){ const s=S.cur.scales[key]; return s?s.levels:[]; }
   function optText(l){ return l.code + (l.label?(' · '+l.label):(l.range?(' · '+l.range):'')); }
   function sel(dataKey,scaleKey,val,dis){
@@ -198,6 +246,7 @@
       <h2>${esc(P.student.name)}</h2>
       <span class="who">Grade ${esc(P.student.grade||'—')} · ${esc(P.template.name)} · ${esc(P.term_label)}</span>
       <span class="chip ${stat}" style="margin-left:auto;">${({none:'Not started',draft:'In progress',complete:'Complete'})[stat]}</span>
+      ${P.purpose==='progress'?`<a class="btn btn-ghost btn-sm" href="${printUrl(P.student.student_id)}" target="_blank">Print</a>`:''}
     </div>`;
     // scale legend(s)
     const used=[...new Set((st.sections||[]).filter(s=>s.scale).map(s=>s.scale))];
@@ -207,11 +256,34 @@
       const kind=sec.kind||'skills';
       h+=`<div class="section"><div class="sec-head"><span>${esc(sec.title||'Section')}</span>`+
          (sec.scale?`<span class="scaletag">${esc(P.scales[sec.scale]?P.scales[sec.scale].name:sec.scale)}</span>`:'')+`</div><div class="sec-body">`;
-      if(kind==='subjects'){
+      const prog=(P.purpose==='progress');
+      const terms=S.ctx.terms||[];
+      const pastVal=(t,k)=>{ const m=(P.history||{})[t.key]||{}; return m[k]||''; };
+      if(kind==='subjects' && prog && (sec.columns||[]).length===1){
+        // Progress report: one estimate per trimester. The open trimester is editable;
+        // the others show what was entered then.
+        h+='<table class="grid"><thead><tr><th>Subject</th>'+terms.map(t=>`<th class="${t.key===S.term?'cur':''}">${esc(t.label)}</th>`).join('')+'</tr></thead><tbody>';
+        subjRows(P,si).forEach(row=>{
+          const tag=row.generic?'':(row.dropped?`<div class="autohint">no longer enrolled · earlier grades kept</div>`:(row.area_label?`<div class="autohint">${esc(row.area_label)}</div>`:''));
+          const k=si+':'+row.key+':0';
+          h+=`<tr><td class="subj">${esc(row.label)}${tag}</td>`+
+             terms.map(t=>t.key===S.term?`<td>${sel(k, sec.scale, marks[k], lock(k))}</td>`:`<td class="past">${esc(pastVal(t,k))||'—'}</td>`).join('')+'</tr>';
+        });
+        h+='</tbody></table>';
+      }else if(kind==='behavior_matrix' && prog && !(sec.subjects||[]).length){
+        h+='<table class="grid"><thead><tr><th></th>'+terms.map(t=>`<th class="${t.key===S.term?'cur':''}">${esc(t.label)}</th>`).join('')+'</tr></thead><tbody>';
+        (sec.rows||[]).forEach((rw,ri)=>{
+          const k=si+':b:'+ri;
+          h+=`<tr><td class="subj">${esc(rw)}</td>`+
+             terms.map(t=>t.key===S.term?`<td>${sel(k, sec.scale, marks[k], lock(k))}</td>`:`<td class="past">${esc(pastVal(t,k))||'—'}</td>`).join('')+'</tr>';
+        });
+        h+='</tbody></table>';
+      }else if(kind==='subjects'){
         h+='<table class="grid"><thead><tr><th>Subject</th>'+(sec.columns||[]).map(c=>`<th>${esc(c)}</th>`).join('')+'</tr></thead><tbody>';
-        (sec.rows||[]).forEach((subj,ri)=>{
-          h+=`<tr><td class="subj">${esc(subj)}</td>`+
-             (sec.columns||[]).map((c,ci)=>`<td>${sel(si+':'+ri+':'+ci, sec.scale, marks[si+':'+ri+':'+ci], lock(si+':'+ri+':'+ci))}</td>`).join('')+'</tr>';
+        subjRows(P,si).forEach(row=>{
+          const tag=row.generic?'':(row.dropped?`<div class="autohint">no longer enrolled · earlier grades kept</div>`:(row.area_label?`<div class="autohint">${esc(row.area_label)}</div>`:''));
+          h+=`<tr><td class="subj">${esc(row.label)}${tag}</td>`+
+             (sec.columns||[]).map((c,ci)=>{ const k=si+':'+row.key+':'+ci; return `<td>${sel(k, sec.scale, marks[k], lock(k))}</td>`; }).join('')+'</tr>';
         });
         h+='</tbody></table>';
       }else if(kind==='behavior_matrix'){
@@ -259,14 +331,15 @@
 
     // overall comments
     const comment=(P.entry.data&&P.entry.data.comment)||'';
-    h+=`<div style="margin-top:16px;"><label style="font-size:11px;font-weight:500;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:5px;">Teacher comments</label>
+    if(P.purpose!=='progress') h+=`<div style="margin-top:16px;"><label style="font-size:11px;font-weight:500;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:5px;">Teacher comments</label>
         <textarea class="cmt" id="rc-comment" ${(dis||only)?'disabled':''} placeholder="Overall comments for this trimester…">${esc(comment)}</textarea></div>`;
 
     if(dis){
       h+=`<div class="ro-note">You can view this card, but only ${esc(P.student.name.split(' ')[0])}'s homeroom teacher (or an admin) can edit it.</div>`;
     }else if(only){
-      const names=(st.sections||[]).filter(x=>(x.kind||'skills')==='subjects')
-        .flatMap(x=>(x.rows||[]).filter((r,ri)=>(x.columns||[]).some((c,ci)=>allowSet.has((st.sections.indexOf(x))+':'+ri+':'+ci))));
+      const names=[];
+      (st.sections||[]).forEach((x,si)=>{ if((x.kind||'skills')!=='subjects') return;
+        subjRows(P,si).forEach(row=>{ if((x.columns||[]).some((c,ci)=>allowSet.has(si+':'+row.key+':'+ci))) names.push(row.label); }); });
       h+=`<div class="ro-note">You teach ${esc(names.join(', ')||'a class')} for ${esc(P.student.name.split(' ')[0])}, so you can enter those marks. The rest of the card belongs to their homeroom teacher.</div>
         <div class="save-bar">
         <button class="btn btn-primary" onclick="save('draft')">Save my marks</button>

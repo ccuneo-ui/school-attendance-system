@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Print Progress Reports — Mizzentop Day School</title>
+<link rel="icon" type="image/svg+xml" href="/logo.svg">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=DM+Sans:wght@300;400;500;700&display=swap" rel="stylesheet"/>
+<style>
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+  :root{--navy:#1a2744;--gold:#c8992a;--cream:#f7f3ec;--muted:#6b7280;--light:#e8e2d9;--danger:#9b1c1c;}
+  html,body{font-family:'DM Sans',sans-serif;background:var(--cream);color:#111;}
+  .bar{position:sticky;top:0;z-index:5;background:var(--navy);color:#fff;display:flex;gap:14px;align-items:center;padding:12px 24px;font-size:14px;}
+  .bar .btn{background:#fff;color:var(--navy);border:none;border-radius:8px;padding:8px 16px;font-family:inherit;font-weight:500;font-size:13px;cursor:pointer;}
+  .bar .muted{color:rgba(255,255,255,.75);font-size:13px;}
+  .warn{max-width:8.5in;margin:16px auto 0;background:#fff7e6;border:1px solid #f0d9a8;border-radius:10px;padding:10px 14px;font-size:13px;color:#7a5a10;}
+  .warn b{color:#5b420a;}
+  .sheet{width:8.5in;min-height:11in;margin:18px auto;background:#fff;box-shadow:0 1px 6px rgba(0,0,0,.12);padding:.6in .75in .5in;display:flex;flex-direction:column;}
+  .logo{display:block;margin:0 auto 8px;height:70px;}
+  h1{font-family:'Playfair Display',serif;font-size:24px;text-align:center;color:var(--navy);margin-bottom:22px;line-height:1.25;}
+  .hdr{font-size:14px;line-height:1.75;margin-bottom:22px;}
+  .hdr b{font-weight:700;}
+  table.t{width:100%;border-collapse:collapse;margin-bottom:26px;font-size:14px;}
+  table.t th,table.t td{border:1px solid #9aa3b2;padding:9px 10px;text-align:center;}
+  table.t th{background:#eef1f6;font-weight:700;color:var(--navy);}
+  table.t td.l,table.t th.l{text-align:left;}
+  table.t{table-layout:fixed;}
+  table.t th.l{width:44%;}
+  table.t td.v{font-weight:600;font-size:15px;}
+  .note{font-size:12.5px;font-style:italic;color:#333;margin-top:4px;}
+  .foot{margin-top:auto;padding-top:18px;border-top:1px solid #d8dde6;text-align:center;font-size:11px;color:#555;}
+  .empty{max-width:8.5in;margin:60px auto;text-align:center;color:var(--muted);}
+  @media print{
+    @page{size:letter;margin:0;}
+    html,body{background:#fff;}
+    .bar,.warn{display:none !important;}
+    .sheet{margin:0;box-shadow:none;page-break-after:always;break-after:page;min-height:11in;}
+    .sheet:last-child{page-break-after:auto;break-after:auto;}
+    table.t th{-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+  }
+</style>
+</head>
+<body>
+<div class="bar"><span id="barText">Loading…</span><span class="muted" id="barSub"></span><span style="margin-left:auto"></span><button class="btn" onclick="window.print()">Print / Save as PDF</button></div>
+<div id="warn"></div>
+<div id="out"></div>
+<script>
+  const SCHOOL_LINE='Mizzentop Day School | 64 East Main St, Pawling, NY, 12564 | 845-855-7338 | www.mizzentop.org';
+  const DEFAULT_NOTE='Please Note: This mid-trimester report contains estimates of student averages. These estimates are subject to change as the trimester continues.';
+  const GRADE_WORD={'1':'First','2':'Second','3':'Third','4':'Fourth','5':'Fifth','6':'Sixth','7':'Seventh','8':'Eighth','K':'Kindergarten','SPK':'Senior Pre-K','JPK':'Junior Pre-K'};
+  function esc(s){const d=document.createElement('div');d.textContent=s==null?'':s;return d.innerHTML;}
+  function joinAnd(a){ return a.length<=1?(a[0]||''):a.slice(0,-1).join(', ')+' & '+a[a.length-1]; }
+
+  async function load(){
+    const qs=new URLSearchParams(location.search);
+    if(!qs.get('purpose')) qs.set('purpose','progress');
+    let D;
+    try{
+      const r=await fetch('/api/report/print?'+qs.toString());
+      D=await r.json();
+      if(!r.ok||D.error) throw new Error(D.error||('HTTP '+r.status));
+    }catch(e){ document.getElementById('barText').textContent='Could not load'; document.getElementById('out').innerHTML='<div class="empty">'+esc(e.message)+'</div>'; return; }
+    if(D.purpose!=='progress'){ document.getElementById('out').innerHTML='<div class="empty">Printing full report cards is the next step and isn\'t ready yet. Progress reports print from here.</div>'; return; }
+    const title=D.school_year.replace('–','-')+' Mid-Trimester Progress Report';
+    const month=new Date().toLocaleDateString('en-US',{month:'long',year:'numeric'});
+    document.getElementById('barText').textContent=D.students.length+' progress report'+(D.students.length==1?'':'s')+' · '+D.term_label;
+    document.getElementById('barSub').textContent='Tip: in the print dialog, turn off "Headers and footers".';
+    if(!D.students.length){ document.getElementById('out').innerHTML='<div class="empty">No students with a progress report template here.</div>'; return; }
+    const missing=[], sheets=[];
+    D.students.forEach(st=>{
+      const T=D.templates[String(st.template_id)]; const S=T.structure; const secs=S.sections||[];
+      const cur=(st.entries[D.term]||{}); const curMarks=(cur.data||{}).marks||{};
+      const mk=(t,k)=>(((st.entries[t]||{}).data||{}).marks||{})[k]||'';
+      let blanks=0;
+      let h='<div class="sheet"><img class="logo" src="/logo.png" alt="Mizzentop Day School" onerror="this.style.display=\'none\'">';
+      h+='<h1>'+esc(title)+'</h1><div class="hdr">';
+      h+='<div><b>Student Name:</b> '+esc(st.name)+'</div>';
+      h+='<div><b>Grade:</b> '+esc(GRADE_WORD[String(st.grade).toUpperCase()]||st.grade)+'</div>';
+      if(st.homeroom_teacher) h+='<div><b>Homeroom Teacher:</b> '+esc(st.homeroom_teacher)+'</div>';
+      (st.subject_teachers||[]).forEach(x=>{ h+='<div><b>'+esc(joinAnd(x.subjects))+' Teacher:</b> '+esc(x.teacher)+'</div>'; });
+      h+='<div><b>'+esc(D.term_label)+'</b> · '+esc(month)+'</div></div>';
+      secs.forEach((sec,si)=>{
+        const kind=sec.kind||'skills';
+        if(kind==='subjects'){
+          let rows=(st.subject_rows[String(si)]||[]);
+          rows=rows.filter(r=>!r.dropped || D.terms.some(t=>mk(t.key,si+':'+r.key+':0')));
+          h+='<table class="t"><thead><tr><th class="l">Subject</th>'+D.terms.map(t=>'<th>'+esc(t.label)+'</th>').join('')+'</tr></thead><tbody>';
+          rows.forEach(r=>{
+            const k=si+':'+r.key+':0';
+            if(!curMarks[k]) blanks++;
+            h+='<tr><td class="l">'+esc(r.label)+'</td>'+D.terms.map(t=>'<td class="v">'+esc(mk(t.key,k))+'</td>').join('')+'</tr>';
+          });
+          h+='</tbody></table>';
+        }else if(kind==='behavior_matrix' && !(sec.subjects||[]).length){
+          h+='<table class="t"><thead><tr><th class="l">'+esc(sec.title||'Behaviors')+'</th>'+D.terms.map(t=>'<th>'+esc(t.label)+'</th>').join('')+'</tr></thead><tbody>';
+          (sec.rows||[]).forEach((rw,ri)=>{
+            const k=si+':b:'+ri;
+            if(!curMarks[k]) blanks++;
+            h+='<tr><td class="l">'+esc(rw)+'</td>'+D.terms.map(t=>'<td class="v">'+esc(mk(t.key,k))+'</td>').join('')+'</tr>';
+          });
+          h+='</tbody></table>';
+        }
+      });
+      h+='<div class="note">'+esc(S.footer_note||DEFAULT_NOTE)+'</div>';
+      h+='<div class="foot">'+esc(SCHOOL_LINE)+'</div></div>';
+      if(blanks) missing.push(st.name+' ('+blanks+' blank)');
+      sheets.push(h);
+    });
+    document.getElementById('out').innerHTML=sheets.join('');
+    if(missing.length){
+      document.getElementById('warn').innerHTML='<div class="warn"><b>Not finished for '+esc(D.term_label)+':</b> '+missing.map(esc).join(', ')+'. They\'ll print with blanks. (This note doesn\'t print.)</div>';
+    }
+  }
+  load();
+</script>
+</body>
+</html>

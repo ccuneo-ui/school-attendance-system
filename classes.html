@@ -82,11 +82,11 @@
 <body>
 <nav class="topnav">
   <span class="title">Classes</span>
-  <div class="right"><a href="/reconcile">Check vs. Scheduler</a><a href="/rooms">Rooms</a><a href="/">← Home</a></div>
+  <div class="right"><a href="/reconcile">Check vs. Scheduler</a><a href="/courses">Courses</a><a href="/rooms">Rooms</a><a href="/">← Home</a></div>
 </nav>
 <div class="page">
   <h1>Classes</h1>
-  <div class="sub">Every homeroom, advisory, and subject class in one place. Open one to set its teacher and room and manage its roster. <span id="yearLabel"></span></div>
+  <div class="sub">Every homeroom, advisory, and subject class in one place. Open one to set its teacher, room and course and manage its roster. The course (e.g. Pre-Algebra) is what shows on report cards and progress reports. <a href="/courses" style="color:var(--navy);font-weight:500;">Manage the course list →</a> <span id="yearLabel"></span></div>
 
   <div class="tabs">
     <button class="tab active" id="tab-classes" onclick="showView('classes')">Classes</button>
@@ -160,6 +160,7 @@
       <div><label class="fld">Teacher</label><select id="n-teacher"></select></div>
       <div><label class="fld">Room</label><select id="n-room"></select></div>
       <div><label class="fld">Grade (optional)</label><select id="n-grade"></select></div>
+      <div class="full"><label class="fld">Course (for report cards)</label><select id="n-course"></select></div>
     </div>
     <div class="modal-foot">
       <button class="btn btn-ghost" onclick="closeNew()">Cancel</button>
@@ -260,6 +261,12 @@
 
   function teacherOptions(sel){return '<option value="">— none —</option>'+S.opts.teachers.map(t=>`<option value="${t.staff_id}" ${t.staff_id==sel?'selected':''}>${esc(t.name)}</option>`).join('');}
   function roomOptions(sel){return '<option value="">— none —</option>'+S.opts.rooms.map(r=>`<option value="${r.room_id}" ${r.room_id==sel?'selected':''}>${esc(r.name)}</option>`).join('');}
+  function courseOptions(sel){
+    const cs=(S.opts.courses||[]);
+    let h='<option value="">— no course (report card shows the generic subject) —</option>';
+    h+=cs.map(c=>`<option value="${c.course_id}" ${c.course_id==sel?'selected':''}>${esc(c.name)}${c.level?(' · '+esc(c.level)):''}${(c.grades&&c.grades.length)?(' (Gr '+esc(c.grades.join(', '))+')'):''}</option>`).join('');
+    return h;
+  }
   function gradeOptions(sel,allLabel){return `<option value="">${allLabel||'— none —'}</option>`+S.opts.grades.map(g=>`<option value="${esc(g)}" ${g==sel?'selected':''}>${esc(g)}</option>`).join('');}
 
   async function init(){
@@ -270,6 +277,7 @@
     document.getElementById('n-teacher').innerHTML=teacherOptions();
     document.getElementById('n-room').innerHTML=roomOptions();
     document.getElementById('n-grade').innerHTML=gradeOptions('','— none —');
+    document.getElementById('n-course').innerHTML=courseOptions();
     document.getElementById('gradeFilter').innerHTML='<option value="">All grades</option>'+(S.opts.grades||[]).map(g=>`<option value="${esc(g)}">${esc(g)}</option>`).join('');
     await loadSections();
   }
@@ -289,7 +297,7 @@
     el.innerHTML=items.map(s=>`
       <div class="sec-item ${s.section_id==S.selId?'active':''} ${s.active?'':'inactive'}" onclick="select(${s.section_id})">
         <div class="sec-name"><span class="type-tag t-${s.type}">${TYPES[s.type]||s.type}</span>${s.grade?`<span class="grade-badge">${esc(fmtGrade(s.grade))}</span>`:''}${esc(s.name)}</div>
-        <div class="sec-meta">${esc(s.teacher_name||'No teacher')}${s.room_name?' · '+esc(s.room_name):''} · ${s.roster_count} student${s.roster_count==1?'':'s'}</div>
+        <div class="sec-meta">${s.course_name?('<b>'+esc(s.course_name)+'</b> · '):((s.type==='subject'||s.type==='elective')?'<span style="color:#9b1c1c">No course</span> · ':'')}${esc(s.teacher_name||'No teacher')}${s.room_name?' · '+esc(s.room_name):''} · ${s.roster_count} student${s.roster_count==1?'':'s'}</div>
       </div>`).join('');
   }
 
@@ -312,6 +320,7 @@
         <div><label class="fld">Teacher</label><select id="e-teacher">${teacherOptions(s.teacher_id)}</select></div>
         <div><label class="fld">Room</label><select id="e-room">${roomOptions(s.room_id)}</select></div>
         <div><label class="fld">Grade</label><select id="e-grade">${gradeOptions(s.grade,'— none —')}</select></div>
+        <div class="full"><label class="fld">Course (what shows on report cards &amp; progress reports)</label><select id="e-course">${courseOptions(s.course_id)}</select></div>
         <div><label class="fld">Status</label><select id="e-active"><option value="true" ${s.active?'selected':''}>Active</option><option value="false" ${s.active?'':'selected'}>Inactive</option></select></div>
       </div>
       <button class="btn btn-primary" onclick="saveSection()">Save changes</button>
@@ -339,6 +348,7 @@
       teacher_id:document.getElementById('e-teacher').value||null,
       room_id:document.getElementById('e-room').value||null,
       grade:document.getElementById('e-grade').value||null,
+      course_id:document.getElementById('e-course').value||null,
       active:document.getElementById('e-active').value==='true'
     };
     if(!body.name){toast('Name is required',true);return;}
@@ -365,6 +375,7 @@
       teacher_id:document.getElementById('n-teacher').value||null,
       room_id:document.getElementById('n-room').value||null,
       grade:document.getElementById('n-grade').value||null,
+      course_id:document.getElementById('n-course').value||null,
       school_year_start:S.opts.current_school_year_start
     };
     if(!body.name){toast('Name is required',true);return;}

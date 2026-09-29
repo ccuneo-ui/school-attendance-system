@@ -125,7 +125,7 @@
     if(!S.list.length){el.innerHTML='<div class="tpl-item"><span class="tpl-meta">No templates yet.</span></div>';return;}
     el.innerHTML=S.list.map(t=>`<div class="tpl-item ${t.template_id==S.sel?'active':''}" onclick="select(${t.template_id})">
       <div class="tpl-name">${esc(t.name)}</div>
-      <div class="tpl-meta"><span class="tag">${t.layout}</span> Grades: ${(t.grades||[]).join(', ')||'—'}</div></div>`).join('');
+      <div class="tpl-meta">${t.purpose==='progress'?'<span class="tag" style="background:rgba(200,153,42,.18);color:#7a5a10;">progress report</span> ':''}<span class="tag">${t.layout}</span> Grades: ${(t.grades||[]).join(', ')||'—'}</div></div>`).join('');
   }
   async function select(id){
     S.sel=id; renderList();
@@ -254,17 +254,17 @@
     const name=document.getElementById('nt-name').value.trim();
     if(!name){ toast('Give the template a name first',true); document.getElementById('nt-name').focus(); return; }
     if(!ntChoice){ toast('Pick what to start from',true); return; }
-    let layout, structure;
+    let layout, structure, purpose='report_card';
     try{
       if(ntChoice.indexOf('copy:')===0){
         const src=await api('/api/report/templates/'+(+ntChoice.split(':')[1]));
-        layout=src.layout;
+        layout=src.layout; purpose=src.purpose||'report_card';
         structure=JSON.parse(JSON.stringify(src.structure||{sections:[]}));
       }else{
         layout=ntChoice.split(':')[1];
         structure=blankStructure(layout);
       }
-      const r=await api('/api/report/templates',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,layout,structure,grades:[]})});
+      const r=await api('/api/report/templates',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,layout,structure,purpose,grades:[]})});
       closeNewModal();
       await loadList(); select(r.template_id);
       toast('Template created');

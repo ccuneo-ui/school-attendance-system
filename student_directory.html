@@ -227,6 +227,7 @@
     } else { h+='<p class="muted-note">None on file.</p>'; }
 
     h+='<div class="section-title">Parents &amp; Guardians</div><div id="m-parents"><p class="muted-note">Loading…</p></div>';
+    h+='<div class="section-title">Classes &amp; Courses</div><div id="m-courses"><p class="muted-note">Loading…</p></div>';
 
     h+='<div class="section-title">Dismissal Defaults</div>';
     h+='<div class="dis-grid">'+
@@ -237,6 +238,20 @@
     document.getElementById('m-body').innerHTML=h;
     document.getElementById('modal').classList.add('open');
     loadParents(id);
+    loadCourses(id);
+  }
+
+  async function loadCourses(id){
+    const box=document.getElementById('m-courses');
+    try{
+      const r=await fetch('/api/students/'+id+'/courses');
+      const d=await r.json();
+      if(!r.ok||d.error) throw new Error();
+      if(!d.classes.length){ box.innerHTML='<p class="muted-note">No subject classes on file for '+esc(d.school_year)+'.</p>'; return; }
+      box.innerHTML=d.classes.map(c=>'<div style="padding:6px 0;border-bottom:1px solid #f0ece5"><b>'+esc(c.course_name||c.section_name)+'</b>'+
+        (c.level?' <span class="muted-note">· '+esc(c.level)+'</span>':'')+
+        '<div class="muted-note">'+(c.subject_area_label?esc(c.subject_area_label)+' · ':'')+esc(c.teacher_name||'No teacher')+'</div></div>').join('');
+    }catch(e){ box.innerHTML='<p class="muted-note">Could not load classes.</p>'; }
   }
 
   async function loadParents(id){

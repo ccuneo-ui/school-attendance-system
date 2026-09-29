@@ -296,6 +296,9 @@
       <div class="section-title">Parents &amp; Guardians <span style="font-size:11px;font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted)">— edit in Family Manager</span></div>
       <div id="f-parents" style="margin-bottom:4px"></div>
 
+      <div class="section-title">Classes &amp; Courses <span id="f-courses-yr" style="font-size:11px;font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted)"></span></div>
+      <div id="f-courses" style="margin-bottom:4px"></div>
+
       <div class="section-title">Dismissal Defaults</div>
       <div class="dismissal-grid">
         <div class="dismissal-day"><label>Mon</label><select id="f-mon"></select></div>
@@ -557,12 +560,75 @@ function openModal(studentId) {
   document.getElementById('save-btn').textContent = 'Save Changes';
   document.getElementById('merge-btn').style.display = IS_SUPERADMIN ? '' : 'none';
   loadStudentFamily(studentId);
+  loadStudentCourses(studentId);
   document.getElementById('edit-modal').classList.add('open');
 }
 
 function escHtml(s) {
   return (s == null ? '' : String(s)).replace(/[&<>"']/g, c =>
     ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+// ── Classes & courses (this school year) ──
+// A student's courses are the subject/elective classes they're enrolled in. The course
+// name (set on the Classes page) is what prints on report cards and progress reports.
+async function loadStudentCourses(studentId) {
+  const box = document.getElementById('f-courses');
+  box.innerHTML = '<p style="font-size:13px;color:var(--muted);margin:0">Loading…</p>';
+  try {
+    const res = await fetch('/api/students/' + studentId + '/courses?options=1');
+    const d = await res.json();
+    if (!res.ok || d.error) throw new Error(d.error || ('HTTP ' + res.status));
+    document.getElementById('f-courses-yr').textContent = '— ' + d.school_year + ' · a class with no course shows its generic subject on report cards';
+    let h = '';
+    if (!d.classes.length) {
+      h += '<p style="font-size:13px;color:var(--muted);margin:0 0 8px">Not enrolled in any subject classes yet.</p>';
+    } else {
+      h += d.classes.map(c => {
+        const title = c.course_name
+          ? escHtml(c.course_name) + (c.level ? ' <span style="font-weight:400;color:var(--muted)">· ' + escHtml(c.level) + '</span>' : '')
+          : '<span style="color:#9b1c1c">No course linked</span>';
+        const area = c.subject_area_label ? escHtml(c.subject_area_label) + ' · ' : '';
+        return '<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;border:1px solid var(--border);border-radius:8px;padding:8px 12px;margin-bottom:6px">' +
+          '<div><div style="font-weight:600;color:var(--navy);font-size:14px">' + title + '</div>' +
+          '<div style="font-size:12px;color:var(--muted)">' + area + escHtml(c.section_name) + ' · ' + escHtml(c.teacher_name || 'No teacher') + (c.type === 'elective' ? ' · elective' : '') + '</div></div>' +
+          '<button type="button" onclick="dropStudentCourse(' + studentId + ',' + c.section_id + ')" style="background:none;border:1px solid var(--border);border-radius:6px;padding:4px 10px;font-size:12px;color:var(--muted);cursor:pointer">Drop</button>' +
+        '</div>';
+      }).join('');
+    }
+    const opts = d.options || [];
+    if (opts.length) {
+      h += '<div style="display:flex;gap:8px;margin-top:8px"><select id="f-course-add" style="flex:1">' +
+        '<option value="">Add to a class…</option>' +
+        opts.map(o => '<option value="' + o.section_id + '">' + (String(o.grade || '') === d.student_grade ? '' : '(Gr ' + escHtml(o.grade || '?') + ') ') +
+          escHtml(o.course_name ? o.course_name + ' — ' + o.section_name : o.section_name) + ' · ' + escHtml(o.teacher_name || 'No teacher') + '</option>').join('') +
+        '</select><button type="button" onclick="addStudentCourse(' + studentId + ')" style="background:var(--navy);color:#fff;border:none;border-radius:6px;padding:6px 14px;font-size:13px;cursor:pointer">Add</button></div>';
+    }
+    box.innerHTML = h;
+  } catch (e) {
+    box.innerHTML = '<p style="font-size:13px;color:var(--muted);margin:0">Could not load classes.</p>';
+  }
+}
+async function addStudentCourse(studentId) {
+  const v = document.getElementById('f-course-add').value;
+  if (!v) return;
+  try {
+    const res = await fetch('/api/students/' + studentId + '/courses', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({section_id: Number(v)})});
+    const d = await res.json().catch(() => ({}));
+    if (!res.ok || d.error) throw new Error(d.error || 'Could not add');
+    showToast('Added to class');
+    loadStudentCourses(studentId);
+  } catch (e) { showToast(e.message, true); }
+}
+async function dropStudentCourse(studentId, sectionId) {
+  if (!confirm('Drop this student from the class? Grades already entered for it stay on their report cards.')) return;
+  try {
+    const res = await fetch('/api/students/' + studentId + '/courses/' + sectionId, {method:'DELETE'});
+    const d = await res.json().catch(() => ({}));
+    if (!res.ok || d.error) throw new Error(d.error || 'Could not drop');
+    showToast('Dropped from class');
+    loadStudentCourses(studentId);
+  } catch (e) { showToast(e.message, true); }
 }
 
 async function loadStudentFamily(studentId) {
@@ -599,6 +665,8 @@ async function loadStudentFamily(studentId) {
 }
 
 function openAddModal() {
+  document.getElementById('f-courses').innerHTML = '<p style="font-size:13px;color:var(--muted);margin:0">Save the student first, then add their classes here.</p>';
+  document.getElementById('f-courses-yr').textContent = '';
   editingId = null;
   isAddMode = true;
 

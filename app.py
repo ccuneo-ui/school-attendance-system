@@ -682,6 +682,28 @@ def init_db():
             """)
             cur.execute("CREATE INDEX IF NOT EXISTS idx_sections_year_type ON sections(school_year_start, type)")
             cur.execute("CREATE INDEX IF NOT EXISTS idx_sections_teacher ON sections(teacher_id)")
+            # ── Course catalog ──
+            # A course is WHAT is taught ("Pre-Algebra", "Earth Science", "Spanish 1B");
+            # a section is one class of it (teacher + room + roster). A student's courses
+            # are the sections they're enrolled in, so report cards and progress reports
+            # can show "Pre-Algebra" instead of a generic "Math".
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS courses (
+                    course_id      SERIAL PRIMARY KEY,
+                    name           TEXT NOT NULL,
+                    subject_area   TEXT NOT NULL DEFAULT 'OTHER',
+                    grades         TEXT NOT NULL DEFAULT '[]',
+                    level          TEXT,
+                    on_report_card BOOLEAN NOT NULL DEFAULT TRUE,
+                    sort_order     INTEGER NOT NULL DEFAULT 0,
+                    active         BOOLEAN NOT NULL DEFAULT TRUE,
+                    created_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_by     TEXT
+                )
+            """)
+            cur.execute("ALTER TABLE sections ADD COLUMN IF NOT EXISTS course_id INTEGER REFERENCES courses(course_id) ON DELETE SET NULL")
+            cur.execute("CREATE INDEX IF NOT EXISTS idx_sections_course ON sections(course_id)")
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS section_enrollments (
                     section_id  INTEGER NOT NULL REFERENCES sections(section_id) ON DELETE CASCADE,
@@ -1306,6 +1328,11 @@ def scheduler_page():
 @require_perm("rooms")
 def rooms_page():
     return send_from_directory(".", "rooms.html")
+
+@app.route("/courses")
+@require_perm("classes")
+def courses_page():
+    return send_from_directory(".", "courses.html")
 
 @app.route("/special-services")
 @require_perm("special_services")
@@ -8462,6 +8489,248 @@ def api_rooms_update(room_id):
         conn.close()
 
 
+# ---- Course catalog ----
+# Subject areas order the rows on report cards/progress reports and let a course
+# fill the matching generic row of a template ("Pre-Algebra" fills the Math slot).
+COURSE_SUBJECT_AREAS = [
+    ("ELA", "English Language Arts"), ("MATH", "Math"), ("SCIENCE", "Science"),
+    ("SOCIAL", "Social Studies"), ("WORLDLANG", "World Language"),
+    ("ART", "Art"), ("MUSIC", "Music"), ("PE", "Physical Education"), ("STEAM", "STEAM"),
+    ("TECH", "Technology"), ("LIBRARY", "Library"), ("HEALTH", "Health"), ("OTHER", "Other"),
+]
+_COURSE_AREA_KEYS = [k for k, _l in COURSE_SUBJECT_AREAS]
+
+
+def _course_row_out(r):
+    d = dict(r)
+    try:
+        d["grades"] = json.loads(d.get("grades") or "[]")
+    except Exception:
+        d["grades"] = []
+    return d
+
+
+def _course_payload(d):
+    """Clean a course create/update body. Returns (fields dict, error)."""
+    out = {}
+    if "name" in d:
+        name = (d.get("name") or "").strip()
+        if not name:
+            return None, "Course name is required."
+        out["name"] = name
+    if "subject_area" in d:
+        area = (d.get("subject_area") or "OTHER").strip().upper()
+        out["subject_area"] = area if area in _COURSE_AREA_KEYS else "OTHER"
+    if "grades" in d:
+        g = d.get("grades") or []
+        if isinstance(g, str):
+            g = [x.strip() for x in g.split(",")]
+        out["grades"] = json.dumps([str(x).strip().upper() for x in g if str(x).strip()])
+    if "level" in d:
+        out["level"] = (d.get("level") or "").strip() or None
+    for b in ("on_report_card", "active"):
+        if b in d:
+            out[b] = bool(d.get(b))
+    if "sort_order" in d:
+        try:
+            out["sort_order"] = int(d.get("sort_order") or 0)
+        except Exception:
+            out["sort_order"] = 0
+    return out, None
+
+
+@app.route("/api/courses")
+@login_required
+def api_courses_list():
+    active_only = request.args.get("active") in ("1", "true")
+    year = current_school_year_start()
+    conn = get_db_connection()
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute(f"""
+                SELECT c.course_id, c.name, c.subject_area, c.grades, c.level, c.on_report_card,
+                       c.sort_order, c.active,
+                       (SELECT COUNT(*) FROM sections s WHERE s.course_id=c.course_id
+                          AND s.school_year_start=%s) AS section_count,
+                       (SELECT COUNT(DISTINCT se.student_id) FROM sections s
+                          JOIN section_enrollments se ON se.section_id=s.section_id
+                          WHERE s.course_id=c.course_id AND s.school_year_start=%s) AS student_count
+                FROM courses c
+                {'WHERE c.active' if active_only else ''}
+                ORDER BY c.sort_order, c.name
+            """, (year, year))
+            rows = [_course_row_out(r) for r in fa(cur)]
+            order = {k: i for i, k in enumerate(_COURSE_AREA_KEYS)}
+            rows.sort(key=lambda r: (order.get(r["subject_area"], 99), r.get("sort_order") or 0, r["name"].lower()))
+            return jsonify({"courses": rows,
+                            "subject_areas": [{"key": k, "label": l} for k, l in COURSE_SUBJECT_AREAS]})
+    finally:
+        conn.close()
+
+
+@app.route("/api/courses", methods=["POST"])
+@require_perm("classes")
+def api_courses_create():
+    fields, err = _course_payload(request.get_json() or {})
+    if err or "name" not in (fields or {}):
+        return jsonify({"error": err or "Course name is required."}), 400
+    fields.setdefault("subject_area", "OTHER")
+    fields["updated_by"] = session.get("user_email")
+    cols = list(fields.keys())
+    conn = get_db_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT course_id FROM courses WHERE LOWER(name)=LOWER(%s)", (fields["name"],))
+            if cur.fetchone():
+                return jsonify({"error": "A course with that name already exists."}), 400
+            cur.execute(f"INSERT INTO courses ({', '.join(cols)}) VALUES ({', '.join(['%s']*len(cols))}) RETURNING course_id",
+                        [fields[c] for c in cols])
+            cid = cur.fetchone()[0]
+            conn.commit()
+            return jsonify({"success": True, "course_id": cid})
+    except Exception as e:
+        conn.rollback()
+        return jsonify({"error": str(e)}), 500
+    finally:
+        conn.close()
+
+
+@app.route("/api/courses/<int:course_id>", methods=["PUT"])
+@require_perm("classes")
+def api_courses_update(course_id):
+    fields, err = _course_payload(request.get_json() or {})
+    if err:
+        return jsonify({"error": err}), 400
+    if not fields:
+        return jsonify({"error": "no fields"}), 400
+    sets = [f"{c}=%s" for c in fields] + ["updated_at=NOW()", "updated_by=%s"]
+    vals = list(fields.values()) + [session.get("user_email"), course_id]
+    conn = get_db_connection()
+    try:
+        with conn.cursor() as cur:
+            if "name" in fields:
+                cur.execute("SELECT course_id FROM courses WHERE LOWER(name)=LOWER(%s) AND course_id<>%s",
+                            (fields["name"], course_id))
+                if cur.fetchone():
+                    return jsonify({"error": "A course with that name already exists."}), 400
+            cur.execute(f"UPDATE courses SET {', '.join(sets)} WHERE course_id=%s", vals)
+            conn.commit()
+            return jsonify({"success": True})
+    except Exception as e:
+        conn.rollback()
+        return jsonify({"error": str(e)}), 500
+    finally:
+        conn.close()
+
+
+@app.route("/api/students/<int:student_id>/courses")
+@login_required
+def api_student_courses(student_id):
+    """A student's classes + courses for the current school year (the 'Courses' block
+    of the student file). ?options=1 also returns the classes they could be added to."""
+    year = current_school_year_start()
+    area_label = dict(COURSE_SUBJECT_AREAS)
+    conn = get_db_connection()
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute("SELECT grade FROM students WHERE student_id=%s", (student_id,))
+            stu = fo(cur)
+            if not stu:
+                return jsonify({"error": "student not found"}), 404
+            cur.execute("""
+                SELECT s.section_id, s.name AS section_name, s.type, s.term, s.grade,
+                       s.course_id, c.name AS course_name, c.subject_area, c.level,
+                       (st.first_name || ' ' || st.last_name) AS teacher_name
+                FROM section_enrollments se
+                JOIN sections s ON s.section_id = se.section_id
+                LEFT JOIN courses c ON c.course_id = s.course_id
+                LEFT JOIN staff st ON st.staff_id = s.teacher_id
+                WHERE se.student_id=%s AND s.school_year_start=%s AND s.active
+                  AND s.type IN ('subject','elective')
+            """, (student_id, year))
+            order = {k: i for i, k in enumerate(_COURSE_AREA_KEYS)}
+            classes = fa(cur)
+            for r in classes:
+                r["subject_area_label"] = area_label.get(r.get("subject_area") or "", "")
+            classes.sort(key=lambda r: (0 if r.get("course_id") else 1,
+                                        order.get(r.get("subject_area") or "", 99),
+                                        (r.get("course_name") or r["section_name"]).lower()))
+            out = {"school_year": sy_long(year), "classes": classes}
+            if request.args.get("options") in ("1", "true"):
+                mine = {r["section_id"] for r in classes}
+                cur.execute("""
+                    SELECT s.section_id, s.name AS section_name, s.grade, s.type,
+                           c.name AS course_name, (st.first_name || ' ' || st.last_name) AS teacher_name
+                    FROM sections s
+                    LEFT JOIN courses c ON c.course_id = s.course_id
+                    LEFT JOIN staff st ON st.staff_id = s.teacher_id
+                    WHERE s.school_year_start=%s AND s.active AND s.type IN ('subject','elective')
+                    ORDER BY s.grade, COALESCE(c.name, s.name), s.name
+                """, (year,))
+                g = str(stu.get("grade") or "")
+                opts = [r for r in fa(cur) if r["section_id"] not in mine]
+                opts.sort(key=lambda r: (0 if str(r.get("grade") or "") == g else 1,))
+                out["options"] = opts
+                out["student_grade"] = g
+            return jsonify(out)
+    finally:
+        conn.close()
+
+
+def _can_edit_student_courses():
+    return has_perm("students") or has_perm("classes") or bool(session.get("can_manage_people"))
+
+
+@app.route("/api/students/<int:student_id>/courses", methods=["POST"])
+@login_required
+def api_student_course_add(student_id):
+    """Enroll a student in a subject/elective class from the student file."""
+    if not _can_edit_student_courses():
+        return jsonify({"error": "You don't have permission to change class enrollments."}), 403
+    section_id = (request.get_json() or {}).get("section_id")
+    if not section_id:
+        return jsonify({"error": "section_id required"}), 400
+    conn = get_db_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT type FROM sections WHERE section_id=%s", (section_id,))
+            row = cur.fetchone()
+            if not row or row[0] not in ("subject", "elective"):
+                return jsonify({"error": "Pick a subject or elective class."}), 400
+            cur.execute("""INSERT INTO section_enrollments (section_id, student_id)
+                           VALUES (%s,%s) ON CONFLICT (section_id, student_id) DO NOTHING""",
+                        (section_id, student_id))
+            conn.commit()
+            return jsonify({"success": True})
+    except Exception as e:
+        conn.rollback()
+        return jsonify({"error": str(e)}), 500
+    finally:
+        conn.close()
+
+
+@app.route("/api/students/<int:student_id>/courses/<int:section_id>", methods=["DELETE"])
+@login_required
+def api_student_course_drop(student_id, section_id):
+    """Drop a student from a subject/elective class. Grades already entered on report
+    cards/progress reports for that course are kept (they're stored per course)."""
+    if not _can_edit_student_courses():
+        return jsonify({"error": "You don't have permission to change class enrollments."}), 403
+    conn = get_db_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""DELETE FROM section_enrollments se USING sections s
+                           WHERE se.section_id=s.section_id AND se.section_id=%s AND se.student_id=%s
+                             AND s.type IN ('subject','elective')""", (section_id, student_id))
+            conn.commit()
+            return jsonify({"success": True})
+    except Exception as e:
+        conn.rollback()
+        return jsonify({"error": str(e)}), 500
+    finally:
+        conn.close()
+
+
 # ---- Section dropdown options (active teachers, active rooms, grades, current year) ----
 @app.route("/api/sections/options")
 @login_required
@@ -8480,7 +8749,10 @@ def api_sections_options():
                            WHERE status='active' AND grade IS NOT NULL AND grade<>''
                            ORDER BY grade""")
             grades = [r["grade"] for r in fa(cur)]
-        return jsonify({"teachers": teachers, "rooms": rooms, "grades": grades,
+            cur.execute("""SELECT course_id, name, subject_area, grades, level FROM courses
+                           WHERE active ORDER BY sort_order, name""")
+            courses = [_course_row_out(r) for r in fa(cur)]
+        return jsonify({"teachers": teachers, "rooms": rooms, "grades": grades, "courses": courses,
                         "current_school_year_start": current_school_year_start()})
     finally:
         conn.close()
@@ -8497,13 +8769,14 @@ def api_sections_list():
     try:
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
             q = """SELECT s.section_id, s.school_year_start, s.type, s.name, s.subject,
-                          s.grade, s.term, s.teacher_id, s.room_id, s.active,
+                          s.grade, s.term, s.teacher_id, s.room_id, s.active, s.course_id,
                           (st.first_name || ' ' || st.last_name) AS teacher_name,
-                          r.name AS room_name,
+                          r.name AS room_name, c.name AS course_name,
                           (SELECT COUNT(*) FROM section_enrollments e WHERE e.section_id=s.section_id) AS roster_count
                    FROM sections s
                    LEFT JOIN staff st ON st.staff_id = s.teacher_id
                    LEFT JOIN rooms r ON r.room_id = s.room_id
+                   LEFT JOIN courses c ON c.course_id = s.course_id
                    WHERE s.school_year_start=%s"""
             params = [year]
             if stype:
@@ -8585,11 +8858,12 @@ def api_sections_create():
     try:
         with conn.cursor() as cur:
             cur.execute("""INSERT INTO sections
-                           (school_year_start, type, name, subject, grade, term, teacher_id, room_id, updated_by, updated_at)
-                           VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,NOW()) RETURNING section_id""",
+                           (school_year_start, type, name, subject, grade, term, teacher_id, room_id, course_id, updated_by, updated_at)
+                           VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,NOW()) RETURNING section_id""",
                         (int(year), d.get("type") or "subject", name, d.get("subject") or None,
                          d.get("grade") or None, d.get("term") or "year",
                          d.get("teacher_id") or None, d.get("room_id") or None,
+                         d.get("course_id") or None,
                          session.get("user_email")))
             sid = cur.fetchone()[0]
             _sync_shadow_for_section(cur, sid)
@@ -8607,7 +8881,7 @@ def api_sections_create():
 def api_sections_update(section_id):
     d = request.get_json() or {}
     fields, vals = [], []
-    for col in ("name", "subject", "grade", "term", "type", "teacher_id", "room_id", "active"):
+    for col in ("name", "subject", "grade", "term", "type", "teacher_id", "room_id", "course_id", "active"):
         if col in d:
             fields.append(f"{col}=%s")
             vals.append(d[col] if d[col] != "" else None)
@@ -9245,7 +9519,46 @@ REPORT_SCALES = {
         {"code": "4", "label": "Always"}, {"code": "3", "label": "Usually"},
         {"code": "2", "label": "Sometimes"}, {"code": "1", "label": "Rarely"},
     ]},
+    "behavior_4_half": {"name": "Behavior 4–1 (half points)", "levels": [
+        {"code": "4", "label": "Always"}, {"code": "3.5"}, {"code": "3", "label": "Usually"}, {"code": "2.5"},
+        {"code": "2", "label": "Sometimes"}, {"code": "1.5"}, {"code": "1", "label": "Rarely"},
+    ]},
 }
+
+# ── Mid-Trimester Progress Reports ──
+# Same machinery as report cards (templates + report_entries), told apart by
+# report_templates.purpose = 'progress'. One entry per student per trimester holds
+# that trimester's mid-point estimate; the printout lines up T1/T2/T3 side by side
+# like the old Google Docs. Subject rows come from each student's real courses.
+PROGRESS_FOOTER_NOTE = ("Please Note: This mid-trimester report contains estimates of student averages. "
+                        "These estimates are subject to change as the trimester continues.")
+REPORT_PROGRESS_SEEDS = [
+    {
+        "key": "progress_lower", "name": "Lower School Progress Report",
+        "grades": ["1", "2", "3", "4"], "layout": "departmental",
+        "structure": {"footer_note": PROGRESS_FOOTER_NOTE, "sections": [
+            {"title": "Subjects", "kind": "subjects", "scale": "letter", "columns": ["Mid-Trimester Grade"],
+             "rows": ["Reading", "English Language Arts", "Math", "Science", "Social Studies"]},
+            {"title": "Behaviors that Support Learning", "kind": "behavior_matrix", "scale": "behavior_4_half",
+             "rows": ["Comes to class prepared", "Maintains focus during class", "Puts forth effort", "Participates in class discussions"]},
+        ]},
+    },
+    {
+        "key": "progress_upper", "name": "Upper School Progress Report",
+        "grades": ["5", "6", "7", "8"], "layout": "departmental",
+        "structure": {"footer_note": PROGRESS_FOOTER_NOTE, "sections": [
+            {"title": "Subjects", "kind": "subjects", "scale": "letter", "columns": ["Mid-Trimester Grade"],
+             "note": "Each student's rows come from their own courses (set on the Classes page).",
+             "rows": ["English Language Arts", "Math", "Social Studies", "World Language", "Science"]},
+        ]},
+    },
+]
+REPORT_PURPOSES = ("report_card", "progress")
+
+
+def _report_purpose(v):
+    v = (v or "report_card").strip().lower()
+    return v if v in REPORT_PURPOSES else "report_card"
 
 REPORT_TEMPLATE_SEEDS = [
     {
@@ -9420,6 +9733,11 @@ def _seed_report_cards(cur):
         )
     """)
     cur.execute("CREATE INDEX IF NOT EXISTS idx_report_entries_lookup ON report_entries(school_year_start, term)")
+    cur.execute("ALTER TABLE report_templates ADD COLUMN IF NOT EXISTS purpose TEXT NOT NULL DEFAULT 'report_card'")
+    for t in REPORT_PROGRESS_SEEDS:
+        cur.execute("""INSERT INTO report_templates (key, name, grades, layout, structure, purpose)
+                       VALUES (%s,%s,%s,%s,%s,'progress') ON CONFLICT (key) DO NOTHING""",
+                    (t["key"], t["name"], json.dumps(t["grades"]), t["layout"], json.dumps(t["structure"])))
     for key, sc in REPORT_SCALES.items():
         cur.execute("INSERT INTO report_grading_scales (key, name, levels) VALUES (%s,%s,%s) ON CONFLICT (key) DO NOTHING",
                     (key, sc["name"], json.dumps(sc["levels"])))
@@ -9456,7 +9774,7 @@ def api_report_templates_list():
     conn = get_db_connection()
     try:
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
-            cur.execute("SELECT template_id, key, name, grades, layout, active FROM report_templates ORDER BY name")
+            cur.execute("SELECT template_id, key, name, grades, layout, active, purpose FROM report_templates ORDER BY purpose, name")
             out = []
             for r in fa(cur):
                 r = dict(r)
@@ -9473,7 +9791,7 @@ def api_report_template_get(template_id):
     conn = get_db_connection()
     try:
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
-            cur.execute("SELECT template_id, key, name, grades, layout, structure, active FROM report_templates WHERE template_id=%s", (template_id,))
+            cur.execute("SELECT template_id, key, name, grades, layout, structure, active, purpose FROM report_templates WHERE template_id=%s", (template_id,))
             r = fo(cur)
             if not r:
                 return jsonify({"error": "not found"}), 404
@@ -9495,10 +9813,11 @@ def api_report_template_create():
     conn = get_db_connection()
     try:
         with conn.cursor() as cur:
-            cur.execute("""INSERT INTO report_templates (key, name, grades, layout, structure, updated_by, updated_at)
-                           VALUES (%s,%s,%s,%s,%s,%s,NOW()) RETURNING template_id""",
+            cur.execute("""INSERT INTO report_templates (key, name, grades, layout, structure, purpose, updated_by, updated_at)
+                           VALUES (%s,%s,%s,%s,%s,%s,%s,NOW()) RETURNING template_id""",
                         (key, name, json.dumps(d.get("grades") or []), d.get("layout") or "checklist",
-                         json.dumps(d.get("structure") or {"sections": []}), session.get("user_email")))
+                         json.dumps(d.get("structure") or {"sections": []}), _report_purpose(d.get("purpose")),
+                         session.get("user_email")))
             tid = cur.fetchone()[0]
             conn.commit()
             return jsonify({"success": True, "template_id": tid})
@@ -9565,8 +9884,9 @@ def _report_current_term(year=None):
 def _report_term_label(term):
     return {"t1": "Trimester 1", "t2": "Trimester 2", "t3": "Trimester 3"}.get(term, term)
 
-def _active_templates(cur):
-    cur.execute("SELECT template_id, name, layout, grades FROM report_templates WHERE active=TRUE ORDER BY name")
+def _active_templates(cur, purpose="report_card"):
+    cur.execute("SELECT template_id, name, layout, grades FROM report_templates WHERE active=TRUE AND purpose=%s ORDER BY name",
+                (_report_purpose(purpose),))
     out = []
     for r in fa(cur):
         out.append({"template_id": r["template_id"], "name": r["name"], "layout": r["layout"],
@@ -9634,40 +9954,144 @@ def _report_edit_scope(cur, email, student_id):
     year = current_school_year_start()
     # also treat "teacher of a homeroom/advisory section this student is in" as homeroom
     cur.execute("""
-        SELECT s.type, s.name, s.subject
+        SELECT s.type, s.name, s.subject, s.course_id
         FROM sections s
         JOIN section_enrollments se ON se.section_id = s.section_id
         WHERE se.student_id=%s AND s.teacher_id=%s AND s.active AND s.school_year_start=%s
     """, (student_id, sid, year))
     subs = set()
+    course_ids = set()
     for r in fa(cur):
         if (r.get("type") or "") in ("homeroom", "advisory"):
             return {"mode": "all", "subjects": []}
+        if r.get("course_id"):
+            # A class linked to a course: the teacher owns that course's row exactly.
+            course_ids.add(int(r["course_id"]))
+            continue
         k = _report_subject_key(r.get("subject")) or _report_subject_key(r.get("name"))
         if k:
             subs.add(k)
-    if subs:
-        return {"mode": "subject", "subjects": sorted(subs)}
+    if subs or course_ids:
+        return {"mode": "subject", "subjects": sorted(subs), "course_ids": sorted(course_ids)}
     return {"mode": "none", "subjects": []}
 
 
-def _report_allowed_keys(structure, scope):
-    """Mark keys a 'subject'-scope teacher may write. None = everything (mode 'all')."""
+def _report_allowed_keys(structure, scope, subject_rows=None):
+    """Mark keys a 'subject'-scope teacher may write. None = everything (mode 'all').
+    subject_rows (from _report_subject_rows) lets course rows be matched by course id;
+    without it the template's generic rows are used."""
     if scope.get("mode") == "all":
         return None
     keys = set()
     if scope.get("mode") != "subject":
         return keys
     allowed = set(scope.get("subjects") or [])
+    my_courses = set(int(x) for x in (scope.get("course_ids") or []))
     for si, sec in enumerate(structure.get("sections") or []):
         if (sec.get("kind") or "skills") != "subjects":
             continue
         cols = len(sec.get("columns") or [])
-        for ri, label in enumerate(sec.get("rows") or []):
-            if _report_subject_key(label) in allowed:
+        rows = (subject_rows or {}).get(str(si))
+        if rows is None:
+            rows = [{"key": str(ri), "label": label, "course_id": None} for ri, label in enumerate(sec.get("rows") or [])]
+        for row in rows:
+            cid = row.get("course_id")
+            ok = (cid in my_courses) if cid else (_report_subject_key(row.get("label")) in allowed)
+            if ok:
                 for ci in range(cols):
-                    keys.add("%d:%d:%d" % (si, ri, ci))
+                    keys.add("%d:%s:%d" % (si, row["key"], ci))
     return keys
+
+
+def _report_subject_rows(cur, student_id, template_id, structure, year):
+    """The Subjects rows for ONE student on one template: their real courses in place
+    of the template's generic subject rows.
+
+    Returns {"<si>": [{"key", "label", "course_id", "area", "generic"}]} for every
+    'subjects' section. Mark keys are "<si>:<key>:<ci>" — key "c<course_id>" for a
+    course row, the template row index for a generic row (so old keys still work).
+
+    Rules:
+      * A course fills the template row(s) of its subject area (Pre-Algebra takes the
+        Math row). Several courses in one area each get a row.
+      * A template row with no matching course stays as the generic subject.
+      * A course whose area has no template row is added at the end of the first
+        Subjects section (only if the course is marked "shows on report cards").
+      * Courses the student had marks for earlier this year stay listed even after
+        they drop the class, so a mid-year level change keeps its earlier grades.
+    """
+    area_label = dict(COURSE_SUBJECT_AREAS)
+    cur.execute("""
+        SELECT DISTINCT c.course_id, c.name, c.level, c.subject_area, c.sort_order
+        FROM section_enrollments se
+        JOIN sections s ON s.section_id = se.section_id
+        JOIN courses c ON c.course_id = s.course_id
+        WHERE se.student_id=%s AND s.school_year_start=%s AND s.active
+          AND s.type IN ('subject','elective') AND c.on_report_card
+    """, (student_id, year))
+    courses = {int(r["course_id"]): dict(r) for r in fa(cur)}
+    # courses that already have marks this year (any term) but the student has left
+    cur.execute("""SELECT data FROM report_entries
+                   WHERE student_id=%s AND template_id=%s AND school_year_start=%s""",
+                (student_id, template_id, year))
+    past_ids, snap = set(), {}
+    for r in fa(cur):
+        try:
+            d = json.loads(r["data"] or "{}")
+        except Exception:
+            continue
+        for k in (d.get("marks") or {}):
+            parts = k.split(":")
+            if len(parts) >= 2 and parts[1].startswith("c") and parts[1][1:].isdigit():
+                past_ids.add(int(parts[1][1:]))
+        for cid, nm in (d.get("course_names") or {}).items():
+            if str(cid).isdigit():
+                snap[int(cid)] = nm
+    missing = [cid for cid in past_ids if cid not in courses]
+    if missing:
+        cur.execute("SELECT course_id, name, level, subject_area, sort_order FROM courses WHERE course_id = ANY(%s)", (missing,))
+        for r in fa(cur):
+            courses[int(r["course_id"])] = dict(r, dropped=True)
+        for cid in missing:
+            if cid not in courses:
+                courses[cid] = {"course_id": cid, "name": snap.get(cid) or "Course", "level": None,
+                                "subject_area": "OTHER", "sort_order": 0, "dropped": True}
+
+    def course_row(c):
+        label = c["name"] + ((" (" + c["level"] + ")") if c.get("level") else "")
+        return {"key": "c%d" % int(c["course_id"]), "label": label, "course_id": int(c["course_id"]),
+                "area": c.get("subject_area"), "generic": False, "dropped": bool(c.get("dropped"))}
+
+    by_area = {}
+    for c in sorted(courses.values(), key=lambda c: (c.get("sort_order") or 0, c["name"].lower())):
+        by_area.setdefault(c.get("subject_area") or "OTHER", []).append(c)
+    out, used_areas, first_subj = {}, set(), None
+    for si, sec in enumerate(structure.get("sections") or []):
+        if (sec.get("kind") or "skills") != "subjects":
+            continue
+        if first_subj is None:
+            first_subj = si
+        rows = []
+        for ri, label in enumerate(sec.get("rows") or []):
+            area = _report_subject_key(label)
+            if area and area in by_area:
+                if area not in used_areas:
+                    rows.extend(course_row(c) for c in by_area[area])
+                    used_areas.add(area)
+                continue          # this generic row is replaced by the course row(s)
+            rows.append({"key": str(ri), "label": label, "course_id": None, "area": area, "generic": True})
+        out[str(si)] = rows
+    if first_subj is not None:
+        order = {k: i for i, k in enumerate(_COURSE_AREA_KEYS)}
+        for area in sorted(by_area, key=lambda a: order.get(a, 99)):
+            if area not in used_areas:
+                out[str(first_subj)].extend(course_row(c) for c in by_area[area])
+                used_areas.add(area)
+    for rows in out.values():
+        for r in rows:
+            if r.get("area"):
+                r["area_label"] = area_label.get(r["area"], "")
+    return out
 
 
 def _report_can_edit_student(cur, email, student_id):
@@ -9794,6 +10218,7 @@ def api_report_entry_roster():
     email = session.get("user_email")
     year = current_school_year_start()
     term = (request.args.get("term") or _report_current_term(year)).strip()
+    purpose = _report_purpose(request.args.get("purpose"))
     is_admin = bool(session.get("is_superadmin") or session.get("can_manage_people"))
     conn = get_db_connection()
     try:
@@ -9808,7 +10233,7 @@ def api_report_entry_roster():
                     return jsonify({"error": "That class was not found for this school year."}), 404
                 if not is_admin and not (staff and sec.get("teacher_id") == staff["staff_id"]):
                     return jsonify({"error": "You can only open rosters for your own classes."}), 403
-                templates = _active_templates(cur)
+                templates = _active_templates(cur, purpose)
                 cur.execute("""
                     SELECT st.student_id, st.first_name, st.last_name, st.grade
                     FROM section_enrollments se JOIN students st ON st.student_id = se.student_id
@@ -9819,8 +10244,9 @@ def api_report_entry_roster():
                 ids = [r["student_id"] for r in students]
                 emap = {}
                 if ids:
-                    cur.execute("""SELECT student_id, template_id, status FROM report_entries
-                                   WHERE school_year_start=%s AND term=%s AND student_id = ANY(%s)""", (year, term, ids))
+                    cur.execute("""SELECT e.student_id, e.template_id, e.status FROM report_entries e
+                                   JOIN report_templates t ON t.template_id = e.template_id AND t.purpose=%s
+                                   WHERE e.school_year_start=%s AND e.term=%s AND e.student_id = ANY(%s)""", (purpose, year, term, ids))
                     emap = {r["student_id"]: r for r in fa(cur)}
                 out = []
                 for stu in students:
@@ -9848,7 +10274,7 @@ def api_report_entry_roster():
                 teacher_id = staff["staff_id"] if staff else None
             if not teacher_id:
                 return jsonify({"error": "No homeroom is linked to your account. An admin can pick a homeroom to enter for."}), 404
-            templates = _active_templates(cur)
+            templates = _active_templates(cur, purpose)
             cur.execute("""
                 SELECT student_id, first_name, last_name, grade
                 FROM students WHERE homeroom_teacher_id=%s AND status='active'
@@ -9858,8 +10284,9 @@ def api_report_entry_roster():
             cur.execute("""
                 SELECT e.student_id, e.template_id, e.status
                 FROM report_entries e JOIN students s ON s.student_id=e.student_id
+                JOIN report_templates t ON t.template_id = e.template_id AND t.purpose=%s
                 WHERE s.homeroom_teacher_id=%s AND e.school_year_start=%s AND e.term=%s
-            """, (teacher_id, year, term))
+            """, (purpose, teacher_id, year, term))
             emap = {r["student_id"]: r for r in fa(cur)}
             out = []
             for stu in students:
@@ -9892,6 +10319,7 @@ def api_report_entry_student():
     year = current_school_year_start()
     student_id = request.args.get("student_id", type=int)
     term = (request.args.get("term") or _report_current_term(year)).strip()
+    purpose = _report_purpose(request.args.get("purpose"))
     if not student_id:
         return jsonify({"error": "student_id required"}), 400
     conn = get_db_connection()
@@ -9903,10 +10331,11 @@ def api_report_entry_student():
                 return jsonify({"error": "student not found"}), 404
             scope = _report_edit_scope(cur, email, student_id)
             can_edit = scope["mode"] != "none"
-            templates = _active_templates(cur)
+            templates = _active_templates(cur, purpose)
             tpl = _match_template(templates, stu.get("grade"))
             if not tpl:
-                return jsonify({"error": 'No report card template exists yet for grade "%s".' % (stu.get("grade") or "?")}), 404
+                what = "progress report" if purpose == "progress" else "report card"
+                return jsonify({"error": 'No %s template exists yet for grade "%s".' % (what, stu.get("grade") or "?")}), 404
             cur.execute("SELECT template_id, name, layout, structure FROM report_templates WHERE template_id=%s", (tpl["template_id"],))
             trow = fo(cur)
             structure = json.loads(trow["structure"] or '{"sections":[]}')
@@ -9916,10 +10345,23 @@ def api_report_entry_student():
                            WHERE student_id=%s AND template_id=%s AND school_year_start=%s AND term=%s""",
                         (student_id, trow["template_id"], year, term))
             ent = fo(cur)
+            # Progress reports show every trimester's estimate side by side, so send the
+            # other trimesters' marks along (read-only on the page).
+            history = {}
+            if purpose == "progress":
+                cur.execute("""SELECT term, data FROM report_entries
+                               WHERE student_id=%s AND template_id=%s AND school_year_start=%s""",
+                            (student_id, trow["template_id"], year))
+                for r in fa(cur):
+                    try:
+                        history[r["term"]] = (json.loads(r["data"] or "{}") or {}).get("marks") or {}
+                    except Exception:
+                        pass
             attendance_auto = _attendance_auto_for_template(cur, student_id, structure, term, year)
+            subject_rows = _report_subject_rows(cur, student_id, trow["template_id"], structure, year)
             # A specials teacher (Art/PE/…) is a subject teacher, but this template may have
             # no row of theirs — then there is nothing for them to edit, so: read-only.
-            allowed_keys = sorted(_report_allowed_keys(structure, scope) or [])
+            allowed_keys = sorted(_report_allowed_keys(structure, scope, subject_rows) or [])
             if scope["mode"] == "subject" and not allowed_keys:
                 scope = {"mode": "none", "subjects": []}
                 can_edit = False
@@ -9931,6 +10373,9 @@ def api_report_entry_student():
                 "scales": scales,
                 "entry": {"data": (json.loads(ent["data"] or "{}") if ent else {}), "status": (ent["status"] if ent else "none")},
                 "attendance_auto": attendance_auto,
+                "subject_rows": subject_rows,
+                "purpose": purpose,
+                "history": history,
                 "can_edit": can_edit,
                 "edit_scope": scope_out,
             })
@@ -9959,14 +10404,17 @@ def api_report_entry_save():
             scope = _report_edit_scope(cur, email, student_id)
             if scope["mode"] == "none":
                 return jsonify({"error": "You can only enter report cards for your own homeroom or class students."}), 403
+            cur.execute("SELECT structure FROM report_templates WHERE template_id=%s", (template_id,))
+            trow = fo(cur)
+            if not trow:
+                return jsonify({"error": "template not found"}), 404
+            structure = json.loads(trow.get("structure") or '{"sections":[]}')
+            subject_rows = _report_subject_rows(cur, student_id, template_id, structure, year)
             if scope["mode"] == "subject":
                 # A subject teacher may only touch their own subject's marks. Merge their
                 # changes into whatever the homeroom teacher has already saved, and never
                 # let them change the comment or the completion status.
-                cur.execute("SELECT structure FROM report_templates WHERE template_id=%s", (template_id,))
-                trow = fo(cur)
-                structure = json.loads((trow or {}).get("structure") or '{"sections":[]}')
-                allowed = _report_allowed_keys(structure, scope)
+                allowed = _report_allowed_keys(structure, scope, subject_rows)
                 if not allowed:
                     return jsonify({"error": "None of this card's subjects are yours to enter."}), 403
                 cur.execute("""SELECT data, status FROM report_entries
@@ -9987,6 +10435,15 @@ def api_report_entry_save():
                 status = (prev or {}).get("status") or "draft"
                 if status == "none":
                     status = "draft"
+            # Snapshot the course names next to the marks so this card still reads right
+            # if a course is renamed or the student changes classes later.
+            data = dict(data or {})
+            names = dict(data.get("course_names") or {})
+            for rows in subject_rows.values():
+                for r in rows:
+                    if r.get("course_id"):
+                        names[str(r["course_id"])] = r["label"]
+            data["course_names"] = names
             cur.execute("""
                 INSERT INTO report_entries (student_id, template_id, school_year_start, term, data, status, updated_by, updated_at)
                 VALUES (%s,%s,%s,%s,%s,%s,%s,NOW())
@@ -9998,6 +10455,131 @@ def api_report_entry_save():
     except Exception as e:
         conn.rollback()
         return jsonify({"error": str(e)}), 500
+    finally:
+        conn.close()
+
+
+# ── Printable report cards / progress reports ──
+@app.route("/report-cards/print")
+@login_required
+def report_cards_print_page():
+    return send_from_directory(".", "report_print.html")
+
+
+@app.route("/api/report/print")
+@login_required
+def api_report_print():
+    """Everything the print page needs for a batch of students: each student's matched
+    template, their course-based subject rows, the teachers of those courses, and the
+    saved marks for EVERY trimester (progress reports print T1/T2/T3 side by side).
+    Scope args match the roster: student_id, section_id, or teacher_id (homeroom)."""
+    email = session.get("user_email")
+    year = current_school_year_start()
+    purpose = _report_purpose(request.args.get("purpose"))
+    term = (request.args.get("term") or _report_current_term(year)).strip()
+    is_admin = bool(session.get("is_superadmin") or session.get("can_manage_people"))
+    conn = get_db_connection()
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            staff = _staff_row_for_email(cur, email)
+            my_id = staff["staff_id"] if staff else None
+            student_id = request.args.get("student_id", type=int)
+            section_id = request.args.get("section_id", type=int)
+            teacher_id = request.args.get("teacher_id", type=int)
+            if student_id:
+                if not is_admin and _report_edit_scope(cur, email, student_id)["mode"] == "none":
+                    return jsonify({"error": "You can only print for your own students."}), 403
+                ids = [student_id]
+            elif section_id:
+                cur.execute("SELECT teacher_id FROM sections WHERE section_id=%s", (section_id,))
+                sec = fo(cur)
+                if not sec:
+                    return jsonify({"error": "class not found"}), 404
+                if not is_admin and sec.get("teacher_id") != my_id:
+                    return jsonify({"error": "You can only print your own classes."}), 403
+                cur.execute("""SELECT se.student_id FROM section_enrollments se JOIN students st ON st.student_id=se.student_id
+                               WHERE se.section_id=%s AND st.status='active'""", (section_id,))
+                ids = [r["student_id"] for r in fa(cur)]
+            else:
+                if not teacher_id or not is_admin:
+                    teacher_id = my_id
+                if not teacher_id:
+                    return jsonify({"error": "No homeroom is linked to your account."}), 404
+                cur.execute("SELECT student_id FROM students WHERE homeroom_teacher_id=%s AND status='active'", (teacher_id,))
+                ids = [r["student_id"] for r in fa(cur)]
+            if not ids:
+                return jsonify({"purpose": purpose, "term": term, "students": [], "school_year": sy_long(year)})
+            cur.execute("""
+                SELECT s.student_id, s.first_name, s.last_name, s.grade,
+                       (h.first_name || ' ' || h.last_name) AS homeroom_teacher
+                FROM students s LEFT JOIN staff h ON h.staff_id = s.homeroom_teacher_id
+                WHERE s.student_id = ANY(%s) ORDER BY s.last_name, s.first_name
+            """, (ids,))
+            students = fa(cur)
+            templates = _active_templates(cur, purpose)
+            cur.execute("SELECT key, name, levels FROM report_grading_scales")
+            scales = {r["key"]: {"name": r["name"], "levels": json.loads(r["levels"] or "[]")} for r in fa(cur)}
+            tcache = {}
+            out = []
+            for stu in students:
+                tpl = _match_template(templates, stu.get("grade"))
+                if not tpl:
+                    continue
+                tid = tpl["template_id"]
+                if tid not in tcache:
+                    cur.execute("SELECT template_id, name, structure FROM report_templates WHERE template_id=%s", (tid,))
+                    tr = fo(cur)
+                    tcache[tid] = {"template_id": tid, "name": tr["name"],
+                                   "structure": json.loads(tr["structure"] or '{"sections":[]}')}
+                structure = tcache[tid]["structure"]
+                cur.execute("""SELECT term, data, status FROM report_entries
+                               WHERE student_id=%s AND template_id=%s AND school_year_start=%s""",
+                            (stu["student_id"], tid, year))
+                entries = {}
+                for r in fa(cur):
+                    try:
+                        entries[r["term"]] = {"data": json.loads(r["data"] or "{}") or {}, "status": r["status"]}
+                    except Exception:
+                        pass
+                # who teaches which course/subject for this student (for the header)
+                cur.execute("""
+                    SELECT s.course_id, s.name, (st.first_name || ' ' || st.last_name) AS teacher
+                    FROM section_enrollments se JOIN sections s ON s.section_id = se.section_id
+                    LEFT JOIN staff st ON st.staff_id = s.teacher_id
+                    WHERE se.student_id=%s AND s.school_year_start=%s AND s.active AND s.type IN ('subject','elective')
+                """, (stu["student_id"], year))
+                sec_rows = fa(cur)
+                rows = _report_subject_rows(cur, stu["student_id"], tid, structure, year)
+                teachers = {}
+                for si_rows in rows.values():
+                    for r in si_rows:
+                        t = None
+                        if r.get("course_id"):
+                            t = next((x["teacher"] for x in sec_rows if x.get("course_id") == r["course_id"]), None)
+                        else:
+                            k = _report_subject_key(r["label"])
+                            t = next((x["teacher"] for x in sec_rows if not x.get("course_id") and k and _report_subject_key(x["name"]) == k), None)
+                        if t:
+                            teachers.setdefault(t, []).append(r["label"])
+                out.append({
+                    "student_id": stu["student_id"],
+                    "name": f'{stu["first_name"]} {stu["last_name"]}',
+                    "grade": stu.get("grade") or "",
+                    "homeroom_teacher": stu.get("homeroom_teacher") or "",
+                    "template_id": tid,
+                    "subject_rows": rows,
+                    "subject_teachers": [{"teacher": t, "subjects": subs} for t, subs in teachers.items()],
+                    "entries": entries,
+                    "attendance_auto": _attendance_auto_for_template(cur, stu["student_id"], structure, term, year),
+                })
+            return jsonify({
+                "purpose": purpose, "term": term, "term_label": _report_term_label(term),
+                "school_year": sy_long(year),
+                "terms": [{"key": k, "label": l} for k, l, _s, _e in get_trimester_windows(year)],
+                "templates": {str(k): v for k, v in tcache.items()},
+                "scales": scales,
+                "students": out,
+            })
     finally:
         conn.close()
 
