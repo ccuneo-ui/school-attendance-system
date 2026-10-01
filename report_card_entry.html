@@ -278,6 +278,15 @@
              terms.map(t=>t.key===S.term?`<td>${sel(k, sec.scale, marks[k], lock(k))}</td>`:`<td class="past">${esc(pastVal(t,k))||'—'}</td>`).join('')+'</tr>';
         });
         h+='</tbody></table>';
+      }else if(kind==='skills' && prog && !sec.groups){
+        // Grades 1-3 progress report: one 1-4 mark per skill per trimester.
+        h+='<table class="grid"><thead><tr><th></th>'+terms.map(t=>`<th class="${t.key===S.term?'cur':''}">${esc(t.label)}</th>`).join('')+'</tr></thead><tbody>';
+        (sec.rows||[]).forEach((rw,ri)=>{
+          const k=si+':'+ri;
+          h+=`<tr><td class="subj">${esc(rw)}</td>`+
+             terms.map(t=>t.key===S.term?`<td>${sel(k, sec.scale, marks[k], lock(k))}</td>`:`<td class="past">${esc(pastVal(t,k))||'—'}</td>`).join('')+'</tr>';
+        });
+        h+='</tbody></table>';
       }else if(kind==='subjects'){
         h+='<table class="grid"><thead><tr><th>Subject</th>'+(sec.columns||[]).map(c=>`<th>${esc(c)}</th>`).join('')+'</tr></thead><tbody>';
         subjRows(P,si).forEach(row=>{

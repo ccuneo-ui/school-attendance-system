@@ -26,6 +26,14 @@
   table.t td.l,table.t th.l{text-align:left;}
   table.t{table-layout:fixed;}
   table.t th.l{width:44%;}
+  .sheet.compact table.t{margin-bottom:14px;font-size:12.5px;}
+  .sheet.compact table.t th,.sheet.compact table.t td{padding:4px 8px;}
+  .sheet.compact table.t td.v{font-size:13px;}
+  .sheet.compact h1{margin-bottom:12px;font-size:21px;}
+  .sheet.compact .hdr{margin-bottom:14px;line-height:1.55;}
+  .sheet.compact .logo{height:56px;}
+  table.t.key{width:60%;}
+
   table.t td.v{font-weight:600;font-size:15px;}
   .note{font-size:12.5px;font-style:italic;color:#333;margin-top:4px;}
   .foot{margin-top:auto;padding-top:18px;border-top:1px solid #d8dde6;text-align:center;font-size:11px;color:#555;}
@@ -71,8 +79,9 @@
       const T=D.templates[String(st.template_id)]; const S=T.structure; const secs=S.sections||[];
       const cur=(st.entries[D.term]||{}); const curMarks=(cur.data||{}).marks||{};
       const mk=(t,k)=>(((st.entries[t]||{}).data||{}).marks||{})[k]||'';
-      let blanks=0;
-      let h='<div class="sheet"><img class="logo" src="/logo.png" alt="Mizzentop Day School" onerror="this.style.display=\'none\'">';
+      let blanks=0; const keyScales=new Set();
+      const isSkills=secs.some(x=>(x.kind||'skills')==='skills');
+      let h='<div class="sheet'+(isSkills?' compact long':'')+'"><img class="logo" src="/logo.png" alt="Mizzentop Day School" onerror="this.style.display=\'none\'">';
       h+='<h1>'+esc(title)+'</h1><div class="hdr">';
       h+='<div><b>Student Name:</b> '+esc(st.name)+'</div>';
       h+='<div><b>Grade:</b> '+esc(GRADE_WORD[String(st.grade).toUpperCase()]||st.grade)+'</div>';
@@ -91,6 +100,15 @@
             h+='<tr><td class="l">'+esc(r.label)+'</td>'+D.terms.map(t=>'<td class="v">'+esc(mk(t.key,k))+'</td>').join('')+'</tr>';
           });
           h+='</tbody></table>';
+        }else if(kind==='skills' && !sec.groups){
+          h+='<table class="t"><thead><tr><th class="l">'+esc(sec.title||'Skills')+'</th>'+D.terms.map(t=>'<th>'+esc(t.label)+'</th>').join('')+'</tr></thead><tbody>';
+          (sec.rows||[]).forEach((rw,ri)=>{
+            const k=si+':'+ri;
+            if(!curMarks[k]) blanks++;
+            h+='<tr><td class="l">'+esc(rw)+'</td>'+D.terms.map(t=>'<td class="v">'+esc(mk(t.key,k))+'</td>').join('')+'</tr>';
+          });
+          h+='</tbody></table>';
+          if(sec.scale) keyScales.add(sec.scale);
         }else if(kind==='behavior_matrix' && !(sec.subjects||[]).length){
           h+='<table class="t"><thead><tr><th class="l">'+esc(sec.title||'Behaviors')+'</th>'+D.terms.map(t=>'<th>'+esc(t.label)+'</th>').join('')+'</tr></thead><tbody>';
           (sec.rows||[]).forEach((rw,ri)=>{
@@ -101,7 +119,11 @@
           h+='</tbody></table>';
         }
       });
-      h+='<div class="note">'+esc(S.footer_note||DEFAULT_NOTE)+'</div>';
+      // Grading key for skills-based reports (grades 1-3: 1-4 standards)
+      keyScales.forEach(sk=>{ const sc=D.scales[sk]; if(!sc) return;
+        h+='<table class="t key"><thead><tr><th colspan="2">Grading Key</th></tr></thead><tbody>'+
+          sc.levels.map(l=>'<tr><td class="v" style="width:60px">'+esc(l.code)+'</td><td class="l">'+esc(l.label||l.range||'')+'</td></tr>').join('')+'</tbody></table>'; });
+      if(S.footer_note||!isSkills) h+='<div class="note">'+esc(S.footer_note||DEFAULT_NOTE)+'</div>';
       h+='<div class="foot">'+esc(SCHOOL_LINE)+'</div></div>';
       if(blanks) missing.push(st.name+' ('+blanks+' blank)');
       sheets.push(h);

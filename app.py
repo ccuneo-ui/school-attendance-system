@@ -9542,10 +9542,44 @@ REPORT_SCALES = {
 # like the old Google Docs. Subject rows come from each student's real courses.
 PROGRESS_FOOTER_NOTE = ("Please Note: This mid-trimester report contains estimates of student averages. "
                         "These estimates are subject to change as the trimester continues.")
+# Grades 1-3 use a skills checklist on the 1-4 standards scale (Susan Parisi,
+# 2026-10-01); grade 4 uses letter grades + behaviors; grades 5-8 letter grades.
+_PRIMARY_PROGRESS_STRUCTURE = {"sections": [
+    {"title": "Academic Development", "kind": "skills", "scale": "standards_4", "rows": [
+        "Follows directions", "Works well independently", "Is neat and organized", "Listens attentively",
+        "Completes homework", "Displays effort", "Focuses on and completes the task at hand",
+        "Works well in groups", "Participates in class"]},
+    {"title": "Personal Development", "kind": "skills", "scale": "standards_4", "rows": [
+        "Follows the rules", "Exercises self-control", "Cooperates with others", "Has a positive attitude",
+        "Shows respect"]},
+    {"title": "Reading", "kind": "skills", "scale": "standards_4", "rows": [
+        "Applies reading strategies", "Comprehends material", "Reads with fluency & expression",
+        "Recalls sight words", "Self-corrects", "Displays an understanding of vocabulary in text",
+        "Reading on grade level"]},
+    {"title": "Spelling", "kind": "skills", "scale": "standards_4", "rows": [
+        "Consistently spells grade level words", "Applies spelling patterns",
+        "Uses a variety of strategies to spell words correctly"]},
+    {"title": "Science", "kind": "skills", "scale": "standards_4", "rows": ["Comprehends terminology and concepts"]},
+    {"title": "Social Studies", "kind": "skills", "scale": "standards_4", "rows": ["Comprehends terminology and concepts"]},
+    {"title": "Writing Skills", "kind": "skills", "scale": "standards_4", "rows": [
+        "Forms letters correctly", "Spaces words correctly", "Applies the rules of capitalization",
+        "Uses punctuation correctly", "Writes using complete sentences", "Arranges ideas in a logical order",
+        "Adds details", "Writes independently", "Follows the steps in the writing process",
+        "Writes neatly and takes care with presentation", "Completes writing assignment in a timely manner"]},
+    {"title": "Math", "kind": "skills", "scale": "standards_4", "rows": [
+        "Basic knowledge of math facts", "Uses a variety of problem-solving techniques",
+        "Completes class work independently", "Understands and applies concepts"]},
+]}
+
 REPORT_PROGRESS_SEEDS = [
     {
-        "key": "progress_lower", "name": "Lower School Progress Report",
-        "grades": ["1", "2", "3", "4"], "layout": "departmental",
+        "key": "progress_primary", "name": "Grades 1-3 Progress Report",
+        "grades": ["1", "2", "3"], "layout": "checklist",
+        "structure": _PRIMARY_PROGRESS_STRUCTURE,
+    },
+    {
+        "key": "progress_lower", "name": "Fourth Grade Progress Report",
+        "grades": ["4"], "layout": "departmental",
         "structure": {"footer_note": PROGRESS_FOOTER_NOTE, "sections": [
             {"title": "Subjects", "kind": "subjects", "scale": "letter", "columns": ["Mid-Trimester Grade"],
              "rows": ["Reading", "English Language Arts", "Math", "Science", "Social Studies"]},
@@ -9744,6 +9778,12 @@ def _seed_report_cards(cur):
     """)
     cur.execute("CREATE INDEX IF NOT EXISTS idx_report_entries_lookup ON report_entries(school_year_start, term)")
     cur.execute("ALTER TABLE report_templates ADD COLUMN IF NOT EXISTS purpose TEXT NOT NULL DEFAULT 'report_card'")
+    # 2026-10-01: the first seed of progress_lower covered grades 1-4, but grades 1-3
+    # have their own skills-based progress report. Narrow it to grade 4 — only if it
+    # still has the original seeded grades, so a later edit on the Templates page wins.
+    cur.execute("""UPDATE report_templates SET grades=%s, name='Fourth Grade Progress Report'
+                   WHERE key='progress_lower' AND grades=%s""",
+                (json.dumps(["4"]), json.dumps(["1", "2", "3", "4"])))
     for t in REPORT_PROGRESS_SEEDS:
         cur.execute("""INSERT INTO report_templates (key, name, grades, layout, structure, purpose)
                        VALUES (%s,%s,%s,%s,%s,'progress') ON CONFLICT (key) DO NOTHING""",
