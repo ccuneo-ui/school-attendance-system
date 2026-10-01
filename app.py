@@ -5219,31 +5219,41 @@ def _build_backup_json():
     conn = get_db_connection()
     try:
         backup = {}
-        tables = [
-            "students", "staff", "programs", "enrollments",
-            "attendance_records", "mcard_charges", "electives",
-            "daily_dismissal", "dismissal_today", "program_attendance",
-            "aftercare_attendance", "billing_rates",
-            "households", "parents", "household_members",
-            "student_households"
-        ]
+        import base64
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            # Dump EVERY table in the public schema so the backup is always the complete
+            # database. (This used to be a hardcoded list that silently fell out of date as
+            # new features added tables — e.g. sections, section_enrollments, scheduler_state,
+            # courses, report cards. Enumerating live means new tables are always included.)
+            cur.execute("SELECT tablename FROM pg_tables WHERE schemaname='public' ORDER BY tablename")
+            tables = [r["tablename"] for r in fa(cur)]
             for table in tables:
-                cur.execute(f"SELECT * FROM {table}")
-                rows = fa(cur)
-                for row in rows:
-                    for k, v in row.items():
-                        if hasattr(v, 'isoformat'):
-                            row[k] = v.isoformat()
-                        elif isinstance(v, Decimal):
-                            row[k] = float(v)
-                backup[table] = rows
+                try:
+                    cur.execute(f'SELECT * FROM "{table}"')
+                    rows = fa(cur)
+                    for row in rows:
+                        for k, v in row.items():
+                            if hasattr(v, 'isoformat'):
+                                row[k] = v.isoformat()
+                            elif isinstance(v, Decimal):
+                                row[k] = float(v)
+                            elif isinstance(v, (bytes, memoryview)):
+                                row[k] = base64.b64encode(bytes(v)).decode('ascii')
+                    backup[table] = rows
+                except Exception as e:
+                    conn.rollback()
+                    backup[table] = {"_backup_error": str(e)}
+        backup["_meta"] = {
+            "generated_at": datetime.now().isoformat(),
+            "table_count": len(tables),
+            "row_counts": {t: (len(backup[t]) if isinstance(backup[t], list) else backup[t]) for t in tables},
+        }
     finally:
         conn.close()
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     filename  = f"mizzentop_backup_{timestamp}.json"
-    return json.dumps(backup, indent=2), filename
+    return json.dumps(backup, indent=2, default=str), filename
 
 
 @app.route("/backup/download")
@@ -5291,7 +5301,7 @@ def send_backup_email():
             <p>Hello,</p>
             <p>Please find attached the weekly database backup for the Mizzentop Day School Admin Portal,
             generated on <strong>{today}</strong>.</p>
-            <p>This backup includes all student records, attendance, dismissal, billing, and program data.</p>
+            <p>This backup contains a complete copy of every table in the database.</p>
             <p>This is an automated message. To download a backup manually, visit:<br>
             <a href="https://admin.mizzentopdayschool.org/backup/download?key={BACKUP_PASSWORD}">
             admin.mizzentopdayschool.org/backup/download</a></p>
