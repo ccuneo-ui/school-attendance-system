@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Roster Gaps — Mizzentop Day School</title>
+<link rel="icon" type="image/svg+xml" href="/logo.svg">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+<style>
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+  :root{--navy:#1a2744;--green:#2d5016;--gold:#c8992a;--cream:#f7f3ec;--muted:#6b7280;--light:#e8e2d9;--danger:#9b1c1c;
+        --ok:#2d7a3e;--warn:#b45309;--warnbg:#fff8e6;--warnbd:#f0d98a;--okbg:#eef6ee;--errbg:#fbecec;}
+  html,body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--navy);min-height:100%;}
+  .topnav{background:var(--navy);display:flex;align-items:center;gap:16px;padding:0 28px;height:56px;}
+  .topnav .title{color:#fff;font-size:14px;font-weight:500;}
+  .topnav .right{margin-left:auto;display:flex;gap:10px;}
+  .topnav a{color:rgba(255,255,255,0.85);text-decoration:none;font-size:13px;font-weight:500;border:1px solid rgba(255,255,255,0.25);padding:7px 14px;border-radius:8px;}
+  .topnav a:hover{background:rgba(255,255,255,0.1);}
+  .page{max-width:1000px;margin:0 auto;padding:28px 24px 90px;}
+  h1{font-family:'Playfair Display',serif;font-size:30px;margin-bottom:2px;}
+  .sub{color:var(--muted);font-size:14px;margin-bottom:20px;line-height:1.55;max-width:780px;}
+  .scorecards{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:14px;margin-bottom:20px;}
+  .card{background:#fff;border:1px solid var(--light);border-radius:12px;padding:16px 18px;}
+  .card .num{font-family:'Playfair Display',serif;font-size:32px;line-height:1;}
+  .card .lbl{font-size:12px;color:var(--muted);margin-top:6px;font-weight:500;}
+  .card.ok .num{color:var(--ok);} .card.warn .num{color:var(--warn);}
+  .pills{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px;}
+  .pill-btn{border:1px solid var(--light);background:#fff;color:var(--navy);font:inherit;font-size:13px;font-weight:500;padding:6px 13px;border-radius:20px;cursor:pointer;}
+  .pill-btn.on{background:var(--navy);color:#fff;border-color:var(--navy);}
+  .grade-block{background:#fff;border:1px solid var(--light);border-radius:12px;margin-bottom:18px;overflow:hidden;}
+  .grade-h{font-family:'Playfair Display',serif;font-size:18px;padding:14px 18px;border-bottom:1px solid var(--light);display:flex;align-items:center;gap:10px;}
+  .grade-h .cnt{font-family:'DM Sans',sans-serif;font-size:12px;font-weight:600;padding:3px 10px;border-radius:12px;background:var(--warnbg);color:var(--warn);}
+  .stu{padding:14px 18px;border-bottom:1px solid #f1ede6;}
+  .stu:last-child{border-bottom:none;}
+  .stu-name{font-weight:600;font-size:15px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+  .stu-name a{color:inherit;text-decoration:none;} .stu-name a:hover{text-decoration:underline;}
+  .meta{font-size:12px;color:var(--muted);font-weight:400;}
+  .chip{font-size:11px;font-weight:600;padding:2px 8px;border-radius:10px;}
+  .chip.gold{background:#fbf1d6;color:#7a5a10;} .chip.blue{background:#e3ecfb;color:#1e4fa3;}
+  .gap{margin-top:10px;padding:10px 12px;border:1px solid var(--warnbd);background:var(--warnbg);border-radius:10px;}
+  .gap-line{font-size:14px;}
+  .gap-line b{font-weight:600;}
+  .gap-why{font-size:12px;color:var(--muted);margin-top:2px;}
+  .gap-note{font-size:12px;color:var(--warn);margin-top:6px;}
+  .acts{display:flex;gap:8px;flex-wrap:wrap;margin-top:9px;align-items:center;}
+  .btn{display:inline-flex;align-items:center;gap:6px;padding:7px 12px;border-radius:8px;font-size:13px;font-weight:500;font-family:inherit;cursor:pointer;border:1px solid transparent;text-decoration:none;}
+  .btn-primary{background:var(--navy);color:#fff;}
+  .btn-secondary{background:#fff;color:var(--navy);border-color:var(--light);}
+  .btn-ghost{background:transparent;color:var(--muted);border-color:transparent;text-decoration:underline;padding:7px 6px;}
+  .btn:disabled{opacity:.5;cursor:default;}
+  .exform{display:none;gap:8px;margin-top:8px;align-items:center;flex-wrap:wrap;}
+  .exform.open{display:flex;}
+  .exform input{flex:1;min-width:220px;font:inherit;font-size:13px;padding:7px 10px;border:1px solid var(--light);border-radius:8px;}
+  .empty{background:#fff;border:1px solid var(--light);border-radius:12px;padding:36px;text-align:center;color:var(--muted);font-size:15px;}
+  .empty b{display:block;color:var(--ok);font-family:'Playfair Display',serif;font-size:22px;margin-bottom:6px;}
+  details.exempted{background:#fff;border:1px solid var(--light);border-radius:12px;margin-top:26px;}
+  details.exempted summary{cursor:pointer;padding:14px 18px;font-weight:600;font-size:14px;}
+  .ex-row{display:flex;gap:10px;align-items:center;padding:9px 18px;border-top:1px solid #f1ede6;font-size:13px;flex-wrap:wrap;}
+  .ex-row .grow{flex:1;}
+  .how{font-size:12px;color:var(--muted);margin-top:26px;line-height:1.6;}
+  .toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);background:var(--navy);color:#fff;padding:10px 18px;border-radius:10px;font-size:13px;opacity:0;transition:opacity .2s;pointer-events:none;}
+  .toast.show{opacity:1;} .toast.err{background:var(--danger);}
+  .loading{padding:40px;text-align:center;color:var(--muted);}
+  @media (max-width:640px){ .page{padding:20px 16px 80px;} .topnav{padding:0 16px;} }
+</style>
+</head>
+<body>
+<div class="topnav">
+  <span class="title">Roster Gaps</span>
+  <div class="right"><a href="/classes">Classes</a><a href="/">← Home</a></div>
+</div>
+<div class="page">
+  <h1>Roster Gaps</h1>
+  <div class="sub">Students who look like they're missing a class their grade-mates are in. This usually happens when a student joins after rosters were built. Add them with one click, or mark a class "not needed" if they really aren't supposed to be in it.</div>
+  <div id="out"><div class="loading">Checking every roster…</div></div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+let DATA=null, GRADE='all';
+const esc=s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+function toast(msg,err){ const t=document.getElementById('toast'); t.textContent=msg; t.className='toast show'+(err?' err':''); clearTimeout(t._h); t._h=setTimeout(()=>t.className='toast',2600); }
+function gradeWord(g){ return g==='K'?'K':g; }
+function gradersWord(label){ return /^\d/.test(label)? label+' graders' : label+' students'; }
+
+async function load(){
+  try{
+    const r=await fetch('/api/roster-gaps'); const j=await r.json();
+    if(j.error){ document.getElementById('out').innerHTML='<div class="empty">Could not load: '+esc(j.error)+'</div>'; return; }
+    DATA=j; render();
+  }catch(e){ document.getElementById('out').innerHTML='<div class="empty">Could not load. Make sure you are signed in, then refresh.</div>'; }
+}
+
+function render(){
+  const studs=DATA.students||[];
+  const open=studs.filter(s=>s.open_count>0);
+  const nGaps=open.reduce((a,s)=>a+s.open_count,0);
+  const exempted=[]; studs.forEach(s=>s.gaps.forEach(g=>{ if(g.exempt) exempted.push({s,g}); }));
+  let h=`<div class="scorecards">
+    <div class="card ${open.length?'warn':'ok'}"><div class="num">${open.length}</div><div class="lbl">Students to check</div></div>
+    <div class="card ${nGaps?'warn':'ok'}"><div class="num">${nGaps}</div><div class="lbl">Missing class placements</div></div>
+    <div class="card"><div class="num">${exempted.length}</div><div class="lbl">Marked not needed</div></div>
+  </div>`;
+  if(!open.length){
+    h+=`<div class="empty"><b>Everyone looks fully rostered</b>No student is missing a class that most of their grade is in.</div>`;
+  } else {
+    const grades=[...new Set(open.map(s=>s.grade))];
+    if(GRADE!=='all' && !grades.includes(GRADE)) GRADE='all';
+    h+='<div class="pills"><button class="pill-btn '+(GRADE==='all'?'on':'')+'" onclick="setGrade(\'all\')">All grades</button>'+
+       grades.map(g=>{ const lab=open.find(s=>s.grade===g).grade_label; return `<button class="pill-btn ${GRADE===g?'on':''}" onclick="setGrade('${esc(g)}')">${esc(lab)}</button>`; }).join('')+'</div>';
+    grades.filter(g=>GRADE==='all'||g===GRADE).forEach(g=>{
+      const list=open.filter(s=>s.grade===g); const lab=list[0].grade_label;
+      h+=`<div class="grade-block"><div class="grade-h">${/^\d/.test(lab)?esc(lab)+' Grade':esc(lab)}<span class="cnt">${list.length} student${list.length==1?'':'s'}</span></div>`;
+      list.forEach(s=>{ h+=studentHtml(s); });
+      h+='</div>';
+    });
+  }
+  if(exempted.length){
+    h+=`<details class="exempted"><summary>Marked not needed (${exempted.length})</summary>`+
+      exempted.map(({s,g})=>`<div class="ex-row"><span class="grow"><b>${esc(s.first_name)} ${esc(s.last_name)}</b> <span class="meta">(${esc(s.grade_label)})</span> · ${esc(g.family_label)}${g.exemption&&g.exemption.note?` <span class="meta">· “${esc(g.exemption.note)}”</span>`:''}${g.exemption&&g.exemption.created_by?` <span class="meta">· ${esc(g.exemption.created_by.split('@')[0])}</span>`:''}</span>
+        ${DATA.can_edit?`<button class="btn btn-secondary" onclick="unexempt(${g.exemption.exemption_id},this)">Undo</button>`:''}</div>`).join('')+
+      '</details>';
+  }
+  h+=`<div class="how"><b>How this decides:</b> for each class, if at least ${Math.round((DATA.threshold||0.6)*100)}% of a grade's active students are on its roster, every student in that grade is expected to be in it. Gold / Blue / White groups of the same class count as one class, so a student only needs to be in one of them. Every student is expected to have a homeroom (and an advisory, where their grade has them). Electives and small support classes are never flagged. Combined classes (e.g. K and 1st together) are checked for each grade they serve.</div>`;
+  document.getElementById('out').innerHTML=h;
+}
+
+function studentHtml(s){
+  const color = s.cohort_color? `<span class="chip ${esc(s.cohort_color)}">${s.cohort_color==='gold'?'Gold':'Blue'}</span>`:'';
+  let h=`<div class="stu"><div class="stu-name"><a href="/schedule?student=${s.student_id}" title="Open weekly schedule">${esc(s.first_name)} ${esc(s.last_name)}</a> ${color}
+    <span class="meta">${s.class_count} subject class${s.class_count==1?'':'es'} on file</span></div>`;
+  s.gaps.filter(g=>!g.exempt).forEach((g,i)=>{
+    const fid=`ex-${s.student_id}-${i}`;
+    const isType=g.family_key.indexOf('type:')===0;
+    const what=isType? `Not in <b>${esc(g.family_label)}</b>` : `Not in <b>${esc(g.family_label)}</b>`;
+    const many=g.sections.length>1;
+    let btns='';
+    if(DATA.can_edit){
+      g.sections.forEach(o=>{
+        const primary = o.suggested || (!many);
+        btns+=`<button class="btn ${primary?'btn-primary':'btn-secondary'}" onclick="addTo(${o.section_id},${s.student_id},this)" title="${esc(o.grade_count)} ${esc(s.grade_label)} student(s) on this roster">＋ Add to ${esc(o.name)}${o.teacher_name?' <span style="opacity:.7">· '+esc(o.teacher_name)+'</span>':''}</button>`;
+      });
+      btns+=`<button class="btn btn-ghost" onclick="document.getElementById('${fid}').classList.toggle('open')">Not needed</button>`;
+    }
+    h+=`<div class="gap"><div class="gap-line">${what}</div>
+      <div class="gap-why">${g.covered} of ${g.grade_size} ${esc(gradersWord(s.grade_label))} are${many?' in one of '+g.sections.length+' groups':''}.</div>
+      ${g.needs_color?`<div class="gap-note">${esc(s.first_name)} has no Gold/Blue group yet. Pick the right group below, or set it on Classes › Gold &amp; Blue.</div>`:''}
+      ${btns?`<div class="acts">${btns}</div>`:''}
+      ${DATA.can_edit?`<div class="exform" id="${fid}"><input type="text" maxlength="300" placeholder="Optional reason (e.g. pulled out for OG tutoring)"><button class="btn btn-secondary" onclick="exempt(${s.student_id},'${esc(g.family_key)}',this)">Save as not needed</button></div>`:''}
+    </div>`;
+  });
+  return h+'</div>';
+}
+
+function setGrade(g){ GRADE=g; render(); }
+
+async function addTo(sectionId, studentId, btn){
+  btn.disabled=true;
+  try{
+    const r=await fetch(`/api/sections/${sectionId}/roster`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({student_ids:[studentId]})});
+    const j=await r.json().catch(()=>({}));
+    if(!r.ok||!j.success) throw new Error(j.error||'Could not add');
+    toast('Added to roster'); await load();
+  }catch(e){ btn.disabled=false; toast(e.message||'Could not add',true); }
+}
+async function exempt(studentId, fam, btn){
+  const note=btn.parentElement.querySelector('input').value;
+  btn.disabled=true;
+  try{
+    const r=await fetch('/api/roster-gaps/exempt',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({student_id:studentId,family_key:fam,note})});
+    const j=await r.json().catch(()=>({}));
+    if(!r.ok||!j.success) throw new Error(j.error||'Could not save');
+    toast('Marked not needed'); await load();
+  }catch(e){ btn.disabled=false; toast(e.message||'Could not save',true); }
+}
+async function unexempt(id, btn){
+  btn.disabled=true;
+  try{
+    const r=await fetch('/api/roster-gaps/exempt/'+id,{method:'DELETE'});
+    const j=await r.json().catch(()=>({}));
+    if(!r.ok||!j.success) throw new Error(j.error||'Could not undo');
+    toast('Back on the list'); await load();
+  }catch(e){ btn.disabled=false; toast(e.message||'Could not undo',true); }
+}
+load();
+</script>
+<script src="/nav.js" defer></script>
+</body>
+</html>

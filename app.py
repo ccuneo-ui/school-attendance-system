@@ -714,6 +714,21 @@ def init_db():
             """)
             cur.execute("CREATE INDEX IF NOT EXISTS idx_section_enroll_student ON section_enrollments(student_id)")
             cur.execute("CREATE INDEX IF NOT EXISTS idx_section_enroll_section ON section_enrollments(section_id)")
+            # Roster-gap "not needed" marks: a student who really isn't supposed to be in a
+            # class their grade-mates take (see _compute_roster_gaps). family_key is the
+            # section family ("class:1st grade music", "type:homeroom").
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS roster_gap_exemptions (
+                    exemption_id      SERIAL PRIMARY KEY,
+                    school_year_start INTEGER NOT NULL,
+                    student_id        INTEGER NOT NULL REFERENCES students(student_id) ON DELETE CASCADE,
+                    family_key        TEXT NOT NULL,
+                    note              TEXT,
+                    created_by        TEXT,
+                    created_at        TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    UNIQUE(school_year_start, student_id, family_key)
+                )
+            """)
             # ── In-session special services ──
             # A second, much simpler schedule for during-the-school-day support
             # (OG tutoring, push-in, pull-out). One row per staff+student+period+day
@@ -9417,6 +9432,309 @@ def api_cohorts_populate(grade):
                 report["placements"] += len(target)
             conn.commit()
             return jsonify({"success": True, **report})
+    except Exception as e:
+        conn.rollback()
+        return jsonify({"error": str(e)}), 500
+    finally:
+        conn.close()
+
+
+# ============================================
+# Roster gaps — students who look like they're missing a class
+# --------------------------------------------
+# Built 2026-10-02 after a teacher found K / 1st graders who joined after rosters were
+# made and were never added to their classes. Nothing here guesses from a schedule; it
+# compares each student to their own grade-mates:
+#   * Sections are grouped into a "family": the section name with a trailing split tag
+#     (Gold / Blue / White / Whole Grade) removed, so "1st Grade Math Gold" and
+#     "1st Grade Math Blue" are one family. Every homeroom is one family, every advisory
+#     is one family. Electives are ignored (they're chosen, not expected).
+#   * For each family and grade, if at least GAP_COVERAGE_THRESHOLD of that grade's
+#     active students are in some section of it, the grade "takes" that class, and any
+#     active student of the grade who is in none of its sections is a gap.
+#   * The grades a section serves come from the students actually on it plus its own
+#     grade field, so combined classes (e.g. K + 1st together) work too.
+#   * A gap can be marked "not needed" (roster_gap_exemptions) for a student who really
+#     isn't supposed to be in that class, so the alert stays quiet for them.
+# Read by the Roster Gaps page (admins), a banner on the portal home + Classes page, and
+# an alert card on My Classroom for the teachers whose class / homeroom is involved.
+# ============================================
+GAP_COVERAGE_THRESHOLD = 0.6
+_GAP_SPLIT_RE = re.compile(r"[\s\-–—:(]*\b(whole grade|whole|gold|blue|white)\)?\s*$", re.I)
+GAP_GRADE_ORDER = ["JPK", "SPK", "PK", "K", "1", "2", "3", "4", "5", "6", "7", "8"]
+
+
+def _gap_grade(g):
+    s = re.sub(r"\s+", " ", str(g or "").strip().upper())
+    if s in ("KINDERGARTEN", "KG", "KINDER"):
+        return "K"
+    m = re.match(r"^(?:GRADE\s*)?(\d+)(?:ST|ND|RD|TH)?(?:\s*GRADE)?$", s)
+    return m.group(1) if m else s
+
+
+def _gap_grade_label(g):
+    if g in ("JPK", "SPK", "PK", "K"):
+        return g
+    if g.isdigit():
+        n = int(g)
+        suf = "th" if 10 <= n % 100 <= 20 else {1: "st", 2: "nd", 3: "rd"}.get(n % 10, "th")
+        return f"{n}{suf}"
+    return g or "?"
+
+
+def _gap_family(sec):
+    """(family_key, display_label) for a section, or None if it isn't checked."""
+    stype = sec.get("type")
+    if stype == "homeroom":
+        return "type:homeroom", "a homeroom"
+    if stype == "advisory":
+        return "type:advisory", "an advisory"
+    if stype != "subject":
+        return None
+    name = re.sub(r"\s+", " ", (sec.get("name") or "").strip())
+    base = _GAP_SPLIT_RE.sub("", name).strip() or name
+    return "class:" + base.lower(), base
+
+
+def _compute_roster_gaps(students, sections, enrollments, exemptions, threshold=GAP_COVERAGE_THRESHOLD):
+    """Pure function (no DB) so it can be tested on its own.
+       students:    dicts with student_id, first_name, last_name, grade, cohort_color
+       sections:    dicts with section_id, type, name, grade, teacher_id, teacher_name
+       enrollments: (section_id, student_id) pairs
+       exemptions:  dicts with exemption_id, student_id, family_key, note, created_by, created_at
+    """
+    stu = {}
+    by_grade = {}
+    for s in students:
+        g = _gap_grade(s.get("grade"))
+        stu[s["student_id"]] = dict(s, _g=g)
+        by_grade.setdefault(g, []).append(s["student_id"])
+
+    sec_by_id, fam_of, fam_label = {}, {}, {}
+    for sec in sections:
+        fam = _gap_family(sec)
+        if not fam:
+            continue
+        sec_by_id[sec["section_id"]] = sec
+        fam_of[sec["section_id"]] = fam[0]
+        fam_label.setdefault(fam[0], fam[1])
+
+    roster = {sid: set() for sid in sec_by_id}
+    for sec_id, st_id in enrollments:
+        if sec_id in roster and st_id in stu:
+            roster[sec_id].add(st_id)
+
+    fam_grade_secs = {}
+    for sec_id, sec in sec_by_id.items():
+        grades = {stu[x]["_g"] for x in roster[sec_id]}
+        if sec.get("grade"):
+            grades.add(_gap_grade(sec["grade"]))
+        for g in grades:
+            fam_grade_secs.setdefault((fam_of[sec_id], g), set()).add(sec_id)
+
+    exempt = {(e["student_id"], e["family_key"]): e for e in (exemptions or [])}
+    per_student = {}
+    for (fam, g), secids in fam_grade_secs.items():
+        kids = by_grade.get(g) or []
+        if len(kids) < 2:
+            continue
+        covered = {x for sid in secids for x in roster[sid] if stu[x]["_g"] == g}
+        if len(covered) < 2 or len(covered) / len(kids) < threshold:
+            continue
+        for kid in kids:
+            if kid in covered:
+                continue
+            s = stu[kid]
+            color = (s.get("cohort_color") or "").lower()
+            opts = []
+            for sid in secids:
+                sec = sec_by_id[sid]
+                opts.append({
+                    "section_id": sid, "name": sec.get("name"),
+                    "teacher_id": sec.get("teacher_id"), "teacher_name": sec.get("teacher_name") or "",
+                    "grade_count": sum(1 for x in roster[sid] if stu[x]["_g"] == g),
+                    "split": _classify_section_split(sec.get("name")),
+                })
+            opts.sort(key=lambda o: (-(o["grade_count"]), (o["name"] or "").lower()))
+            colored = [o for o in opts if o["split"] in ("gold", "blue")]
+            for o in opts:
+                o["suggested"] = (len(opts) == 1) or (bool(color) and o["split"] == color)
+            ex = exempt.get((kid, fam))
+            gap = {
+                "family_key": fam, "family_label": fam_label.get(fam, fam),
+                "grade": g, "covered": len(covered), "grade_size": len(kids),
+                "sections": opts,
+                "needs_color": bool(colored) and color not in ("gold", "blue"),
+                "exempt": bool(ex),
+                "exemption": ({"exemption_id": ex.get("exemption_id"), "note": ex.get("note") or "",
+                               "created_by": ex.get("created_by") or "",
+                               "created_at": str(ex.get("created_at") or "")} if ex else None),
+            }
+            ps = per_student.setdefault(kid, {
+                "student_id": kid, "first_name": s.get("first_name"), "last_name": s.get("last_name"),
+                "grade": g, "grade_label": _gap_grade_label(g), "cohort_color": color or None,
+                "class_count": sum(1 for sid in sec_by_id if kid in roster[sid] and sec_by_id[sid].get("type") == "subject"),
+                "gaps": [],
+            })
+            ps["gaps"].append(gap)
+
+    out = []
+    for ps in per_student.values():
+        ps["gaps"].sort(key=lambda x: (0 if x["family_key"].startswith("type:") else 1, x["family_label"].lower()))
+        ps["open_count"] = sum(1 for x in ps["gaps"] if not x["exempt"])
+        out.append(ps)
+    gi = lambda g: GAP_GRADE_ORDER.index(g) if g in GAP_GRADE_ORDER else 99
+    out.sort(key=lambda p: (gi(p["grade"]), (p["last_name"] or "").lower(), (p["first_name"] or "").lower()))
+    return out
+
+
+def _load_roster_gaps(cur, year=None):
+    year = year or current_school_year_start()
+    cur.execute("""SELECT student_id, first_name, last_name, grade, cohort_color
+                   FROM students WHERE status='active'""")
+    students = fa(cur)
+    cur.execute("""SELECT s.section_id, s.type, s.name, s.grade, s.teacher_id,
+                          (st.first_name || ' ' || st.last_name) AS teacher_name
+                   FROM sections s LEFT JOIN staff st ON st.staff_id = s.teacher_id
+                   WHERE s.school_year_start=%s AND s.active=TRUE""", (year,))
+    sections = fa(cur)
+    cur.execute("""SELECT se.section_id, se.student_id FROM section_enrollments se
+                   JOIN sections s ON s.section_id = se.section_id
+                   WHERE s.school_year_start=%s AND s.active=TRUE""", (year,))
+    enrollments = [(r["section_id"], r["student_id"]) for r in fa(cur)]
+    cur.execute("""SELECT exemption_id, student_id, family_key, note, created_by, created_at
+                   FROM roster_gap_exemptions WHERE school_year_start=%s""", (year,))
+    exemptions = fa(cur)
+    return _compute_roster_gaps(students, sections, enrollments, exemptions), year
+
+
+@app.route("/roster-gaps")
+@require_perm("classes")
+def roster_gaps_page():
+    return send_from_directory(".", "roster_gaps.html")
+
+
+@app.route("/api/roster-gaps")
+@require_perm("classes")
+def api_roster_gaps():
+    conn = get_db_connection()
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            students, year = _load_roster_gaps(cur)
+        return jsonify({"school_year_start": year, "threshold": GAP_COVERAGE_THRESHOLD,
+                        "students": students,
+                        "open_students": sum(1 for s in students if s["open_count"]),
+                        "can_edit": bool(session.get("is_superadmin") or session.get("can_manage_people"))})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    finally:
+        conn.close()
+
+
+@app.route("/api/roster-gaps/summary")
+@login_required
+def api_roster_gaps_summary():
+    # Banner count for the portal home / Classes page. Only staff who can fix rosters get a number.
+    if not has_perm("classes"):
+        return jsonify({"open_students": None})
+    conn = get_db_connection()
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            students, _ = _load_roster_gaps(cur)
+        open_s = [s for s in students if s["open_count"]]
+        return jsonify({"open_students": len(open_s),
+                        "open_gaps": sum(s["open_count"] for s in open_s)})
+    except Exception:
+        return jsonify({"open_students": None})
+    finally:
+        conn.close()
+
+
+@app.route("/api/roster-gaps/mine")
+@login_required
+def api_roster_gaps_mine():
+    """Gaps that touch the signed-in teacher: a student who looks missing from a class
+       they teach (or from that class's sister Gold/Blue section), or a student in their
+       homeroom who looks missing from any class. Exempted gaps are left out."""
+    conn = get_db_connection()
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            me = _staff_row_for_email(cur, session.get("user_email"))
+            if not me:
+                return jsonify({"items": []})
+            my_id = me["staff_id"]
+            students, year = _load_roster_gaps(cur)
+            cur.execute("""SELECT se.student_id FROM section_enrollments se
+                           JOIN sections s ON s.section_id = se.section_id
+                           WHERE s.school_year_start=%s AND s.active=TRUE AND s.type='homeroom'
+                             AND s.teacher_id=%s""", (year, my_id))
+            my_hr = {r["student_id"] for r in fa(cur)}
+            cur.execute("SELECT student_id FROM students WHERE status='active' AND homeroom_teacher_id=%s", (my_id,))
+            my_hr |= {r["student_id"] for r in fa(cur)}
+        items = []
+        for s in students:
+            for gp in s["gaps"]:
+                if gp["exempt"]:
+                    continue
+                mine_class = any(o["teacher_id"] == my_id for o in gp["sections"])
+                mine_hr = s["student_id"] in my_hr
+                if not (mine_class or mine_hr):
+                    continue
+                items.append({
+                    "student_id": s["student_id"],
+                    "name": f'{s["first_name"] or ""} {s["last_name"] or ""}'.strip(),
+                    "grade_label": s["grade_label"], "family_label": gp["family_label"],
+                    "covered": gp["covered"], "grade_size": gp["grade_size"],
+                    "reason": "your_class" if mine_class else "your_homeroom",
+                    "sections": [o["name"] for o in gp["sections"]],
+                })
+        return jsonify({"items": items, "can_fix": has_perm("classes")})
+    except Exception as e:
+        return jsonify({"items": [], "error": str(e)})
+    finally:
+        conn.close()
+
+
+@app.route("/api/roster-gaps/exempt", methods=["POST"])
+@people_required
+def api_roster_gaps_exempt():
+    d = request.get_json() or {}
+    try:
+        student_id = int(d.get("student_id"))
+    except (TypeError, ValueError):
+        return jsonify({"error": "student_id required"}), 400
+    fam = (d.get("family_key") or "").strip()
+    if not fam:
+        return jsonify({"error": "family_key required"}), 400
+    year = current_school_year_start()
+    conn = get_db_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""INSERT INTO roster_gap_exemptions
+                             (school_year_start, student_id, family_key, note, created_by)
+                           VALUES (%s,%s,%s,%s,%s)
+                           ON CONFLICT (school_year_start, student_id, family_key)
+                           DO UPDATE SET note=EXCLUDED.note, created_by=EXCLUDED.created_by, created_at=NOW()""",
+                        (year, student_id, fam, (d.get("note") or "").strip()[:300] or None,
+                         session.get("user_email")))
+            conn.commit()
+        return jsonify({"success": True})
+    except Exception as e:
+        conn.rollback()
+        return jsonify({"error": str(e)}), 500
+    finally:
+        conn.close()
+
+
+@app.route("/api/roster-gaps/exempt/<int:exemption_id>", methods=["DELETE"])
+@people_required
+def api_roster_gaps_unexempt(exemption_id):
+    conn = get_db_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM roster_gap_exemptions WHERE exemption_id=%s", (exemption_id,))
+            conn.commit()
+        return jsonify({"success": True})
     except Exception as e:
         conn.rollback()
         return jsonify({"error": str(e)}), 500

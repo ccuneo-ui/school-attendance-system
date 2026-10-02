@@ -126,6 +126,7 @@
 </div>
 
 <div class="container">
+  <div id="gapAlert"></div>
   <div id="root"><div class="loading">Loading your classroom…</div></div>
 </div>
 
@@ -410,6 +411,27 @@ function fmtDate(iso){ try { const d = new Date(iso+'T00:00:00'); return d.toLoc
 function fmtStamp(ts){ if(!ts) return ''; const d = new Date(ts); return isNaN(d) ? '' : d.toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'}); }
 
 load();
+</script>
+<script>
+/* Roster-gap alert: students who look like they belong on one of this teacher's rosters
+   (or are in their homeroom and are missing a class their grade-mates take). */
+fetch('/api/roster-gaps/mine').then(function(r){return r.json();}).then(function(j){
+  var items=(j&&j.items)||[]; if(!items.length) return;
+  var el=document.getElementById('gapAlert'); if(!el) return;
+  function e(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+  function graders(l){return /^\d/.test(l)?l+' graders':l+' students';}
+  var li=items.map(function(it){
+    var who='<b>'+e(it.name)+'</b> ('+e(it.grade_label)+')'+(it.reason==='your_homeroom'?', from your homeroom,':'');
+    return '<li>'+who+' is not in <b>'+e(it.family_label)+'</b>. '+it.covered+' of '+it.grade_size+' '+e(graders(it.grade_label))+' are.</li>';
+  }).join('');
+  el.innerHTML='<div style="background:#fbf3e0;border:1px solid #f0d98a;border-radius:12px;padding:14px 18px;margin-bottom:20px;color:#5c4100;">'+
+    '<div style="font-weight:600;font-size:15px;margin-bottom:4px;">&#9888; Possible roster gap'+(items.length==1?'':'s')+'</div>'+
+    '<div style="font-size:13px;margin-bottom:8px;">'+(items.length==1?'This student looks like they belong':'These students look like they belong')+
+    ' on a roster but aren\'t on it yet, usually because they joined after rosters were set up. The office sees this list too.</div>'+
+    '<ul style="font-size:13px;line-height:1.6;padding-left:18px;">'+li+'</ul>'+
+    (j.can_fix?'<a href="/roster-gaps" style="display:inline-block;margin-top:8px;font-size:13px;font-weight:600;color:#1a2744;">Fix on the Roster Gaps page &rarr;</a>':'')+
+  '</div>';
+}).catch(function(){});
 </script>
 <script src="/nav.js" defer></script>
 </body>

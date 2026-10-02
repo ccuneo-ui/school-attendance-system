@@ -60,6 +60,7 @@
     Add or gate a page in PERMISSION_SILOS in app.py and it appears in BOTH.
     The shells below (badge / icon / title / description) are the only static part.
   -->
+  <div id="gapBanner" style="display:none;margin:0 0 18px;padding:12px 16px;border-radius:10px;background:#fff8e6;border:1px solid #f0d98a;color:#7a4a05;font-size:14px;line-height:1.5;width:100%;max-width:1080px;margin:-28px 0 28px;"></div>
   <div class="cards">
     <!-- DAILY INPUT -->
     <div class="card card-admin" data-silo="daily_input" style="display:none;">
@@ -167,6 +168,18 @@ fetch('/api/nav').then(function(r){ return r.json(); }).then(function(nav){
     }).join('');
     card.style.display = '';
   });
+}).catch(function(){});
+</script>
+<script>
+/* Roster-gap banner: shows only for staff who can fix rosters, and only when a student
+   looks like they're missing a class most of their grade is in. See /roster-gaps. */
+fetch('/api/roster-gaps/summary').then(function(r){return r.json();}).then(function(j){
+  var n=j&&j.open_students; if(!n) return;
+  var el=document.getElementById('gapBanner'); if(!el) return;
+  el.innerHTML='<b>&#9888; '+n+' student'+(n==1?'':'s')+' may not be fully rostered.</b> '+
+    (n==1?'They are':'They are')+' missing '+(j.open_gaps==1?'a class':j.open_gaps+' class placements')+
+    ' that most of their grade is in. <a href="/roster-gaps" style="color:#1a2744;font-weight:600;">Review roster gaps &rarr;</a>';
+  el.style.display='block';
 }).catch(function(){});
 </script>
 <script src="/nav.js" defer></script>
